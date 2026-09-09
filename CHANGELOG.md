@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.13.0](https://github.com/openai/openai-node/compare/v7.12.1...v7.13.0) (2026-09-09)
+
+
+### Features
+
+* **api:** Add API key expiration controls ([#2708](https://github.com/openai/openai-node/issues/2708)) ([b416806](https://github.com/openai/openai-node/commit/b4168065d3839b3008d557fdbb8972da2e247f24))
+
 ## [7.12.1](https://github.com/openai/openai-node/compare/v7.12.0...v7.12.1) (2026-09-09)
 
 Includes the GPT Image 2.5 support from 7.12.0, which was not published to npm.
