@@ -1012,7 +1012,17 @@ export class OpenAI {
 
   #observeAPIKeyWrites(): void {
     if (typeof this._options.apiKey !== 'function' || !this.hasCustomRequestCredentialHooks()) return;
-    const descriptor = Object.getOwnPropertyDescriptor(this, 'apiKey');
+    let descriptor = Object.getOwnPropertyDescriptor(this, 'apiKey');
+    if (!descriptor) {
+      let prototype = Object.getPrototypeOf(this);
+      while (prototype) {
+        descriptor = Object.getOwnPropertyDescriptor(prototype, 'apiKey');
+        if (descriptor) break;
+        prototype = Object.getPrototypeOf(prototype);
+      }
+      // Shadow inherited accessors on this client without changing the shared prototype.
+      if (!descriptor || 'value' in descriptor || !Object.isExtensible(this)) return;
+    }
     if (
       !descriptor?.configurable ||
       (this.#apiKeyWriteObserver && descriptor.set === this.#apiKeyWriteObserver)
@@ -1049,6 +1059,18 @@ export class OpenAI {
   }
 
   protected async [Opts.prepareAPIKey](options: FinalRequestOptions): Promise<void> {
+    if (!this.#synchronousCredentialAttempt) {
+      let requestSeen = false;
+      for (const candidate of this.#apiKeyPreparationAttempts.get(options) ?? []) {
+        if (candidate.kind !== 'request') continue;
+        if (requestSeen) {
+          throw new Errors.OpenAIError(
+            'Cannot safely resolve credentials for overlapping requests that share the same options object after a preparation hook awaits before delegating. Pass a distinct options object to each request.',
+          );
+        }
+        requestSeen = true;
+      }
+    }
     const attempt = this.#synchronousCredentialAttempt ?? this.currentAPIKeyPreparationAttempt(options);
     const remember = (prepared: PreparedAPIKey) => {
       if (attempt) {

@@ -66,8 +66,9 @@ are also honored.
 For direct builds, authentication hooks can explicitly assign `null` to suppress
 a function credential. With custom credential hooks, the SDK observes writes to
 configurable `apiKey` properties using an accessor; existing getters and setters
-continue to run. Subclasses that make `apiKey` non-configurable should return
-custom authentication headers instead. Ordinary clients keep their existing
+continue to run. On extensible clients, inherited accessors are observed on the
+client instance without changing the shared prototype. Subclasses that make `apiKey` non-configurable
+should return custom authentication headers instead. Ordinary clients keep their existing
 property descriptors.
 
 `_callApiKey` overrides can forward the existing optional `capture` callback to
@@ -82,6 +83,11 @@ When concurrent requests use custom `authHeaders` or `bearerAuth` hooks, pass a
 distinct request-options object to each invocation. If two such hooks overlap on
 the same options object before authentication finishes, the SDK rejects the later
 request rather than risk associating one request's credential with the other.
+Use distinct options objects also when a custom `prepareOptions` awaits before
+delegating to `super.prepareOptions`. If several requests with the same options
+remain active when that delegation resumes, the SDK rejects the ambiguous
+preparation before invoking the credential provider. Synchronous delegation
+continues to retain its request's credential context.
 
 `AzureOpenAI` uses the inherited function-credential lifecycle for
 `azureADTokenProvider`, but a static `apiKey` uses Azure's `api-key` header. For
