@@ -1,3 +1,4 @@
+import { compiledFixture, compiledFixtureConfig } from '../utils/compiled-fixtures';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -32,11 +33,9 @@ async function runExample(baseURL: string) {
   const child = spawn(
     process.execPath,
     [
-      path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '--swc',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
-      path.join(root, 'examples/responses/structured-outputs-tools.ts'),
+      compiledFixture('examples/responses/structured-outputs-tools.ts'),
     ],
     {
       cwd: root,
@@ -44,7 +43,7 @@ async function runExample(baseURL: string) {
         OPENAI_API_KEY: 'synthetic-query-example-key',
         OPENAI_BASE_URL: baseURL,
         OPENAI_LOG: 'off',
-        TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+        TS_NODE_PROJECT: compiledFixtureConfig(),
         TS_NODE_TRANSPILE_ONLY: 'true',
         DISABLE_V8_COMPILE_CACHE: '1',
         NODE_COMPILE_CACHE: process.env['NODE_COMPILE_CACHE'],

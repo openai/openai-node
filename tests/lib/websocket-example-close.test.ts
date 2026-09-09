@@ -1,3 +1,4 @@
+import { compiledFixture, compiledFixtureConfig } from '../utils/compiled-fixtures';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -137,18 +138,16 @@ async function runExample(
       // Observe crashes without handling them or changing Node's default failure behavior.
       '--require',
       observerPath,
-      path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '--swc',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
-      path.join(root, 'examples/responses/websocket.ts'),
+      compiledFixture('examples/responses/websocket.ts'),
     ],
     {
       cwd: root,
       env: {
         OPENAI_API_KEY: 'synthetic-example-key',
         OPENAI_BASE_URL: `http://127.0.0.1:${address.port}/v1`,
-        TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+        TS_NODE_PROJECT: compiledFixtureConfig(),
         DISABLE_V8_COMPILE_CACHE: '1',
         NODE_COMPILE_CACHE: process.env['NODE_COMPILE_CACHE'],
         SystemRoot: process.env['SystemRoot'],

@@ -1,3 +1,4 @@
+import { compiledFixture, compiledFixtureConfig } from '../utils/compiled-fixtures';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -22,13 +23,7 @@ const examples = [
 async function runExample(file: string, baseURL: string, bedrock: boolean) {
   const child = spawn(
     process.execPath,
-    [
-      path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '--swc',
-      '-r',
-      path.join(root, 'node_modules/tsconfig-paths/register.js'),
-      path.join(root, 'examples', file),
-    ],
+    ['-r', path.join(root, 'node_modules/tsconfig-paths/register.js'), compiledFixture('examples', file)],
     {
       cwd: root,
       // Never inherit real credentials, profiles, proxy settings, or Node preload hooks.
@@ -40,7 +35,7 @@ async function runExample(file: string, baseURL: string, bedrock: boolean) {
         AWS_CONFIG_FILE: devNull,
         AWS_EC2_METADATA_DISABLED: 'true',
         OPENAI_LOG: 'off',
-        TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+        TS_NODE_PROJECT: compiledFixtureConfig(),
         DISABLE_V8_COMPILE_CACHE: '1',
         NODE_COMPILE_CACHE: process.env['NODE_COMPILE_CACHE'],
         NO_PROXY: '127.0.0.1',

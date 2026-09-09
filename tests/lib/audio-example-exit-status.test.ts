@@ -1,3 +1,4 @@
+import { compiledFixture, compiledFixtureConfig } from '../utils/compiled-fixtures';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { existsSync } from 'node:fs';
@@ -36,11 +37,9 @@ async function runExample(directory: string, example: string, baseURL: string, t
   const child = spawn(
     process.execPath,
     [
-      path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '--swc',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
-      path.join(root, 'examples/audio', `${example}.ts`),
+      compiledFixture('examples/audio', `${example}.ts`),
     ],
     {
       cwd: directory,
@@ -53,7 +52,7 @@ async function runExample(directory: string, example: string, baseURL: string, t
         no_proxy: '127.0.0.1',
         DISABLE_V8_COMPILE_CACHE: '1',
         NODE_COMPILE_CACHE: process.env['NODE_COMPILE_CACHE'],
-        TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+        TS_NODE_PROJECT: compiledFixtureConfig(),
         TS_NODE_TRANSPILE_ONLY: 'true',
         AUDIO_TRACE: path.join(directory, 'tool.json'),
         AUDIO_BYTES: audio.toString('hex'),

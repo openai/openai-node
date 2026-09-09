@@ -153,31 +153,19 @@ jobs:
           node scripts/steady/publication.test.cjs
           node scripts/steady/cache.test.cjs
 
-      - name: Run tests and packed-package checks
+      - name: Run tests
         # Reuse V8 compilation within this job only; never restore it across runs.
         env:
           NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
-          CHECK_PACKED_PACKAGE: ${{ matrix.experimental == false }}
+        run: ./scripts/test
+
+      - name: Test packed npm package
+        if: matrix.experimental == false
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
         run: |
-          (
-            TIMEFORMAT='Run tests: %Rs'
-            time ./scripts/test
-          ) &
-          tests_pid=$!
-          (
-            if [ "$CHECK_PACKED_PACKAGE" = true ]; then
-              TIMEFORMAT='Test packed npm package: %Rs'
-              time {
-                ./scripts/build
-                node --experimental-strip-types scripts/test-packed-package.ts
-              }
-            fi
-          ) &
-          packed_pid=$!
-          status=0
-          wait "$tests_pid" || status=1
-          wait "$packed_pid" || status=1
-          exit "$status"
+          ./scripts/build
+          node --experimental-strip-types scripts/test-packed-package.ts
 
       - name: Prepare isolated minimum-runtime package and synthetic certificate
         if: matrix.node-version == 22

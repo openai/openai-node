@@ -1,3 +1,4 @@
+import { compiledFixture, compiledFixtureConfig } from '../utils/compiled-fixtures';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
@@ -191,12 +192,12 @@ test.each(cases)('$source: $status $name', async ({ chunks, resumed, partial, st
   const child = spawn(
     process.execPath,
     [
-      path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '--swc',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
       ...(source === 'guide'
         ? [
+            path.join(root, 'node_modules/ts-node/dist/bin.js'),
+            '--swc',
             '--eval',
             `import OpenAI from 'openai';
 const client = new OpenAI();
@@ -206,8 +207,7 @@ ${guideSnippet}
 main();`,
           ]
         : [
-            path.join(
-              root,
+            compiledFixture(
               'examples/responses',
               source === 'example' ? 'stream_background.ts' : `${source}.ts`,
             ),
@@ -223,7 +223,7 @@ main();`,
         OPENAI_LOG: undefined,
         // Keep console-inspected event numbers plain for the sequence assertions.
         FORCE_COLOR: undefined,
-        TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+        TS_NODE_PROJECT: compiledFixtureConfig(),
         DISABLE_V8_COMPILE_CACHE: '1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],

@@ -1,3 +1,4 @@
+import { compiledFixture, compiledFixtureConfig } from '../utils/compiled-fixtures';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
@@ -146,16 +147,13 @@ Module._load = function(request, ...args) {
     const child = spawn(
       process.execPath,
       [
-        path.join(root, 'node_modules/ts-node/dist/bin.js'),
-        '--swc',
         ...(provider === 'azure' ? ['-r', identityPath] : []),
         '-r',
         path.join(root, 'node_modules/tsconfig-paths/register.js'),
         ...(example === 'guide'
-          ? ['--eval', guideSnippet]
+          ? [path.join(root, 'node_modules/ts-node/dist/bin.js'), '--swc', '--eval', guideSnippet]
           : [
-              path.join(
-                root,
+              compiledFixture(
                 'examples',
                 ...(provider === 'azure' ? ['azure'] : []),
                 'realtime',
@@ -177,7 +175,7 @@ Module._load = function(request, ...args) {
           OPENAI_LOG: 'off',
           NODE_EXTRA_CA_CERTS: certificatePath,
           DOTENV_CONFIG_PATH: path.join(directory, '.env'),
-          TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+          TS_NODE_PROJECT: compiledFixtureConfig(),
           DISABLE_V8_COMPILE_CACHE: '1',
         },
         stdio: ['ignore', 'pipe', 'pipe'],

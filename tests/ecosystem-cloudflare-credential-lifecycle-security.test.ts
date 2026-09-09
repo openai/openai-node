@@ -1,4 +1,4 @@
-import { compileTestScript } from './utils/compile-test-script';
+import { compiledFixture } from './utils/compiled-fixtures';
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -19,11 +19,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const repositoryRoot = process.cwd();
-let compiledCLI: ReturnType<typeof compileTestScript>;
-beforeAll(() => {
-  compiledCLI = compileTestScript(path.join(repositoryRoot, 'ecosystem-tests/cli.ts'));
-});
-afterAll(() => compiledCLI?.cleanup());
 const apiKey = 'sk-synthetic-cloudflare-lifecycle-private-83d4';
 const stagedContents = Buffer.from(`OPENAI_API_KEY='${apiKey}'`);
 const originalContents = Buffer.from([
@@ -230,7 +225,7 @@ function runCloudflare(
   const result = spawnSync(
     process.execPath,
     [
-      compiledCLI.file,
+      compiledFixture('ecosystem-tests/cli.ts'),
       'cloudflare-worker',
       '--fromNpm=openai',
       '--skipPack',
