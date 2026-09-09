@@ -589,6 +589,15 @@ test('keeps observing a direct hook after it resolves a provider credential', as
   expect(provider).toHaveBeenCalledTimes(1);
 });
 
+function preparationGate() {
+  let release!: () => void;
+  // oxlint-disable-next-line promise/avoid-new -- Gates select the order of asynchronous hook delegation.
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
+}
+
 test('restarts credential observation when a direct hook writes before and after provider resolution', async () => {
   class Credentials extends OpenAI {
     protected override async authHeaders(options: FinalRequestOptions) {
@@ -606,6 +615,95 @@ test('restarts credential observation when a direct hook writes before and after
   );
 
   expect(provider).toHaveBeenCalledTimes(1);
+});
+
+test('retains a borrowed credential observer until every participating build settles', async () => {
+  const firstEntered = preparationGate();
+  const resolveFirstProvider = preparationGate();
+  const firstProviderResolved = preparationGate();
+  const finishFirst = preparationGate();
+  const secondEntered = preparationGate();
+  const finishSecond = preparationGate();
+  class Credentials extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      if (options.path === '/first') {
+        this.apiKey = 'synthetic-prior';
+        firstEntered.release();
+        await resolveFirstProvider.promise;
+        await this._callApiKey();
+        firstProviderResolved.release();
+        await finishFirst.promise;
+        this.apiKey = null;
+        return super.authHeaders(options);
+      }
+      const headers = await super.authHeaders(options);
+      secondEntered.release();
+      await finishSecond.promise;
+      return headers;
+    }
+  }
+  let resolutions = 0;
+  const provider = vi.fn(async () => {
+    resolutions += 1;
+    return `synthetic-${resolutions}`;
+  });
+  const client = new Credentials({ apiKey: provider, adminAPIKey: null });
+  let firstError: unknown;
+  const first = (async () => {
+    try {
+      await client.buildRequest({ method: 'get', path: '/first' });
+    } catch (error) {
+      firstError = error;
+    }
+  })();
+  await firstEntered.promise;
+  const second = client.buildRequest({ method: 'get', path: '/second' });
+  await secondEntered.promise;
+  resolveFirstProvider.release();
+  await firstProviderResolved.promise;
+  finishSecond.release();
+  const secondResult = await second;
+  finishFirst.release();
+  await first;
+
+  expect(secondResult.req.headers.get('authorization')).toBe('Bearer synthetic-prior');
+  expect(firstError).toBeInstanceOf(Error);
+  expect((firstError as Error).message).toContain('Could not resolve authentication method');
+  expect(provider).toHaveBeenCalledTimes(1);
+  expect(client.apiKey).toBeNull();
+});
+
+test('restores credential observation after hook inspection throws during setup', async () => {
+  class Credentials extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      return super.authHeaders(options);
+    }
+  }
+  const client = new Credentials({ apiKey: async () => 'synthetic-provider', adminAPIKey: null });
+  let fail = true;
+  Object.defineProperty(client, 'buildURL', {
+    configurable: true,
+    get() {
+      if (fail) {
+        fail = false;
+        throw new Error('synthetic hook lookup failure');
+      }
+      return OpenAI.prototype.buildURL;
+    },
+  });
+
+  await expect(client.buildRequest({ method: 'get', path: '/first' })).rejects.toThrow(
+    'synthetic hook lookup failure',
+  );
+  const { req } = await client.buildRequest({ method: 'get', path: '/second' });
+
+  expect(req.headers.get('authorization')).toBe('Bearer synthetic-provider');
+  expect(Object.getOwnPropertyDescriptor(client, 'apiKey')).toMatchObject({
+    value: 'synthetic-provider',
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
 });
 
 test('restores credential data-property metadata changed during a build', async () => {
@@ -1664,15 +1762,6 @@ test('does not resolve the OpenAI callback for admin-only requests', async () =>
   expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-admin');
 });
 
-function preparationGate() {
-  let release!: () => void;
-  // oxlint-disable-next-line promise/avoid-new -- Gates select the order of asynchronous hook delegation.
-  const promise = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  return { promise, release };
-}
-
 describe('delayed credential preparation', () => {
   test.each([true, false])('handles pre-delegation overlap with shared options: %s', async (shared) => {
     const entered = [preparationGate(), preparationGate()] as const;
@@ -1750,4 +1839,67 @@ describe('delayed credential preparation', () => {
       'Bearer synthetic-second',
     ]);
   });
+
+  test.each([true, false])(
+    'isolates delayed request preparation from a direct build with shared options: %s',
+    async (shared) => {
+      const preparationEntered = preparationGate();
+      const startPreparation = preparationGate();
+      const preparationDelegated = preparationGate();
+      const finishPreparation = preparationGate();
+      let resolveDirect!: (value: string) => void;
+      // oxlint-disable-next-line promise/avoid-new -- Hold the direct provider to select the write order.
+      const directProvider = new Promise<string>((resolve) => {
+        resolveDirect = resolve;
+      });
+      const directProviderEntered = preparationGate();
+      class DelayedPreparation extends OpenAI {
+        protected override async prepareOptions(options: FinalRequestOptions) {
+          preparationEntered.release();
+          await startPreparation.promise;
+          await super.prepareOptions(options);
+          preparationDelegated.release();
+          await finishPreparation.promise;
+        }
+      }
+      const provider = vi
+        .fn<() => Promise<string>>()
+        .mockImplementationOnce(() => {
+          directProviderEntered.release();
+          return directProvider;
+        })
+        .mockResolvedValueOnce('synthetic-normal');
+      const fetch = mockFetch();
+      const client = new DelayedPreparation({ apiKey: provider, adminAPIKey: null, fetch });
+      const options: FinalRequestOptions = { method: 'get', path: '/items' };
+      const normalSettled = preparationGate();
+      const normal = (async () => {
+        try {
+          return { value: await client.request(options) };
+        } catch (error) {
+          return { error: error as Error };
+        } finally {
+          normalSettled.release();
+        }
+      })();
+      await preparationEntered.promise;
+      const direct = client.buildRequest(shared ? options : { ...options });
+      await directProviderEntered.promise;
+      startPreparation.release();
+      await Promise.race([preparationDelegated.promise, normalSettled.promise]);
+      resolveDirect('synthetic-direct');
+      const directResult = await direct;
+      expect(directResult.req.headers.get('authorization')).toBe('Bearer synthetic-direct');
+      finishPreparation.release();
+
+      const result = await normal;
+      if ('error' in result) {
+        expect(shared).toBe(true);
+        expect(result.error.message).toContain('overlapping requests that share the same options object');
+        expect(fetch).not.toHaveBeenCalled();
+      } else {
+        expect(sentHeaders(fetch)[0]?.get('authorization')).toBe('Bearer synthetic-normal');
+      }
+    },
+  );
 });

@@ -513,7 +513,7 @@ export class OpenAI {
   #writingProviderAPIKey = false;
   #apiKeyWriteObservations = new Map<Function, APIKeyWriteObservation>();
   #apiKeyBuildObservationDepth = 0;
-  #deferredAPIKeyWriteObserverReleases: Array<() => void> = [];
+  #deferredAPIKeyWriteObserver: { observer: Function; release: () => void } | undefined;
   #baseAPIKeyCapture: { apiKey: string | null } | undefined;
   #apiKeyPreparationAttempts = new WeakMap<FinalRequestOptions, APIKeyPreparationAttempt[]>();
   #synchronousCredentialAttempt: APIKeyPreparationAttempt | undefined;
@@ -916,9 +916,20 @@ export class OpenAI {
 
     const resolved = await this.resolveAPIKeyProvider(apiKey);
     if (this.#apiKeyBuildObservationDepth > 0) {
-      const releaseAPIKeyWriteObserver = this.#observeAPIKeyWrites();
-      if (releaseAPIKeyWriteObserver) {
-        this.#deferredAPIKeyWriteObserverReleases.push(releaseAPIKeyWriteObserver);
+      const activeObserver = Object.getOwnPropertyDescriptor(this, 'apiKey')?.set;
+      if (
+        !this.#deferredAPIKeyWriteObserver ||
+        this.#deferredAPIKeyWriteObserver.observer !== activeObserver
+      ) {
+        this.#deferredAPIKeyWriteObserver?.release();
+        this.#deferredAPIKeyWriteObserver = undefined;
+        const release = this.#observeAPIKeyWrites();
+        const observer = Object.getOwnPropertyDescriptor(this, 'apiKey')?.set;
+        if (release && observer && this.#apiKeyWriteObservations.has(observer)) {
+          this.#deferredAPIKeyWriteObserver = { observer, release };
+        } else {
+          release?.();
+        }
       }
     }
     this.#writingProviderAPIKey = true;
@@ -1182,19 +1193,29 @@ export class OpenAI {
   }
 
   protected async [Opts.prepareAPIKey](options: FinalRequestOptions): Promise<void> {
-    if (!this.#synchronousCredentialAttempt) {
-      let requestSeen = false;
+    let attempt = this.#synchronousCredentialAttempt;
+    if (!attempt) {
+      let requestAttempt: APIKeyPreparationAttempt | undefined;
+      let buildSeen = false;
       for (const candidate of this.#apiKeyPreparationAttempts.get(options) ?? []) {
-        if (candidate.kind !== 'request') continue;
-        if (requestSeen) {
+        if (candidate.kind === 'build') {
+          buildSeen = true;
+          continue;
+        }
+        if (requestAttempt) {
           throw new Errors.OpenAIError(
             'Cannot safely resolve credentials for overlapping requests that share the same options object after a preparation hook awaits before delegating. Pass a distinct options object to each request.',
           );
         }
-        requestSeen = true;
+        requestAttempt = candidate;
       }
+      if (requestAttempt && buildSeen) {
+        throw new Errors.OpenAIError(
+          'Cannot safely resolve credentials for overlapping requests that share the same options object after a preparation hook awaits before delegating. Pass a distinct options object to each request.',
+        );
+      }
+      attempt = requestAttempt ?? this.currentAPIKeyPreparationAttempt(options);
     }
-    const attempt = this.#synchronousCredentialAttempt ?? this.currentAPIKeyPreparationAttempt(options);
     const remember = (prepared: PreparedAPIKey) => {
       if (attempt) {
         attempt.prepared = prepared;
@@ -2161,16 +2182,17 @@ export class OpenAI {
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
     // A hook can intentionally assign the function credential's initial null value.
     this.#apiKeyBuildObservationDepth++;
-    const releaseAPIKeyWriteObserver = this.#observeAPIKeyWrites();
+    let releaseAPIKeyWriteObserver: (() => void) | undefined;
     try {
+      releaseAPIKeyWriteObserver = this.#observeAPIKeyWrites();
       return await this.#buildRequest(inputOptions, properties);
     } finally {
       releaseAPIKeyWriteObserver?.();
       this.#apiKeyBuildObservationDepth--;
       if (this.#apiKeyBuildObservationDepth === 0) {
-        for (const release of this.#deferredAPIKeyWriteObserverReleases.splice(0).reverse()) {
-          release();
-        }
+        const deferredAPIKeyWriteObserver = this.#deferredAPIKeyWriteObserver;
+        this.#deferredAPIKeyWriteObserver = undefined;
+        deferredAPIKeyWriteObserver?.release();
       }
     }
   }
