@@ -64,11 +64,11 @@ control of that credential. Changes to `this.apiKey` inside authentication hooks
 are also honored.
 
 For direct builds, authentication hooks can explicitly assign `null` to suppress
-a function credential. With custom credential hooks, the SDK observes writes to
-configurable `apiKey` properties using an accessor; existing getters and setters
-continue to run. Subclasses that make `apiKey` non-configurable should return
-custom authentication headers instead. Ordinary clients keep their existing
-property descriptors.
+a function credential. With custom credential hooks, the SDK temporarily observes
+writes to configurable `apiKey` properties while building the request; existing
+getters and setters continue to run, and the original property descriptor is
+restored when the build settles. Subclasses that make `apiKey` non-configurable
+should return custom authentication headers instead.
 
 `_callApiKey` overrides can forward the existing optional `capture` callback to
 preserve the credential belonging to their invocation. Legacy overrides that omit

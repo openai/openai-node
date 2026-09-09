@@ -346,8 +346,95 @@ test('preserves a custom credential accessor while observing null writes across 
   expect(setter).toHaveBeenCalledTimes(2);
   expect(getter).toHaveBeenCalled();
   expect(Object.getOwnPropertyDescriptor(client, 'apiKey')?.get).toBe(getter);
+  expect(Object.getOwnPropertyDescriptor(client, 'apiKey')?.set).toBe(setter);
   expect(provider).not.toHaveBeenCalled();
   expect(client.apiKey).toBeNull();
+});
+
+test('preserves an inherited credential accessor while observing null writes across direct builds', async () => {
+  const values = new WeakMap<OpenAI, string | null>();
+  const getter = vi.fn(function getter(this: OpenAI) {
+    return values.get(this) ?? null;
+  });
+  const setter = vi.fn(function setter(this: OpenAI, nextValue: string | null) {
+    values.set(this, nextValue);
+  });
+  class NullCredentials extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      this.apiKey = null;
+      return super.authHeaders(options);
+    }
+  }
+  Object.defineProperty(NullCredentials.prototype, 'apiKey', {
+    configurable: true,
+    enumerable: true,
+    get: getter,
+    set: setter,
+  });
+  const provider = vi.fn(async () => 'synthetic-provider');
+  const client = new NullCredentials({ apiKey: provider, adminAPIKey: null });
+
+  await expect(client.buildRequest({ method: 'get', path: '/items' })).rejects.toThrow(
+    'Could not resolve authentication method.',
+  );
+  await expect(client.buildRequest({ method: 'get', path: '/items' })).rejects.toThrow(
+    'Could not resolve authentication method.',
+  );
+
+  expect(setter).toHaveBeenCalledTimes(3);
+  expect(getter).toHaveBeenCalled();
+  expect(Object.getOwnPropertyDescriptor(NullCredentials.prototype, 'apiKey')?.get).toBe(getter);
+  expect(Object.hasOwn(client, 'apiKey')).toBe(false);
+  expect(provider).not.toHaveBeenCalled();
+  expect(client.apiKey).toBeNull();
+});
+
+test.each(['direct', 'normal'] as const)(
+  'preserves credential writes through a proxy receiver during a %s request',
+  async (mode) => {
+    class ProxyCredentials extends OpenAI {
+      protected override async authHeaders(options: FinalRequestOptions) {
+        new Proxy(this, {}).apiKey = 'synthetic-hook';
+        return super.authHeaders(options);
+      }
+    }
+    const provider = vi.fn(async () => 'synthetic-provider');
+    const fetch = mockFetch();
+    const client = new ProxyCredentials({ apiKey: provider, adminAPIKey: null, fetch });
+
+    if (mode === 'direct') {
+      const { req } = await client.buildRequest({ method: 'get', path: '/items' });
+      expect(req.headers.get('authorization')).toBe('Bearer synthetic-hook');
+    } else {
+      await client.get('/items');
+      expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('authorization')).toBe(
+        'Bearer synthetic-hook',
+      );
+    }
+  },
+);
+
+test('restores the ordinary apiKey data descriptor after observing a direct build', async () => {
+  class Credentials extends OpenAI {
+    protected override async authHeaders(options: FinalRequestOptions) {
+      return super.authHeaders(options);
+    }
+  }
+  const client = new Credentials({ apiKey: async () => 'synthetic-provider', adminAPIKey: null });
+
+  await client.buildRequest({ method: 'get', path: '/items' });
+
+  const descriptor = Object.getOwnPropertyDescriptor(client, 'apiKey');
+  expect(descriptor).toMatchObject({
+    value: 'synthetic-provider',
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+  const receiver = Object.freeze({ apiKey: 'synthetic-receiver' });
+  expect(Reflect.set(client, 'apiKey', 'synthetic-update', receiver)).toBe(false);
+  Object.defineProperty(client, 'apiKey', { writable: false });
+  expect(client.apiKey).toBe('synthetic-provider');
 });
 
 test('preserves the credential failure when upload cleanup throws during a direct build', async () => {

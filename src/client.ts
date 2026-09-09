@@ -506,6 +506,8 @@ export class OpenAI {
   #apiKeyWriteVersion = 0;
   #lastProviderAPIKeyWriteVersion = 0;
   #apiKeyWriteObserver: ((apiKey: string | null) => void) | undefined;
+  #apiKeyWriteObservationDepth = 0;
+  #restoreAPIKeyWriteDescriptor: (() => void) | undefined;
   #baseAPIKeyCapture: { apiKey: string | null } | undefined;
   #apiKeyPreparationAttempts = new WeakMap<FinalRequestOptions, APIKeyPreparationAttempt[]>();
   #synchronousCredentialAttempt: APIKeyPreparationAttempt | undefined;
@@ -1000,9 +1002,19 @@ export class OpenAI {
     if (attempts.length === 0) this.#apiKeyPreparationAttempts.delete(options);
   }
 
-  #observeAPIKeyWrites(): void {
+  #observeAPIKeyWrites(): (() => void) | undefined {
     if (typeof this._options.apiKey !== 'function' || !this.hasCustomRequestCredentialHooks()) return;
-    const descriptor = Object.getOwnPropertyDescriptor(this, 'apiKey');
+    if (this.#apiKeyWriteObservationDepth) {
+      if (Object.getOwnPropertyDescriptor(this, 'apiKey')?.set !== this.#apiKeyWriteObserver) return;
+      this.#apiKeyWriteObservationDepth++;
+      return () => this.#releaseAPIKeyWriteObserver();
+    }
+    let owner: object | null = this;
+    let descriptor: PropertyDescriptor | undefined;
+    while (owner && !descriptor) {
+      descriptor = Object.getOwnPropertyDescriptor(owner, 'apiKey');
+      if (!descriptor) owner = Object.getPrototypeOf(owner);
+    }
     if (
       !descriptor?.configurable ||
       (this.#apiKeyWriteObserver && descriptor.set === this.#apiKeyWriteObserver)
@@ -1011,31 +1023,75 @@ export class OpenAI {
     }
 
     const client = this;
+    const inherited = owner !== this;
     let getter = descriptor.get;
     let setter = descriptor.set;
+    let dataValue: { apiKey: string | null } | undefined;
+    let observer: (this: OpenAI, next: string | null) => void;
+    const targetsClient = (receiver: OpenAI) => {
+      if (receiver === client) return true;
+      try {
+        return Object.getOwnPropertyDescriptor(receiver, 'apiKey')?.set === observer;
+      } catch {
+        return false;
+      }
+    };
     if ('value' in descriptor) {
       if (!descriptor.writable) return;
-      const value: { apiKey: string | null } = { apiKey: descriptor.value };
-      getter = () => value.apiKey;
+      dataValue = { apiKey: descriptor.value };
+      getter = () => dataValue!.apiKey;
       setter = function (this: OpenAI, next: string | null) {
-        if (!Reflect.set(value, 'apiKey', next, this === client ? value : this)) {
+        if (targetsClient(this)) {
+          dataValue!.apiKey = next;
+        } else if (!Reflect.set(dataValue!, 'apiKey', next, this)) {
           throw new TypeError('Cannot assign to read only property apiKey');
         }
       };
     }
     if (!setter) return;
     const originalSetter = setter;
-    const observer = function (this: OpenAI, next: string | null) {
+    observer = function (this: OpenAI, next: string | null) {
+      const observesClient = targetsClient(this);
       originalSetter.call(this, next);
-      if (this === client) client.#apiKeyWriteVersion++;
+      if (observesClient) client.#apiKeyWriteVersion++;
     };
-    Object.defineProperty(this, 'apiKey', {
+    const observedDescriptor: PropertyDescriptor = {
       ...(getter && { get: getter }),
       set: observer,
       enumerable: descriptor.enumerable ?? false,
       configurable: descriptor.configurable,
-    });
+    };
+    Object.defineProperty(this, 'apiKey', observedDescriptor);
     this.#apiKeyWriteObserver = observer;
+    this.#apiKeyWriteObservationDepth = 1;
+    this.#restoreAPIKeyWriteDescriptor = () => {
+      const current = Object.getOwnPropertyDescriptor(this, 'apiKey');
+      if (
+        current?.get !== observedDescriptor.get ||
+        current?.set !== observer ||
+        current.enumerable !== observedDescriptor.enumerable ||
+        current.configurable !== observedDescriptor.configurable
+      ) {
+        return;
+      }
+      if (inherited) {
+        Reflect.deleteProperty(this, 'apiKey');
+      } else if (dataValue) {
+        Object.defineProperty(this, 'apiKey', { ...descriptor, value: dataValue.apiKey });
+      } else {
+        Object.defineProperty(this, 'apiKey', descriptor);
+      }
+    };
+    return () => this.#releaseAPIKeyWriteObserver();
+  }
+
+  #releaseAPIKeyWriteObserver(): void {
+    if (--this.#apiKeyWriteObservationDepth > 0) return;
+    this.#apiKeyWriteObservationDepth = 0;
+    const restore = this.#restoreAPIKeyWriteDescriptor;
+    this.#restoreAPIKeyWriteDescriptor = undefined;
+    this.#apiKeyWriteObserver = undefined;
+    restore?.();
   }
 
   protected async [Opts.prepareAPIKey](options: FinalRequestOptions): Promise<void> {
@@ -1992,7 +2048,18 @@ export class OpenAI {
     properties: { retryCount?: number } = {},
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
     // A hook can intentionally assign the function credential's initial null value.
-    this.#observeAPIKeyWrites();
+    const releaseAPIKeyWriteObserver = this.#observeAPIKeyWrites();
+    try {
+      return await this.#buildRequest(inputOptions, properties);
+    } finally {
+      releaseAPIKeyWriteObserver?.();
+    }
+  }
+
+  async #buildRequest(
+    inputOptions: FinalRequestOptions,
+    properties: { retryCount?: number } = {},
+  ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
     const { retryCount = 0 } = properties;
     const internalProperties = properties as InternalBuildProperties;
     const apiKeyContext = internalProperties[preparedAPIKeyContext];
