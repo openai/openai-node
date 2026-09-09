@@ -266,7 +266,7 @@ export interface RequiredActionFunctionToolCall {
   /**
    * The ID of the tool call. This ID must be referenced when you submit the tool
    * outputs in using the
-   * [Submit tool outputs to run](https://platform.openai.com/docs/api-reference/runs/submitToolOutputs)
+   * [Submit tool outputs to run](https://developers.openai.com/api/docs/assistants/migration)
    * endpoint.
    */
   id: string;
@@ -302,7 +302,7 @@ export namespace RequiredActionFunctionToolCall {
 
 /**
  * Represents an execution run on a
- * [thread](https://platform.openai.com/docs/api-reference/threads).
+ * [thread](https://developers.openai.com/api/docs/assistants/migration).
  */
 export interface Run {
   /**
@@ -312,8 +312,8 @@ export interface Run {
 
   /**
    * The ID of the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * execution of this run.
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) used
+   * for execution of this run.
    */
   assistant_id: string;
 
@@ -350,8 +350,8 @@ export interface Run {
 
   /**
    * The instructions that the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * this run.
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) used
+   * for this run.
    */
   instructions: string;
 
@@ -384,8 +384,8 @@ export interface Run {
 
   /**
    * The model that the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * this run.
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) used
+   * for this run.
    */
   model: string;
 
@@ -396,7 +396,7 @@ export interface Run {
 
   /**
    * Whether to enable
-   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling#configuring-parallel-function-calling)
+   * [parallel function calling](https://developers.openai.com/api/docs/guides/function-calling#parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls: boolean;
@@ -409,14 +409,14 @@ export interface Run {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
-   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://developers.openai.com/api/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://developers.openai.com/api/docs/models/gpt-4-turbo), and
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
    * Outputs which ensures the model will match your supplied JSON schema. Learn more
    * in the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
    * message the model generates is valid JSON.
@@ -444,8 +444,9 @@ export interface Run {
   status: RunStatus;
 
   /**
-   * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
-   * that was executed on as a part of this run.
+   * The ID of the
+   * [thread](https://developers.openai.com/api/docs/assistants/migration) that was
+   * executed on as a part of this run.
    */
   thread_id: string;
 
@@ -462,8 +463,8 @@ export interface Run {
 
   /**
    * The list of tools that the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * this run.
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) used
+   * for this run.
    */
   tools: Array<AssistantsAPI.AssistantTool>;
 
@@ -609,8 +610,8 @@ export type RunCreateParams = RunCreateParamsNonStreaming | RunCreateParamsStrea
 export interface RunCreateParamsBase {
   /**
    * Body param: The ID of the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
-   * execute this run.
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) to use
+   * to execute this run.
    */
   assistant_id: string;
 
@@ -621,7 +622,7 @@ export interface RunCreateParamsBase {
    * search result content.
    *
    * See the
-   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
+   * [file search tool documentation](https://developers.openai.com/api/docs/guides/tools-file-search#retrieval-customization)
    * for more information.
    */
   include?: Array<StepsAPI.RunStepInclude>;
@@ -640,8 +641,8 @@ export interface RunCreateParamsBase {
 
   /**
    * Body param: Overrides the
-   * [instructions](https://platform.openai.com/docs/api-reference/assistants/createAssistant)
-   * of the assistant. This is useful for modifying the behavior on a per-run basis.
+   * [instructions](https://developers.openai.com/api/docs/assistants/migration) of
+   * the assistant. This is useful for modifying the behavior on a per-run basis.
    */
   instructions?: string | null;
 
@@ -675,8 +676,8 @@ export interface RunCreateParamsBase {
 
   /**
    * Body param: The ID of the
-   * [Model](https://platform.openai.com/docs/api-reference/models) to be used to
-   * execute this run. If a value is provided here, it will override the model
+   * [Model](https://developers.openai.com/api/reference/resources/models) to be used
+   * to execute this run. If a value is provided here, it will override the model
    * associated with the assistant. If not, the model associated with the assistant
    * will be used.
    */
@@ -684,7 +685,7 @@ export interface RunCreateParamsBase {
 
   /**
    * Body param: Whether to enable
-   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling#configuring-parallel-function-calling)
+   * [parallel function calling](https://developers.openai.com/api/docs/guides/function-calling#parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls?: boolean;
@@ -694,21 +695,22 @@ export interface RunCreateParamsBase {
    * supported values are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and
    * `max`. Reducing reasoning effort can result in faster responses and fewer tokens
    * used on reasoning in a response. Not all reasoning models support every value.
-   * See the [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+   * See the
+   * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
    * model-specific support.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 
   /**
    * Body param: Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
-   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://developers.openai.com/api/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://developers.openai.com/api/docs/models/gpt-4-turbo), and
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
    * Outputs which ensures the model will match your supplied JSON schema. Learn more
    * in the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
    * message the model generates is valid JSON.
@@ -872,8 +874,9 @@ export interface RunCreateParamsStreaming extends RunCreateParamsBase {
 
 export interface RunRetrieveParams {
   /**
-   * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
-   * that was run.
+   * The ID of the
+   * [thread](https://developers.openai.com/api/docs/assistants/migration) that was
+   * run.
    */
   thread_id: string;
 }
@@ -881,7 +884,8 @@ export interface RunRetrieveParams {
 export interface RunUpdateParams {
   /**
    * Path param: The ID of the
-   * [thread](https://platform.openai.com/docs/api-reference/threads) that was run.
+   * [thread](https://developers.openai.com/api/docs/assistants/migration) that was
+   * run.
    */
   thread_id: string;
 
@@ -932,8 +936,8 @@ export type RunSubmitToolOutputsParams =
 export interface RunSubmitToolOutputsParamsBase {
   /**
    * Path param: The ID of the
-   * [thread](https://platform.openai.com/docs/api-reference/threads) to which this
-   * run belongs.
+   * [thread](https://developers.openai.com/api/docs/assistants/migration) to which
+   * this run belongs.
    */
   thread_id: string;
 
