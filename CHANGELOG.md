@@ -2,6 +2,12 @@
 
 ## [7.12.1](https://github.com/openai/openai-node/compare/v7.12.0...v7.12.1) (2026-09-09)
 
+Includes the GPT Image 2.5 support from 7.12.0, which was not published to npm.
+
+### Features
+
+* **api:** add GPT Image 2.5 models and image options ([#2705](https://github.com/openai/openai-node/pull/2705)) ([6500a16](https://github.com/openai/openai-node/commit/6500a1670911e8f5a6cbbd9f7ff42800af6450cd))
+
 
 ### Bug Fixes
 
