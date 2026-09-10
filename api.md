@@ -392,6 +392,262 @@ Methods:
 
 # Beta
 
+## Agents
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/agents.ts">Agent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentCloseSubagentCallItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentCommandExecutionItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentContent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentCreateSubagentCallItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentDeleted</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentFunctionCallItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentFunctionCallOutput</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentFunctionCallOutputParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentFunctionCallStatus</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentInterruptSubagentCallItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentMcpCallItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentOutputCommandExecutionOutputDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentOutputItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentOutputItemStatus</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentReasoning</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentReasoningItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentReasoningParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentResumeSubagentCallItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSendSubagentInputCallItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSession</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionAssistantMessage</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionDeleted</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentConnectedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentDisconnectedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentFailedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentPendingEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentReadyEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentState</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionErrorEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionFailedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionIdleEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionInProgressEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionInputMessageParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionInputParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionMessage</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionMessageContent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionRequiresActionEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionSubagentActiveEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionSubagentClosedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionSubagentCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnCancelledEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnCompletedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnContentPartAddedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnContentPartDoneEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnCreatedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnFailedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnInProgressEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnItemAddedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnItemDoneEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnOutputTextDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnOutputTextDoneEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnReasoningSummaryPartAddedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnReasoningSummaryPartDoneEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnReasoningSummaryTextDeltaEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionTurnReasoningSummaryTextDoneEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentText</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentTextParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentTool</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentToolParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentWaitForSubagentsCallItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentWebSearchCallItem</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">Environment</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">EnvironmentParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">HostedEnvironmentFile</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">HostedEnvironmentFileID</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">HostedEnvironmentFileParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">HostedPlugin</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">HostedPluginParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">HostedSkill</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">HostedSkillParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">HostedSkillReference</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">InlineCapabilitySourceParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">InputContent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">InputContentParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">McpTransport</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">McpTransportParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">MultiAgentConfig</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">MultiAgentConfigParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">OutputText</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">PersistedAgentTool</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">PersistedAgentToolParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">PersistedMcpTransport</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">PersistedMcpTransportParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">SessionError</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">SessionTurnError</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">SetupCommandParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">Subagent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">SummaryText</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">TextFormat</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">TextFormatParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">TokenUsage</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">WebSearchAction</a></code>
+
+Methods:
+
+- <code title="post /agents">client.beta.agents.<a href="./src/resources/beta/agents/agents.ts">create</a>({ ...params }) -> Agent</code>
+- <code title="get /agents/{agent_id}">client.beta.agents.<a href="./src/resources/beta/agents/agents.ts">retrieve</a>(agentID) -> Agent</code>
+- <code title="post /agents/{agent_id}">client.beta.agents.<a href="./src/resources/beta/agents/agents.ts">update</a>(agentID, { ...params }) -> Agent</code>
+- <code title="get /agents">client.beta.agents.<a href="./src/resources/beta/agents/agents.ts">list</a>({ ...params }) -> AgentsPage</code>
+- <code title="delete /agents/{agent_id}">client.beta.agents.<a href="./src/resources/beta/agents/agents.ts">delete</a>(agentID) -> AgentDeleted</code>
+
+### Environments
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/environments/environments.ts">EnvironmentInfo</a></code>
+
+Methods:
+
+- <code title="get /agents/environments/{environment_id}">client.beta.agents.environments.<a href="./src/resources/beta/agents/environments/environments.ts">retrieve</a>(environmentID) -> EnvironmentInfo</code>
+
+#### Files
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/environments/files.ts">EnvironmentFile</a></code>
+
+Methods:
+
+- <code title="post /agents/environments/{environment_id}/files">client.beta.agents.environments.files.<a href="./src/resources/beta/agents/environments/files.ts">create</a>(environmentID, { ...params }) -> EnvironmentFile</code>
+- <code title="get /agents/environments/{environment_id}/files">client.beta.agents.environments.files.<a href="./src/resources/beta/agents/environments/files.ts">list</a>(environmentID, { ...params }) -> EnvironmentFilesPage</code>
+
+#### Templates
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/environments/templates.ts">EnvironmentTemplate</a></code>
+- <code><a href="./src/resources/beta/agents/environments/templates.ts">EnvironmentTemplateDeleted</a></code>
+
+Methods:
+
+- <code title="post /agents/environments/templates">client.beta.agents.environments.templates.<a href="./src/resources/beta/agents/environments/templates.ts">create</a>({ ...params }) -> EnvironmentTemplate</code>
+- <code title="get /agents/environments/templates/{environment_template_id}">client.beta.agents.environments.templates.<a href="./src/resources/beta/agents/environments/templates.ts">retrieve</a>(environmentTemplateID) -> EnvironmentTemplate</code>
+- <code title="post /agents/environments/templates/{environment_template_id}">client.beta.agents.environments.templates.<a href="./src/resources/beta/agents/environments/templates.ts">update</a>(environmentTemplateID, { ...params }) -> EnvironmentTemplate</code>
+- <code title="get /agents/environments/templates">client.beta.agents.environments.templates.<a href="./src/resources/beta/agents/environments/templates.ts">list</a>({ ...params }) -> EnvironmentTemplatesPage</code>
+- <code title="delete /agents/environments/templates/{environment_template_id}">client.beta.agents.environments.templates.<a href="./src/resources/beta/agents/environments/templates.ts">delete</a>(environmentTemplateID) -> EnvironmentTemplateDeleted</code>
+
+### Vaults
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/vaults/vaults.ts">Vault</a></code>
+- <code><a href="./src/resources/beta/agents/vaults/vaults.ts">VaultDeleted</a></code>
+- <code><a href="./src/resources/beta/agents/vaults/vaults.ts">VaultStatus</a></code>
+- <code><a href="./src/resources/beta/agents/vaults/vaults.ts">VaultStatusFilter</a></code>
+
+Methods:
+
+- <code title="post /vaults">client.beta.agents.vaults.<a href="./src/resources/beta/agents/vaults/vaults.ts">create</a>({ ...params }) -> Vault</code>
+- <code title="get /vaults/{vault_id}">client.beta.agents.vaults.<a href="./src/resources/beta/agents/vaults/vaults.ts">retrieve</a>(vaultID) -> Vault</code>
+- <code title="get /vaults">client.beta.agents.vaults.<a href="./src/resources/beta/agents/vaults/vaults.ts">list</a>({ ...params }) -> VaultsPage</code>
+- <code title="delete /vaults/{vault_id}">client.beta.agents.vaults.<a href="./src/resources/beta/agents/vaults/vaults.ts">delete</a>(vaultID) -> VaultDeleted</code>
+
+#### Credentials
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/vaults/credentials.ts">Credential</a></code>
+- <code><a href="./src/resources/beta/agents/vaults/credentials.ts">CredentialAuth</a></code>
+- <code><a href="./src/resources/beta/agents/vaults/credentials.ts">CredentialAuthCreateParam</a></code>
+- <code><a href="./src/resources/beta/agents/vaults/credentials.ts">CredentialAuthRotateParam</a></code>
+- <code><a href="./src/resources/beta/agents/vaults/credentials.ts">CredentialDeleted</a></code>
+- <code><a href="./src/resources/beta/agents/vaults/credentials.ts">McpOauthTokenEndpointAuth</a></code>
+- <code><a href="./src/resources/beta/agents/vaults/credentials.ts">McpOauthTokenEndpointAuthCreateParam</a></code>
+- <code><a href="./src/resources/beta/agents/vaults/credentials.ts">McpOauthTokenEndpointAuthRotateParam</a></code>
+
+Methods:
+
+- <code title="post /vaults/{vault_id}/credentials">client.beta.agents.vaults.credentials.<a href="./src/resources/beta/agents/vaults/credentials.ts">create</a>(vaultID, { ...params }) -> Credential</code>
+- <code title="get /vaults/{vault_id}/credentials/{credential_id}">client.beta.agents.vaults.credentials.<a href="./src/resources/beta/agents/vaults/credentials.ts">retrieve</a>(credentialID, { ...params }) -> Credential</code>
+- <code title="post /vaults/{vault_id}/credentials/{credential_id}">client.beta.agents.vaults.credentials.<a href="./src/resources/beta/agents/vaults/credentials.ts">update</a>(credentialID, { ...params }) -> Credential</code>
+- <code title="get /vaults/{vault_id}/credentials">client.beta.agents.vaults.credentials.<a href="./src/resources/beta/agents/vaults/credentials.ts">list</a>(vaultID, { ...params }) -> CredentialsPage</code>
+- <code title="delete /vaults/{vault_id}/credentials/{credential_id}">client.beta.agents.vaults.credentials.<a href="./src/resources/beta/agents/vaults/credentials.ts">delete</a>(credentialID, { ...params }) -> CredentialDeleted</code>
+
+### Sessions
+
+Methods:
+
+- <code title="post /agents/sessions">client.beta.agents.sessions.<a href="./src/resources/beta/agents/sessions/sessions.ts">create</a>({ ...params }) -> AgentSession</code>
+- <code title="get /agents/sessions/{session_id}">client.beta.agents.sessions.<a href="./src/resources/beta/agents/sessions/sessions.ts">retrieve</a>(sessionID) -> AgentSession</code>
+- <code title="post /agents/sessions/{session_id}">client.beta.agents.sessions.<a href="./src/resources/beta/agents/sessions/sessions.ts">update</a>(sessionID, { ...params }) -> AgentSession</code>
+- <code title="get /agents/sessions">client.beta.agents.sessions.<a href="./src/resources/beta/agents/sessions/sessions.ts">list</a>({ ...params }) -> AgentSessionsPage</code>
+- <code title="delete /agents/sessions/{session_id}">client.beta.agents.sessions.<a href="./src/resources/beta/agents/sessions/sessions.ts">delete</a>(sessionID) -> AgentSessionDeleted</code>
+
+#### Subagents
+
+Methods:
+
+- <code title="get /agents/sessions/{session_id}/subagents/{subagent_id}">client.beta.agents.sessions.subagents.<a href="./src/resources/beta/agents/sessions/subagents/subagents.ts">retrieve</a>(subagentID, { ...params }) -> Subagent</code>
+- <code title="get /agents/sessions/{session_id}/subagents">client.beta.agents.sessions.subagents.<a href="./src/resources/beta/agents/sessions/subagents/subagents.ts">list</a>(sessionID, { ...params }) -> SubagentsPage</code>
+
+##### Items
+
+Methods:
+
+- <code title="get /agents/sessions/{session_id}/subagents/{subagent_id}/items">client.beta.agents.sessions.subagents.items.<a href="./src/resources/beta/agents/sessions/subagents/items.ts">list</a>(subagentID, { ...params }) -> AgentSessionItemsPage</code>
+
+##### Turns
+
+Methods:
+
+- <code title="get /agents/sessions/{session_id}/subagents/{subagent_id}/turns/{turn_id}">client.beta.agents.sessions.subagents.turns.<a href="./src/resources/beta/agents/sessions/subagents/turns/turns.ts">retrieve</a>(turnID, { ...params }) -> Turn</code>
+- <code title="get /agents/sessions/{session_id}/subagents/{subagent_id}/turns">client.beta.agents.sessions.subagents.turns.<a href="./src/resources/beta/agents/sessions/subagents/turns/turns.ts">list</a>(subagentID, { ...params }) -> TurnsPage</code>
+
+###### Items
+
+Methods:
+
+- <code title="get /agents/sessions/{session_id}/subagents/{subagent_id}/turns/{turn_id}/items">client.beta.agents.sessions.subagents.turns.items.<a href="./src/resources/beta/agents/sessions/subagents/turns/items.ts">list</a>(turnID, { ...params }) -> AgentSessionItemsPage</code>
+
+#### Artifacts
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/sessions/artifacts.ts">SessionArtifact</a></code>
+- <code><a href="./src/resources/beta/agents/sessions/artifacts.ts">SessionArtifactDeleted</a></code>
+
+Methods:
+
+- <code title="get /agents/sessions/{session_id}/artifacts/{artifact_id}">client.beta.agents.sessions.artifacts.<a href="./src/resources/beta/agents/sessions/artifacts.ts">retrieve</a>(artifactID, { ...params }) -> SessionArtifact</code>
+- <code title="get /agents/sessions/{session_id}/artifacts">client.beta.agents.sessions.artifacts.<a href="./src/resources/beta/agents/sessions/artifacts.ts">list</a>(sessionID, { ...params }) -> SessionArtifactsPage</code>
+- <code title="delete /agents/sessions/{session_id}/artifacts/{artifact_id}">client.beta.agents.sessions.artifacts.<a href="./src/resources/beta/agents/sessions/artifacts.ts">delete</a>(artifactID, { ...params }) -> SessionArtifactDeleted</code>
+- <code title="get /agents/sessions/{session_id}/artifacts/{artifact_id}/content">client.beta.agents.sessions.artifacts.<a href="./src/resources/beta/agents/sessions/artifacts.ts">content</a>(artifactID, { ...params }) -> Response</code>
+
+#### Items
+
+Methods:
+
+- <code title="get /agents/sessions/{session_id}/items">client.beta.agents.sessions.items.<a href="./src/resources/beta/agents/sessions/items.ts">list</a>(sessionID, { ...params }) -> AgentSessionItemsPage</code>
+
+#### Events
+
+Methods:
+
+- <code title="post /agents/sessions/{session_id}/events">client.beta.agents.sessions.events.<a href="./src/resources/beta/agents/sessions/events.ts">create</a>(sessionID, { ...params }) -> void</code>
+- <code title="get /agents/sessions/{session_id}/events">client.beta.agents.sessions.events.<a href="./src/resources/beta/agents/sessions/events.ts">stream</a>(sessionID) -> AgentSessionEvent</code>
+
+#### Turns
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/sessions/turns.ts">Turn</a></code>
+
+Methods:
+
+- <code title="get /agents/sessions/{session_id}/turns/{turn_id}">client.beta.agents.sessions.turns.<a href="./src/resources/beta/agents/sessions/turns.ts">retrieve</a>(turnID, { ...params }) -> Turn</code>
+- <code title="get /agents/sessions/{session_id}/turns">client.beta.agents.sessions.turns.<a href="./src/resources/beta/agents/sessions/turns.ts">list</a>(sessionID, { ...params }) -> TurnsPage</code>
+
 ## Responses
 
 Types:
