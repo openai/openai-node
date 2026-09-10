@@ -24,14 +24,11 @@ describe('resource apiKeys', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.admin.organization.projects.serviceAccounts.apiKeys.create(
-      'service_account_id',
-      {
-        project_id: 'project_id',
-        expires_in_seconds: 1,
-        name: 'name',
-        scopes: ['string'],
-      },
-    );
+    await client.admin.organization.projects.serviceAccounts.apiKeys.create('service_account_id', {
+      project_id: 'project_id',
+      expires_in_seconds: 1,
+      name: 'name',
+      scopes: ['string'],
+    });
   });
 });

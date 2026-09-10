@@ -166,6 +166,7 @@ import {
 } from './resources/evals/evals';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
 import { Graders } from './resources/graders/graders';
+import { Live } from './resources/live/live';
 import { Realtime } from './resources/realtime/realtime';
 import { Responses } from './resources/responses/responses';
 import { Safety } from './resources/safety/safety';
@@ -1977,6 +1978,7 @@ export class OpenAI {
   uploads: API.Uploads = new API.Uploads(this);
   admin: API.Admin = new API.Admin(this);
   responses: API.Responses = new API.Responses(this);
+  live: API.Live = new API.Live(this);
   realtime: API.Realtime = new API.Realtime(this);
   /**
    * Manage conversations and conversation items.
@@ -2013,6 +2015,7 @@ OpenAI.Batches = Batches;
 OpenAI.Uploads = UploadsAPIUploads;
 OpenAI.Admin = Admin;
 OpenAI.Responses = Responses;
+OpenAI.Live = Live;
 OpenAI.Realtime = Realtime;
 OpenAI.Conversations = Conversations;
 OpenAI.Evals = Evals;
@@ -2279,6 +2282,8 @@ export declare namespace OpenAI {
   export { Admin as Admin };
 
   export { Responses as Responses };
+
+  export { Live as Live };
 
   export { Realtime as Realtime };
 

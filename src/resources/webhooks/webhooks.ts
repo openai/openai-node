@@ -501,6 +501,8 @@ export namespace FineTuningJobSucceededWebhookEvent {
 }
 
 /**
+ * @deprecated Deprecated: use `live.transport.incoming`. Retained for existing
+ * subscriptions during migration; new subscriptions to this event are not allowed.
  * Sent when an incoming API SIP session is available for Live acceptance. The same
  * pending session can also emit `realtime.call.incoming`; the first successful
  * Realtime or Live accept endpoint selects the runtime surface.
@@ -538,8 +540,9 @@ export namespace LiveCallIncomingWebhookEvent {
    */
   export interface Data {
     /**
-     * The `live_...` ID of the pending SIP session. Forward this value unchanged when
-     * accepting or rejecting the call through the Live API.
+     * The `live_...` ID of the pending SIP session. Pass this value unchanged to Live
+     * call controls and sideband connections. The corresponding
+     * `realtime.call.incoming` event uses a separate `rtc_...` call ID.
      */
     session_id: string;
 
@@ -570,9 +573,83 @@ export namespace LiveCallIncomingWebhookEvent {
 }
 
 /**
- * Sent when an incoming API SIP session is available for Realtime acceptance. The
- * same pending session can also emit `live.call.incoming`; the first successful
+ * Sent when an incoming API SIP session is available for Live acceptance. The same
+ * pending session can also emit `realtime.call.incoming`; the first successful
  * Realtime or Live accept endpoint selects the runtime surface.
+ */
+export interface LiveTransportIncomingWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp (in seconds) of when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * Event data payload.
+   */
+  data: LiveTransportIncomingWebhookEvent.Data;
+
+  /**
+   * The type of the event. Always `live.transport.incoming`.
+   */
+  type: 'live.transport.incoming';
+
+  /**
+   * The object of the event. Always `event`.
+   */
+  object?: 'event';
+}
+
+export namespace LiveTransportIncomingWebhookEvent {
+  /**
+   * Event data payload.
+   */
+  export interface Data {
+    /**
+     * The `live_...` ID of the pending SIP session. Forward this value unchanged when
+     * accepting or rejecting the call through the Live API.
+     */
+    session_id: string;
+
+    /**
+     * Headers from the SIP INVITE, excluding SIP authorization headers. Retained
+     * names, values, repeated entries, and order are preserved. Treat these values as
+     * untrusted call metadata.
+     */
+    sip_headers: Array<Data.SipHeader>;
+
+    /**
+     * The incoming transport type. Always `sip`.
+     */
+    type: 'sip';
+  }
+
+  export namespace Data {
+    /**
+     * A header from the SIP Invite.
+     */
+    export interface SipHeader {
+      /**
+       * Name of the SIP Header.
+       */
+      name: string;
+
+      /**
+       * Value of the SIP Header.
+       */
+      value: string;
+    }
+  }
+}
+
+/**
+ * Sent when an incoming API SIP session is available for Realtime acceptance. The
+ * same pending session can also emit `live.transport.incoming`; the first
+ * successful Realtime or Live accept endpoint selects the runtime surface.
  */
 export interface RealtimeCallIncomingWebhookEvent {
   /**
@@ -608,7 +685,7 @@ export namespace RealtimeCallIncomingWebhookEvent {
   export interface Data {
     /**
      * The Transceiver `rtc_...` ID of the pending SIP session. The paired
-     * `live.call.incoming` event derives its `session_id` by replacing the `rtc_`
+     * `live.transport.incoming` event derives its `session_id` by replacing the `rtc_`
      * prefix with `live_`. Use the ID returned by the event with the corresponding
      * Realtime or Live API.
      */
@@ -895,6 +972,7 @@ export type UnwrapWebhookEvent =
   | FineTuningJobFailedWebhookEvent
   | FineTuningJobSucceededWebhookEvent
   | LiveCallIncomingWebhookEvent
+  | LiveTransportIncomingWebhookEvent
   | RealtimeCallIncomingWebhookEvent
   | ResponseCancelledWebhookEvent
   | ResponseCompletedWebhookEvent
@@ -916,6 +994,7 @@ export declare namespace Webhooks {
     type FineTuningJobFailedWebhookEvent as FineTuningJobFailedWebhookEvent,
     type FineTuningJobSucceededWebhookEvent as FineTuningJobSucceededWebhookEvent,
     type LiveCallIncomingWebhookEvent as LiveCallIncomingWebhookEvent,
+    type LiveTransportIncomingWebhookEvent as LiveTransportIncomingWebhookEvent,
     type RealtimeCallIncomingWebhookEvent as RealtimeCallIncomingWebhookEvent,
     type ResponseCancelledWebhookEvent as ResponseCancelledWebhookEvent,
     type ResponseCompletedWebhookEvent as ResponseCompletedWebhookEvent,

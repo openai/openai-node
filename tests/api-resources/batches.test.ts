@@ -25,7 +25,7 @@ describe('resource batches', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.batches.create({
+    await client.batches.create({
       completion_window: '24h',
       endpoint: '/v1/responses',
       input_file_id: 'input_file_id',
