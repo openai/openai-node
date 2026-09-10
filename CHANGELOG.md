@@ -1,5 +1,20 @@
 # Changelog
 
+## [7.14.0](https://github.com/openai/openai-node/compare/v7.13.0...v7.14.0) (2026-09-10)
+
+
+### Features
+
+* **api:** Add Live API ([c037ba7](https://github.com/openai/openai-node/commit/c037ba724235cd58943e95d5b3b98ff76235e83c))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump joi from 18.2.3 to 18.2.5 in /ecosystem-tests/vercel-edge ([#2702](https://github.com/openai/openai-node/issues/2702)) ([029b805](https://github.com/openai/openai-node/commit/029b805b8d65995a9f53d8872ee83cd4b145355b))
+* **deps:** bump next from 15.5.23 to 15.5.25 in /ecosystem-tests/vercel-edge ([#2703](https://github.com/openai/openai-node/issues/2703)) ([e9446db](https://github.com/openai/openai-node/commit/e9446db4bc43ce7977a4957c9990bddb8fc5913f))
+* **deps:** bump sharp from 0.35.3 to 0.35.4 in /ecosystem-tests/vercel-edge ([#2704](https://github.com/openai/openai-node/issues/2704)) ([ca95705](https://github.com/openai/openai-node/commit/ca957050c7cfd8c4a12335ee3345148a660827cc))
+* **deps:** update remaining tooling and fixture patches ([#2712](https://github.com/openai/openai-node/issues/2712)) ([bcaabee](https://github.com/openai/openai-node/commit/bcaabee91cf476446cfd79e4fd71bf0c80fe157b))
+
 ## [7.13.0](https://github.com/openai/openai-node/compare/v7.12.1...v7.13.0) (2026-09-09)
 
 
