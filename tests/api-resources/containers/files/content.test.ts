@@ -10,7 +10,7 @@ const client = new OpenAI({
 
 describe('resource content', () => {
   test('retrieve: required and optional params', async () => {
-    const response = await client.containers.files.content.retrieve('file_id', {
+    await client.containers.files.content.retrieve('file_id', {
       container_id: 'container_id',
     });
   });

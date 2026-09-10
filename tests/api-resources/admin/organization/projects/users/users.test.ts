@@ -21,7 +21,7 @@ describe('resource users', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.admin.organization.projects.users.create('project_id', {
+    await client.admin.organization.projects.users.create('project_id', {
       role: 'role',
       email: 'email',
       user_id: 'user_id',
@@ -42,7 +42,7 @@ describe('resource users', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    const response = await client.admin.organization.projects.users.retrieve('user_id', {
+    await client.admin.organization.projects.users.retrieve('user_id', {
       project_id: 'project_id',
     });
   });
@@ -61,7 +61,7 @@ describe('resource users', () => {
   });
 
   test('update: required and optional params', async () => {
-    const response = await client.admin.organization.projects.users.update('user_id', {
+    await client.admin.organization.projects.users.update('user_id', {
       project_id: 'project_id',
       role: 'role',
     });
@@ -103,7 +103,7 @@ describe('resource users', () => {
   });
 
   test('delete: required and optional params', async () => {
-    const response = await client.admin.organization.projects.users.delete('user_id', {
+    await client.admin.organization.projects.users.delete('user_id', {
       project_id: 'project_id',
     });
   });

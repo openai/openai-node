@@ -24,7 +24,7 @@ describe('resource translations', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.audio.translations.create({
+    await client.audio.translations.create({
       file: await toFile(Buffer.from('Example data'), 'README.md'),
       model: 'whisper-1',
       prompt: 'prompt',

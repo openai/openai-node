@@ -21,7 +21,7 @@ describe('resource moderations', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.moderations.create({
+    await client.moderations.create({
       input: 'I want to kill them.',
       model: 'omni-moderation-latest',
     });

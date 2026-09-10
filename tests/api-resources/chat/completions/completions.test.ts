@@ -24,7 +24,7 @@ describe('resource completions', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.chat.completions.create({
+    await client.chat.completions.create({
       messages: [
         {
           content: 'string',
@@ -127,7 +127,7 @@ describe('resource completions', () => {
   });
 
   test('update: required and optional params', async () => {
-    const response = await client.chat.completions.update('completion_id', { metadata: { foo: 'string' } });
+    await client.chat.completions.update('completion_id', { metadata: { foo: 'string' } });
   });
 
   test('list', async () => {
