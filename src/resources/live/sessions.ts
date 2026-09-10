@@ -9,7 +9,11 @@ import { path } from '../../internal/utils/path';
 
 export class Sessions extends APIResource {
   /**
-   * Accept an incoming SIP call with Live startup configuration.
+   * Accept an incoming SIP call. Supply session with type live, the model, and
+   * startup configuration. Before accepting calls, follow the
+   * [Live prompting guide](https://developers.openai.com/api/docs/guides/live-prompting)
+   * to write frontend conversation instructions and a separate backend prompt. SIP
+   * media format is negotiated; omit audio.format.
    *
    * @example
    * ```ts
@@ -72,7 +76,7 @@ export class Sessions extends APIResource {
   }
 
   /**
-   * Hang up a Live session.
+   * End a SIP call identified by session_id.
    *
    * @example
    * ```ts
@@ -88,7 +92,8 @@ export class Sessions extends APIResource {
   }
 
   /**
-   * Transfer a Live SIP call to another destination.
+   * Transfer a SIP call to another destination. Supply a nonblank target_uri for the
+   * SIP Refer-To header.
    *
    * @example
    * ```ts
@@ -107,7 +112,8 @@ export class Sessions extends APIResource {
   }
 
   /**
-   * Reject an incoming SIP call.
+   * Reject an incoming SIP call. Send a required SIP rejection status_code between
+   * 300 and 699.
    *
    * @example
    * ```ts

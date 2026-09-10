@@ -41,6 +41,8 @@ import {
   type NextCursorPageParams,
   NextCursorPageResponse,
   PageResponse,
+  type TokenPageParams,
+  TokenPageResponse,
 } from './core/pagination';
 import * as Uploads from './core/uploads';
 import * as API from './resources/index';
@@ -2108,6 +2110,9 @@ export declare namespace OpenAI {
     type NextCursorPageParams as NextCursorPageParams,
     type NextCursorPageResponse as NextCursorPageResponse,
   };
+
+  export import TokenPage = Pagination.TokenPage;
+  export { type TokenPageParams as TokenPageParams, type TokenPageResponse as TokenPageResponse };
 
   export {
     Completions as Completions,
