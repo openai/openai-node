@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.15.0](https://github.com/openai/openai-node/compare/v7.14.0...v7.15.0) (2026-09-10)
+
+
+### Features
+
+* **api:** add Agents API ([#2719](https://github.com/openai/openai-node/issues/2719)) ([20a47f9](https://github.com/openai/openai-node/commit/20a47f9d608885c73a8053a4036b1faec9b5493f))
+
 ## [7.14.0](https://github.com/openai/openai-node/compare/v7.13.0...v7.14.0) (2026-09-10)
 
 
