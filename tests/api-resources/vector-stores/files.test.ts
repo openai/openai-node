@@ -21,7 +21,7 @@ describe('resource files', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.vectorStores.files.create('vs_abc123', {
+    await client.vectorStores.files.create('vs_abc123', {
       file_id: 'file_id',
       attributes: { foo: 'string' },
       chunking_strategy: { type: 'auto' },
@@ -42,7 +42,7 @@ describe('resource files', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    const response = await client.vectorStores.files.retrieve('file-abc123', {
+    await client.vectorStores.files.retrieve('file-abc123', {
       vector_store_id: 'vs_abc123',
     });
   });
@@ -62,7 +62,7 @@ describe('resource files', () => {
   });
 
   test('update: required and optional params', async () => {
-    const response = await client.vectorStores.files.update('file-abc123', {
+    await client.vectorStores.files.update('file-abc123', {
       vector_store_id: 'vs_abc123',
       attributes: { foo: 'string' },
     });
@@ -110,7 +110,7 @@ describe('resource files', () => {
   });
 
   test('delete: required and optional params', async () => {
-    const response = await client.vectorStores.files.delete('file_id', {
+    await client.vectorStores.files.delete('file_id', {
       vector_store_id: 'vector_store_id',
     });
   });
@@ -129,6 +129,6 @@ describe('resource files', () => {
   });
 
   test('content: required and optional params', async () => {
-    const response = await client.vectorStores.files.content('file-abc123', { vector_store_id: 'vs_abc123' });
+    await client.vectorStores.files.content('file-abc123', { vector_store_id: 'vs_abc123' });
   });
 });

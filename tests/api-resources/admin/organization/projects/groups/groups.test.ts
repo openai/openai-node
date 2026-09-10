@@ -24,7 +24,7 @@ describe('resource groups', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.admin.organization.projects.groups.create('project_id', {
+    await client.admin.organization.projects.groups.create('project_id', {
       group_id: 'group_id',
       role: 'role',
     });
@@ -44,7 +44,7 @@ describe('resource groups', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    const response = await client.admin.organization.projects.groups.retrieve('group_id', {
+    await client.admin.organization.projects.groups.retrieve('group_id', {
       project_id: 'project_id',
       group_type: 'group',
     });
@@ -90,7 +90,7 @@ describe('resource groups', () => {
   });
 
   test('delete: required and optional params', async () => {
-    const response = await client.admin.organization.projects.groups.delete('group_id', {
+    await client.admin.organization.projects.groups.delete('group_id', {
       project_id: 'project_id',
     });
   });

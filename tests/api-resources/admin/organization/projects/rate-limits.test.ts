@@ -49,7 +49,7 @@ describe('resource rateLimits', () => {
   });
 
   test('updateRateLimit: required and optional params', async () => {
-    const response = await client.admin.organization.projects.rateLimits.updateRateLimit('rate_limit_id', {
+    await client.admin.organization.projects.rateLimits.updateRateLimit('rate_limit_id', {
       project_id: 'project_id',
       batch_1_day_max_input_tokens: 0,
       max_audio_megabytes_per_1_minute: 0,

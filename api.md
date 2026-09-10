@@ -1250,6 +1250,8 @@ Methods:
 
 # [Responses](src/resources/responses/api.md)
 
+# [Live](src/resources/live/api.md)
+
 # [Realtime](src/resources/realtime/api.md)
 
 # [Conversations](src/resources/conversations/api.md)
