@@ -248,6 +248,29 @@ describe.each([
     expect(errors).toHaveBeenCalledTimes(3);
   });
 
+  test('reports native socket failures with their message and cause', () => {
+    const realtime = new Realtime({ model: 'gpt-realtime' }, createClient());
+    const socket = lastBrowserSocket();
+    const errors = vi.fn();
+    const described = new Error('Received network error or non-101 status code.');
+    // oxlint-disable-next-line unicorn/error-message -- Node's native WebSocket reports connection failures this way.
+    const undescribed = new TypeError('');
+
+    onRealtimeEvent(realtime, 'error', errors);
+
+    socket.dispatch('error', { type: 'error', message: described.message, error: described });
+    socket.dispatch('error', { type: 'error', message: '', error: described });
+    socket.dispatch('error', { type: 'error', message: '', error: undescribed });
+    socket.dispatch('error', { type: 'error' });
+
+    expect(errors.mock.calls.map(([error]) => [error.message, error.cause])).toEqual([
+      [described.message, described],
+      [described.message, described],
+      ['unknown error', undescribed],
+      ['unknown error', null],
+    ]);
+  });
+
   test.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
     'dispatches Object.prototype event type %s without crashing',
     (eventType) => {
