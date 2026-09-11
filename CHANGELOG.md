@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.15.1](https://github.com/openai/openai-node/compare/v7.15.0...v7.15.1) (2026-09-11)
+
+
+### Chores
+
+* bump smol-toml in Vercel Edge fixture ([#2721](https://github.com/openai/openai-node/issues/2721)) ([3c4e4d2](https://github.com/openai/openai-node/commit/3c4e4d26e3aebd422bc73787e4fcbd1773607785))
+
 ## [7.15.0](https://github.com/openai/openai-node/compare/v7.14.0...v7.15.0) (2026-09-10)
 
 
