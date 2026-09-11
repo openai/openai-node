@@ -56,13 +56,13 @@
     "@vercel/python-analysis": {
       "js-yaml": "5.2.2",
       "minimatch": "10.2.5",
-      "smol-toml": "1.7.0"
+      "smol-toml": "1.7.1"
     },
     "@vercel/remix-builder": {
       "path-to-regexp": "6.3.0"
     },
     "@vercel/rust": {
-      "smol-toml": "1.7.0"
+      "smol-toml": "1.7.1"
     },
     "@vercel/sandbox": {
       "undici": "7.29.0"
@@ -76,7 +76,7 @@
     },
     "undici": "6.28.0",
     "vercel": {
-      "smol-toml": "1.7.0"
+      "smol-toml": "1.7.1"
     }
   }
 }
