@@ -478,6 +478,8 @@ export class OpenAI {
       timeout: number;
       retriesRemaining: number;
       hasStreamingBody: boolean;
+      /** Finalized fetch signal after prepareRequest; may be null when a hook clears cancellation. */
+      signal?: AbortSignal | null;
       authentication?: X509WorkloadIdentityAuth;
       helperMethod?: unknown;
       continueRequest?: <T>(operation: () => Promise<T>) => Promise<T>;
@@ -1108,6 +1110,8 @@ export class OpenAI {
           props.options,
           retriesRemaining,
           props.retryOfRequestLogID ?? props.requestLogID,
+          undefined,
+          attempt?.signal,
         );
         Object.assign(props, next);
       } finally {
@@ -1323,7 +1327,7 @@ export class OpenAI {
           retriesRemaining,
           retryOfRequestLogID ?? requestLogID,
           undefined,
-          req.signal ?? options.signal,
+          req.signal,
         );
       }
       const terminalMessage = hasStreamingBody
@@ -1448,7 +1452,7 @@ export class OpenAI {
           retriesRemaining,
           retryOfRequestLogID ?? requestLogID,
           response.headers,
-          req.signal ?? options.signal,
+          req.signal,
         );
       }
 
@@ -1500,6 +1504,7 @@ export class OpenAI {
       timeout,
       retriesRemaining,
       hasStreamingBody,
+      signal: req.signal,
       ...(x509Authentication ? { authentication: x509Authentication } : {}),
       helperMethod: options.__metadata?.['helperMethod'],
       ...(continueRequest ? { continueRequest } : {}),
@@ -1640,7 +1645,7 @@ export class OpenAI {
     retriesRemaining: number,
     requestLogID: string,
     responseHeaders?: Headers | undefined,
-    signal: AbortSignal | null | undefined = options.signal,
+    signal?: AbortSignal | null,
   ): Promise<APIResponseProps> {
     let timeoutMillis: number | undefined;
 

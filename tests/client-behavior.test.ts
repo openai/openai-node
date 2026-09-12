@@ -32,6 +32,12 @@ class SignalReplacingOpenAI extends OpenAI {
   }
 }
 
+class SignalClearingOpenAI extends OpenAI {
+  protected override async prepareRequest(request: RequestInit): Promise<void> {
+    request.signal = null;
+  }
+}
+
 function jsonResponse(value: unknown = {}, init: ResponseInit = {}): Response {
   return Response.json(value, {
     ...init,
@@ -240,6 +246,63 @@ describe('OpenAI client request behavior', () => {
     // Let makeRequest finish canceling the error body and enter retry backoff.
     await Promise.resolve();
     await Promise.resolve();
+    replacement.abort(reason);
+
+    await expect(pending).rejects.toMatchObject({
+      constructor: APIUserAbortError,
+      cause: reason,
+    });
+    expect(performance.now() - startedAt).toBeLessThan(350);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('ignores caller abort during backoff when prepareRequest clears the signal', async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse(
+        { error: { message: 'rate limited' } },
+        { status: 429, headers: { 'retry-after-ms': '200' } },
+      ),
+    );
+    const caller = new AbortController();
+    const client = new SignalClearingOpenAI({ apiKey: 'test-key', maxRetries: 1, fetch });
+    const startedAt = performance.now();
+    const pending = client.get('/items', { signal: caller.signal });
+
+    await vi.waitFor(() => expect(fetch.mock.calls.length).toBeGreaterThanOrEqual(1));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await Promise.resolve();
+    await Promise.resolve();
+    caller.abort(new Error('caller cancelled after hook cleared signal'));
+
+    // Backoff must run to completion; the next attempt then observes the aborted caller signal.
+    await expect(pending).rejects.toBeInstanceOf(APIUserAbortError);
+    expect(performance.now() - startedAt).toBeGreaterThan(150);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('cancels body-timeout retry backoff when a prepareRequest hook replaces the signal', async () => {
+    const replacement = new AbortController();
+    const fetch = vi.fn(async () =>
+      new Response(
+        new ReadableStream({
+          pull() {
+            return Promise.race([]);
+          },
+        }),
+        { headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    const client = new SignalReplacingOpenAI(
+      { apiKey: 'test-key', maxRetries: 1, fetch, timeout: 40 },
+      replacement.signal,
+    );
+    const reason = new Error('stop hook signal after body timeout');
+    const startedAt = performance.now();
+    const pending = client.get('/items');
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // Wait until the body-read timeout fires and retry backoff begins.
+    await new Promise((resolve) => setTimeout(resolve, 55));
     replacement.abort(reason);
 
     await expect(pending).rejects.toMatchObject({
