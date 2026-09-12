@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import OpenAI from 'openai';
 import {
@@ -19,29 +20,20 @@ class IdempotentOpenAI extends OpenAI {
   }
 }
 
-class SignalReplacingOpenAI extends OpenAI {
-  constructor(
-    options: ConstructorParameters<typeof OpenAI>[0],
-    private readonly replacementSignal: AbortSignal,
-  ) {
-    super(options);
-  }
-
-  protected override async prepareRequest(request: RequestInit): Promise<void> {
-    request.signal = this.replacementSignal;
-  }
-}
-
-class SignalClearingOpenAI extends OpenAI {
-  protected override async prepareRequest(request: RequestInit): Promise<void> {
-    request.signal = null;
-  }
-}
-
 function jsonResponse(value: unknown = {}, init: ResponseInit = {}): Response {
   return Response.json(value, {
     ...init,
     headers: { 'content-type': 'application/json', ...init.headers },
+  });
+}
+
+function installPrepareRequest(
+  client: OpenAI,
+  prepare: (request: RequestInit) => void | Promise<void>,
+): void {
+  Object.defineProperty(client, 'prepareRequest', {
+    configurable: true,
+    value: prepare,
   });
 }
 
@@ -234,10 +226,10 @@ describe('OpenAI client request behavior', () => {
       ),
     );
     const replacement = new AbortController();
-    const client = new SignalReplacingOpenAI(
-      { apiKey: 'test-key', maxRetries: 1, fetch },
-      replacement.signal,
-    );
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 1, fetch });
+    installPrepareRequest(client, (request) => {
+      request.signal = replacement.signal;
+    });
     const reason = new Error('stop hook-replaced signal');
     const startedAt = performance.now();
     const pending = client.get('/items');
@@ -264,7 +256,10 @@ describe('OpenAI client request behavior', () => {
       ),
     );
     const caller = new AbortController();
-    const client = new SignalClearingOpenAI({ apiKey: 'test-key', maxRetries: 1, fetch });
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 1, fetch });
+    installPrepareRequest(client, (request) => {
+      request.signal = null;
+    });
     const startedAt = performance.now();
     const pending = client.get('/items', { signal: caller.signal });
 
@@ -282,27 +277,25 @@ describe('OpenAI client request behavior', () => {
 
   test('cancels body-timeout retry backoff when a prepareRequest hook replaces the signal', async () => {
     const replacement = new AbortController();
-    const fetch = vi.fn(async () =>
-      new Response(
-        new ReadableStream({
-          pull() {
-            return Promise.race([]);
-          },
-        }),
-        { headers: { 'content-type': 'application/json' } },
-      ),
+    const hangingBody = new ReadableStream<Uint8Array>({
+      pull: async () => {
+        await Promise.race([]);
+      },
+    });
+    const fetch = vi.fn(
+      async () => new Response(hangingBody, { headers: { 'content-type': 'application/json' } }),
     );
-    const client = new SignalReplacingOpenAI(
-      { apiKey: 'test-key', maxRetries: 1, fetch, timeout: 40 },
-      replacement.signal,
-    );
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 1, fetch, timeout: 40 });
+    installPrepareRequest(client, (request) => {
+      request.signal = replacement.signal;
+    });
     const reason = new Error('stop hook signal after body timeout');
     const startedAt = performance.now();
     const pending = client.get('/items');
 
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     // Wait until the body-read timeout fires and retry backoff begins.
-    await new Promise((resolve) => setTimeout(resolve, 55));
+    await delay(55);
     replacement.abort(reason);
 
     await expect(pending).rejects.toMatchObject({
