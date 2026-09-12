@@ -1108,6 +1108,8 @@ export class OpenAI {
           props.options,
           retriesRemaining,
           props.retryOfRequestLogID ?? props.requestLogID,
+          undefined,
+          props.requestSignal,
         );
         Object.assign(props, next);
       } finally {
@@ -1318,7 +1320,13 @@ export class OpenAI {
             message: x509Authentication ? 'X.509 workload identity API connection failed.' : response.message,
           }),
         );
-        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+        return this.retryRequest(
+          options,
+          retriesRemaining,
+          retryOfRequestLogID ?? requestLogID,
+          undefined,
+          req.signal,
+        );
       }
       const terminalMessage = hasStreamingBody
         ? 'error; streaming body cannot be retried'
@@ -1442,6 +1450,7 @@ export class OpenAI {
           retriesRemaining,
           retryOfRequestLogID ?? requestLogID,
           response.headers,
+          req.signal,
         );
       }
 
@@ -1497,7 +1506,15 @@ export class OpenAI {
       helperMethod: options.__metadata?.['helperMethod'],
       ...(continueRequest ? { continueRequest } : {}),
     });
-    return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
+    return {
+      response,
+      options,
+      controller,
+      requestSignal: req.signal,
+      requestLogID,
+      retryOfRequestLogID,
+      startTime,
+    };
   }
 
   getAPIList<Item, PageClass extends Pagination.AbstractPage<Item> = Pagination.AbstractPage<Item>>(
@@ -1633,6 +1650,7 @@ export class OpenAI {
     retriesRemaining: number,
     requestLogID: string,
     responseHeaders?: Headers | undefined,
+    requestSignal: AbortSignal | null | undefined = options.signal,
   ): Promise<APIResponseProps> {
     let timeoutMillis: number | undefined;
 
@@ -1680,7 +1698,17 @@ export class OpenAI {
     if (x509Authentication) {
       await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.effectiveSignal());
     } else {
-      await sleep(timeoutMillis);
+      const retrySignals =
+        requestSignal === options.signal ? [requestSignal] : [options.signal, requestSignal];
+      try {
+        await sleep(timeoutMillis, ...retrySignals);
+      } catch (error) {
+        const abortedSignal = retrySignals.find((signal) => signal?.aborted);
+        if (abortedSignal) {
+          throw this._makeUserAbortError(abortedSignal);
+        }
+        throw error;
+      }
     }
 
     return this.makeRequest(options, retriesRemaining - 1, requestLogID);
