@@ -1504,7 +1504,7 @@ export class OpenAI {
       timeout,
       retriesRemaining,
       hasStreamingBody,
-      signal: req.signal,
+      ...(req.signal !== undefined ? { signal: req.signal } : {}),
       ...(x509Authentication ? { authentication: x509Authentication } : {}),
       helperMethod: options.__metadata?.['helperMethod'],
       ...(continueRequest ? { continueRequest } : {}),
