@@ -1318,7 +1318,13 @@ export class OpenAI {
             message: x509Authentication ? 'X.509 workload identity API connection failed.' : response.message,
           }),
         );
-        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+        return this.retryRequest(
+          options,
+          retriesRemaining,
+          retryOfRequestLogID ?? requestLogID,
+          undefined,
+          req.signal ?? options.signal,
+        );
       }
       const terminalMessage = hasStreamingBody
         ? 'error; streaming body cannot be retried'
@@ -1442,6 +1448,7 @@ export class OpenAI {
           retriesRemaining,
           retryOfRequestLogID ?? requestLogID,
           response.headers,
+          req.signal ?? options.signal,
         );
       }
 
@@ -1633,6 +1640,7 @@ export class OpenAI {
     retriesRemaining: number,
     requestLogID: string,
     responseHeaders?: Headers | undefined,
+    signal: AbortSignal | null | undefined = options.signal,
   ): Promise<APIResponseProps> {
     let timeoutMillis: number | undefined;
 
@@ -1679,8 +1687,8 @@ export class OpenAI {
     }
     if (x509Authentication) {
       await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.effectiveSignal());
-    } else if (options.signal) {
-      await sleepUntilAborted(timeoutMillis, options.signal);
+    } else if (signal) {
+      await sleepUntilAborted(timeoutMillis, signal);
     } else {
       await sleep(timeoutMillis);
     }

@@ -9,12 +9,26 @@ import {
   SubjectTokenProviderError,
 } from 'openai/core/error';
 import { CursorPage } from 'openai/core/pagination';
+import type { RequestInit } from 'openai/internal/builtin-types';
 
 class IdempotentOpenAI extends OpenAI {
   protected override idempotencyHeader = 'Idempotency-Key';
 
   createIdempotencyKey() {
     return this.defaultIdempotencyKey();
+  }
+}
+
+class SignalReplacingOpenAI extends OpenAI {
+  constructor(
+    options: ConstructorParameters<typeof OpenAI>[0],
+    private readonly replacementSignal: AbortSignal,
+  ) {
+    super(options);
+  }
+
+  protected override async prepareRequest(request: RequestInit): Promise<void> {
+    request.signal = this.replacementSignal;
   }
 }
 
@@ -197,6 +211,36 @@ describe('OpenAI client request behavior', () => {
     await Promise.resolve();
     await Promise.resolve();
     controller.abort(reason);
+
+    await expect(pending).rejects.toMatchObject({
+      constructor: APIUserAbortError,
+      cause: reason,
+    });
+    expect(performance.now() - startedAt).toBeLessThan(350);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('cancels Retry-After backoff when a prepareRequest hook replaces the signal', async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse(
+        { error: { message: 'rate limited' } },
+        { status: 429, headers: { 'retry-after-ms': '500' } },
+      ),
+    );
+    const replacement = new AbortController();
+    const client = new SignalReplacingOpenAI(
+      { apiKey: 'test-key', maxRetries: 1, fetch },
+      replacement.signal,
+    );
+    const reason = new Error('stop hook-replaced signal');
+    const startedAt = performance.now();
+    const pending = client.get('/items');
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // Let makeRequest finish canceling the error body and enter retry backoff.
+    await Promise.resolve();
+    await Promise.resolve();
+    replacement.abort(reason);
 
     await expect(pending).rejects.toMatchObject({
       constructor: APIUserAbortError,
