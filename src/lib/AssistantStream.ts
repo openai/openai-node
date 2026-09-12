@@ -20,7 +20,7 @@ import type {
 } from '../resources/beta/threads/runs/runs';
 import type { ReadableStream } from '../internal/shim-types';
 import { Stream } from '../streaming';
-import { APIError, APIUserAbortError, OpenAIError } from '../error';
+import { APIError, OpenAIError } from '../error';
 import type {
   AssistantStreamEvent,
   MessageStreamEvent,
@@ -204,7 +204,7 @@ export class AssistantStream
       this.#addEvent(event);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
     return this._addRun(this.#endRequest());
   }
@@ -252,7 +252,7 @@ export class AssistantStream
       this.#addEvent(event);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
 
     return this._addRun(this.#endRequest());
@@ -358,7 +358,7 @@ export class AssistantStream
       this.#addEvent(event);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
 
     return this._addRun(this.#endRequest());
@@ -381,7 +381,7 @@ export class AssistantStream
       this.#addEvent(event);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
 
     return this._addRun(this.#endRequest());

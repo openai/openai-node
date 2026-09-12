@@ -131,13 +131,37 @@ test('keeps distinct abort sources and immediately observes an already-aborted s
   expect(getEventListeners(first.signal, 'abort')).toHaveLength(1);
   expect(getEventListeners(second.signal, 'abort')).toHaveLength(1);
 
-  second.abort();
+  const reason = new Error('second source aborted');
+  second.abort(reason);
   expect(stream.controller.signal.aborted).toBe(true);
+  expect(stream.controller.signal.reason).toBe(reason);
   stream.controller = new AbortController();
   stream.observe(second.signal);
   expect(stream.controller.signal.aborted).toBe(true);
+  expect(stream.controller.signal.reason).toBe(reason);
 
   stream.end();
   expect(getEventListeners(first.signal, 'abort')).toHaveLength(0);
   expect(getEventListeners(second.signal, 'abort')).toHaveLength(0);
+});
+
+
+test('still aborts when a structural signal reason getter throws', () => {
+  const stream = new TestStream();
+  const target = new EventTarget();
+  let aborted = false;
+  Object.defineProperties(target, {
+    aborted: { get: () => aborted },
+    reason: {
+      get: () => {
+        throw new Error('reason getter failed');
+      },
+    },
+  });
+  const signal = target as AbortSignal;
+
+  stream.observe(signal);
+  aborted = true;
+  expect(() => target.dispatchEvent(new Event('abort'))).not.toThrow();
+  expect(stream.controller.signal.aborted).toBe(true);
 });

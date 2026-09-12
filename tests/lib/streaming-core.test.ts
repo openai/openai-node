@@ -104,16 +104,20 @@ describe('Stream.fromSSEResponse', () => {
             .create({ ...params, stream: true }, { signal: caller.signal })
             .then((stream) => stream[Symbol.asyncIterator]().next())
         : client.responses.stream(params, { signal: caller.signal }).finalResponse();
-    const assertion =
+    const rawAssertion =
       kind === 'raw'
         ? expect(settlesSoon(completion)).resolves.toEqual({ value: undefined, done: true })
-        : expect(settlesSoon(completion)).rejects.toBeInstanceOf(APIUserAbortError);
+        : undefined;
     const reason = new Error('private caller abort reason');
 
     await vi.waitFor(() => expect(body.locked).toBe(true));
     caller.abort(reason);
 
-    await assertion;
+    if (kind === 'raw') {
+      await rawAssertion;
+    } else {
+      await expect(settlesSoon(completion)).rejects.toMatchObject({ cause: reason });
+    }
     expect(caller.signal.reason).toBe(reason);
     expect(caller.signal.onabort).toBe(onabort);
     expect(cancel).toHaveBeenCalledWith(undefined);
