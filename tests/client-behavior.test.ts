@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 import {
   APIConnectionError,
   APIConnectionTimeoutError,
+  APIUserAbortError,
   OAuthError,
   SubjectTokenProviderError,
 } from 'openai/core/error';
@@ -152,6 +153,57 @@ describe('OpenAI client request behavior', () => {
     } finally {
       parseDate.mockRestore();
     }
+  });
+
+  test('cancels Retry-After backoff immediately when its caller aborts', async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse(
+        { error: { message: 'rate limited' } },
+        { status: 429, headers: { 'retry-after-ms': '500' } },
+      ),
+    );
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 1, fetch });
+    const controller = new AbortController();
+    const reason = new Error('stop retrying');
+    const startedAt = performance.now();
+    const pending = client.get('/items', { signal: controller.signal });
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // Let makeRequest finish canceling the error body and enter retry backoff.
+    await Promise.resolve();
+    await Promise.resolve();
+    controller.abort(reason);
+
+    await expect(pending).rejects.toMatchObject({
+      constructor: APIUserAbortError,
+      cause: reason,
+    });
+    expect(performance.now() - startedAt).toBeLessThan(350);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('cancels connection-error retry backoff immediately when its caller aborts', async () => {
+    const fetch = vi.fn(async () => {
+      throw new Error('network unavailable');
+    });
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 1, fetch });
+    const controller = new AbortController();
+    const reason = new Error('stop retrying connection');
+    const startedAt = performance.now();
+    const pending = client.get('/items', { signal: controller.signal });
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // Let makeRequest classify the connection error and enter retry backoff.
+    await Promise.resolve();
+    await Promise.resolve();
+    controller.abort(reason);
+
+    await expect(pending).rejects.toMatchObject({
+      constructor: APIUserAbortError,
+      cause: reason,
+    });
+    expect(performance.now() - startedAt).toBeLessThan(350);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   test.each([

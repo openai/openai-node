@@ -4,7 +4,7 @@ import type { RequestInit, RequestInfo, BodyInit } from './internal/builtin-type
 import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestInit } from './internal/types';
 import { uuid4 } from './internal/utils/uuid';
 import { validatePositiveInteger, isAbsoluteURL, safeJSON, hasOwn } from './internal/utils/values';
-import { sleep } from './internal/utils/sleep';
+import { sleep, sleepUntilAborted } from './internal/utils/sleep';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
 import { addRequestID, defaultParseResponse, type APIResponseProps } from './internal/parse';
@@ -1679,6 +1679,8 @@ export class OpenAI {
     }
     if (x509Authentication) {
       await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.effectiveSignal());
+    } else if (options.signal) {
+      await sleepUntilAborted(timeoutMillis, options.signal);
     } else {
       await sleep(timeoutMillis);
     }
