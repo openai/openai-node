@@ -4,7 +4,7 @@ import type { RequestInit, RequestInfo, BodyInit } from './internal/builtin-type
 import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestInit } from './internal/types';
 import { uuid4 } from './internal/utils/uuid';
 import { validatePositiveInteger, isAbsoluteURL, safeJSON, hasOwn } from './internal/utils/values';
-import { sleep } from './internal/utils/sleep';
+import { sleep, sleepUntilAborted } from './internal/utils/sleep';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
 import { addRequestID, defaultParseResponse, type APIResponseProps } from './internal/parse';
@@ -478,6 +478,8 @@ export class OpenAI {
       timeout: number;
       retriesRemaining: number;
       hasStreamingBody: boolean;
+      /** Finalized fetch signal after prepareRequest; may be null when a hook clears cancellation. */
+      signal?: AbortSignal | null;
       authentication?: X509WorkloadIdentityAuth;
       helperMethod?: unknown;
       continueRequest?: <T>(operation: () => Promise<T>) => Promise<T>;
@@ -1108,6 +1110,8 @@ export class OpenAI {
           props.options,
           retriesRemaining,
           props.retryOfRequestLogID ?? props.requestLogID,
+          undefined,
+          attempt?.signal,
         );
         Object.assign(props, next);
       } finally {
@@ -1318,7 +1322,13 @@ export class OpenAI {
             message: x509Authentication ? 'X.509 workload identity API connection failed.' : response.message,
           }),
         );
-        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+        return this.retryRequest(
+          options,
+          retriesRemaining,
+          retryOfRequestLogID ?? requestLogID,
+          undefined,
+          req.signal,
+        );
       }
       const terminalMessage = hasStreamingBody
         ? 'error; streaming body cannot be retried'
@@ -1442,6 +1452,7 @@ export class OpenAI {
           retriesRemaining,
           retryOfRequestLogID ?? requestLogID,
           response.headers,
+          req.signal,
         );
       }
 
@@ -1493,6 +1504,7 @@ export class OpenAI {
       timeout,
       retriesRemaining,
       hasStreamingBody,
+      ...(req.signal !== undefined ? { signal: req.signal } : {}),
       ...(x509Authentication ? { authentication: x509Authentication } : {}),
       helperMethod: options.__metadata?.['helperMethod'],
       ...(continueRequest ? { continueRequest } : {}),
@@ -1633,6 +1645,7 @@ export class OpenAI {
     retriesRemaining: number,
     requestLogID: string,
     responseHeaders?: Headers | undefined,
+    signal?: AbortSignal | null,
   ): Promise<APIResponseProps> {
     let timeoutMillis: number | undefined;
 
@@ -1679,6 +1692,8 @@ export class OpenAI {
     }
     if (x509Authentication) {
       await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.effectiveSignal());
+    } else if (signal) {
+      await sleepUntilAborted(timeoutMillis, signal);
     } else {
       await sleep(timeoutMillis);
     }
