@@ -1,5 +1,7 @@
 /* oxlint-disable unicorn/prefer-single-call -- TranscriptGrouper.push consumes one event at a time; it is not Array.push. */
+import { spawnSync } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { compiledFixture } from '../../utils/compiled-fixtures';
 import { TranscriptGrouper } from 'openai/helpers/live';
 import type {
   TranscriptGrouperOptions,
@@ -70,6 +72,36 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('public Live transcript grouping', () => {
+  it.each(['.', ' '])(
+    'preserves a large transcript with interior %j without blocking normalization',
+    (padding) => {
+      const result = spawnSync(
+        process.execPath,
+        [
+          '-e',
+          `
+          const assert = require('node:assert/strict');
+          const { TranscriptGrouper } = require(process.argv[1]);
+          const transcript = 'a' + process.argv[2].repeat(1_000_000) + 'b';
+          const grouper = new TranscriptGrouper();
+          const segments = [];
+          grouper.on('segment.closed', ({ segment }) => segments.push([segment.speaker, segment.text]));
+          grouper.push({ type: 'session.input_transcript.delta', event_id: 'user', delta: 'Tell me', start_ms: 0, end_ms: 200 });
+          grouper.push({ type: 'session.output_transcript.delta', event_id: 'assistant', delta: transcript, start_ms: 200, end_ms: 400 });
+          grouper.close();
+          assert.deepEqual(segments, [['user', 'Tell me'], ['assistant', transcript]]);
+        `,
+          compiledFixture('src/helpers/live.ts'),
+          padding,
+        ],
+        { encoding: 'utf-8', timeout: 5000 },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.stderr).toBe('');
+      expect(result.status).toBe(0);
+    },
+  );
+
   it('emits append-only snapshots, stable IDs, predecessors and one final event', () => {
     const { grouper, updates, closed } = recording();
     grouper.push(text('user', 'Can you ', 0));
@@ -117,6 +149,18 @@ describe('public Live transcript grouping', () => {
       expect(contents()).toEqual([['user', 'Tell me more']]);
     },
   );
+
+  it.each([
+    ['ος', '\u00A0(ΟΣ!)\u2028'],
+    ['🙂 sure', '\uFEFF[🙂--SURE?!]\u202F'],
+  ])('preserves Unicode normalization for the custom acknowledgment %j', (phrase, transcript) => {
+    const { grouper, contents } = recording({ additionalAcknowledgments: [phrase] });
+    grouper.push(text('user', 'Tell me', 0));
+    grouper.push(text('assistant', transcript, 200));
+    grouper.push(text('user', 'more', 800));
+    grouper.close();
+    expect(contents()).toEqual([['user', 'Tell me more']]);
+  });
 
   it('keeps additional acknowledgments local to each instance', () => {
     const custom = recording({ additionalAcknowledgments: ['xyz'] });
