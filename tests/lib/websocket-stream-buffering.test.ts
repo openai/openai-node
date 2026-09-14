@@ -46,6 +46,61 @@ function measureElementMovement<T>(operation: () => T): { result: T; elementMove
 }
 
 describe.each(websocketVariants)('$name public stream buffering', ({ create, event }) => {
+  test.each(['open', 'closed'] as const)(
+    'return discards queued data while the socket is %s',
+    async (state) => {
+      const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }));
+      const stream = connection.stream();
+      try {
+        await stream.next();
+        dispatchFrame(connection, JSON.stringify(event(0)));
+        dispatchFrame(connection, JSON.stringify(event(1)));
+        dispatchFrame(connection, Buffer.from('synthetic binary data'), true);
+        await expect(stream.next()).resolves.toEqual({
+          value: { type: 'message', message: event(0) },
+          done: false,
+        });
+        if (state === 'closed') {
+          connection.close();
+        }
+
+        await expect(stream.return?.()).resolves.toEqual({ value: undefined, done: true });
+        await expect(stream.next()).resolves.toEqual({ value: undefined, done: true });
+        await expect(stream.next()).resolves.toEqual({ value: undefined, done: true });
+      } finally {
+        await stream.return?.();
+        connection.close();
+      }
+    },
+  );
+
+  test('return leaves other iterators attached and their backlogs intact', async () => {
+    const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }));
+    const cancelled = connection.stream();
+    const active = connection.stream();
+    try {
+      await cancelled.next();
+      await active.next();
+      dispatchFrame(connection, JSON.stringify(event(0)));
+      await cancelled.return?.();
+      await expect(active.next()).resolves.toEqual({
+        value: { type: 'message', message: event(0) },
+        done: false,
+      });
+
+      dispatchFrame(connection, JSON.stringify(event(1)));
+      await expect(active.next()).resolves.toEqual({
+        value: { type: 'message', message: event(1) },
+        done: false,
+      });
+      await expect(cancelled.next()).resolves.toEqual({ value: undefined, done: true });
+    } finally {
+      await cancelled.return?.();
+      await active.return?.();
+      connection.close();
+    }
+  });
+
   test('delivers a large interleaved backlog in FIFO order with linear element movement', async () => {
     const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }));
     const stream = connection.stream();
