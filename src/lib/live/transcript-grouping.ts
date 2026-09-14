@@ -42,14 +42,16 @@ const ACKNOWLEDGMENTS = [
 ];
 
 function normalizeAcknowledgment(text: string): string {
-  return text
+  const normalized = text
     .toLowerCase()
     .split('-')
     .join(' ')
-    .replace(/^[\s.,!?;:"'()[\]{}]+/u, '')
-    .replace(/[\s.,!?;:"'()[\]{}]+$/u, '')
-    .split(/\s+/u)
-    .join(' ');
+    .replace(/^[\s.,!?;:"'()[\]{}]+/u, '');
+  let end = normalized.length;
+  while (end > 0 && /[\s.,!?;:"'()[\]{}]/u.test(normalized.charAt(end - 1))) {
+    end -= 1;
+  }
+  return normalized.slice(0, end).split(/\s+/u).join(' ');
 }
 
 /** The v2 grouping policy, driven by timed public text rather than engine frames. */
