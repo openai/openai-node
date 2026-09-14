@@ -47,6 +47,7 @@ import {
 import * as Uploads from './core/uploads';
 import * as API from './resources/index';
 import { APIPromise } from './core/api-promise';
+import { resolveRealtimeAPIKey } from './internal/realtime-credentials';
 import {
   Batch,
   BatchCreateParams,
@@ -300,8 +301,9 @@ export interface ClientOptions {
    *
    * - Accepts either a static string or an async function that resolves to a string.
    * - Defaults to process.env['OPENAI_API_KEY'].
-   * - When a function is provided, it is invoked before each request so you can rotate
-   *   or refresh credentials at runtime.
+   * - When a function is provided, it is invoked when building bearer authentication
+   *   headers for each attempt, including retries and direct `buildRequest()` calls.
+   *   Each invocation's result is used for its own request.
    * - The function must return a non-empty string; otherwise an OpenAIError is thrown.
    * - If the function throws, the error is wrapped in an OpenAIError with the original
    *   error available as `cause`.
@@ -816,10 +818,11 @@ export class OpenAI {
           : await authentication.getToken();
       return buildHeaders([{ Authorization: `Bearer ${token}` }]);
     }
-    if (this.apiKey == null) {
+    const { apiKey } = await resolveRealtimeAPIKey(this);
+    if (apiKey == null) {
       return undefined;
     }
-    return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+    return buildHeaders([{ Authorization: `Bearer ${apiKey}` }]);
   }
 
   protected async adminAPIKeyAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
@@ -857,7 +860,7 @@ export class OpenAI {
    * Returns whether a provider was invoked. Internal callers can capture this
    * invocation's key before another request updates the shared `apiKey` property.
    * Overrides should forward `capture` or invoke it with their own resolved key
-   * to preserve connection-local credentials in concurrent Realtime factories.
+   * to preserve invocation-local credentials in concurrent requests and Realtime factories.
    * @internal
    */
   async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
@@ -919,15 +922,11 @@ export class OpenAI {
 
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
+   * Function-based credentials are resolved later, when building authentication
+   * headers, including for direct `buildRequest()` calls. Overriding this hook
+   * does not bypass that resolution.
    */
-  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
-    if (this._provider) return;
-
-    const security = options.__security ?? { bearerAuth: true };
-    if (security.bearerAuth) {
-      await this._callApiKey();
-    }
-  }
+  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {}
 
   /**
    * Used as a callback for mutating the given `RequestInit` object.
@@ -1745,6 +1744,10 @@ export class OpenAI {
         options.signal = snapshot.signal;
       }
     }
+    const authenticationHeaders =
+      this._provider || x509Authentication
+        ? undefined
+        : await this.authHeaders(inputOptions, inputOptions.__security ?? { bearerAuth: true });
     const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
 
     if (isStreamingBody) {
@@ -1759,6 +1762,7 @@ export class OpenAI {
       options: inputOptions,
       method,
       bodyHeaders,
+      authenticationHeaders,
       retryCount,
       x509Headers,
       x509Timeout: explicitTimeout ? options.timeout : undefined,
@@ -1783,6 +1787,7 @@ export class OpenAI {
     options,
     method,
     bodyHeaders,
+    authenticationHeaders,
     retryCount,
     x509Headers,
     x509Timeout,
@@ -1791,6 +1796,7 @@ export class OpenAI {
     options: FinalRequestOptions;
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
+    authenticationHeaders: NullableHeaders | undefined;
     retryCount: number;
     x509Headers?: { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } | undefined;
     x509Timeout: number | undefined;
@@ -1816,9 +1822,10 @@ export class OpenAI {
         'OpenAI-Organization': x509Tenant ? x509Tenant.organization : this.organization,
         'OpenAI-Project': x509Tenant ? x509Tenant.project : this.project,
       },
-      this._provider || this.#x509Authentication?.isPlanningRequest()
-        ? undefined
-        : await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
+      // X.509 owns streaming uploads before authentication so it can retire them on failure.
+      this.#x509Authentication && !this.#x509Authentication.isPlanningRequest()
+        ? await this.authHeaders(options, options.__security ?? { bearerAuth: true })
+        : authenticationHeaders,
       x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
       bodyHeaders,
       x509Headers?.requestHeaders ?? options.headers,
