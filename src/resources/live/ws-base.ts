@@ -353,6 +353,8 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
       next,
       return: (): Promise<IteratorReturnResult<undefined>> => {
         done = true;
+        queue.length = 0;
+        queueHead = 0;
         cleanup();
         flushResolvers();
         return Promise.resolve({ value: undefined, done: true });

@@ -357,6 +357,8 @@ export abstract class ForksWSBase<TSocket extends WebSocketLike> extends ForksEm
       next,
       return: (): Promise<IteratorReturnResult<undefined>> => {
         done = true;
+        queue.length = 0;
+        queueHead = 0;
         cleanup();
         flushResolvers();
         return Promise.resolve({ value: undefined, done: true });

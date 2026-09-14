@@ -367,6 +367,8 @@ export abstract class SidebandWSBase<TSocket extends WebSocketLike> extends Side
       next,
       return: (): Promise<IteratorReturnResult<undefined>> => {
         done = true;
+        queue.length = 0;
+        queueHead = 0;
         cleanup();
         flushResolvers();
         return Promise.resolve({ value: undefined, done: true });
