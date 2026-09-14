@@ -109,3 +109,87 @@ describe.each(websocketVariants)('$name event envelopes', ({ create }) => {
     }
   });
 });
+
+describe.each(websocketVariants.filter(({ name }) => name.endsWith('Responses')))(
+  '$name server error messages',
+  ({ create }) => {
+    test.each<{ message: unknown; expected: string }>([
+      { message: 'synthetic server error', expected: 'synthetic server error' },
+      { message: '', expected: '' },
+      { message: 0, expected: '0' },
+      { message: false, expected: 'false' },
+      { message: { detail: 'synthetic detail' }, expected: '[object Object]' },
+      { message: ['synthetic', 'error'], expected: 'synthetic,error' },
+      { message: { toString: null }, expected: '[unserializable error value]' },
+      { message: { toString: {}, valueOf: null }, expected: '[unserializable error value]' },
+      { message: [{ toString: null }], expected: '[unserializable error value]' },
+    ])('delivers flat and nested message $message safely', async ({ message, expected }) => {
+      const websocket = create(new OpenAI({ apiKey: 'test-key' }));
+      const errors = vi.fn();
+      const events = vi.fn();
+      onWebSocketEvent(websocket, 'error', errors);
+      onWebSocketEvent(websocket, 'event', events);
+      const iterator = websocket.stream();
+
+      try {
+        await iterator.next();
+        const deliveries = [
+          { type: 'error', message },
+          { type: 'error', error: { message } },
+        ].map((event) => {
+          expect(() => dispatchFrame(websocket, JSON.stringify(event))).not.toThrow();
+          const error = errors.mock.lastCall?.[0];
+          expect(error).toBeInstanceOf(OpenAIError);
+          expect(error.message).toBe(expected);
+          expect(error.error).toBe(events.mock.lastCall?.[0]);
+          expect(error.error).toEqual(event);
+          return expect(iterator.next()).resolves.toEqual({ value: { type: 'error', error }, done: false });
+        });
+        await Promise.all(deliveries);
+        expect(errors).toHaveBeenCalledTimes(2);
+      } finally {
+        await iterator.return?.();
+        websocket.close();
+      }
+    });
+
+    test('preserves asynchronous rejection without an error listener', () => {
+      const websocket = create(new OpenAI({ apiKey: 'test-key' }));
+      const reject = vi.spyOn(Promise, 'reject').mockReturnValue(Promise.resolve() as Promise<never>);
+      const event = { type: 'error', message: { toString: null } };
+
+      try {
+        expect(() => dispatchFrame(websocket, JSON.stringify(event))).not.toThrow();
+        expect(reject).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({
+            message: expect.stringContaining('[unserializable error value]'),
+            error: event,
+          }),
+        );
+        expect(reject.mock.lastCall?.[0]).toBeInstanceOf(OpenAIError);
+      } finally {
+        reject.mockRestore();
+        websocket.close();
+      }
+    });
+
+    test('preserves transport causes and exceptions from application error listeners', () => {
+      const websocket = create(new OpenAI({ apiKey: 'test-key' }));
+      const cause = new Error('synthetic transport failure');
+      const listenerError = new Error('application listener failed');
+      const errors = vi.fn<(error: unknown) => void>(() => {
+        throw listenerError;
+      });
+      onWebSocketEvent(websocket, 'error', errors);
+
+      try {
+        expect(() => websocket.socket.platformSocket.emit('error', cause)).toThrow(listenerError);
+        expect(errors.mock.lastCall?.[0]).toEqual(
+          expect.objectContaining({ message: cause.message, cause, error: undefined }),
+        );
+      } finally {
+        websocket.close();
+      }
+    });
+  },
+);

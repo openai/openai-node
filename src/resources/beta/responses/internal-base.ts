@@ -79,6 +79,11 @@ export abstract class ResponsesEmitter extends EventEmitter<WebSocketEvents> {
   protected _onError(event: WebSocketErrorEvent | null, message?: string | undefined, cause?: any): void {
     const eventMessage = event && ('error' in event ? event.error?.message : event.message);
     message = message ?? eventMessage ?? safeJSONStringify(event) ?? 'unknown error';
+    try {
+      message = String(message);
+    } catch {
+      message = '[unserializable error value]';
+    }
 
     if (!this._hasListener('error')) {
       const error = new WebSocketError(
