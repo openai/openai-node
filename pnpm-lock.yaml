@@ -104,8 +104,8 @@ importers:
         specifier: 7.10.5
         version: 7.10.5(oxfmt@0.62.0)(oxlint@1.81.0)
       undici:
-        specifier: 8.9.0
-        version: 8.9.0
+        specifier: 8.10.2
+        version: 8.10.2
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@types/node@26.2.0)(vite@8.1.5(@types/node@26.2.0)(yaml@2.9.0))
@@ -132,10 +132,10 @@ importers:
         version: 5.2.1
       openai:
         specifier: file:..
-        version: file:(@aws-sdk/credential-provider-node@3.972.81)(@smithy/hash-node@4.5.2)(@smithy/signature-v4@5.7.3)(undici@8.9.0)(ws@8.21.3)(zod@4.5.4)
+        version: file:(@aws-sdk/credential-provider-node@3.972.81)(@smithy/hash-node@4.5.2)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.3)(zod@4.5.4)
       undici:
         specifier: ^8.9.0
-        version: 8.9.0
+        version: 8.10.2
       zod:
         specifier: ^3.25 || ^4.0
         version: 4.5.4
@@ -3135,8 +3135,8 @@ packages:
   undici-types@8.3.0:
     resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
 
-  undici@8.9.0:
-    resolution: {integrity: sha512-aWZpUj7XoGonMClx4gdDRfgBjqeA+F473aDmROQQbM9n6PRfK/u1q/a0X4wMTgcHfT8H6fpbt98PFuDUwFg2YA==}
+  undici@8.10.2:
+    resolution: {integrity: sha512-/y4/bH9YNU5hi9NIrpOuvGXFcxrj3CMrV+/AYpowAYTpHn8gX/XPFjNy766FPoYY0miQhdW977JFWKGNhBdwyQ==}
     engines: {node: '>=22.19.0'}
 
   unicode-emoji-modifier-base@1.0.0:
@@ -5981,12 +5981,12 @@ snapshots:
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
 
-  openai@file:(@aws-sdk/credential-provider-node@3.972.81)(@smithy/hash-node@4.5.2)(@smithy/signature-v4@5.7.3)(undici@8.9.0)(ws@8.21.3)(zod@4.5.4):
+  openai@file:(@aws-sdk/credential-provider-node@3.972.81)(@smithy/hash-node@4.5.2)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.3)(zod@4.5.4):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.81
       '@smithy/hash-node': 4.5.2
       '@smithy/signature-v4': 5.7.3
-      undici: 8.9.0
+      undici: 8.10.2
       ws: 8.21.3
       zod: 4.5.4
 
@@ -6535,7 +6535,7 @@ snapshots:
 
   undici-types@8.3.0: {}
 
-  undici@8.9.0: {}
+  undici@8.10.2: {}
 
   unicode-emoji-modifier-base@1.0.0: {}
 
