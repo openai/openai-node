@@ -1,12 +1,12 @@
 import { vi } from 'vitest';
 
-import { OpenAIError } from 'openai/core/error';
+import { APIUserAbortError, OpenAIError } from 'openai/core/error';
 import { buildHeaders } from 'openai/internal/headers';
 import { FallbackEncoder } from 'openai/internal/request-options';
 import { concatBytes, decodeUTF8, encodeUTF8 } from 'openai/internal/utils/bytes';
 import { readEnv } from 'openai/internal/utils/env';
 import { stringifyQuery } from 'openai/internal/utils/query';
-import { sleep } from 'openai/internal/utils/sleep';
+import { sleep, sleepUntilAborted } from 'openai/internal/utils/sleep';
 import { uuid4 } from 'openai/internal/utils/uuid';
 import {
   coerceBoolean,
@@ -95,6 +95,57 @@ describe('environment and request utilities', () => {
       vi.advanceTimersByTime(1);
       await pending;
       expect(completed).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('sleepUntilAborted resolves when the timer fires without an abort', async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+
+    try {
+      const completed = vi.fn();
+      const pending = sleepUntilAborted(25, controller.signal).then(completed);
+
+      vi.advanceTimersByTime(24);
+      await Promise.resolve();
+      expect(completed).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(1);
+      await pending;
+      expect(completed).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('sleepUntilAborted rejects immediately when the signal is already aborted', async () => {
+    const controller = new AbortController();
+    const reason = new Error('already cancelled');
+    controller.abort(reason);
+
+    await expect(sleepUntilAborted(25, controller.signal)).rejects.toMatchObject({
+      constructor: APIUserAbortError,
+      cause: reason,
+    });
+  });
+
+  test('sleepUntilAborted rejects and clears its timer when aborted mid-wait', async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const reason = new Error('cancelled mid-wait');
+
+    try {
+      const pending = sleepUntilAborted(500, controller.signal);
+      vi.advanceTimersByTime(10);
+      await Promise.resolve();
+      controller.abort(reason);
+
+      await expect(pending).rejects.toMatchObject({
+        constructor: APIUserAbortError,
+        cause: reason,
+      });
     } finally {
       vi.useRealTimers();
     }
