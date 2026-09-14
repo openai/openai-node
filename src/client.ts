@@ -2024,6 +2024,11 @@ OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
 OpenAI.Skills = Skills;
 OpenAI.Videos = Videos;
+OpenAI.ConversationCursorPage = Pagination.ConversationCursorPage;
+OpenAI.CursorPage = Pagination.CursorPage;
+OpenAI.NextCursorPage = Pagination.NextCursorPage;
+OpenAI.Page = Pagination.Page;
+OpenAI.TokenPage = Pagination.TokenPage;
 
 const composedCallerSignals = new WeakMap<AbortController, AbortSignal>();
 
