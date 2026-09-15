@@ -3,17 +3,26 @@ import type OpenAI from 'openai';
 import type { ResponseTextDeltaEvent } from 'openai/resources/responses/responses';
 import type { OutputTranscriptDeltaEvent } from 'openai/resources/live/live';
 import { ResponsesWS } from 'openai/resources/responses/ws';
+import type { ResponsesWSClientOptions } from 'openai/resources/responses/ws';
 import { ResponsesWS as BetaResponsesWS } from 'openai/resources/beta/responses/ws';
 import { LiveWS } from 'openai/resources/live/ws';
+import type { ForksWSClientOptions } from 'openai/resources/live/forks/ws';
+import type { SidebandWSClientOptions } from 'openai/resources/live/sideband/ws';
 import { ForksWS } from 'openai/resources/live/forks/ws';
 import { SidebandWS } from 'openai/resources/live/sideband/ws';
+
+const mockSocketState = vi.hoisted(() => ({ readyState: 1 }));
+
+export function setMockSocketReadyState(readyState: number): void {
+  mockSocketState.readyState = readyState;
+}
 
 vi.mock('ws', async () => {
   const { EventEmitter } = await import('node:events');
   return {
     // oxlint-disable-next-line unicorn/prefer-event-target -- The public ws adapter requires Node EventEmitter semantics.
     WebSocket: class extends EventEmitter {
-      readyState = 1;
+      readyState = mockSocketState.readyState;
       send = vi.fn();
       close(code = 1000, reason = 'OK') {
         this.readyState = 3;
@@ -41,30 +50,34 @@ const liveEvent = (index: number): OutputTranscriptDeltaEvent => ({
   end_ms: index + 1,
 });
 
+type TestWebSocketOptions = ResponsesWSClientOptions & ForksWSClientOptions & SidebandWSClientOptions;
+
 export const websocketVariants = [
   {
     name: 'stable Responses',
-    create: (client: OpenAI) => new ResponsesWS(client),
+    create: (client: OpenAI, options?: TestWebSocketOptions) => new ResponsesWS(client, options),
     event: responseEvent,
   },
   {
     name: 'beta Responses',
-    create: (client: OpenAI) => new BetaResponsesWS(client),
+    create: (client: OpenAI, options?: TestWebSocketOptions) => new BetaResponsesWS(client, options),
     event: responseEvent,
   },
   {
     name: 'Live',
-    create: (client: OpenAI) => new LiveWS(client),
+    create: (client: OpenAI, options?: TestWebSocketOptions) => new LiveWS(client, options),
     event: liveEvent,
   },
   {
     name: 'Live forks',
-    create: (client: OpenAI) => new ForksWS(client, { session_id: 'synthetic-session' }),
+    create: (client: OpenAI, options?: TestWebSocketOptions) =>
+      new ForksWS(client, { session_id: 'synthetic-session' }, options),
     event: liveEvent,
   },
   {
     name: 'Live sideband',
-    create: (client: OpenAI) => new SidebandWS(client, { session_id: 'synthetic-session' }),
+    create: (client: OpenAI, options?: TestWebSocketOptions) =>
+      new SidebandWS(client, { session_id: 'synthetic-session' }, options),
     event: liveEvent,
   },
 ] as const;

@@ -1,5 +1,11 @@
-import OpenAI from 'openai';
-import { dispatchFrame, websocketVariants } from './helpers/websocket-variants';
+import OpenAI, { OpenAIError } from 'openai';
+import { vi } from 'vitest';
+import {
+  dispatchFrame,
+  onWebSocketEvent,
+  setMockSocketReadyState,
+  websocketVariants,
+} from './helpers/websocket-variants';
 
 const BACKLOG_SIZE = 4096;
 
@@ -46,6 +52,204 @@ function measureElementMovement<T>(operation: () => T): { result: T; elementMove
 }
 
 describe.each(websocketVariants)('$name public stream buffering', ({ create, event }) => {
+  test('preserves FIFO and raw identity at the snapshotted limit, regardless of payload size', async () => {
+    const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }));
+    const options = { maxBufferedEvents: 2 };
+    const stream = connection.stream(options);
+    const raw = vi.fn();
+    onWebSocketEvent(connection, 'raw', raw);
+    try {
+      await stream.next();
+      options.maxBufferedEvents = 1;
+      dispatchFrame(connection, Buffer.alloc(1024 * 1024), true);
+      dispatchFrame(connection, JSON.stringify(event(0)));
+      const first = await stream.next();
+      expect(first.done).toBe(false);
+      expect(raw).toHaveBeenCalledTimes(1);
+      expect(first.value?.type === 'raw' && first.value.data).toBe(raw.mock.calls[0]?.[0]);
+      await expect(stream.next()).resolves.toEqual({
+        value: { type: 'message', message: event(0) },
+        done: false,
+      });
+      // Consumed array slots must not count toward the next batch's capacity.
+      const events = Array.from({ length: 80 }, (_, index) => event(index + 1));
+      const deliveries = events.map((message) => {
+        dispatchFrame(connection, JSON.stringify(message));
+        return stream.next();
+      });
+      expect(await Promise.all(deliveries)).toEqual(
+        events.map((message) => ({ value: { type: 'message', message }, done: false })),
+      );
+    } finally {
+      await stream.return?.();
+      connection.close();
+    }
+  });
+
+  test('an opt-in event limit terminates only the overflowing iterator', async () => {
+    const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }));
+    const limited = connection.stream({ maxBufferedEvents: 1 });
+    const unlimited = connection.stream({ maxBufferedEvents: undefined });
+    const off = vi.spyOn(connection, 'off');
+    try {
+      await limited.next();
+      await unlimited.next();
+      dispatchFrame(connection, JSON.stringify(event(0)));
+      dispatchFrame(connection, Buffer.from('synthetic binary data'), true);
+
+      await expect(limited.next()).rejects.toThrow('maxBufferedEvents (1)');
+      await expect(limited.next()).rejects.toThrow('maxBufferedEvents (1)');
+      expect(off.mock.calls.map(([name]) => name)).toEqual(['event', 'raw', 'error']);
+      expect(connection.socket.readyState).toBe(1);
+      await expect(unlimited.next()).resolves.toEqual({
+        value: { type: 'message', message: event(0) },
+        done: false,
+      });
+      await expect(unlimited.next()).resolves.toEqual({
+        value: { type: 'raw', data: Buffer.from('synthetic binary data') },
+        done: false,
+      });
+      dispatchFrame(connection, JSON.stringify(event(1)));
+      await expect(unlimited.next()).resolves.toEqual({
+        value: { type: 'message', message: event(1) },
+        done: false,
+      });
+      await expect(limited.return?.()).resolves.toEqual({ value: undefined, done: true });
+      await expect(limited.return?.()).resolves.toEqual({ value: undefined, done: true });
+    } finally {
+      await limited.return?.();
+      await unlimited.return?.();
+      connection.close();
+    }
+  });
+
+  test.each([0, -1, 0.5, Number.NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, null, '1', true])(
+    'rejects invalid maxBufferedEvents %s before attaching listeners',
+    (maxBufferedEvents) => {
+      const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }));
+      const on = vi.spyOn(connection, 'on');
+      try {
+        expect(() => Reflect.apply(connection.stream, connection, [{ maxBufferedEvents }])).toThrow(
+          'positive safe integer',
+        );
+        expect(on).not.toHaveBeenCalled();
+      } finally {
+        connection.close();
+      }
+    },
+  );
+
+  test.each(['initial state', 'close', 'error'] as const)(
+    'counts %s records toward the limit',
+    async (kind) => {
+      const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }));
+      const stream = connection.stream({ maxBufferedEvents: 1 });
+      try {
+        if (kind !== 'initial state') {
+          await stream.next();
+        }
+        dispatchFrame(connection, JSON.stringify(event(0)));
+        if (kind === 'close') {
+          connection.close();
+        }
+        if (kind === 'error') {
+          connection.socket.platformSocket.emit('error', new Error('synthetic error'));
+        }
+        await expect(stream.next()).rejects.toMatchObject({
+          message: 'WebSocket stream exceeded maxBufferedEvents (1)',
+          error: undefined,
+        });
+        await expect(stream.next()).rejects.toBeInstanceOf(OpenAIError);
+      } finally {
+        await stream.return?.();
+        connection.close();
+      }
+    },
+  );
+
+  test.each(['close', 'return'] as const)('settles waiting readers at capacity one on %s', async (finish) => {
+    const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }));
+    const stream = connection.stream({ maxBufferedEvents: 1 });
+    try {
+      await stream.next();
+      const pending = Array.from({ length: 4 }, () => stream.next());
+      dispatchFrame(connection, JSON.stringify(event(0)));
+      if (finish === 'close') {
+        connection.close();
+      } else {
+        await stream.return?.();
+      }
+      const results = await Promise.all(pending);
+      expect(results[0]).toEqual({ value: { type: 'message', message: event(0) }, done: false });
+      if (finish === 'close') {
+        expect(results[1]).toEqual({
+          value: { type: 'close', code: 1000, reason: 'OK', unsent: [] },
+          done: false,
+        });
+      }
+      expect(results.slice(finish === 'close' ? 2 : 1)).toEqual(
+        Array.from({ length: finish === 'close' ? 2 : 3 }, () => ({ value: undefined, done: true })),
+      );
+    } finally {
+      await stream.return?.();
+      connection.close();
+    }
+  });
+
+  test.each([false, true])(
+    'retains limits and detaches across reconnects (failed attempt: %s)',
+    async (failFirst) => {
+      vi.useFakeTimers();
+      const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }), {
+        reconnect: { onReconnecting() {}, maxRetries: 2, initialDelay: 0, maxDelay: 0 },
+      });
+      const original = connection.socket.platformSocket;
+      const existing = connection.stream({ maxBufferedEvents: 1 });
+      const retained = connection.stream({ maxBufferedEvents: 4 });
+      let duringReconnect: ReturnType<typeof connection.stream> | undefined;
+      try {
+        await existing.next();
+        await retained.next();
+        setMockSocketReadyState(0);
+        connection.socket.platformSocket.emit('close', 1006, Buffer.from('synthetic reconnect'));
+        await vi.runAllTimersAsync();
+        if (failFirst) {
+          connection.socket.platformSocket.emit('close', 1006, Buffer.from('synthetic failed attempt'));
+          await vi.runAllTimersAsync();
+        }
+        const replacement = connection.socket.platformSocket;
+        duringReconnect = connection.stream({ maxBufferedEvents: 2 });
+        await expect(duringReconnect.next()).resolves.toMatchObject({ value: { type: 'reconnecting' } });
+        Reflect.set(replacement, 'readyState', 1);
+        replacement.emit('open');
+        await vi.runAllTimersAsync();
+        // Existing iterator has unread reconnecting + reconnected records.
+        await expect(existing.next()).rejects.toThrow('maxBufferedEvents (1)');
+        await expect(duringReconnect.next()).resolves.toEqual({ value: { type: 'open' }, done: false });
+        await expect(duringReconnect.next()).resolves.toEqual({
+          value: { type: 'reconnected' },
+          done: false,
+        });
+        dispatchFrame(connection, JSON.stringify(event(0)));
+        dispatchFrame(connection, JSON.stringify(event(1)));
+        dispatchFrame(connection, JSON.stringify(event(2)));
+        await expect(duringReconnect.next()).rejects.toThrow('maxBufferedEvents (2)');
+        await expect(retained.next()).rejects.toThrow('maxBufferedEvents (4)');
+        expect(original.listenerCount('open')).toBe(1);
+        // Only the connection's own send-queue listener remains after both iterators detach.
+        expect(replacement.listenerCount('open')).toBe(1);
+        expect(connection.socket.readyState).toBe(1);
+      } finally {
+        await existing.return?.();
+        await retained.return?.();
+        await duringReconnect?.return?.();
+        connection.close();
+        setMockSocketReadyState(1);
+        vi.useRealTimers();
+      }
+    },
+  );
+
   test.each(['open', 'closed'] as const)(
     'return discards queued data while the socket is %s',
     async (state) => {

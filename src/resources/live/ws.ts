@@ -6,6 +6,8 @@ import { LiveWSBase, type LiveWSBaseOptions } from './ws-base';
 import { OpenAI } from '../../client';
 import { VERSION } from '../../version';
 
+export type { WebSocketStreamOptions } from '../../internal/ws';
+
 export type { LiveWSReconnectOptions } from './ws-base';
 
 export interface LiveWSClientOptions extends WS.ClientOptions, LiveWSBaseOptions {}

@@ -160,6 +160,18 @@ those clients, pass a resolved `Authorization` header in the WebSocket options. 
 WebSocket errors otherwise become unhandled promise rejections. You can also iterate over `socket` or `socket.stream()`
 to receive connection lifecycle events and server messages.
 
+Each iterator buffers incoming records independently. To limit an iterator's backlog, pass a positive safe integer
+to `socket.stream({ maxBufferedEvents: 256 })`; choose the count for your application's processing capacity.
+Omitting the option leaves buffering unlimited, including when iterating over `socket` directly. This option is
+also available on the beta Responses and Live WebSocket streams.
+
+The count includes messages, raw data, errors, and lifecycle records such as the initial connection state,
+reconnecting, and close. If the next record would exceed the limit, the iterator discards its backlog, removes
+its listeners, and rejects its `next()` calls with a `WebSocketError`. A close record can overflow a full queue.
+The socket and other iterators remain active; close the socket yourself when you no longer need it. The limit
+continues across reconnects and does not restart a failed iterator. It limits event count, not payload bytes
+or total memory: one large message still counts as one record.
+
 For additional headers, including feature-specific beta headers when required, pass WebSocket options to the constructor:
 
 ```ts
