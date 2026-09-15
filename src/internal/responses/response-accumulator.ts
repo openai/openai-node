@@ -153,6 +153,7 @@ function validateArrayIndex(
   allowAppend = false,
 ): void {
   if (
+    !Array.isArray(collection) ||
     !Number.isSafeInteger(index) ||
     index < 0 ||
     index > collection.length ||

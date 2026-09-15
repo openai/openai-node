@@ -1,7 +1,43 @@
 import { toResponseInputItem, toResponseInputItems } from 'openai/lib/responses/ResponseInputItems';
-import type { ResponseInputItem, ResponseOutputItem } from 'openai/resources/responses/responses';
+import type {
+  BetaResponseConfigurationUpdateItem,
+  BetaResponseConfigurationUpdateItemParam,
+  BetaResponseInputItem,
+} from 'openai/resources/beta/responses/responses';
+import type {
+  ResponseConfigurationUpdateItem,
+  ResponseConfigurationUpdateItemParam,
+  ResponseInputItem,
+  ResponseOutputItem,
+} from 'openai/resources/responses/responses';
 
 describe('toResponseInputItems', () => {
+  test('preserves configuration updates when replaying history', () => {
+    const item: ResponseConfigurationUpdateItem = {
+      type: 'configuration_update',
+      id: 'cnfu_123',
+      reasoning: { effort: 'high' },
+    };
+    const param: ResponseConfigurationUpdateItemParam = item;
+    const history: ResponseInputItem[] = [param, { role: 'user', content: 'Continue.' }];
+
+    expect(toResponseInputItems(history)).toEqual(history);
+    expect(toResponseInputItem(item)).toBe(item);
+  });
+
+  test('beta configuration update resources remain assignable to input items', () => {
+    const item: BetaResponseConfigurationUpdateItem = {
+      type: 'configuration_update',
+      id: 'cnfu_123',
+      reasoning: { effort: 'high' },
+      agent: { agent_name: 'worker' },
+    };
+    const param: BetaResponseConfigurationUpdateItemParam = item;
+    const input: BetaResponseInputItem = param;
+
+    expect(input).toBe(item);
+  });
+
   test('normalizes mixed response history items', () => {
     const history: (ResponseInputItem | ResponseOutputItem)[] = [
       {

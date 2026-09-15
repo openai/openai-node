@@ -1,8 +1,10 @@
 import { vi } from 'vitest';
-import { APIError, OpenAIError } from 'openai/core/error';
+import OpenAI from 'openai';
+import { APIError, APIUserAbortError, OpenAIError } from 'openai/core/error';
 import { Stream, _iterSSEMessages } from 'openai/core/streaming';
 import * as lineDecoders from 'openai/internal/decoders/line';
 import { ReadableStreamFrom } from 'openai/internal/shims';
+import type { ResponseTextDeltaEvent } from 'openai/resources/responses/responses';
 
 const encoder = new TextEncoder();
 
@@ -18,12 +20,104 @@ async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
   return result;
 }
 
+function settlesSoon<T>(promise: Promise<T>): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  // oxlint-disable-next-line promise/avoid-new -- Bound regression fixtures that intentionally never settle.
+  const expired = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => reject(new Error('Aborted SSE stream did not settle')), 1500);
+  });
+  return Promise.race([promise, expired]).finally(() => clearTimeout(timeout));
+}
+
 describe('Stream.fromSSEResponse', () => {
   test('parses data events and ignores events after the completion sentinel', async () => {
     const response = responseForSSE('data: {"id":1}\n\ndata: {"id":2}\n\ndata: [DONE]\n\ndata: not-json\n\n');
     const stream = Stream.fromSSEResponse<{ id: number }>(response, new AbortController());
 
     await expect(collect(stream)).resolves.toEqual([{ id: 1 }, { id: 2 }]);
+  });
+
+  test.each(['before', 'registration', 'buffered'])('hides data after %s abort', async (stage) => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(source) {
+        source.enqueue(encoder.encode('data: {"id":1}\n\ndata: {"private":"never expose"}\n\n'));
+      },
+      cancel,
+    });
+    const controller = new AbortController();
+    const reason = new Error('private abort reason');
+    const removeListener = vi.spyOn(controller.signal, 'removeEventListener');
+    if (stage === 'registration') {
+      const addListener = controller.signal.addEventListener.bind(controller.signal);
+      vi.spyOn(controller.signal, 'addEventListener').mockImplementation((...args) => {
+        controller.abort(reason);
+        addListener(...args);
+      });
+    }
+    const iterator = Stream.fromSSEResponse(new Response(body), controller)[Symbol.asyncIterator]();
+    if (stage === 'buffered') {
+      await expect(iterator.next()).resolves.toEqual({ value: { id: 1 }, done: false });
+    }
+    if (stage !== 'registration') {
+      controller.abort(reason);
+    }
+
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+    expect(cancel).toHaveBeenCalledWith(undefined);
+    expect(removeListener).toHaveBeenCalledWith('abort', expect.any(Function));
+    expect(body.locked).toBe(false);
+  });
+
+  test.each([
+    ['rejects', () => Promise.reject(new Error('private cancellation failure'))],
+    ['never resolves', () => Promise.race([])],
+  ])('settles an aborted pending response read when source cancellation %s', async (_, cancellation) => {
+    const cancel = vi.fn(cancellation);
+    const body = new ReadableStream<Uint8Array>({ cancel });
+    const controller = new AbortController();
+    const iterator = Stream.fromSSEResponse(new Response(body), controller)[Symbol.asyncIterator]();
+    const pending = settlesSoon(iterator.next());
+    await vi.waitFor(() => expect(body.locked).toBe(true));
+    controller.abort(new Error('private abort reason'));
+
+    await expect(pending).resolves.toEqual({ value: undefined, done: true });
+    expect(cancel.mock.calls).toEqual([[undefined]]);
+    expect(body.locked).toBe(false);
+  });
+
+  test.each(['raw', 'helper'])('settles public %s Responses aborts', async (kind) => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({ cancel });
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+    });
+    const caller = new AbortController();
+    const onabort = vi.fn();
+    // oxlint-disable-next-line unicorn/prefer-add-event-listener -- Existing caller handlers must survive streaming.
+    caller.signal.onabort = onabort;
+    const params = { model: 'gpt-4o', input: 'hello' };
+    const completion: Promise<unknown> =
+      kind === 'raw'
+        ? client.responses
+            .create({ ...params, stream: true }, { signal: caller.signal })
+            .then((stream) => stream[Symbol.asyncIterator]().next())
+        : client.responses.stream(params, { signal: caller.signal }).finalResponse();
+    const assertion =
+      kind === 'raw'
+        ? expect(settlesSoon(completion)).resolves.toEqual({ value: undefined, done: true })
+        : expect(settlesSoon(completion)).rejects.toBeInstanceOf(APIUserAbortError);
+    const reason = new Error('private caller abort reason');
+
+    await vi.waitFor(() => expect(body.locked).toBe(true));
+    caller.abort(reason);
+
+    await assertion;
+    expect(caller.signal.reason).toBe(reason);
+    expect(caller.signal.onabort).toBe(onabort);
+    expect(cancel).toHaveBeenCalledWith(undefined);
+    expect(body.locked).toBe(false);
   });
 
   test('finishes at the completion sentinel without waiting for the response body to close', async () => {
@@ -251,6 +345,16 @@ describe('Stream.tee', () => {
 });
 
 describe('Stream.toReadableStream', () => {
+  const event: ResponseTextDeltaEvent = {
+    type: 'response.output_text.delta',
+    sequence_number: 0,
+    item_id: 'msg_test',
+    output_index: 0,
+    content_index: 0,
+    delta: 'hello',
+    logprobs: [],
+  };
+
   test('round-trips structured values as newline-delimited JSON', async () => {
     const original = new Stream(
       () =>
@@ -268,8 +372,12 @@ describe('Stream.toReadableStream', () => {
     await expect(collect(roundTripped)).resolves.toEqual([{ id: 1 }, { id: 2 }]);
   });
 
-  test('closes the source iterator when the readable stream is canceled', async () => {
+  test.each([false, true])('closes the source iterator (return rejects: %s)', async (rejects) => {
+    const failure = new OpenAIError('source cleanup failed');
     const returned = vi.fn().mockResolvedValue({ done: true, value: undefined });
+    if (rejects) {
+      returned.mockRejectedValue(failure);
+    }
     const source = new Stream(
       () => ({
         next: vi.fn().mockResolvedValue({ done: false, value: { id: 1 } }),
@@ -280,9 +388,230 @@ describe('Stream.toReadableStream', () => {
     const reader = source.toReadableStream().getReader();
 
     await reader.read();
-    await reader.cancel();
+    await (rejects ? expect(reader.cancel()).rejects.toBe(failure) : reader.cancel());
 
     expect(returned).toHaveBeenCalledTimes(1);
+    reader.releaseLock();
+  });
+
+  test('reads an iterator return hook once and preserves its receiver', async () => {
+    const returned = vi.fn().mockResolvedValue({ done: true, value: undefined });
+    let returnReads = 0;
+    const iterator = {
+      next: vi.fn().mockResolvedValue({ done: false, value: { id: 1 } }),
+      get return() {
+        returnReads += 1;
+        if (returnReads > 1) {
+          throw new OpenAIError('return hook was read more than once');
+        }
+        return returned;
+      },
+    };
+    const source = new Stream(() => iterator, new AbortController());
+    const reader = source.toReadableStream().getReader();
+
+    try {
+      await reader.read();
+      await expect(reader.cancel()).resolves.toBeUndefined();
+      expect(returnReads).toBe(1);
+      expect(returned).toHaveBeenCalledTimes(1);
+      expect(returned.mock.contexts[0]).toBe(iterator);
+    } finally {
+      reader.releaseLock();
+    }
+  });
+
+  test.each([
+    ['SSE', false],
+    ['SSE', true],
+    ['NDJSON', false],
+    ['NDJSON', true],
+  ] as const)('cancels a pending %s read (after one event: %s)', async (format, afterEvent) => {
+    const cancel = vi.fn();
+    const pull = vi.fn((controller: ReadableStreamDefaultController<Uint8Array>) => {
+      if (afterEvent && pull.mock.calls.length === 1) {
+        const json = JSON.stringify(event);
+        controller.enqueue(encoder.encode(format === 'SSE' ? `data: ${json}\n\n` : `${json}\n`));
+      }
+    });
+    const body = new ReadableStream<Uint8Array>({ pull, cancel }, { highWaterMark: 0 });
+    const fetch = vi.fn(async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }));
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 0, fetch });
+    const stream =
+      format === 'SSE'
+        ? await client.responses.create({ model: 'gpt-4o', input: 'hello', stream: true })
+        : Stream.fromReadableStream(body, new AbortController());
+    const reader = stream.toReadableStream().getReader();
+    let pending: ReturnType<typeof reader.read> | undefined;
+    let cancellation: Promise<void> | undefined;
+
+    try {
+      if (afterEvent) {
+        const first = await reader.read();
+        expect(new TextDecoder().decode(first.value)).toBe(`${JSON.stringify(event)}\n`);
+      }
+      pending = reader.read();
+      await vi.waitFor(() => expect(pull).toHaveBeenCalledTimes(afterEvent ? 2 : 1));
+      cancellation = reader.cancel();
+
+      await expect(settlesSoon(cancellation)).resolves.toBeUndefined();
+      await expect(pending).resolves.toEqual({ done: true, value: undefined });
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(body.locked).toBe(false);
+      expect(fetch).toHaveBeenCalledTimes(format === 'SSE' ? 1 : 0);
+    } finally {
+      stream.controller.abort();
+      await (cancellation ?? reader.cancel());
+      await pending;
+      reader.releaseLock();
+    }
+  });
+
+  test('canceling a pending tee branch leaves its sibling usable', async () => {
+    const cancel = vi.fn();
+    const pull = vi.fn();
+    let sendEvent = () => {};
+    const body = new ReadableStream<Uint8Array>(
+      {
+        start(controller) {
+          sendEvent = () => {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+            controller.close();
+          };
+        },
+        pull,
+        cancel,
+      },
+      { highWaterMark: 0 },
+    );
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      maxRetries: 0,
+      fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+    });
+    const stream = await client.responses.create({ model: 'gpt-4o', input: 'hello', stream: true });
+    const [left, right] = stream.tee();
+    const reader = left.toReadableStream().getReader();
+    const sibling = right[Symbol.asyncIterator]();
+    const pending = reader.read();
+
+    try {
+      await vi.waitFor(() => expect(pull).toHaveBeenCalledTimes(1));
+      await expect(settlesSoon(reader.cancel())).resolves.toBeUndefined();
+      expect(stream.controller.signal.aborted).toBe(false);
+      expect(cancel).not.toHaveBeenCalled();
+
+      sendEvent();
+      await expect(settlesSoon(sibling.next())).resolves.toEqual({ done: false, value: event });
+      await expect(settlesSoon(sibling.next())).resolves.toEqual({ done: true, value: undefined });
+      expect(stream.controller.signal.aborted).toBe(false);
+      expect(body.locked).toBe(false);
+    } finally {
+      stream.controller.abort();
+      await reader.cancel();
+      await pending;
+      reader.releaseLock();
+    }
+  });
+
+  test.each([false, true])(
+    'keeps a long-running sibling usable after tee cancellation (nested: %s)',
+    async (nested) => {
+      const cancel = vi.fn();
+      let sequence = 0;
+      const body = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ ...event, sequence_number: sequence })}\n\n`),
+            );
+            sequence += 1;
+          },
+          cancel,
+        },
+        { highWaterMark: 0 },
+      );
+      const client = new OpenAI({
+        apiKey: 'test-key',
+        maxRetries: 0,
+        fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+      });
+      const stream = await client.responses.create({ model: 'gpt-4o', input: 'hello', stream: true });
+      const [left, right] = stream.tee();
+      const branches = nested ? left.tee() : [left];
+      const readers = branches.map((branch) => branch.toReadableStream().getReader());
+      const sibling = right[Symbol.asyncIterator]();
+
+      try {
+        await Promise.all(readers.map((reader) => reader.read()));
+        await Promise.all(readers.map((reader) => reader.cancel()));
+
+        const results = await Promise.all(Array.from({ length: 2048 }, () => sibling.next()));
+        expect(results.every((result) => !result.done)).toBe(true);
+        expect(results.map((result) => result.value.sequence_number)).toEqual(
+          Array.from({ length: 2048 }, (_, index) => index),
+        );
+        await expect(Promise.all(readers.map((reader) => reader.read()))).resolves.toEqual(
+          readers.map(() => ({ done: true, value: undefined })),
+        );
+        expect(stream.controller.signal.aborted).toBe(false);
+        expect(cancel).not.toHaveBeenCalled();
+        await expect(sibling.next()).resolves.toMatchObject({
+          done: false,
+          value: { sequence_number: 2048 },
+        });
+      } finally {
+        stream.controller.abort();
+        await sibling.next();
+        await Promise.all(readers.map((reader) => reader.cancel()));
+        for (const reader of readers) {
+          reader.releaseLock();
+        }
+      }
+    },
+  );
+
+  test('canceling both pending tee branches closes their response once', async () => {
+    const cancel = vi.fn();
+    const pull = vi.fn();
+    const body = new ReadableStream<Uint8Array>({ pull, cancel }, { highWaterMark: 0 });
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      maxRetries: 0,
+      fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+    });
+    const stream = await client.responses.create({ model: 'gpt-4o', input: 'hello', stream: true });
+    const [left, right] = stream.tee();
+    const first = left.toReadableStream().getReader();
+    const second = right.toReadableStream().getReader();
+    const readers = [first, second];
+    const pending = readers.map((reader) => reader.read());
+
+    try {
+      await vi.waitFor(() => expect(pull).toHaveBeenCalledTimes(1));
+      await expect(settlesSoon(first.cancel())).resolves.toBeUndefined();
+      expect(stream.controller.signal.aborted).toBe(false);
+      expect(cancel).not.toHaveBeenCalled();
+      await expect(settlesSoon(second.cancel())).resolves.toBeUndefined();
+
+      expect(stream.controller.signal.aborted).toBe(true);
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(body.locked).toBe(false);
+      await expect(Promise.all(pending)).resolves.toEqual([
+        { done: true, value: undefined },
+        { done: true, value: undefined },
+      ]);
+      await Promise.all(readers.map((reader) => reader.cancel()));
+      expect(cancel).toHaveBeenCalledTimes(1);
+    } finally {
+      stream.controller.abort();
+      await Promise.all(readers.map((reader) => reader.cancel()));
+      await Promise.all(pending);
+      for (const reader of readers) {
+        reader.releaseLock();
+      }
+    }
   });
 
   test('propagates iterator failures through the readable stream', async () => {
@@ -301,6 +630,62 @@ describe('_iterSSEMessages', () => {
       'Attempted to iterate over a response with no body',
     );
     expect(controller.signal.aborted).toBe(true);
+  });
+
+  test.each([
+    ['rejects', () => Promise.reject(new Error('private iterable cancellation failure'))],
+    [
+      'throws',
+      () => {
+        throw new Error('private iterable cancellation failure');
+      },
+    ],
+    ['never resolves', () => Promise.race<IteratorResult<Uint8Array>>([])],
+  ])('settles an aborted async-only response when iterator cancellation %s', async (_, cancellation) => {
+    const returned = vi.fn(cancellation);
+    const source: AsyncIterableIterator<Uint8Array> = {
+      next: vi
+        .fn()
+        .mockResolvedValueOnce({ value: encoder.encode('data: {"id":1}\n\n'), done: false })
+        .mockImplementation(() => Promise.race<IteratorResult<Uint8Array>>([])),
+      return: returned,
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+    };
+    const body = new ReadableStream<Uint8Array>();
+    const response = new Response(body);
+    Object.defineProperties(body, {
+      getReader: { value: undefined },
+      [Symbol.asyncIterator]: { value: () => source },
+    });
+    const controller = new AbortController();
+    const events = _iterSSEMessages(response, controller);
+    await expect(events.next()).resolves.toMatchObject({ value: { data: '{"id":1}' }, done: false });
+    const pending = settlesSoon(events.next());
+
+    await vi.waitFor(() => expect(source.next).toHaveBeenCalledTimes(2));
+    controller.abort(new Error('private iterable abort reason'));
+
+    await expect(pending).resolves.toEqual({ value: undefined, done: true });
+    expect(returned.mock.calls).toEqual([[]]);
+  });
+
+  test('preserves a primary reader failure when cancellation and lock release also fail', async () => {
+    const primary = new Error('original response read failure');
+    const body = new ReadableStream<Uint8Array>();
+    const response = new Response(body);
+    const reader = body.getReader();
+    Object.defineProperty(body, 'getReader', { value: () => reader });
+    vi.spyOn(reader, 'read').mockRejectedValue(primary);
+    const cancel = vi.spyOn(reader, 'cancel').mockRejectedValue(new Error('secondary cancellation failure'));
+    const release = vi.spyOn(reader, 'releaseLock').mockImplementation(() => {
+      throw new Error('secondary lock-release failure');
+    });
+
+    await expect(collect(_iterSSEMessages(response, new AbortController()))).rejects.toBe(primary);
+    expect(cancel.mock.calls).toEqual([[]]);
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
   test('ignores comments and handles CRLF-delimited multiline data', async () => {

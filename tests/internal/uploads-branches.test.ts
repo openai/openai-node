@@ -140,6 +140,46 @@ describe('buffered multipart forms', () => {
     await expect(maybeMultipartFormRequestOptions(options, fetch)).resolves.toBe(options);
   });
 
+  test('ignores uploadable values inherited from a body prototype', async () => {
+    let inheritedReads = 0;
+    const prototype = Object.create(null);
+    Object.defineProperty(prototype, 'file', {
+      enumerable: true,
+      get() {
+        inheritedReads += 1;
+        return new File(['prototype bytes'], 'prototype.txt');
+      },
+    });
+    const options = { body: Object.assign(Object.create(prototype), { file_id: 'file_123' }) };
+
+    await expect(maybeMultipartFormRequestOptions(options, fetch)).resolves.toBe(options);
+    expect(inheritedReads).toBe(0);
+  });
+
+  test('selects buffered encoding from own values when a prototype holds a streaming value', async () => {
+    let inheritedReads = 0;
+    const prototype = Object.create(null);
+    Object.defineProperty(prototype, 'stream', {
+      enumerable: true,
+      get() {
+        inheritedReads += 1;
+        return (async function* prototypeChunks() {
+          yield 'prototype chunk';
+        })();
+      },
+    });
+    const upload = new File(['file contents'], 'input.jsonl');
+    const options = await maybeMultipartFormRequestOptions(
+      { body: Object.assign(Object.create(prototype), { upload }) },
+      fetch,
+    );
+
+    expect(options.body).toBeInstanceOf(FormData);
+    expect((options.body as FormData).get('upload')).toBeInstanceOf(File);
+    expect((options.body as FormData).get('stream')).toBeNull();
+    expect(inheritedReads).toBe(0);
+  });
+
   test('creates buffered multipart forms for nested File values', async () => {
     const upload = new File(['file contents'], 'input.jsonl', { type: 'application/jsonl' });
     const options = await maybeMultipartFormRequestOptions(

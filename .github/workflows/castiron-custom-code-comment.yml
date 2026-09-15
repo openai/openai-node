@@ -165,7 +165,8 @@ jobs:
               const current = [];
               for (const number of numbers) {
                 const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: number});
-                if (pr.number === number && pr.state === 'open' && pr.head.sha === head && pr.base.sha === base &&
+                if (pr.number === number && pr.state === 'open' && pr.head.sha === head &&
+                    /^[0-9a-f]{40}$/.test(pr.base.sha) &&
                     pr.head.repo?.full_name === source.full_name && pr.base.ref === 'main' &&
                     pr.base.repo.full_name === upstream) current.push(pr);
               }

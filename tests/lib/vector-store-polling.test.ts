@@ -23,7 +23,8 @@ describe.each([
   { name: 'batch', id: 'batch_123', segment: 'file_batches' },
 ] as const)('vector store $name polling compatibility', ({ name, id, segment }) => {
   test.each([
-    { label: 'zero explicit interval', interval: 0, header: '17', expected: 17 },
+    { label: 'zero explicit interval', interval: 0, header: '17', expected: 0 },
+    { label: 'zero interval without a server interval', interval: 0, header: '', expected: 0 },
     { label: 'negative explicit interval', interval: -2, header: '17', expected: -2 },
     { label: 'NaN explicit interval', interval: Number.NaN, header: '0x10', expected: 16 },
     { label: 'numeric header prefix', interval: undefined, header: '12ms', expected: 12 },
@@ -83,22 +84,23 @@ describe.each([
     expect(mockedSleep).not.toHaveBeenCalled();
   });
 
-  test('preserves the distinct cancelled status behavior', async () => {
+  test('stops polling a resource that stays cancelled', async () => {
     let count = 0;
     const client = new OpenAI({
       apiKey: 'test-key',
+      maxRetries: 0,
       fetch: async () => {
         count += 1;
-        return Response.json({ id, status: count === 1 ? 'cancelled' : 'completed' });
+        if (count > 10) {
+          throw new Error(`poll re-requested the ${name} after ${count - 1} cancelled responses`);
+        }
+        return Response.json({ id, status: 'cancelled' });
       },
     });
     const resource = name === 'file' ? client.vectorStores.files : client.vectorStores.fileBatches;
 
-    await expect(resource.poll('vs_123', id)).resolves.toMatchObject({
-      id,
-      status: name === 'file' ? 'completed' : 'cancelled',
-    });
-    expect(count).toBe(name === 'file' ? 2 : 1);
+    await expect(resource.poll('vs_123', id)).resolves.toMatchObject({ id, status: 'cancelled' });
+    expect(count).toBe(1);
     expect(mockedSleep).not.toHaveBeenCalled();
   });
 

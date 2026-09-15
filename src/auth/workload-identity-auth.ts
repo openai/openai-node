@@ -6,6 +6,7 @@ import { APIError, OAuthError, OpenAIError } from '../core/error';
 interface CachedToken {
   token: string;
   expiresAt: number;
+  refreshAt: number;
 }
 
 const SUBJECT_TOKEN_TYPES: Record<WorkloadIdentity['provider']['tokenType'], string> = {
@@ -14,6 +15,129 @@ const SUBJECT_TOKEN_TYPES: Record<WorkloadIdentity['provider']['tokenType'], str
 };
 
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
+// Cap the refresh buffer at half the actual token lifetime, matching the X.509
+// workload-identity path, so short-lived tokens keep a usable cache window.
+const MAX_REFRESH_BUFFER_FRACTION = 0.5;
+
+function calculateExpiresAt(expiresIn: unknown, exchangeStartedAt: number): number {
+  if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+    throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
+  }
+
+  const now = Date.now();
+  const fullLifetimeDeadline = now + expiresIn * 1000;
+  if (!Number.isSafeInteger(fullLifetimeDeadline) || fullLifetimeDeadline <= now) {
+    throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
+  }
+  const expiresAt = fullLifetimeDeadline - (performance.now() - exchangeStartedAt);
+  if (expiresAt <= now) {
+    throw new OpenAIError('Workload identity token expired before its exchange completed.');
+  }
+
+  return expiresAt;
+}
+
+function calculateRefreshAt(
+  expiresAt: number,
+  lifetimeSeconds: number,
+  refreshBufferSeconds: number | undefined,
+): number {
+  const configuredBufferMs = (refreshBufferSeconds ?? 1200) * 1000;
+  const effectiveBufferMs = Math.min(
+    configuredBufferMs,
+    lifetimeSeconds * 1000 * MAX_REFRESH_BUFFER_FRACTION,
+  );
+  return expiresAt - effectiveBufferMs;
+}
+
+const NATIVE_RESPONSE_PROTOTYPE = Response.prototype;
+const READ_NATIVE_RESPONSE_BODY = NATIVE_RESPONSE_PROTOTYPE.arrayBuffer;
+
+function isResponsePrototype(response: Response, prototype: object): boolean {
+  const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+  if (
+    prototype === response ||
+    typeof constructor !== 'function' ||
+    Object.getOwnPropertyDescriptor(constructor, 'name')?.value !== 'Response' ||
+    Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype
+  ) {
+    return false;
+  }
+
+  const tag = Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag);
+  return (
+    (tag?.value === 'Response' || typeof tag?.get === 'function') &&
+    typeof Object.getOwnPropertyDescriptor(prototype, 'headers')?.get === 'function' &&
+    typeof Object.getOwnPropertyDescriptor(prototype, 'ok')?.get === 'function' &&
+    typeof Object.getOwnPropertyDescriptor(prototype, 'status')?.get === 'function'
+  );
+}
+
+function isResponseBodyPrototype(prototype: object, responsePrototype: object | null): boolean {
+  if (prototype === responsePrototype) {
+    return true;
+  }
+
+  const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
+  return (
+    responsePrototype !== null &&
+    Object.getPrototypeOf(responsePrototype) === prototype &&
+    typeof constructor === 'function' &&
+    Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Body' &&
+    Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype
+  );
+}
+
+function decodeNativeResponseBody(body: ArrayBuffer): string {
+  const scope = globalThis as typeof globalThis & { Bun?: { version?: unknown } };
+  return new TextDecoder('utf-8', { ignoreBOM: typeof scope.Bun?.version === 'string' }).decode(body);
+}
+
+async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
+  let readText: ((this: Response) => Promise<string>) | undefined;
+  let responsePrototype: object | null = null;
+  for (
+    let depth = 0, prototype: object | null = response;
+    prototype !== null && depth < 16;
+    prototype = Object.getPrototypeOf(prototype), depth += 1
+  ) {
+    if (prototype === NATIVE_RESPONSE_PROTOTYPE) {
+      break;
+    }
+
+    if (isResponsePrototype(response, prototype)) {
+      responsePrototype = prototype;
+    }
+
+    const parser = Object.getOwnPropertyDescriptor(prototype, 'json');
+    if (!parser) {
+      continue;
+    }
+
+    if (typeof parser.value !== 'function') {
+      break;
+    }
+
+    const bodyReader = Object.getOwnPropertyDescriptor(prototype, 'text')?.value;
+    if (typeof bodyReader === 'function' && isResponseBodyPrototype(prototype, responsePrototype)) {
+      readText = bodyReader;
+      break;
+    }
+
+    // Custom parsers own their results and failures; rejection provenance cannot be inferred.
+    return parser.value.call(response);
+  }
+
+  const body =
+    readText === undefined
+      ? decodeNativeResponseBody(await READ_NATIVE_RESPONSE_BODY.call(response))
+      : await readText.call(response);
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new SyntaxError('Token exchange response contains invalid JSON');
+  }
+}
 
 function isUnsafeAccessToken(accessToken: string): boolean {
   const scope = globalThis as typeof globalThis & { Bun?: { version?: unknown } };
@@ -45,7 +169,17 @@ export class WorkloadIdentityAuth {
    * @param fetch Optional fetch implementation for calls to the OpenAI token endpoint.
    */
   constructor(config: WorkloadIdentity, fetch?: Fetch) {
-    this.config = config;
+    const { identityProviderId, serviceAccountId, clientId, refreshBufferSeconds, provider } = config;
+    this.config = {
+      identityProviderId,
+      serviceAccountId,
+      ...(clientId === undefined ? {} : { clientId }),
+      ...(refreshBufferSeconds === undefined ? {} : { refreshBufferSeconds }),
+      provider: {
+        tokenType: provider.tokenType,
+        getToken: provider.getToken.bind(provider),
+      },
+    };
     this.fetch = fetch ?? Shims.getDefaultFetch();
   }
 
@@ -77,7 +211,7 @@ export class WorkloadIdentityAuth {
       }
     }
 
-    if (this.needsRefresh(this.cachedToken) && !this.refreshPromise) {
+    if (WorkloadIdentityAuth.needsRefresh(this.cachedToken) && !this.refreshPromise) {
       const refreshPromise = this.refreshToken(this.tokenGeneration).finally(() => {
         if (this.refreshPromise === refreshPromise) {
           this.refreshPromise = null;
@@ -104,6 +238,8 @@ export class WorkloadIdentityAuth {
       body['client_id'] = this.config.clientId;
     }
 
+    // Exclude provider acquisition and measure delivery time independently of wall-clock changes.
+    const exchangeStartedAt = performance.now();
     const response = await this.fetch(this.tokenExchangeUrl, {
       method: 'POST',
       headers: {
@@ -134,7 +270,7 @@ export class WorkloadIdentityAuth {
       );
     }
 
-    const tokenResponse: unknown = await response.json();
+    const tokenResponse: unknown = await parseOAuthTokenResponse(response);
     const accessToken =
       typeof tokenResponse === 'object' && tokenResponse !== null && 'access_token' in tokenResponse
         ? tokenResponse.access_token
@@ -148,20 +284,13 @@ export class WorkloadIdentityAuth {
     }
 
     const expiresIn = (tokenResponse as Partial<TokenExchangeResponse>).expires_in ?? 3600;
-    if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
-      throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
-    }
-
-    const now = Date.now();
-    const expiresAt = now + expiresIn * 1000;
-    if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) {
-      throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
-    }
+    const expiresAt = calculateExpiresAt(expiresIn, exchangeStartedAt);
 
     if (this.tokenGeneration === generation) {
       this.cachedToken = {
         token: accessToken,
         expiresAt,
+        refreshAt: calculateRefreshAt(expiresAt, expiresIn, this.config.refreshBufferSeconds),
       };
     }
 
@@ -172,10 +301,8 @@ export class WorkloadIdentityAuth {
     return Date.now() >= cachedToken.expiresAt;
   }
 
-  private needsRefresh(cachedToken: CachedToken): boolean {
-    const bufferSeconds = this.config.refreshBufferSeconds ?? 1200;
-    const bufferMs = bufferSeconds * 1000;
-    return Date.now() >= cachedToken.expiresAt - bufferMs;
+  private static needsRefresh(cachedToken: CachedToken): boolean {
+    return Date.now() >= cachedToken.refreshAt;
   }
 
   /** Discards the cached access token so the next request performs a fresh exchange. */

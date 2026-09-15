@@ -1,5 +1,5 @@
 import type { BlobPart } from './uploads';
-import { getName, makeFile, isAsyncIterable, checkFileSupport } from './uploads';
+import { getName, makeFile, isAsyncIterable, isArrayBuffer, checkFileSupport } from './uploads';
 import type { FilePropertyBag } from './builtin-types';
 
 /** Text, binary content, or a Blob-compatible value accepted inside a file stream. */
@@ -106,7 +106,8 @@ export type ToFileInput =
  * filename and metadata are unchanged. Renamed native files reuse the original
  * file contents without buffering and retain their MIME type and modification
  * time unless explicitly overridden. Other filenames are inferred from response
- * URLs or input metadata when omitted, falling back to `unknown_file`. Responses,
+ * URLs or input metadata when omitted or null, falling back to `unknown_file`.
+ * An explicit empty filename is preserved. Responses,
  * native or compatible `Blob` values, and compatible non-native files supply
  * their MIME type unless `options.type` provides an explicit override.
  *
@@ -148,7 +149,7 @@ export async function toFile(
 
   if (isResponseLike(value)) {
     const blob = await value.blob();
-    name ||= getName(value);
+    name ??= getName(value);
 
     const responseOptions =
       options?.type === undefined && blob.type ? { ...options, type: blob.type } : options;
@@ -157,7 +158,7 @@ export async function toFile(
 
   const parts = await getBytes(value);
 
-  name ||= getName(value);
+  name ??= getName(value);
 
   if (options?.type === undefined) {
     const typedPart = parts.find(
@@ -176,7 +177,7 @@ async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Prom
   if (
     typeof value === 'string' ||
     ArrayBuffer.isView(value) || // includes Uint8Array, Buffer, etc.
-    value instanceof ArrayBuffer
+    isArrayBuffer(value)
   ) {
     parts.push(value);
   } else if (isBlobLike(value)) {

@@ -1,16 +1,18 @@
 import { vi } from 'vitest';
 import type { MockedFunction } from 'vitest';
 import { spawn } from 'node:child_process';
-import { EventEmitter, getEventListeners } from 'node:events';
+import { EventEmitter, getEventListeners, once } from 'node:events';
 import { PassThrough, Readable, Writable } from 'node:stream';
 import { playAudio, recordAudio } from 'openai/helpers/audio';
 
 vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
 
 const spawnMock = spawn as MockedFunction<typeof spawn>;
+const devicePrefix = ['darwin', 'win32', 'cygwin'].includes(process.platform) ? '' : 'hw';
 
-function mockFfmpeg() {
+function mockFfmpeg(started = true) {
   const ffmpeg = Object.assign(new EventEmitter(), {
+    pid: started ? 123 : undefined,
     stdout: new PassThrough(),
     stderr: new PassThrough(),
     kill: vi.fn().mockReturnValue(true),
@@ -59,7 +61,7 @@ describe('recordAudio', () => {
     expect(Buffer.from(await file.arrayBuffer()).toString()).toBe('first second');
     expect(spawnMock).toHaveBeenCalledWith(
       'ffmpeg',
-      expect.arrayContaining(['-i', ':0', '-ar', '24000', '-ac', '1', '-f', 'wav', 'pipe:1']),
+      expect.arrayContaining(['-i', `${devicePrefix}:0`, '-ar', '24000', '-ac', '1', '-f', 'wav', 'pipe:1']),
       { stdio: ['ignore', 'pipe', 'ignore'] },
     );
   });
@@ -73,7 +75,7 @@ describe('recordAudio', () => {
 
     expect(spawnMock).toHaveBeenCalledWith(
       'ffmpeg',
-      expect.arrayContaining(['-i', ':3']),
+      expect.arrayContaining(['-i', `${devicePrefix}:3`]),
       expect.any(Object),
     );
   });
@@ -136,6 +138,42 @@ describe('recordAudio', () => {
     },
   );
 
+  test('preserves captured audio when cleanup fails without collecting private later output', async () => {
+    const ffmpeg = mockFfmpeg();
+    const caller = new AbortController();
+    const timeout = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal);
+    const recording = recordAudio({ signal: caller.signal, timeout: 50 });
+    ffmpeg.stdout.write(Buffer.from('captured audio'));
+
+    const removeCaller = vi.spyOn(caller.signal, 'removeEventListener').mockImplementation(() => {
+      throw new Error('caller cleanup failed');
+    });
+    const removeTimeout = vi.spyOn(timeout.signal, 'removeEventListener');
+    const removeOutput = vi.spyOn(ffmpeg.stdout, 'removeListener').mockImplementation(() => {
+      ffmpeg.stdout.write(Buffer.from('private cleanup audio'));
+      throw new Error('stdout cleanup failed');
+    });
+    const concatenate = vi.spyOn(Buffer, 'concat');
+
+    expect(() => ffmpeg.emit('close', 0)).not.toThrow();
+    const chunks = concatenate.mock.calls[0]?.[0];
+    expect(chunks).toHaveLength(1);
+
+    const file = await recording;
+    expect(Buffer.from(await file.arrayBuffer()).toString()).toBe('captured audio');
+    expect(removeCaller).toHaveBeenCalledTimes(1);
+    expect(removeTimeout).toHaveBeenCalledTimes(1);
+    expect(removeOutput).toHaveBeenCalledTimes(1);
+    expect(getEventListeners(timeout.signal, 'abort')).toHaveLength(0);
+
+    ffmpeg.stdout.write(Buffer.from('private late audio'));
+    expect(chunks).toHaveLength(1);
+    caller.abort();
+    timeout.abort();
+    expect(ffmpeg.kill).not.toHaveBeenCalled();
+  });
+
   test('does not stop ffmpeg when an external signal aborts after recording completes', async () => {
     const ffmpeg = mockFfmpeg();
     const controller = new AbortController();
@@ -186,6 +224,30 @@ describe('recordAudio', () => {
 
     await expect(recording).rejects.toThrow('ffmpeg process exited with code 2');
   });
+
+  test.each(['caller', 'timeout'] as const)(
+    'rejects the original termination error when %s cancellation cannot signal ffmpeg',
+    async (target) => {
+      const ffmpeg = mockFfmpeg();
+      const caller = new AbortController();
+      const timeout = new AbortController();
+      vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal);
+      const recording = recordAudio({ signal: caller.signal, timeout: 50 });
+      const failure = new Error('signal delivery failed');
+      ffmpeg.kill.mockImplementation(() => {
+        throw failure;
+      });
+
+      (target === 'caller' ? caller : timeout).abort();
+
+      await expect(recording).rejects.toBe(failure);
+      expect(ffmpeg.kill).toHaveBeenCalledTimes(1);
+      expect(ffmpeg.kill).toHaveBeenCalledWith('SIGTERM');
+      expect(getEventListeners(caller.signal, 'abort')).toHaveLength(0);
+      expect(getEventListeners(timeout.signal, 'abort')).toHaveLength(0);
+      expect(ffmpeg.stdout.listenerCount('data')).toBe(0);
+    },
+  );
 
   test('immediately stops recording for an already-aborted signal', async () => {
     const ffmpeg = mockFfmpeg();
@@ -250,6 +312,30 @@ describe('recordAudio', () => {
     expect(consoleError).toHaveBeenCalledWith(failure);
   });
 
+  test('preserves the original process failure when cleanup and error logging throw', async () => {
+    const ffmpeg = mockFfmpeg();
+    const caller = new AbortController();
+    const timeout = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal);
+    const recording = recordAudio({ signal: caller.signal, timeout: 50 });
+    vi.spyOn(caller.signal, 'removeEventListener').mockImplementation(() => {
+      throw new Error('caller cleanup failed');
+    });
+    const logger = vi.spyOn(console, 'error').mockImplementation(() => {
+      throw new Error('logging failed');
+    });
+    const failure = new Error('microphone unavailable');
+
+    expect(() => ffmpeg.emit('error', failure)).not.toThrow();
+
+    await expect(recording).rejects.toBe(failure);
+    expect(logger).toHaveBeenCalledWith(failure);
+    expect(getEventListeners(timeout.signal, 'abort')).toHaveLength(0);
+    expect(ffmpeg.stdout.listenerCount('data')).toBe(0);
+    caller.abort();
+    expect(ffmpeg.kill).not.toHaveBeenCalled();
+  });
+
   test('reports synchronous ffmpeg startup failures', async () => {
     spawnMock.mockImplementation(() => {
       throw new Error('ffmpeg was not found');
@@ -257,6 +343,37 @@ describe('recordAudio', () => {
 
     await expect(recordAudio()).rejects.toThrow('ffmpeg was not found');
   });
+
+  test.each(['an already-aborted caller', 'a caller-listener setup failure'] as const)(
+    'does not signal a process without a PID after %s',
+    async (scenario) => {
+      const ffmpeg = mockFfmpeg(false);
+      const caller = new AbortController();
+      const spawnFailure = new Error('ffmpeg could not start');
+      const setupFailure = new Error('caller listener could not be installed');
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      if (scenario === 'an already-aborted caller') {
+        caller.abort();
+      } else {
+        vi.spyOn(caller.signal, 'addEventListener').mockImplementationOnce(() => {
+          throw setupFailure;
+        });
+      }
+
+      const recording = recordAudio({ signal: caller.signal });
+      const rejection = expect(recording).rejects.toBe(
+        scenario === 'an already-aborted caller' ? spawnFailure : setupFailure,
+      );
+      expect(() => ffmpeg.emit('error', spawnFailure)).not.toThrow();
+      ffmpeg.emit('close', -2);
+      await rejection;
+
+      expect(ffmpeg.kill).not.toHaveBeenCalled();
+      expect(getEventListeners(caller.signal, 'abort')).toHaveLength(0);
+      expect(ffmpeg.stdout.listenerCount('data')).toBe(0);
+      expect(() => ffmpeg.emit('error', spawnFailure)).not.toThrow();
+    },
+  );
 
   test('terminates ffmpeg when recording setup fails after it starts', async () => {
     const ffmpeg = mockFfmpeg();
@@ -270,6 +387,29 @@ describe('recordAudio', () => {
     expect(ffmpeg.stdout.listenerCount('data')).toBe(0);
   });
 
+  test('does not register cancellation listeners after process setup has already failed', async () => {
+    const ffmpeg = mockFfmpeg();
+    const caller = new AbortController();
+    const timeout = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failure = new Error('microphone failed while close observation was installed');
+
+    ffmpeg.on('newListener', (event) => {
+      if (event === 'close') {
+        ffmpeg.emit('error', failure);
+      }
+    });
+
+    await expect(recordAudio({ signal: caller.signal, timeout: 50 })).rejects.toBe(failure);
+    expect(getEventListeners(caller.signal, 'abort')).toHaveLength(0);
+    expect(getEventListeners(timeout.signal, 'abort')).toHaveLength(0);
+    expect(ffmpeg.stdout.listenerCount('data')).toBe(0);
+    caller.abort();
+    timeout.abort();
+    expect(ffmpeg.kill).not.toHaveBeenCalled();
+  });
+
   test('rejects an unexpected unsuccessful ffmpeg exit', async () => {
     const ffmpeg = mockFfmpeg();
     const recording = recordAudio();
@@ -281,6 +421,17 @@ describe('recordAudio', () => {
 });
 
 describe('playAudio input and process errors', () => {
+  test('plays a Response body even when the response has a callable pipe property', async () => {
+    const { chunks } = mockFfplay();
+    const pipe = vi.fn();
+    const response = Object.assign(new Response('response audio'), { pipe });
+
+    await playAudio(response);
+
+    expect(Buffer.concat(chunks).toString()).toBe('response audio');
+    expect(pipe).not.toHaveBeenCalled();
+  });
+
   test('plays File inputs through their readable stream', async () => {
     const { chunks } = mockFfplay();
 
@@ -295,6 +446,36 @@ describe('playAudio input and process errors', () => {
     await playAudio(Readable.from(['node audio']));
 
     expect(Buffer.concat(chunks).toString()).toBe('node audio');
+  });
+
+  test.each([
+    { name: 'null', body: null },
+    { name: 'Buffer', body: Buffer.from('body metadata') },
+    { name: 'another readable', body: Readable.from(['body metadata']) },
+  ])('plays the outer Node readable with $name body metadata', async ({ body }) => {
+    const { chunks } = mockFfplay();
+    const source = Object.assign(Readable.from(['node audio']), { body });
+
+    await playAudio(source);
+
+    expect(Buffer.concat(chunks).toString()).toBe('node audio');
+    expect(source.body).toBe(body);
+    if (body instanceof Readable) {
+      expect(body.readableEnded).toBe(false);
+    }
+  });
+
+  test('keeps ended Node readable inputs on the stream path despite body metadata', async () => {
+    const { chunks } = mockFfplay();
+    const source = Object.assign(Readable.from([]), { body: null });
+    const ended = once(source, 'end');
+    source.resume();
+    await ended;
+
+    await playAudio(source);
+
+    expect(Buffer.concat(chunks).length).toBe(0);
+    expect(spawnMock).toHaveBeenCalledTimes(1);
   });
 
   test('drains ffplay output without changing its spawn arguments', async () => {

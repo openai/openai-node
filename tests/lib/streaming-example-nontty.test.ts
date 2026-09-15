@@ -1,0 +1,159 @@
+import { compiledFixture, compiledFixtureConfig } from '../utils/compiled-fixtures';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { createServer } from 'node:http';
+import path from 'node:path';
+
+import type {
+  ChatCompletionChunk,
+  ChatCompletionCreateParamsStreaming,
+} from 'openai/resources/chat/completions';
+import { expect, test } from 'vitest';
+
+const examples = ['function-call-stream.ts', 'function-call-stream-raw.ts', 'tool-calls-stream.ts'] as const;
+const cases = [
+  ...examples.map((filename) => ({ filename, hasToolCall: true, emptyToolCalls: false })),
+  { filename: 'tool-calls-stream.ts', hasToolCall: true, emptyToolCalls: true },
+  { filename: 'tool-calls-stream.ts', hasToolCall: false, emptyToolCalls: false },
+  { filename: 'tool-calls-stream.ts', hasToolCall: false, emptyToolCalls: true },
+];
+
+test.each(cases)('$filename (tool=$hasToolCall, empty=$emptyToolCalls)', async (scenario) => {
+  const { filename, hasToolCall, emptyToolCalls } = scenario;
+  const usesTools = filename === 'tool-calls-stream.ts';
+  const expectedRequests = hasToolCall ? 2 : 1;
+  const requests: ChatCompletionCreateParamsStreaming[] = [];
+  const server = createServer((request, response) => {
+    let body = '';
+    request.setEncoding('utf-8').on('data', (chunk: string) => {
+      body += chunk;
+    });
+    request.on('end', () => {
+      requests.push(JSON.parse(body) as ChatCompletionCreateParamsStreaming);
+      if (requests.length > expectedRequests) {
+        // Bound unintended extra rounds without relying on the child timeout.
+        response.writeHead(400, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ error: { message: 'Unexpected extra completion request.' } }));
+        return;
+      }
+      let deltas: ChatCompletionChunk.Choice.Delta[];
+      if (requests.length > 1 || !hasToolCall) {
+        deltas = [
+          { role: 'assistant', content: 'Synthetic ', ...(emptyToolCalls ? { tool_calls: [] } : {}) },
+          { content: 'recommendation.' },
+        ];
+      } else if (usesTools) {
+        deltas = [
+          {
+            role: 'assistant',
+            tool_calls: [
+              {
+                index: 0,
+                id: 'call_example',
+                type: 'function',
+                function: { name: 'list', arguments: '{"genre":' },
+              },
+            ],
+          },
+          { tool_calls: [{ index: 0, function: { arguments: '"historical"}' } }] },
+        ];
+      } else {
+        deltas = [
+          { role: 'assistant', function_call: { name: 'list', arguments: '{"genre":' } },
+          { function_call: { arguments: '"historical"}' } },
+        ];
+      }
+
+      let finishReason: ChatCompletionChunk.Choice['finish_reason'] = 'stop';
+      if (hasToolCall && requests.length === 1) {
+        finishReason = usesTools ? 'tool_calls' : 'function_call';
+      }
+      response.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      for (const [index, delta] of deltas.entries()) {
+        const chunk: ChatCompletionChunk = {
+          id: 'chatcmpl_example',
+          object: 'chat.completion.chunk',
+          created: 1,
+          model: 'gpt-3.5-turbo',
+          choices: [{ index: 0, delta, finish_reason: index === deltas.length - 1 ? finishReason : null }],
+        };
+        response.write(`data: ${JSON.stringify(chunk)}\n\n`);
+      }
+      response.end('data: [DONE]\n\n');
+    });
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Expected a local TCP address');
+  }
+
+  const root = process.cwd();
+  const child = spawn(
+    process.execPath,
+    [
+      '-r',
+      path.join(root, 'node_modules/tsconfig-paths/register.js'),
+      compiledFixture('examples/chat-completions', filename),
+    ],
+    {
+      cwd: root,
+      env: {
+        OPENAI_API_KEY: 'synthetic-example-key',
+        OPENAI_BASE_URL: `http://127.0.0.1:${address.port}/v1`,
+        TS_NODE_PROJECT: compiledFixtureConfig(),
+        DISABLE_V8_COMPILE_CACHE: '1',
+        NODE_COMPILE_CACHE: process.env['NODE_COMPILE_CACHE'],
+        SystemRoot: process.env['SystemRoot'],
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 15_000,
+    },
+  );
+  let stdout = '';
+  let stderr = '';
+  child.stdout.setEncoding('utf-8').on('data', (data: string) => {
+    stdout += data;
+  });
+  child.stderr.setEncoding('utf-8').on('data', (data: string) => {
+    stderr += data;
+  });
+
+  try {
+    const [exitCode, signal] = await once(child, 'close');
+    expect(signal).toBeNull();
+    expect(requests).toHaveLength(expectedRequests);
+    expect(stderr).toBe('');
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain('Synthetic recommendation.');
+    expect(stdout.match(/Synthetic /gu)).toHaveLength(1);
+    expect(stdout).not.toContain('\u001B[');
+    expect(stdout).not.toContain('synthetic-example-key');
+    expect(requests[0]?.stream).toBe(true);
+    if (!hasToolCall) {
+      expect(requests[0]?.messages).toHaveLength(2);
+      return;
+    }
+    const messages = requests[1]?.messages;
+    expect(messages).toHaveLength(4);
+    const result = messages?.[3];
+    expect(result?.role).toBe(usesTools ? 'tool' : 'function');
+    expect(JSON.parse(String(result?.content))).toEqual([
+      { name: 'To Kill a Mockingbird', id: 'a1' },
+      { name: 'All the Light We Cannot See', id: 'a2' },
+      { name: 'Where the Crawdads Sing', id: 'a3' },
+    ]);
+    if (usesTools) {
+      expect(result).toHaveProperty('tool_call_id', 'call_example');
+    } else {
+      expect(result).toHaveProperty('name', 'list');
+    }
+  } finally {
+    child.kill();
+    const closed = once(server, 'close');
+    server.closeAllConnections();
+    server.close();
+    await closed;
+  }
+});

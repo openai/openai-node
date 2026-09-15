@@ -79,16 +79,16 @@ export class Responses extends APIResource {
 
   /**
    * Creates a model response. Provide
-   * [text](https://platform.openai.com/docs/guides/text) or
-   * [image](https://platform.openai.com/docs/guides/images) inputs to generate
-   * [text](https://platform.openai.com/docs/guides/text) or
-   * [JSON](https://platform.openai.com/docs/guides/structured-outputs) outputs. Have
-   * the model call your own
-   * [custom code](https://platform.openai.com/docs/guides/function-calling) or use
-   * built-in [tools](https://platform.openai.com/docs/guides/tools) like
-   * [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-   * [file search](https://platform.openai.com/docs/guides/tools-file-search) to use
-   * your own data as input for the model's response.
+   * [text](https://developers.openai.com/api/docs/guides/text) or
+   * [image](https://developers.openai.com/api/docs/guides/images-vision) inputs to
+   * generate [text](https://developers.openai.com/api/docs/guides/text) or
+   * [JSON](https://developers.openai.com/api/docs/guides/structured-outputs)
+   * outputs. Have the model call your own
+   * [custom code](https://developers.openai.com/api/docs/guides/function-calling) or
+   * use built-in [tools](https://developers.openai.com/api/docs/guides/tools) like
+   * [web search](https://developers.openai.com/api/docs/guides/tools-web-search) or
+   * [file search](https://developers.openai.com/api/docs/guides/tools-file-search)
+   * to use your own data as input for the model's response.
    *
    * @example
    * ```ts
@@ -210,7 +210,7 @@ export class Responses extends APIResource {
   /**
    * Cancels a model response with the given ID. Only responses created with the
    * `background` parameter set to `true` can be cancelled.
-   * [Learn more](https://platform.openai.com/docs/guides/background).
+   * [Learn more](https://developers.openai.com/api/docs/guides/background).
    *
    * @example
    * ```ts
@@ -230,14 +230,14 @@ export class Responses extends APIResource {
    * Compact a conversation. Returns a compacted response object.
    *
    * Learn when and how to compact long-running conversations in the
-   * [conversation state guide](https://platform.openai.com/docs/guides/conversation-state#managing-the-context-window).
+   * [conversation state guide](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window).
    * For ZDR-compatible compaction details, see
-   * [Compaction (advanced)](https://platform.openai.com/docs/guides/conversation-state#compaction-advanced).
+   * [Compaction (advanced)](https://developers.openai.com/api/docs/guides/conversation-state#compaction-advanced).
    *
    * @example
    * ```ts
    * const compactedResponse = await client.responses.compact({
-   *   model: 'gpt-5.6-sol',
+   *   model: 'gpt-6-astra',
    * });
    * ```
    */
@@ -536,7 +536,7 @@ export type ComputerActionList = Array<ComputerAction>;
 
 /**
  * A tool that controls a virtual computer. Learn more about the
- * [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
+ * [computer tool](https://developers.openai.com/api/docs/guides/tools-computer-use).
  */
 export interface ComputerTool {
   /**
@@ -547,7 +547,7 @@ export interface ComputerTool {
 
 /**
  * A tool that controls a virtual computer. Learn more about the
- * [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
+ * [computer tool](https://developers.openai.com/api/docs/guides/tools-computer-use).
  */
 export interface ComputerUsePreviewTool {
   /**
@@ -653,7 +653,7 @@ export interface ContainerReference {
 
 /**
  * A custom tool that processes input using a specified format. Learn more about
- * [custom tools](https://platform.openai.com/docs/guides/function-calling#custom-tools)
+ * [custom tools](https://developers.openai.com/api/docs/guides/function-calling#custom-tools)
  */
 export interface CustomTool {
   /**
@@ -670,6 +670,12 @@ export interface CustomTool {
    * The tool invocation context(s).
    */
   allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+  /**
+   * Whether the tool response can be returned asynchronously versus immediately
+   * returned on next response creation.
+   */
+  async?: boolean;
 
   /**
    * Whether this tool should be deferred and discovered via tool search.
@@ -724,7 +730,7 @@ export interface EasyInputMessage {
 /**
  * A tool that searches for relevant content from uploaded files. Learn more about
  * the
- * [file search tool](https://platform.openai.com/docs/guides/tools-file-search).
+ * [file search tool](https://developers.openai.com/api/docs/guides/tools-file-search).
  */
 export interface FileSearchTool {
   /**
@@ -817,7 +823,7 @@ export interface FunctionShellTool {
 /**
  * Defines a function in your own code the model can choose to call. Learn more
  * about
- * [function calling](https://platform.openai.com/docs/guides/function-calling).
+ * [function calling](https://developers.openai.com/api/docs/guides/function-calling).
  */
 export interface FunctionTool {
   /**
@@ -844,6 +850,8 @@ export interface FunctionTool {
    * The tool invocation context(s).
    */
   allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+  async?: boolean;
 
   /**
    * Whether this function is deferred and loaded via tool search.
@@ -1002,6 +1010,12 @@ export namespace NamespaceTool {
     allowed_callers?: Array<'direct' | 'programmatic'> | null;
 
     /**
+     * Whether the tool response can be returned asynchronously versus immediately
+     * returned on next response creation.
+     */
+    async?: boolean;
+
+    /**
      * Whether this function should be deferred and discovered via tool search.
      */
     defer_loading?: boolean;
@@ -1068,11 +1082,11 @@ export interface Response {
   metadata: Shared.Metadata | null;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * Model ID used to generate the response, like `gpt-6-astra`. OpenAI offers a wide
+   * range of models with different capabilities, performance characteristics, and
+   * price points. Refer to the
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model: Shared.ResponsesModel;
 
@@ -1129,17 +1143,18 @@ export interface Response {
    *
    * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
    *   capabilities, like
-   *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-   *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+   *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+   *   or
+   *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
    *   Learn more about
-   *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+   *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
    * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
    *   predefined connectors such as Google Drive and SharePoint. Learn more about
-   *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
+   *   [MCP Tools](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
    * - **Function calls (custom tools)**: Functions that are defined by you, enabling
    *   the model to call your own code with strongly typed arguments and outputs.
    *   Learn more about
-   *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+   *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
    *   You can also use custom tools to call your own code.
    */
   tools: Array<Tool>;
@@ -1155,7 +1170,7 @@ export interface Response {
 
   /**
    * Whether to run the model response in the background.
-   * [Learn more](https://platform.openai.com/docs/guides/background).
+   * [Learn more](https://developers.openai.com/api/docs/guides/background).
    */
   background?: boolean | null;
 
@@ -1174,7 +1189,7 @@ export interface Response {
   /**
    * An upper bound for the number of tokens that can be generated for a response,
    * including visible output tokens and
-   * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
    */
   max_output_tokens?: number | null;
 
@@ -1187,21 +1202,30 @@ export interface Response {
   /**
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
-   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
    * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
 
   /**
    * Reference to a prompt template and its variables.
-   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
    */
   prompt?: ResponsePrompt | null;
 
   /**
+   * Prompt cache diagnostics requested for this response.
+   */
+  prompt_cache_diagnostics?:
+    | Response.CacheMiss
+    | Response.CacheHit
+    | Response.ComparisonResponseNotFound
+    | Response.Unavailable;
+
+  /**
    * Used by OpenAI to cache responses for similar requests to optimize your cache
    * hit rates. Replaces the `user` field.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching).
    */
   prompt_cache_key?: string | null;
 
@@ -1217,7 +1241,7 @@ export interface Response {
    * The retention policy for the prompt cache. Set to `24h` to enable extended
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching#prompt-cache-retention).
    * This field expresses a maximum retention policy, while
    * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
    * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
@@ -1233,10 +1257,8 @@ export interface Response {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   reasoning?: Shared.Reasoning | null;
 
@@ -1246,7 +1268,7 @@ export interface Response {
    * identifies each user, with a maximum length of 64 characters. We recommend
    * hashing their username or email address, in order to avoid sending us any
    * identifying information.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   safety_identifier?: string | null;
 
@@ -1259,13 +1281,15 @@ export interface Response {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
-   *   then the request will be processed with the Flex Processing service tier.
-   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
-   *   include the `service_tier=fast` or `service_tier=priority` parameter for
-   *   Responses or Chat Completions. The response will show `service_tier=priority`
-   *   regardless of if you specify `service_tier=fast` or `priority` in your
-   *   request.
+   * - If set to
+   *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+   *   the request will be processed with the Flex Processing service tier.
+   * - To opt-in to
+   *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+   *   request level, include the `service_tier=fast` or `service_tier=priority`
+   *   parameter for Responses or Chat Completions. The response will show
+   *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+   *   `priority` in your request.
    * - If set to 'ultrafast', then the request will be processed with the
    *   access-controlled Ultrafast Processing service tier. This tier is currently
    *   available for `gpt-5.6-sol`; a response served through it will show
@@ -1287,8 +1311,8 @@ export interface Response {
    * Configuration options for a text response from the model. Can be plain text or
    * structured JSON data. Learn more:
    *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+   * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+   * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
    */
   text?: ResponseTextConfig;
 
@@ -1322,7 +1346,7 @@ export interface Response {
    * optimizations. A stable identifier for your end-users. Used to boost cache hit
    * rates by better bucketing similar requests and to help OpenAI detect and prevent
    * abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 }
@@ -1333,9 +1357,11 @@ export namespace Response {
    */
   export interface IncompleteDetails {
     /**
-     * The reason why the response is incomplete.
+     * The reason why the response is incomplete. `steered` means the response stopped
+     * at a safe output boundary after a WebSocket `response.steer` event. The server
+     * can then create a successor response automatically with the queued input.
      */
-    reason?: 'max_output_tokens' | 'content_filter';
+    reason?: 'max_output_tokens' | 'max_messages' | 'content_filter' | 'steered';
   }
 
   export interface SpecificProgrammaticToolCallingParam {
@@ -1488,6 +1514,47 @@ export namespace Response {
     }
   }
 
+  export interface CacheMiss {
+    /**
+     * The estimated number of input tokens affected after the first detected
+     * divergence.
+     */
+    cache_missed_tokens: number;
+
+    /**
+     * The reason prompt cache reuse did not occur.
+     */
+    reason:
+      | 'model_changed'
+      | 'prompt_cache_key_changed'
+      | 'tools_changed'
+      | 'text_format_changed'
+      | 'reasoning_effort_changed'
+      | 'verbosity_changed'
+      | 'context_compacted'
+      | 'input_changed'
+      | 'service_tier_changed';
+
+    type: 'cache_miss';
+
+    /**
+     * The raw token count of the reusable prefix in the compared response.
+     */
+    comparison_reusable_tokens?: number;
+  }
+
+  export interface CacheHit {
+    type: 'cache_hit';
+  }
+
+  export interface ComparisonResponseNotFound {
+    type: 'comparison_response_not_found';
+  }
+
+  export interface Unavailable {
+    type: 'unavailable';
+  }
+
   /**
    * The prompt-caching options that were applied to the response. Supported for
    * `gpt-5.6` and later models.
@@ -1502,6 +1569,11 @@ export namespace Response {
      * The minimum lifetime applied to each cache breakpoint.
      */
     ttl: '30m';
+
+    /**
+     * The response ID supplied as the prompt cache diagnostics comparison.
+     */
+    comparison_response_id?: string | null;
   }
 }
 
@@ -1956,7 +2028,7 @@ export namespace ResponseCodeInterpreterToolCall {
 
 /**
  * A compaction item generated by the
- * [`v1/responses/compact` API](https://platform.openai.com/docs/api-reference/responses/compact).
+ * [`v1/responses/compact` API](https://developers.openai.com/api/reference/resources/responses/methods/compact).
  */
 export interface ResponseCompactionItem {
   /**
@@ -1982,7 +2054,7 @@ export interface ResponseCompactionItem {
 
 /**
  * A compaction item generated by the
- * [`v1/responses/compact` API](https://platform.openai.com/docs/api-reference/responses/compact).
+ * [`v1/responses/compact` API](https://developers.openai.com/api/reference/resources/responses/methods/compact).
  */
 export interface ResponseCompactionItemParam {
   /**
@@ -2023,7 +2095,7 @@ export interface ResponseCompletedEvent {
 
 /**
  * A tool call to a computer use tool. See the
- * [computer use guide](https://platform.openai.com/docs/guides/tools-computer-use)
+ * [computer use guide](https://developers.openai.com/api/docs/guides/tools-computer-use)
  * for more information.
  */
 export interface ResponseComputerToolCall {
@@ -2399,6 +2471,75 @@ export interface ResponseComputerToolCallOutputScreenshot {
 }
 
 /**
+ * A configuration update that applies to subsequent responses until it is replaced
+ * by another configuration update.
+ */
+export interface ResponseConfigurationUpdateItem {
+  /**
+   * The unique ID of the configuration update item.
+   */
+  id: string;
+
+  /**
+   * The item type. Always `configuration_update`.
+   */
+  type: 'configuration_update';
+
+  /**
+   * The reasoning configuration applied by this update.
+   */
+  reasoning?: ResponseConfigurationUpdateItem.Reasoning;
+}
+
+export namespace ResponseConfigurationUpdateItem {
+  /**
+   * The reasoning configuration applied by this update.
+   */
+  export interface Reasoning {
+    /**
+     * The reasoning effort used for subsequent responses until another configuration
+     * update replaces it.
+     */
+    effort?: Shared.ReasoningEffort | null;
+  }
+}
+
+/**
+ * An update to the conversation's response configuration. The configuration
+ * remains in effect for subsequent responses until it is replaced by another
+ * configuration update.
+ */
+export interface ResponseConfigurationUpdateItemParam {
+  /**
+   * The item type. Always `configuration_update`.
+   */
+  type: 'configuration_update';
+
+  /**
+   * The unique ID of the configuration update item.
+   */
+  id?: string | null;
+
+  /**
+   * Updates to reasoning configuration. Only effort is supported.
+   */
+  reasoning?: ResponseConfigurationUpdateItemParam.Reasoning;
+}
+
+export namespace ResponseConfigurationUpdateItemParam {
+  /**
+   * Updates to reasoning configuration. Only effort is supported.
+   */
+  export interface Reasoning {
+    /**
+     * The reasoning effort to use for subsequent responses until another configuration
+     * update replaces it.
+     */
+    effort?: Shared.ReasoningEffort | null;
+  }
+}
+
+/**
  * Represents a container created with /v1/containers.
  */
 export interface ResponseContainerReference {
@@ -2602,6 +2743,11 @@ export interface ResponseCustomToolCall {
   id?: string;
 
   /**
+   * Whether the custom tool call runs asynchronously.
+   */
+  async?: boolean;
+
+  /**
    * The execution context that produced this tool call.
    */
   caller?: ResponseCustomToolCall.Direct | ResponseCustomToolCall.Program | null;
@@ -2794,6 +2940,7 @@ export interface ResponseError {
     | 'invalid_prompt'
     | 'data_residency_mismatch'
     | 'bio_policy'
+    | 'misalignment_policy_violation'
     | 'vector_store_timeout'
     | 'invalid_image'
     | 'invalid_image_format'
@@ -2814,6 +2961,44 @@ export interface ResponseError {
    * A human-readable description of the error.
    */
   message: string;
+
+  misalignment?: ResponseError.Misalignment;
+}
+
+export namespace ResponseError {
+  export interface Misalignment {
+    /**
+     * The public explanation for this block.
+     */
+    detailed_explanation?: string;
+
+    /**
+     * An optional classification; clients must accept additional values.
+     */
+    error_type?:
+      | (string & {})
+      | 'potentially_unintended_data_transfer'
+      | 'potentially_unintended_data_access'
+      | 'potentially_unintended_destructive_activity'
+      | 'other';
+
+    /**
+     * An optional public continuation instruction.
+     */
+    steer?: Misalignment.Steer;
+  }
+
+  export namespace Misalignment {
+    /**
+     * An optional public continuation instruction.
+     */
+    export interface Steer {
+      /**
+       * The public continuation instruction.
+       */
+      message: string;
+    }
+  }
 }
 
 /**
@@ -2943,7 +3128,7 @@ export interface ResponseFileSearchCallSearchingEvent {
 
 /**
  * The results of a file search tool call. See the
- * [file search guide](https://platform.openai.com/docs/guides/tools-file-search)
+ * [file search guide](https://developers.openai.com/api/docs/guides/tools-file-search)
  * for more information.
  */
 export interface ResponseFileSearchToolCall {
@@ -3012,7 +3197,7 @@ export namespace ResponseFileSearchToolCall {
  *
  * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
  * ensures the model will match your supplied JSON schema. Learn more in the
- * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+ * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
  *
  * The default format is `{ "type": "text" }` with no additional options.
  *
@@ -3030,7 +3215,7 @@ export type ResponseFormatTextConfig =
 /**
  * JSON Schema response format. Used to generate structured JSON responses. Learn
  * more about
- * [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs).
+ * [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
  */
 export interface ResponseFormatTextJSONSchemaConfig {
   /**
@@ -3061,7 +3246,7 @@ export interface ResponseFormatTextJSONSchemaConfig {
    * true, the model will always follow the exact schema defined in the `schema`
    * field. Only a subset of JSON Schema is supported when `strict` is `true`. To
    * learn more, read the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    */
   strict?: boolean | null;
 }
@@ -3109,11 +3294,6 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
    * The ID of the item.
    */
   item_id: string;
-
-  /**
-   * The name of the function that was called.
-   */
-  name: string;
 
   /**
    * The index of the output item.
@@ -3385,7 +3565,7 @@ export namespace ResponseFunctionShellToolCallOutput {
 
 /**
  * A tool call to run a function. See the
- * [function calling guide](https://platform.openai.com/docs/guides/function-calling)
+ * [function calling guide](https://developers.openai.com/api/docs/guides/function-calling)
  * for more information.
  */
 export interface ResponseFunctionToolCall {
@@ -3413,6 +3593,11 @@ export interface ResponseFunctionToolCall {
    * The unique ID of the function tool call.
    */
   id?: string;
+
+  /**
+   * Whether the function tool call runs asynchronously.
+   */
+  async?: boolean;
 
   /**
    * The execution context that produced this tool call.
@@ -3448,7 +3633,7 @@ export namespace ResponseFunctionToolCall {
 
 /**
  * A tool call to run a function. See the
- * [function calling guide](https://platform.openai.com/docs/guides/function-calling)
+ * [function calling guide](https://developers.openai.com/api/docs/guides/function-calling)
  * for more information.
  */
 export interface ResponseFunctionToolCallItem extends ResponseFunctionToolCall {
@@ -3476,11 +3661,6 @@ export interface ResponseFunctionToolCallOutputItem {
   id: string;
 
   /**
-   * The unique ID of the function tool call generated by the model.
-   */
-  call_id: string;
-
-  /**
    * The output from the function call generated by your code. Can be a string or an
    * list of output content.
    */
@@ -3496,6 +3676,11 @@ export interface ResponseFunctionToolCallOutputItem {
    * The type of the function tool call output. Always `function_call_output`.
    */
   type: 'function_call_output';
+
+  /**
+   * The unique ID of the function tool call generated by the model.
+   */
+  call_id?: string;
 
   /**
    * The execution context that produced this tool call.
@@ -3541,8 +3726,8 @@ export namespace ResponseFunctionToolCallOutputItem {
 
 /**
  * The results of a web search tool call. See the
- * [web search guide](https://platform.openai.com/docs/guides/tools-web-search) for
- * more information.
+ * [web search guide](https://developers.openai.com/api/docs/guides/tools-web-search)
+ * for more information.
  */
 export interface ResponseFunctionWebSearch {
   /**
@@ -3562,7 +3747,7 @@ export interface ResponseFunctionWebSearch {
   /**
    * The status of the web search tool call.
    */
-  status: 'in_progress' | 'searching' | 'completed' | 'failed';
+  status: 'in_progress' | 'searching' | 'completed' | 'failed' | 'incomplete';
 
   /**
    * The type of the web search tool call. Always `web_search_call`.
@@ -3839,6 +4024,10 @@ export type ResponseIncludable =
 
 /**
  * An event that is emitted when a response finishes as incomplete.
+ *
+ * Over WebSocket, steering can finish a response with
+ * `response.incomplete_details.reason` set to `steered`, followed automatically by
+ * a successor `response.created` that commits the queued steering input.
  */
 export interface ResponseIncompleteEvent {
   /**
@@ -4016,7 +4205,7 @@ export namespace ResponseInputFileContent {
 
 /**
  * An image input to the model. Learn about
- * [image inputs](https://platform.openai.com/docs/guides/vision).
+ * [image inputs](https://developers.openai.com/api/docs/guides/images-vision).
  */
 export interface ResponseInputImage {
   /**
@@ -4065,7 +4254,7 @@ export namespace ResponseInputImage {
 
 /**
  * An image input to the model. Learn about
- * [image inputs](https://platform.openai.com/docs/guides/vision)
+ * [image inputs](https://developers.openai.com/api/docs/guides/images-vision)
  */
 export interface ResponseInputImageContent {
   /**
@@ -4132,6 +4321,7 @@ export type ResponseInputItem =
   | ResponseInputItem.ToolSearchCall
   | ResponseToolSearchOutputItemParam
   | ResponseInputItem.AdditionalTools
+  | ResponseConfigurationUpdateItemParam
   | ResponseReasoningItem
   | ResponseCompactionItemParam
   | ResponseInputItem.ImageGenerationCall
@@ -4247,11 +4437,6 @@ export namespace ResponseInputItem {
    */
   export interface FunctionCallOutput {
     /**
-     * The unique ID of the function tool call generated by the model.
-     */
-    call_id: string;
-
-    /**
      * Text, image, or file output of the function tool call.
      */
     output: string | ResponsesAPI.ResponseFunctionCallOutputItemList;
@@ -4266,6 +4451,11 @@ export namespace ResponseInputItem {
      * returned via API.
      */
     id?: string | null;
+
+    /**
+     * The unique ID of the function tool call generated by the model.
+     */
+    call_id?: string | null;
 
     /**
      * The execution context that produced this tool call.
@@ -4387,6 +4577,37 @@ export namespace ResponseInputItem {
      * The type of the image generation call. Always `image_generation_call`.
      */
     type: 'image_generation_call';
+
+    /**
+     * The action used for image generation.
+     */
+    action?: 'generate' | 'edit' | 'auto' | null;
+
+    /**
+     * The background setting used for generation.
+     */
+    background?: 'transparent' | 'opaque' | 'auto' | null;
+
+    /**
+     * The output format used for generation.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg' | null;
+
+    /**
+     * The quality of the image generated by the image generation tool call. One of
+     * `low`, `medium`, `high`, `xhigh`, `max`, or `auto`.
+     */
+    quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto' | null;
+
+    /**
+     * The prompt that was used after any model prompt rewriting.
+     */
+    revised_prompt?: string | null;
+
+    /**
+     * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
+     */
+    size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
   }
 
   /**
@@ -5173,6 +5394,7 @@ export type ResponseItem =
   | ResponseToolSearchCall
   | ResponseToolSearchOutputItem
   | ResponseItem.AdditionalTools
+  | ResponseConfigurationUpdateItem
   | ResponseReasoningItem
   | ResponseItem.Program
   | ResponseItem.ProgramOutput
@@ -5292,6 +5514,37 @@ export namespace ResponseItem {
      * The type of the image generation call. Always `image_generation_call`.
      */
     type: 'image_generation_call';
+
+    /**
+     * The action used for image generation.
+     */
+    action?: 'generate' | 'edit' | 'auto' | null;
+
+    /**
+     * The background setting used for generation.
+     */
+    background?: 'transparent' | 'opaque' | 'auto' | null;
+
+    /**
+     * The output format used for generation.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg' | null;
+
+    /**
+     * The quality of the image generated by the image generation tool call. One of
+     * `low`, `medium`, `high`, `xhigh`, `max`, or `auto`.
+     */
+    quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto' | null;
+
+    /**
+     * The prompt that was used after any model prompt rewriting.
+     */
+    revised_prompt?: string | null;
+
+    /**
+     * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
+     */
+    size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
   }
 
   /**
@@ -5933,6 +6186,37 @@ export namespace ResponseOutputItem {
      * The type of the image generation call. Always `image_generation_call`.
      */
     type: 'image_generation_call';
+
+    /**
+     * The action used for image generation.
+     */
+    action?: 'generate' | 'edit' | 'auto' | null;
+
+    /**
+     * The background setting used for generation.
+     */
+    background?: 'transparent' | 'opaque' | 'auto' | null;
+
+    /**
+     * The output format used for generation.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg' | null;
+
+    /**
+     * The quality of the image generated by the image generation tool call. One of
+     * `low`, `medium`, `high`, `xhigh`, `max`, or `auto`.
+     */
+    quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto' | null;
+
+    /**
+     * The prompt that was used after any model prompt rewriting.
+     */
+    revised_prompt?: string | null;
+
+    /**
+     * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
+     */
+    size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
   }
 
   /**
@@ -6629,7 +6913,7 @@ export namespace ResponseOutputTextAnnotationAddedEvent {
 
 /**
  * Reference to a prompt template and its variables.
- * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+ * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
  */
 export interface ResponsePrompt {
   /**
@@ -6674,7 +6958,7 @@ export interface ResponseQueuedEvent {
  * A description of the chain of thought used by a reasoning model while generating
  * a response. Be sure to include these items in your `input` to the Responses API
  * for subsequent turns of a conversation if you are manually
- * [managing context](https://platform.openai.com/docs/guides/conversation-state).
+ * [managing context](https://developers.openai.com/api/docs/guides/conversation-state).
  */
 export interface ResponseReasoningItem {
   /**
@@ -7312,6 +7596,534 @@ export namespace ResponseShellCallOutputContentDoneEvent {
 export type ResponseStatus = 'completed' | 'failed' | 'in_progress' | 'cancelled' | 'queued' | 'incomplete';
 
 /**
+ * Emitted when steering input has been validated and queued. Acceptance means the
+ * server owns the input, not that it has been applied. The successor's
+ * `response.created` event is the commit point. If accepted input cannot be
+ * committed, `response.steer.failed` returns it with the same steering ID.
+ *
+ * When the response stops for client-owned tool output or approval, the input
+ * remains queued and `response.steer.pending` is emitted after
+ * `response.completed`. Fill the pending event's `required_input` stubs with saved
+ * results and send one matching explicit `response.create` per parent. Do not
+ * resend accepted input while it is still queued.
+ */
+export interface ResponseSteerAcceptedEvent {
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The accepted steering submission.
+   */
+  steer: ResponseSteerAcceptedEvent.Steer;
+
+  /**
+   * The event discriminator. Always `response.steer.accepted`.
+   */
+  type: 'response.steer.accepted';
+
+  /**
+   * The WebSocket lane that emitted this event. This field is present when the
+   * target response's `response.create` event supplied a `stream_id`.
+   */
+  stream_id?: string;
+}
+
+export namespace ResponseSteerAcceptedEvent {
+  /**
+   * The accepted steering submission.
+   */
+  export interface Steer {
+    /**
+     * The ID assigned to the steering submission.
+     */
+    id: string;
+
+    /**
+     * The ID of the response being steered.
+     */
+    previous_response_id: string;
+  }
+}
+
+/**
+ * A machine-readable steering error code. Clients should handle unknown values
+ * because additional codes may be introduced. Known values include:
+ *
+ * - `response_not_found`: The target response is not available on this connection.
+ * - `invalid_input`: The event or input failed validation.
+ * - `steering_not_supported`: The model or response execution mode does not
+ *   support steering.
+ * - `too_many_pending_steers`: Too much steering input is pending for the
+ *   response.
+ * - `response_already_completed`: The response completed and is no longer
+ *   accepting steering input.
+ * - `response_not_active`: The response is no longer accepting steering input.
+ * - `successor_creation_failed`: The successor response could not be created.
+ */
+export type ResponseSteerErrorCode =
+  | 'response_not_found'
+  | 'invalid_input'
+  | 'steering_not_supported'
+  | 'too_many_pending_steers'
+  | 'response_already_completed'
+  | 'response_not_active'
+  | 'successor_creation_failed'
+  | (string & {});
+
+/**
+ * Queues user input to steer a response on this WebSocket connection. Input can
+ * contain text, images, and files. Steering is supported only for single-agent
+ * responses on models and execution modes that support steering. Responses bound
+ * to a conversation or using automatic compaction do not support steering.
+ *
+ * A `response.steer.accepted` event acknowledges that the server owns the queued
+ * input, not that it has been applied. The successor's `response.created` event is
+ * the commit point. Input that cannot be committed is returned in
+ * `response.steer.failed`.
+ *
+ * Steering may cause the active response to finish at a safe output boundary with
+ * `response.incomplete` and `incomplete_details.reason` set to `steered`, followed
+ * automatically by a successor `response.created`. Normal completion can also be
+ * followed by an automatic successor. Automatic successors inherit the previous
+ * response's settings and continue from it with the queued input.
+ *
+ * If the response stops for client-owned tool output or approval, accepted
+ * steering input remains queued and `response.steer.pending` is emitted after
+ * `response.completed`. Fill the `required_input` stubs from that event with saved
+ * tool results or approval decisions, and send one explicit `response.create` per
+ * parent with the same `previous_response_id` and WebSocket lane. Do not rerun
+ * tools or resend accepted steering input. The queued input is prepended in
+ * submission order to that request's input, and the explicit request retains its
+ * own settings.
+ *
+ * This event accepts only `type`, `previous_response_id`, and `input`. Do not send
+ * `stream_id`; the target response determines the WebSocket lane.
+ */
+export interface ResponseSteerEvent {
+  /**
+   * Input to queue for a continuation of the response. Uses the same string or
+   * input-item shape as `response.create.input`, with a non-empty array when
+   * supplying input items.
+   *
+   * Steering accepts only messages with the `user` role. Each message may contain
+   * only `type`, `role`, and `content`, with `content` as a string or an array of
+   * `input_text`, `input_image`, and `input_file` parts. The optional `type` must be
+   * `message`. Other roles, tool outputs, and item types are not supported for
+   * steering.
+   */
+  input: ResponseSteerInput;
+
+  /**
+   * The ID of the response to steer on this WebSocket connection.
+   */
+  previous_response_id: string;
+
+  /**
+   * The event discriminator. Always `response.steer`.
+   */
+  type: 'response.steer';
+}
+
+/**
+ * Emitted when steering input is rejected or cannot be committed to a successor
+ * response. Returns the original, uncommitted input so the client can carry it
+ * into `response.create` when appropriate. Invalid input must be corrected before
+ * retrying.
+ *
+ * Failures after acceptance include the same steering ID. Failures before an ID is
+ * allocated omit `steer.id`. A lost connection or missing acknowledgement leaves
+ * the outcome unknown; it is not proof that the input was rejected.
+ */
+export interface ResponseSteerFailedEvent {
+  /**
+   * Information about why the input could not be committed.
+   */
+  error: ResponseSteerFailedEvent.Error;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The steering submission that could not be committed.
+   */
+  steer: ResponseSteerFailedEvent.Steer;
+
+  /**
+   * The event discriminator. Always `response.steer.failed`.
+   */
+  type: 'response.steer.failed';
+
+  /**
+   * The WebSocket lane that emitted this event, when the target response is
+   * available and its `response.create` event supplied a `stream_id`.
+   */
+  stream_id?: string;
+}
+
+export namespace ResponseSteerFailedEvent {
+  /**
+   * Information about why the input could not be committed.
+   */
+  export interface Error {
+    /**
+     * A machine-readable steering error code. Clients should handle unknown values
+     * because additional codes may be introduced. Known values include:
+     *
+     * - `response_not_found`: The target response is not available on this connection.
+     * - `invalid_input`: The event or input failed validation.
+     * - `steering_not_supported`: The model or response execution mode does not
+     *   support steering.
+     * - `too_many_pending_steers`: Too much steering input is pending for the
+     *   response.
+     * - `response_already_completed`: The response completed and is no longer
+     *   accepting steering input.
+     * - `response_not_active`: The response is no longer accepting steering input.
+     * - `successor_creation_failed`: The successor response could not be created.
+     */
+    code: ResponsesAPI.ResponseSteerErrorCode;
+
+    /**
+     * A human-readable description of the error.
+     */
+    message: string;
+
+    /**
+     * The error type. Always `invalid_request_error`.
+     */
+    type: 'invalid_request_error';
+  }
+
+  /**
+   * The steering submission that could not be committed.
+   */
+  export interface Steer {
+    /**
+     * Input to queue for a continuation of the response. Uses the same string or
+     * input-item shape as `response.create.input`, with a non-empty array when
+     * supplying input items.
+     *
+     * Steering accepts only messages with the `user` role. Each message may contain
+     * only `type`, `role`, and `content`, with `content` as a string or an array of
+     * `input_text`, `input_image`, and `input_file` parts. The optional `type` must be
+     * `message`. Other roles, tool outputs, and item types are not supported for
+     * steering.
+     */
+    input: ResponsesAPI.ResponseSteerInput;
+
+    /**
+     * The ID of the response that was targeted for steering.
+     */
+    previous_response_id: string;
+
+    /**
+     * The ID assigned to the steering submission, if one was allocated.
+     */
+    id?: string;
+  }
+}
+
+/**
+ * Input to queue for a continuation of the response. Uses the same string or
+ * input-item shape as `response.create.input`, with a non-empty array when
+ * supplying input items.
+ *
+ * Steering accepts only messages with the `user` role. Each message may contain
+ * only `type`, `role`, and `content`, with `content` as a string or an array of
+ * `input_text`, `input_image`, and `input_file` parts. The optional `type` must be
+ * `message`. Other roles, tool outputs, and item types are not supported for
+ * steering.
+ */
+export type ResponseSteerInput =
+  | string
+  | Array<ResponseSteerInputItemList.Message | ResponseSteerInputItemList.FunctionCallOutput>;
+
+export namespace ResponseSteerInputItemList {
+  export interface Message {
+    /**
+     * The message content, as an array of content parts.
+     */
+    content: Array<ResponsesAPI.ResponseSteerInputContent> | string;
+
+    /**
+     * The message role. Always `user`.
+     */
+    role: 'user';
+
+    /**
+     * The item type. Always `message`.
+     */
+    type: 'message';
+
+    /**
+     * The unique ID of this message item.
+     */
+    id?: string | null;
+
+    /**
+     * The status of the message item.
+     */
+    status?: string | null;
+  }
+
+  /**
+   * The output of a function tool call.
+   */
+  export interface FunctionCallOutput {
+    /**
+     * Text, image, or file output of the function tool call.
+     */
+    output: string | ResponsesAPI.ResponseFunctionCallOutputItemList;
+
+    /**
+     * The type of the function tool call output. Always `function_call_output`.
+     */
+    type: 'function_call_output';
+
+    /**
+     * The unique ID of the function tool call output. Populated when this item is
+     * returned via API.
+     */
+    id?: string | null;
+
+    /**
+     * The unique ID of the function tool call generated by the model.
+     */
+    call_id?: string | null;
+
+    /**
+     * The execution context that produced this tool call.
+     */
+    caller?: FunctionCallOutput.Direct | FunctionCallOutput.Program | null;
+
+    /**
+     * The name of the tool that produced the output.
+     */
+    name?: string | null;
+
+    /**
+     * The namespace of the tool that produced the output.
+     */
+    namespace?: string | null;
+
+    /**
+     * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+     * Populated when items are returned via API.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export namespace FunctionCallOutput {
+    export interface Direct {
+      /**
+       * The caller type. Always `direct`.
+       */
+      type: 'direct';
+    }
+
+    export interface Program {
+      /**
+       * The call ID of the program item that produced this tool call.
+       */
+      caller_id: string;
+
+      /**
+       * The caller type. Always `program`.
+       */
+      type: 'program';
+    }
+  }
+}
+
+/**
+ * A piece of message content, such as text, an image, or a file.
+ */
+export type ResponseSteerInputContent =
+  | ResponseInputTextContent
+  | ResponseInputImageContent
+  | ResponseInputFileContent;
+
+/**
+ * Emitted when accepted steering input remains queued after the target response
+ * completes. The server still owns the input. Do not resend it. The successor's
+ * `response.created` event is the commit point.
+ *
+ * When `reason` is `waiting_for_required_input`, this event follows
+ * `response.completed` while the response waits for the tool results or approval
+ * decisions identified by `required_input`. Copy those stubs, fill their result
+ * fields using the ordinary `response.create` input schemas, and submit one
+ * continuation per parent with the same `previous_response_id` and WebSocket lane.
+ * Use saved results without rerunning tools. The queued steering input is
+ * prepended in submission order to the continuation's input. That explicit request
+ * retains its own settings.
+ *
+ * This notification is emitted at most once per steering submission. Multiple
+ * submissions for the same parent can report the same required inputs; they do not
+ * each require a separate continuation.
+ */
+export interface ResponseSteerPendingEvent {
+  /**
+   * An extensible enum describing why accepted steering input is still queued.
+   * Clients should handle unknown values because additional reasons may be
+   * introduced. Known values include:
+   *
+   * - `waiting_for_required_input`: The response is waiting for the tool results or
+   *   approval decisions identified by `required_input`.
+   */
+  reason: ResponseSteerPendingReason;
+
+  /**
+   * Input stubs identifying outstanding client-owned tool results or approval
+   * decisions. Each stub contains identifying fields only; the client supplies the
+   * result before including it in `response.create`.
+   */
+  required_input: Array<ResponseSteerRequiredInput>;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The steering submission that remains queued.
+   */
+  steer: ResponseSteerPendingEvent.Steer;
+
+  /**
+   * The event discriminator. Always `response.steer.pending`.
+   */
+  type: 'response.steer.pending';
+
+  /**
+   * The WebSocket lane that emitted this event. This field is present when the
+   * target response's `response.create` event supplied a `stream_id`.
+   */
+  stream_id?: string;
+}
+
+export namespace ResponseSteerPendingEvent {
+  /**
+   * The steering submission that remains queued.
+   */
+  export interface Steer {
+    /**
+     * The ID assigned to the steering submission.
+     */
+    id: string;
+
+    /**
+     * The ID of the response being steered.
+     */
+    previous_response_id: string;
+  }
+}
+
+/**
+ * An extensible enum describing why accepted steering input is still queued.
+ * Clients should handle unknown values because additional reasons may be
+ * introduced. Known values include:
+ *
+ * - `waiting_for_required_input`: The response is waiting for the tool results or
+ *   approval decisions identified by `required_input`.
+ */
+export type ResponseSteerPendingReason = 'waiting_for_required_input' | (string & {});
+
+/**
+ * An input stub identifying an outstanding client-owned tool result or approval
+ * decision. Copy the stub and fill the result fields using the corresponding
+ * `response.create` input schema. Use saved results without rerunning the tool.
+ * The server does not supply results, approval decisions, or safety
+ * acknowledgements in these stubs.
+ */
+export type ResponseSteerRequiredInput =
+  | ResponseSteerRequiredInput.FunctionCallOutput
+  | ResponseSteerRequiredInput.CustomToolCallOutput
+  | ResponseSteerRequiredInput.ComputerCallOutput
+  | ResponseSteerRequiredInput.ShellCallOutput
+  | ResponseSteerRequiredInput.ApplyPatchCallOutput
+  | ResponseSteerRequiredInput.ToolSearchOutput
+  | ResponseSteerRequiredInput.McpApprovalResponse;
+
+export namespace ResponseSteerRequiredInput {
+  /**
+   * Supply `output` using the function tool call output input schema.
+   */
+  export interface FunctionCallOutput {
+    call_id: string;
+
+    name: string;
+
+    type: 'function_call_output';
+  }
+
+  /**
+   * Supply `output` using the custom tool call output input schema. The original
+   * custom tool call supplies the tool's name.
+   */
+  export interface CustomToolCallOutput {
+    call_id: string;
+
+    type: 'custom_tool_call_output';
+  }
+
+  /**
+   * Supply `output` using the computer tool call output input schema, including any
+   * required `acknowledged_safety_checks`.
+   */
+  export interface ComputerCallOutput {
+    call_id: string;
+
+    type: 'computer_call_output';
+  }
+
+  /**
+   * Supply `output` using the shell tool call output input schema. Each output entry
+   * includes `stdout`, `stderr`, and `outcome`.
+   */
+  export interface ShellCallOutput {
+    call_id: string;
+
+    type: 'shell_call_output';
+  }
+
+  /**
+   * Supply `status` and optional `output` using the apply patch tool call output
+   * input schema.
+   */
+  export interface ApplyPatchCallOutput {
+    call_id: string;
+
+    type: 'apply_patch_call_output';
+  }
+
+  /**
+   * Supply `tools` using the tool search output input schema, retaining
+   * `execution: "client"`.
+   */
+  export interface ToolSearchOutput {
+    call_id: string;
+
+    execution: 'client';
+
+    type: 'tool_search_output';
+  }
+
+  /**
+   * Supply `approve` using the MCP approval response input schema. An optional
+   * `reason` can be supplied when denying the request. The original approval request
+   * identifies the tool and server.
+   */
+  export interface McpApprovalResponse {
+    approval_request_id: string;
+
+    type: 'mcp_approval_response';
+  }
+}
+
+/**
  * Event emitted while a response is streamed.
  */
 export type ResponseStreamEvent =
@@ -7378,8 +8190,8 @@ export type ResponseStreamEvent =
  * Configuration options for a text response from the model. Can be plain text or
  * structured JSON data. Learn more:
  *
- * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
- * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+ * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+ * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
  */
 export interface ResponseTextConfig {
   /**
@@ -7387,7 +8199,7 @@ export interface ResponseTextConfig {
    *
    * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
    * ensures the model will match your supplied JSON schema. Learn more in the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    *
    * The default format is `{ "type": "text" }` with no additional options.
    *
@@ -7713,7 +8525,7 @@ export namespace ResponseUsage {
 
     /**
      * The number of tokens that were retrieved from the cache.
-     * [More on prompt caching](https://platform.openai.com/docs/guides/prompt-caching).
+     * [More on prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching).
      */
     cached_tokens: number;
   }
@@ -7804,455 +8616,502 @@ export interface ResponseWebSearchCallSearchingEvent {
   type: 'response.web_search_call.searching';
 }
 
-export interface ResponsesClientEvent {
-  /**
-   * The type of the client event. Always `response.create`.
-   */
-  type: 'response.create';
-
-  /**
-   * Whether to run the model response in the background.
-   * [Learn more](https://platform.openai.com/docs/guides/background).
-   */
-  background?: boolean | null;
-
-  /**
-   * Context management configuration for this request.
-   */
-  context_management?: Array<ResponsesClientEvent.ContextManagement> | null;
-
-  /**
-   * The conversation that this response belongs to. Items from this conversation are
-   * prepended to `input_items` for this response request. Input items and output
-   * items from this response are automatically added to this conversation after this
-   * response completes.
-   */
-  conversation?: string | ResponseConversationParam | null;
-
-  /**
-   * Specify additional output data to include in the model response. Currently
-   * supported values are:
-   *
-   * - `web_search_call.action.sources`: Include the sources of the web search tool
-   *   call.
-   * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
-   *   in code interpreter tool call items.
-   * - `computer_call_output.output.image_url`: Include image urls from the computer
-   *   call output.
-   * - `file_search_call.results`: Include the search results of the file search tool
-   *   call.
-   * - `message.input_image.image_url`: Include image urls from the input message.
-   * - `message.output_text.logprobs`: Include logprobs with assistant messages.
-   * - `reasoning.encrypted_content`: Includes an encrypted version of reasoning
-   *   tokens in reasoning item outputs. This enables reasoning items to be used in
-   *   multi-turn conversations when using the Responses API statelessly (like when
-   *   the `store` parameter is set to `false`, or when an organization is enrolled
-   *   in the zero data retention program).
-   */
-  include?: Array<ResponseIncludable> | null;
-
-  /**
-   * Text, image, or file inputs to the model, used to generate a response.
-   *
-   * Learn more:
-   *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Image inputs](https://platform.openai.com/docs/guides/images)
-   * - [File inputs](https://platform.openai.com/docs/guides/pdf-files)
-   * - [Conversation state](https://platform.openai.com/docs/guides/conversation-state)
-   * - [Function calling](https://platform.openai.com/docs/guides/function-calling)
-   */
-  input?: string | ResponseInput;
-
-  /**
-   * A system (or developer) message inserted into the model's context.
-   *
-   * When using along with `previous_response_id`, the instructions from a previous
-   * response will not be carried over to the next response. This makes it simple to
-   * swap out system (or developer) messages in new responses.
-   */
-  instructions?: string | null;
-
-  /**
-   * An upper bound for the number of tokens that can be generated for a response,
-   * including visible output tokens and
-   * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
-   */
-  max_output_tokens?: number | null;
-
-  /**
-   * The maximum number of total calls to built-in tools that can be processed in a
-   * response. This maximum number applies across all built-in tool calls, not per
-   * individual tool. Any further attempts to call a tool by the model will be
-   * ignored.
-   */
-  max_tool_calls?: number | null;
-
-  /**
-   * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format, and
-   * querying for objects via API or the dashboard.
-   *
-   * Keys are strings with a maximum length of 64 characters. Values are strings with
-   * a maximum length of 512 characters.
-   */
-  metadata?: Shared.Metadata | null;
-
-  /**
-   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
-   */
-  model?: Shared.ResponsesModel;
-
-  /**
-   * Configuration for running moderation on the input and output of this response.
-   */
-  moderation?: ResponsesClientEvent.Moderation | null;
-
-  /**
-   * Whether to allow the model to run tool calls in parallel.
-   */
-  parallel_tool_calls?: boolean | null;
-
-  /**
-   * The unique ID of the previous response to the model. Use this to create
-   * multi-turn conversations. Learn more about
-   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
-   * Cannot be used in conjunction with `conversation`.
-   */
-  previous_response_id?: string | null;
-
-  /**
-   * Reference to a prompt template and its variables.
-   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
-   */
-  prompt?: ResponsePrompt | null;
-
-  /**
-   * Used by OpenAI to cache responses for similar requests to optimize your cache
-   * hit rates. Replaces the `user` field.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
-   */
-  prompt_cache_key?: string | null;
-
-  /**
-   * Options for prompt caching. Supported for `gpt-5.6` and later models. By
-   * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
-   * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
-   * request can write up to four breakpoints. For cache matching, OpenAI considers
-   * up to the latest 80 breakpoints in the conversation, without a content-block
-   * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-   * `ttl` defaults to `30m`, which is currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
-   * for current details.
-   */
-  prompt_cache_options?: ResponsesClientEvent.PromptCacheOptions;
-
-  /**
-   * @deprecated Deprecated. Use `prompt_cache_options.ttl` instead.
-   *
-   * The retention policy for the prompt cache. Set to `24h` to enable extended
-   * prompt caching, which keeps cached prefixes active for longer, up to a maximum
-   * of 24 hours.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
-   * This field expresses a maximum retention policy, while
-   * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
-   * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
-   * models, only `24h` is supported.
-   *
-   * For older models that support both `in_memory` and `24h`, the default depends on
-   * your organization's data retention policy:
-   *
-   * - Organizations without ZDR enabled default to `24h`.
-   * - Organizations with ZDR enabled default to `in_memory` when
-   *   `prompt_cache_retention` is not specified.
-   */
-  prompt_cache_retention?: 'in_memory' | '24h' | null;
-
-  /**
-   * **gpt-5 and o-series models only**
-   *
-   * Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
-   */
-  reasoning?: Shared.Reasoning | null;
-
-  /**
-   * A stable identifier used to help detect users of your application that may be
-   * violating OpenAI's usage policies. The IDs should be a string that uniquely
-   * identifies each user, with a maximum length of 64 characters. We recommend
-   * hashing their username or email address, in order to avoid sending us any
-   * identifying information.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
-   */
-  safety_identifier?: string | null;
-
-  /**
-   * Specifies the processing type used for serving the request.
-   *
-   * - If set to 'auto', then the request will be processed with the service tier
-   *   configured in the Project settings. Unless otherwise configured, the Project
-   *   will use 'default'.
-   * - If set to 'default', then the request will be processed with the standard
-   *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
-   *   then the request will be processed with the Flex Processing service tier.
-   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
-   *   include the `service_tier=fast` or `service_tier=priority` parameter for
-   *   Responses or Chat Completions. The response will show `service_tier=priority`
-   *   regardless of if you specify `service_tier=fast` or `priority` in your
-   *   request.
-   * - If set to 'ultrafast', then the request will be processed with the
-   *   access-controlled Ultrafast Processing service tier. This tier is currently
-   *   available for `gpt-5.6-sol`; a response served through it will show
-   *   `service_tier=ultrafast`.
-   * - When not set, the default behavior is 'auto'.
-   *
-   * When the `service_tier` parameter is set, the response body will include the
-   * `service_tier` value based on the processing mode actually used to serve the
-   * request. This response value may be different from the value set in the
-   * parameter.
-   */
-  service_tier?: ServiceTier | null;
-
-  /**
-   * Whether to store the generated model response for later retrieval via API.
-   */
-  store?: boolean | null;
-
-  /**
-   * If set to true, the model response data will be streamed to the client as it is
-   * generated using
-   * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
-   * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
-   * for more information.
-   */
-  stream?: boolean | null;
-
-  /**
-   * The WebSocket lane for this response. Requests with the same `stream_id` are
-   * processed FIFO, and events for the response echo the same `stream_id`.
-   *
-   * `stream_id` controls routing; `previous_response_id` controls conversation
-   * lineage, so a new lane can fork from a response created on another lane.
-   */
-  stream_id?: string;
-
-  /**
-   * Options for streaming responses. Only set this when you set `stream: true`.
-   */
-  stream_options?: ResponsesClientEvent.StreamOptions | null;
-
-  /**
-   * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
-   * make the output more random, while lower values like 0.2 will make it more
-   * focused and deterministic. We generally recommend altering this or `top_p` but
-   * not both.
-   */
-  temperature?: number | null;
-
-  /**
-   * Configuration options for a text response from the model. Can be plain text or
-   * structured JSON data. Learn more:
-   *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
-   */
-  text?: ResponseTextConfig;
-
-  /**
-   * How the model should select which tool (or tools) to use when generating a
-   * response. See the `tools` parameter to see how to specify which tools the model
-   * can call.
-   */
-  tool_choice?:
-    | ToolChoiceOptions
-    | ToolChoiceAllowed
-    | ToolChoiceTypes
-    | ToolChoiceFunction
-    | ToolChoiceMcp
-    | ToolChoiceCustom
-    | ResponsesClientEvent.SpecificProgrammaticToolCallingParam
-    | ToolChoiceApplyPatch
-    | ToolChoiceShell;
-
-  /**
-   * An array of tools the model may call while generating a response. You can
-   * specify which tool to use by setting the `tool_choice` parameter.
-   *
-   * We support the following categories of tools:
-   *
-   * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
-   *   capabilities, like
-   *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-   *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
-   *   Learn more about
-   *   [built-in tools](https://platform.openai.com/docs/guides/tools).
-   * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
-   *   predefined connectors such as Google Drive and SharePoint. Learn more about
-   *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
-   * - **Function calls (custom tools)**: Functions that are defined by you, enabling
-   *   the model to call your own code with strongly typed arguments and outputs.
-   *   Learn more about
-   *   [function calling](https://platform.openai.com/docs/guides/function-calling).
-   *   You can also use custom tools to call your own code.
-   */
-  tools?: Array<Tool>;
-
-  /**
-   * An integer between 0 and 20 specifying the maximum number of most likely tokens
-   * to return at each token position, each with an associated log probability. In
-   * some cases, the number of returned tokens may be fewer than requested.
-   */
-  top_logprobs?: number | null;
-
-  /**
-   * An alternative to sampling with temperature, called nucleus sampling, where the
-   * model considers the results of the tokens with top_p probability mass. So 0.1
-   * means only the tokens comprising the top 10% probability mass are considered.
-   *
-   * We generally recommend altering this or `temperature` but not both.
-   */
-  top_p?: number | null;
-
-  /**
-   * @deprecated The truncation strategy to use for the model response.
-   *
-   * - `auto`: If the input to this Response exceeds the model's context window size,
-   *   the model will truncate the response to fit the context window by dropping
-   *   items from the beginning of the conversation.
-   * - `disabled` (default): If the input size will exceed the context window size
-   *   for a model, the request will fail with a 400 error.
-   */
-  truncation?: 'auto' | 'disabled' | null;
-
-  /**
-   * @deprecated This field is being replaced by `safety_identifier` and
-   * `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching
-   * optimizations. A stable identifier for your end-users. Used to boost cache hit
-   * rates by better bucketing similar requests and to help OpenAI detect and prevent
-   * abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
-   */
-  user?: string;
-}
+/**
+ * Client events accepted by the Responses WebSocket server.
+ */
+export type ResponsesClientEvent = ResponsesClientEvent.ResponseCreate | ResponseSteerEvent;
 
 export namespace ResponsesClientEvent {
-  export interface ContextManagement {
-    /**
-     * The context management entry type. Currently only 'compaction' is supported.
-     */
-    type: string;
-
-    /**
-     * Token threshold at which compaction should be triggered for this entry.
-     */
-    compact_threshold?: number | null;
-  }
-
-  /**
-   * Configuration for running moderation on the input and output of this response.
-   */
-  export interface Moderation {
-    /**
-     * The moderation model to use for moderated completions, e.g.
-     * 'omni-moderation-latest'.
-     */
-    model: string;
-
-    /**
-     * The policy to apply to moderated response input and output.
-     */
-    policy?: Moderation.Policy | null;
-  }
+  // custom code for back compat aliases
+  // Preserve the names exposed before ResponsesClientEvent became a union.
+  export type ContextManagement = ResponseCreate.ContextManagement;
+  export type Moderation = ResponseCreate.Moderation;
 
   export namespace Moderation {
-    /**
-     * The policy to apply to moderated response input and output.
-     */
-    export interface Policy {
-      /**
-       * The moderation policy for the response input.
-       */
-      input?: Policy.Input | null;
-
-      /**
-       * The moderation policy for the response output.
-       */
-      output?: Policy.Output | null;
-    }
+    export type Policy = ResponseCreate.Moderation.Policy;
 
     export namespace Policy {
-      /**
-       * The moderation policy for the response input.
-       */
-      export interface Input {
-        mode: 'score' | 'block';
-      }
-
-      /**
-       * The moderation policy for the response output.
-       */
-      export interface Output {
-        mode: 'score' | 'block';
-      }
+      export type Input = ResponseCreate.Moderation.Policy.Input;
+      export type Output = ResponseCreate.Moderation.Policy.Output;
     }
   }
 
-  /**
-   * Options for prompt caching. Supported for `gpt-5.6` and later models. By
-   * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
-   * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
-   * request can write up to four breakpoints. For cache matching, OpenAI considers
-   * up to the latest 80 breakpoints in the conversation, without a content-block
-   * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-   * `ttl` defaults to `30m`, which is currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
-   * for current details.
-   */
-  export interface PromptCacheOptions {
-    /**
-     * Controls whether OpenAI automatically creates an implicit cache breakpoint.
-     * Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint
-     * and writes up to the latest three explicit breakpoints in the request. With
-     * `explicit`, OpenAI does not create an implicit breakpoint and writes up to the
-     * latest four explicit breakpoints. If there are no explicit breakpoints, the
-     * request does not use prompt caching.
-     */
-    mode?: 'implicit' | 'explicit';
-
-    /**
-     * The minimum lifetime applied to every implicit and explicit cache breakpoint
-     * written by the request. Defaults to `30m`, which is currently the only supported
-     * value. The backend may retain cache entries for longer.
-     */
-    ttl?: '30m';
-  }
+  export type PromptCacheOptions = ResponseCreate.PromptCacheOptions;
+  export type StreamOptions = ResponseCreate.StreamOptions;
+  export type SpecificProgrammaticToolCallingParam = ResponseCreate.SpecificProgrammaticToolCallingParam;
+  // end custom code for back compat aliases
 
   /**
-   * Options for streaming responses. Only set this when you set `stream: true`.
+   * Client event for creating a response over a persistent WebSocket connection.
+   * This payload uses the same top-level fields as `POST /v1/responses`, plus
+   * WebSocket-only envelope metadata.
+   *
+   * Notes:
+   *
+   * - `stream` is implicit over WebSocket and should not be sent.
+   * - `background` is not supported over WebSocket.
+   * - `stream_id` is WebSocket-only and is not part of `POST /v1/responses`.
    */
-  export interface StreamOptions {
+  export interface ResponseCreate {
     /**
-     * When true, stream obfuscation will be enabled. Stream obfuscation adds random
-     * characters to an `obfuscation` field on streaming delta events to normalize
-     * payload sizes as a mitigation to certain side-channel attacks. These obfuscation
-     * fields are included by default, but add a small amount of overhead to the data
-     * stream. You can set `include_obfuscation` to false to optimize for bandwidth if
-     * you trust the network links between your application and the OpenAI API.
+     * The type of the client event. Always `response.create`.
      */
-    include_obfuscation?: boolean;
+    type: 'response.create';
+
+    /**
+     * Whether to run the model response in the background.
+     * [Learn more](https://developers.openai.com/api/docs/guides/background).
+     */
+    background?: boolean | null;
+
+    /**
+     * Context management configuration for this request.
+     */
+    context_management?: Array<ResponseCreate.ContextManagement> | null;
+
+    /**
+     * The conversation that this response belongs to. Items from this conversation are
+     * prepended to `input_items` for this response request. Input items and output
+     * items from this response are automatically added to this conversation after this
+     * response completes.
+     */
+    conversation?: string | ResponsesAPI.ResponseConversationParam | null;
+
+    /**
+     * Specify additional output data to include in the model response. Currently
+     * supported values are:
+     *
+     * - `web_search_call.action.sources`: Include the sources of the web search tool
+     *   call.
+     * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
+     *   in code interpreter tool call items.
+     * - `computer_call_output.output.image_url`: Include image urls from the computer
+     *   call output.
+     * - `file_search_call.results`: Include the search results of the file search tool
+     *   call.
+     * - `message.input_image.image_url`: Include image urls from the input message.
+     * - `message.output_text.logprobs`: Include logprobs with assistant messages.
+     * - `reasoning.encrypted_content`: Includes an encrypted version of reasoning
+     *   tokens in reasoning item outputs. This enables reasoning items to be used in
+     *   multi-turn conversations when using the Responses API statelessly (like when
+     *   the `store` parameter is set to `false`, or when an organization is enrolled
+     *   in the zero data retention program).
+     */
+    include?: Array<ResponsesAPI.ResponseIncludable> | null;
+
+    /**
+     * Text, image, or file inputs to the model, used to generate a response.
+     *
+     * Learn more:
+     *
+     * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+     * - [Image inputs](https://developers.openai.com/api/docs/guides/images-vision)
+     * - [File inputs](https://developers.openai.com/api/docs/guides/file-inputs)
+     * - [Conversation state](https://developers.openai.com/api/docs/guides/conversation-state)
+     * - [Function calling](https://developers.openai.com/api/docs/guides/function-calling)
+     */
+    input?: string | ResponsesAPI.ResponseInput;
+
+    /**
+     * A system (or developer) message inserted into the model's context.
+     *
+     * When using along with `previous_response_id`, the instructions from a previous
+     * response will not be carried over to the next response. This makes it simple to
+     * swap out system (or developer) messages in new responses.
+     */
+    instructions?: string | null;
+
+    /**
+     * An upper bound for the number of tokens that can be generated for a response,
+     * including visible output tokens and
+     * [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
+     */
+    max_output_tokens?: number | null;
+
+    /**
+     * The maximum number of total calls to built-in tools that can be processed in a
+     * response. This maximum number applies across all built-in tool calls, not per
+     * individual tool. Any further attempts to call a tool by the model will be
+     * ignored.
+     */
+    max_tool_calls?: number | null;
+
+    /**
+     * Set of 16 key-value pairs that can be attached to an object. This can be useful
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard.
+     *
+     * Keys are strings with a maximum length of 64 characters. Values are strings with
+     * a maximum length of 512 characters.
+     */
+    metadata?: Shared.Metadata | null;
+
+    /**
+     * Model ID used to generate the response, like `gpt-6-astra`. OpenAI offers a wide
+     * range of models with different capabilities, performance characteristics, and
+     * price points. Refer to the
+     * [model guide](https://developers.openai.com/api/docs/models) to browse and
+     * compare available models.
+     */
+    model?: Shared.ResponsesModel;
+
+    /**
+     * Configuration for running moderation on the input and output of this response.
+     */
+    moderation?: ResponseCreate.Moderation | null;
+
+    /**
+     * Whether to allow the model to run tool calls in parallel.
+     */
+    parallel_tool_calls?: boolean | null;
+
+    /**
+     * The unique ID of the previous response to the model. Use this to create
+     * multi-turn conversations. Learn more about
+     * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
+     * Cannot be used in conjunction with `conversation`.
+     */
+    previous_response_id?: string | null;
+
+    /**
+     * Reference to a prompt template and its variables.
+     * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
+     */
+    prompt?: ResponsesAPI.ResponsePrompt | null;
+
+    /**
+     * Used by OpenAI to cache responses for similar requests to optimize your cache
+     * hit rates. Replaces the `user` field.
+     * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching).
+     */
+    prompt_cache_key?: string | null;
+
+    /**
+     * Options for prompt caching. Supported for `gpt-5.6` and later models. By
+     * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
+     * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
+     * request can write up to four breakpoints. For cache matching, OpenAI considers
+     * up to the latest 80 breakpoints in the conversation, without a content-block
+     * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
+     * `ttl` defaults to `30m`, which is currently the only supported value. See the
+     * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
+     * for current details.
+     */
+    prompt_cache_options?: ResponseCreate.PromptCacheOptions;
+
+    /**
+     * @deprecated Deprecated. Use `prompt_cache_options.ttl` instead.
+     *
+     * The retention policy for the prompt cache. Set to `24h` to enable extended
+     * prompt caching, which keeps cached prefixes active for longer, up to a maximum
+     * of 24 hours.
+     * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching#prompt-cache-retention).
+     * This field expresses a maximum retention policy, while
+     * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
+     * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
+     * models, only `24h` is supported.
+     *
+     * For older models that support both `in_memory` and `24h`, the default depends on
+     * your organization's data retention policy:
+     *
+     * - Organizations without ZDR enabled default to `24h`.
+     * - Organizations with ZDR enabled default to `in_memory` when
+     *   `prompt_cache_retention` is not specified.
+     */
+    prompt_cache_retention?: 'in_memory' | '24h' | null;
+
+    /**
+     * Configuration options for
+     * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
+     */
+    reasoning?: Shared.Reasoning | null;
+
+    /**
+     * A stable identifier used to help detect users of your application that may be
+     * violating OpenAI's usage policies. The IDs should be a string that uniquely
+     * identifies each user, with a maximum length of 64 characters. We recommend
+     * hashing their username or email address, in order to avoid sending us any
+     * identifying information.
+     * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
+     */
+    safety_identifier?: string | null;
+
+    /**
+     * Specifies the processing type used for serving the request.
+     *
+     * - If set to 'auto', then the request will be processed with the service tier
+     *   configured in the Project settings. Unless otherwise configured, the Project
+     *   will use 'default'.
+     * - If set to 'default', then the request will be processed with the standard
+     *   pricing and performance for the selected model.
+     * - If set to
+     *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+     *   the request will be processed with the Flex Processing service tier.
+     * - To opt-in to
+     *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+     *   request level, include the `service_tier=fast` or `service_tier=priority`
+     *   parameter for Responses or Chat Completions. The response will show
+     *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+     *   `priority` in your request.
+     * - If set to 'ultrafast', then the request will be processed with the
+     *   access-controlled Ultrafast Processing service tier. This tier is currently
+     *   available for `gpt-5.6-sol`; a response served through it will show
+     *   `service_tier=ultrafast`.
+     * - When not set, the default behavior is 'auto'.
+     *
+     * When the `service_tier` parameter is set, the response body will include the
+     * `service_tier` value based on the processing mode actually used to serve the
+     * request. This response value may be different from the value set in the
+     * parameter.
+     */
+    service_tier?: ResponsesAPI.ServiceTier | null;
+
+    /**
+     * Whether to store the generated model response for later retrieval via API.
+     * Defaults to true when omitted. If set to true, response data will be stored for
+     * at least 30 days, subject to the
+     * [data retention exceptions](https://developers.openai.com/api/docs/guides/your-data#v1responses).
+     */
+    store?: boolean | null;
+
+    /**
+     * If set to true, the model response data will be streamed to the client as it is
+     * generated using
+     * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
+     * See the
+     * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
+     * for more information.
+     */
+    stream?: boolean | null;
+
+    /**
+     * The WebSocket lane for this response. Requests with the same `stream_id` are
+     * processed FIFO, and events for the response echo the same `stream_id`.
+     *
+     * `stream_id` controls routing; `previous_response_id` controls conversation
+     * lineage, so a new lane can fork from a response created on another lane.
+     */
+    stream_id?: string;
+
+    /**
+     * Options for streaming responses. Only set this when you set `stream: true`.
+     */
+    stream_options?: ResponseCreate.StreamOptions | null;
+
+    /**
+     * What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
+     * make the output more random, while lower values like 0.2 will make it more
+     * focused and deterministic. We generally recommend altering this or `top_p` but
+     * not both.
+     */
+    temperature?: number | null;
+
+    /**
+     * Configuration options for a text response from the model. Can be plain text or
+     * structured JSON data. Learn more:
+     *
+     * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+     * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
+     */
+    text?: ResponsesAPI.ResponseTextConfig;
+
+    /**
+     * How the model should select which tool (or tools) to use when generating a
+     * response. See the `tools` parameter to see how to specify which tools the model
+     * can call.
+     */
+    tool_choice?:
+      | ResponsesAPI.ToolChoiceOptions
+      | ResponsesAPI.ToolChoiceAllowed
+      | ResponsesAPI.ToolChoiceTypes
+      | ResponsesAPI.ToolChoiceFunction
+      | ResponsesAPI.ToolChoiceMcp
+      | ResponsesAPI.ToolChoiceCustom
+      | ResponseCreate.SpecificProgrammaticToolCallingParam
+      | ResponsesAPI.ToolChoiceApplyPatch
+      | ResponsesAPI.ToolChoiceShell;
+
+    /**
+     * An array of tools the model may call while generating a response. You can
+     * specify which tool to use by setting the `tool_choice` parameter.
+     *
+     * We support the following categories of tools:
+     *
+     * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
+     *   capabilities, like
+     *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+     *   or
+     *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
+     *   Learn more about
+     *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
+     * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
+     *   predefined connectors such as Google Drive and SharePoint. Learn more about
+     *   [MCP Tools](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
+     * - **Function calls (custom tools)**: Functions that are defined by you, enabling
+     *   the model to call your own code with strongly typed arguments and outputs.
+     *   Learn more about
+     *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
+     *   You can also use custom tools to call your own code.
+     */
+    tools?: Array<ResponsesAPI.Tool>;
+
+    /**
+     * An integer between 0 and 20 specifying the maximum number of most likely tokens
+     * to return at each token position, each with an associated log probability. In
+     * some cases, the number of returned tokens may be fewer than requested.
+     */
+    top_logprobs?: number | null;
+
+    /**
+     * An alternative to sampling with temperature, called nucleus sampling, where the
+     * model considers the results of the tokens with top_p probability mass. So 0.1
+     * means only the tokens comprising the top 10% probability mass are considered.
+     *
+     * We generally recommend altering this or `temperature` but not both.
+     */
+    top_p?: number | null;
+
+    /**
+     * @deprecated The truncation strategy to use for the model response.
+     *
+     * - `auto`: If the input to this Response exceeds the model's context window size,
+     *   the model will truncate the response to fit the context window by dropping
+     *   items from the beginning of the conversation.
+     * - `disabled` (default): If the input size will exceed the context window size
+     *   for a model, the request will fail with a 400 error.
+     */
+    truncation?: 'auto' | 'disabled' | null;
+
+    /**
+     * @deprecated This field is being replaced by `safety_identifier` and
+     * `prompt_cache_key`. Use `prompt_cache_key` instead to maintain caching
+     * optimizations. A stable identifier for your end-users. Used to boost cache hit
+     * rates by better bucketing similar requests and to help OpenAI detect and prevent
+     * abuse.
+     * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
+     */
+    user?: string;
   }
 
-  export interface SpecificProgrammaticToolCallingParam {
+  export namespace ResponseCreate {
+    export interface ContextManagement {
+      /**
+       * The context management entry type. Currently only 'compaction' is supported.
+       */
+      type: string;
+
+      /**
+       * Token threshold at which compaction should be triggered for this entry.
+       */
+      compact_threshold?: number | null;
+    }
+
     /**
-     * The tool to call. Always `programmatic_tool_calling`.
+     * Configuration for running moderation on the input and output of this response.
      */
-    type: 'programmatic_tool_calling';
+    export interface Moderation {
+      /**
+       * The moderation model to use for moderated completions, e.g.
+       * 'omni-moderation-latest'.
+       */
+      model: string;
+
+      /**
+       * The policy to apply to moderated response input and output.
+       */
+      policy?: Moderation.Policy | null;
+    }
+
+    export namespace Moderation {
+      /**
+       * The policy to apply to moderated response input and output.
+       */
+      export interface Policy {
+        /**
+         * The moderation policy for the response input.
+         */
+        input?: Policy.Input | null;
+
+        /**
+         * The moderation policy for the response output.
+         */
+        output?: Policy.Output | null;
+      }
+
+      export namespace Policy {
+        /**
+         * The moderation policy for the response input.
+         */
+        export interface Input {
+          mode: 'score' | 'block';
+        }
+
+        /**
+         * The moderation policy for the response output.
+         */
+        export interface Output {
+          mode: 'score' | 'block';
+        }
+      }
+    }
+
+    /**
+     * Options for prompt caching. Supported for `gpt-5.6` and later models. By
+     * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
+     * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
+     * request can write up to four breakpoints. For cache matching, OpenAI considers
+     * up to the latest 80 breakpoints in the conversation, without a content-block
+     * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
+     * `ttl` defaults to `30m`, which is currently the only supported value. See the
+     * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
+     * for current details.
+     */
+    export interface PromptCacheOptions {
+      /**
+       * The ID of a response to compare when diagnosing prompt cache reuse. Supplying
+       * this field requests prompt cache diagnostics when the feature is enabled.
+       */
+      comparison_response_id?: string | null;
+
+      /**
+       * Controls whether OpenAI automatically creates an implicit cache breakpoint.
+       * Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint
+       * and writes up to the latest three explicit breakpoints in the request. With
+       * `explicit`, OpenAI does not create an implicit breakpoint and writes up to the
+       * latest four explicit breakpoints. If there are no explicit breakpoints, the
+       * request does not use prompt caching.
+       */
+      mode?: 'implicit' | 'explicit';
+
+      /**
+       * The minimum lifetime applied to every implicit and explicit cache breakpoint
+       * written by the request. Defaults to `30m`, which is currently the only supported
+       * value. The backend may retain cache entries for longer.
+       */
+      ttl?: '30m';
+    }
+
+    /**
+     * Options for streaming responses. Only set this when you set `stream: true`.
+     */
+    export interface StreamOptions {
+      /**
+       * When true, stream obfuscation will be enabled. Stream obfuscation adds random
+       * characters to an `obfuscation` field on streaming delta events to normalize
+       * payload sizes as a mitigation to certain side-channel attacks. These obfuscation
+       * fields are included by default, but add a small amount of overhead to the data
+       * stream. You can set `include_obfuscation` to false to optimize for bandwidth if
+       * you trust the network links between your application and the OpenAI API.
+       */
+      include_obfuscation?: boolean;
+    }
+
+    export interface SpecificProgrammaticToolCallingParam {
+      /**
+       * The tool to call. Always `programmatic_tool_calling`.
+       */
+      type: 'programmatic_tool_calling';
+    }
   }
 }
 
@@ -8318,7 +9177,10 @@ export type ResponsesServerEvent =
   | ResponsesServerEvent.ResponseCustomToolCallInputWsDelta
   | ResponsesServerEvent.ResponseCustomToolCallInputWsDone
   | ResponsesServerEvent.ResponseWsStreamingError
-  | ResponsesServerEvent.ResponseWsError;
+  | ResponsesServerEvent.ResponseWsError
+  | ResponseSteerAcceptedEvent
+  | ResponseSteerPendingEvent
+  | ResponseSteerFailedEvent;
 
 export namespace ResponsesServerEvent {
   /**
@@ -8598,6 +9460,10 @@ export namespace ResponsesServerEvent {
 
   /**
    * An event that is emitted when a response finishes as incomplete.
+   *
+   * Over WebSocket, steering can finish a response with
+   * `response.incomplete_details.reason` set to `steered`, followed automatically by
+   * a successor `response.created` that commits the queued steering input.
    */
   export interface ResponseWsIncomplete extends ResponseIncompleteEvent {
     /**
@@ -9023,6 +9889,44 @@ export namespace ResponsesServerEvent {
        * The response headers that were emitted with the error, if any.
        */
       headers?: { [key: string]: string };
+
+      misalignment?: Error.Misalignment;
+    }
+
+    export namespace Error {
+      export interface Misalignment {
+        /**
+         * The public explanation for this block.
+         */
+        detailed_explanation?: string;
+
+        /**
+         * An optional classification; clients must accept additional values.
+         */
+        error_type?:
+          | (string & {})
+          | 'potentially_unintended_data_transfer'
+          | 'potentially_unintended_data_access'
+          | 'potentially_unintended_destructive_activity'
+          | 'other';
+
+        /**
+         * An optional public continuation instruction.
+         */
+        steer?: Misalignment.Steer;
+      }
+
+      export namespace Misalignment {
+        /**
+         * An optional public continuation instruction.
+         */
+        export interface Steer {
+          /**
+           * The public continuation instruction.
+           */
+          message: string;
+        }
+      }
     }
   }
 }
@@ -9035,13 +9939,15 @@ export namespace ResponsesServerEvent {
  *   will use 'default'.
  * - If set to 'default', then the request will be processed with the standard
  *   pricing and performance for the selected model.
- * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
- *   then the request will be processed with the Flex Processing service tier.
- * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
- *   include the `service_tier=fast` or `service_tier=priority` parameter for
- *   Responses or Chat Completions. The response will show `service_tier=priority`
- *   regardless of if you specify `service_tier=fast` or `priority` in your
- *   request.
+ * - If set to
+ *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+ *   the request will be processed with the Flex Processing service tier.
+ * - To opt-in to
+ *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+ *   request level, include the `service_tier=fast` or `service_tier=priority`
+ *   parameter for Responses or Chat Completions. The response will show
+ *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+ *   `priority` in your request.
  * - If set to 'ultrafast', then the request will be processed with the
  *   access-controlled Ultrafast Processing service tier. This tier is currently
  *   available for `gpt-5.6-sol`; a response served through it will show
@@ -9097,7 +10003,7 @@ export namespace Tool {
   /**
    * Give the model access to additional tools via remote Model Context Protocol
    * (MCP) servers.
-   * [Learn more about MCP](https://platform.openai.com/docs/guides/tools-remote-mcp).
+   * [Learn more about MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
    */
   export interface Mcp {
     /**
@@ -9131,7 +10037,7 @@ export namespace Tool {
      * Identifier for service connectors, like those available in ChatGPT. One of
      * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
      * service connectors
-     * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
+     * [here](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#connectors).
      *
      * Currently supported `connector_id` values are:
      *
@@ -9340,9 +10246,11 @@ export namespace Tool {
      * one of `transparent`, `opaque`, or `auto` (default value). When `auto` is used,
      * the model will automatically determine the best background for the image.
      *
-     * Transparent backgrounds are available for supported GPT Image models. For
-     * `gpt-image-2` and `gpt-image-2-2026-04-21`, this support is in preview. When
-     * using `transparent`, set the output format to `png` or `webp`.
+     * `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare`, including their `2026-09-08`
+     * snapshots, support `opaque` and `transparent` backgrounds. Transparent
+     * backgrounds are available for supported GPT Image models. For `gpt-image-2` and
+     * `gpt-image-2-2026-04-21`, this support is in preview. When using `transparent`,
+     * set the output format to `png` or `webp`.
      */
     background?: 'transparent' | 'opaque' | 'auto';
 
@@ -9362,7 +10270,9 @@ export namespace Tool {
 
     /**
      * The image generation model to use. One of `gpt-image-1`, `gpt-image-1-mini`,
-     * `gpt-image-1.5`, `gpt-image-2`, `gpt-image-2-2026-04-21`, or
+     * `gpt-image-1.5`, `gpt-image-2`, `gpt-image-2-2026-04-21`,
+     * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
+     * `gpt-image-2.5-flare`, `gpt-image-2.5-flare-2026-09-08`, or
      * `chatgpt-image-latest`. Default: `gpt-image-1`.
      */
     model?:
@@ -9371,6 +10281,10 @@ export namespace Tool {
       | 'gpt-image-1-mini'
       | 'gpt-image-2'
       | 'gpt-image-2-2026-04-21'
+      | 'gpt-image-2.5-sunburst'
+      | 'gpt-image-2.5-sunburst-2026-09-08'
+      | 'gpt-image-2.5-flare'
+      | 'gpt-image-2.5-flare-2026-09-08'
       | 'gpt-image-1.5'
       | 'chatgpt-image-latest';
 
@@ -9397,23 +10311,26 @@ export namespace Tool {
     partial_images?: number;
 
     /**
-     * The quality of the generated image. One of `low`, `medium`, `high`, or `auto`.
-     * Default: `auto`.
+     * The quality of the generated image. The GPT image models support `low`,
+     * `medium`, and `high`. `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare`,
+     * including their `2026-09-08` snapshots, also support `xhigh` and `max`. Default:
+     * `auto`.
      */
-    quality?: 'low' | 'medium' | 'high' | 'auto';
+    quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto';
 
     /**
-     * The size of the generated images. For `gpt-image-2` and
-     * `gpt-image-2-2026-04-21`, arbitrary resolutions are supported as `WIDTHxHEIGHT`
-     * strings, for example `1536x864`. Width and height must both be divisible by 16
-     * and the requested aspect ratio must be between 1:3 and 3:1. Resolutions above
-     * `2560x1440` are experimental, and the maximum supported resolution is
-     * `3840x2160`. The requested size must also satisfy the model's current pixel and
-     * edge limits. The standard sizes `1024x1024`, `1536x1024`, and `1024x1536` are
-     * supported by the GPT image models; `auto` is supported for models that allow
-     * automatic sizing. For `dall-e-2`, use one of `256x256`, `512x512`, or
-     * `1024x1024`. For `dall-e-3`, use one of `1024x1024`, `1792x1024`, or
-     * `1024x1792`.
+     * The size of the generated images. For `gpt-image-2`, `gpt-image-2-2026-04-21`,
+     * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
+     * `gpt-image-2.5-flare`, and `gpt-image-2.5-flare-2026-09-08`, arbitrary
+     * resolutions are supported as `WIDTHxHEIGHT` strings, for example `1536x864`.
+     * Width and height must both be divisible by 16 and the requested aspect ratio
+     * must be between 1:3 and 3:1. Resolutions above `2560x1440` are experimental, and
+     * the maximum supported resolution is `3840x2160`. The requested size must also
+     * satisfy the model's current pixel and edge limits. The standard sizes
+     * `1024x1024`, `1536x1024`, and `1024x1536` are supported by the GPT image models;
+     * `auto` is supported for models that allow automatic sizing. For `dall-e-2`, use
+     * one of `256x256`, `512x512`, or `1024x1024`. For `dall-e-3`, use one of
+     * `1024x1024`, `1792x1024`, or `1024x1792`.
      */
     size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
   }
@@ -9567,12 +10484,12 @@ export interface ToolChoiceShell {
 
 /**
  * Indicates that the model should use a built-in tool to generate a response.
- * [Learn more about built-in tools](https://platform.openai.com/docs/guides/tools).
+ * [Learn more about built-in tools](https://developers.openai.com/api/docs/guides/tools).
  */
 export interface ToolChoiceTypes {
   /**
    * The type of hosted tool the model should to use. Learn more about
-   * [built-in tools](https://platform.openai.com/docs/guides/tools).
+   * [built-in tools](https://developers.openai.com/api/docs/guides/tools).
    *
    * Allowed values are:
    *
@@ -9625,7 +10542,7 @@ export interface ToolSearchTool {
 /**
  * This tool searches the web for relevant results to use in a response. Learn more
  * about the
- * [web search tool](https://platform.openai.com/docs/guides/tools-web-search).
+ * [web search tool](https://developers.openai.com/api/docs/guides/tools-web-search).
  */
 export interface WebSearchPreviewTool {
   /**
@@ -9684,7 +10601,7 @@ export namespace WebSearchPreviewTool {
 
 /**
  * Search the Internet for sources related to the prompt. Learn more about the
- * [web search tool](https://platform.openai.com/docs/guides/tools-web-search).
+ * [web search tool](https://developers.openai.com/api/docs/guides/tools-web-search).
  */
 export interface WebSearchTool {
   /**
@@ -9768,7 +10685,7 @@ export type ResponseCreateParams = ResponseCreateParamsNonStreaming | ResponseCr
 export interface ResponseCreateParamsBase {
   /**
    * Whether to run the model response in the background.
-   * [Learn more](https://platform.openai.com/docs/guides/background).
+   * [Learn more](https://developers.openai.com/api/docs/guides/background).
    */
   background?: boolean | null;
 
@@ -9815,11 +10732,11 @@ export interface ResponseCreateParamsBase {
    *
    * Learn more:
    *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Image inputs](https://platform.openai.com/docs/guides/images)
-   * - [File inputs](https://platform.openai.com/docs/guides/pdf-files)
-   * - [Conversation state](https://platform.openai.com/docs/guides/conversation-state)
-   * - [Function calling](https://platform.openai.com/docs/guides/function-calling)
+   * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+   * - [Image inputs](https://developers.openai.com/api/docs/guides/images-vision)
+   * - [File inputs](https://developers.openai.com/api/docs/guides/file-inputs)
+   * - [Conversation state](https://developers.openai.com/api/docs/guides/conversation-state)
+   * - [Function calling](https://developers.openai.com/api/docs/guides/function-calling)
    */
   input?: string | ResponseInput;
 
@@ -9835,7 +10752,7 @@ export interface ResponseCreateParamsBase {
   /**
    * An upper bound for the number of tokens that can be generated for a response,
    * including visible output tokens and
-   * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
    */
   max_output_tokens?: number | null;
 
@@ -9850,11 +10767,11 @@ export interface ResponseCreateParamsBase {
   metadata?: Shared.Metadata | null;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * Model ID used to generate the response, like `gpt-6-astra`. OpenAI offers a wide
+   * range of models with different capabilities, performance characteristics, and
+   * price points. Refer to the
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model?: Shared.ResponsesModel;
 
@@ -9871,21 +10788,21 @@ export interface ResponseCreateParamsBase {
   /**
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
-   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
    * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
 
   /**
    * Reference to a prompt template and its variables.
-   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
    */
   prompt?: ResponsePrompt | null;
 
   /**
    * Used by OpenAI to cache responses for similar requests to optimize your cache
    * hit rates. Replaces the `user` field.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching).
    */
   prompt_cache_key?: string | null;
 
@@ -9897,7 +10814,7 @@ export interface ResponseCreateParamsBase {
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
    * `ttl` defaults to `30m`, which is currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   prompt_cache_options?: ResponseCreateParams.PromptCacheOptions;
@@ -9908,7 +10825,7 @@ export interface ResponseCreateParamsBase {
    * The retention policy for the prompt cache. Set to `24h` to enable extended
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching#prompt-cache-retention).
    * This field expresses a maximum retention policy, while
    * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
    * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
@@ -9924,10 +10841,8 @@ export interface ResponseCreateParamsBase {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   reasoning?: Shared.Reasoning | null;
 
@@ -9937,7 +10852,7 @@ export interface ResponseCreateParamsBase {
    * identifies each user, with a maximum length of 64 characters. We recommend
    * hashing their username or email address, in order to avoid sending us any
    * identifying information.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   safety_identifier?: string | null;
 
@@ -9950,13 +10865,15 @@ export interface ResponseCreateParamsBase {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
-   *   then the request will be processed with the Flex Processing service tier.
-   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
-   *   include the `service_tier=fast` or `service_tier=priority` parameter for
-   *   Responses or Chat Completions. The response will show `service_tier=priority`
-   *   regardless of if you specify `service_tier=fast` or `priority` in your
-   *   request.
+   * - If set to
+   *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+   *   the request will be processed with the Flex Processing service tier.
+   * - To opt-in to
+   *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+   *   request level, include the `service_tier=fast` or `service_tier=priority`
+   *   parameter for Responses or Chat Completions. The response will show
+   *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+   *   `priority` in your request.
    * - If set to 'ultrafast', then the request will be processed with the
    *   access-controlled Ultrafast Processing service tier. This tier is currently
    *   available for `gpt-5.6-sol`; a response served through it will show
@@ -9970,6 +10887,9 @@ export interface ResponseCreateParamsBase {
 
   /**
    * Whether to store the generated model response for later retrieval via API.
+   * Defaults to true when omitted. If set to true, response data will be stored for
+   * at least 30 days, subject to the
+   * [data retention exceptions](https://developers.openai.com/api/docs/guides/your-data#v1responses).
    */
   store?: boolean | null;
 
@@ -9978,7 +10898,7 @@ export interface ResponseCreateParamsBase {
    * generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream?: boolean | null;
@@ -10000,8 +10920,8 @@ export interface ResponseCreateParamsBase {
    * Configuration options for a text response from the model. Can be plain text or
    * structured JSON data. Learn more:
    *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+   * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+   * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
    */
   text?: ResponseTextConfig;
 
@@ -10029,17 +10949,18 @@ export interface ResponseCreateParamsBase {
    *
    * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
    *   capabilities, like
-   *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-   *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+   *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+   *   or
+   *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
    *   Learn more about
-   *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+   *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
    * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
    *   predefined connectors such as Google Drive and SharePoint. Learn more about
-   *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
+   *   [MCP Tools](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
    * - **Function calls (custom tools)**: Functions that are defined by you, enabling
    *   the model to call your own code with strongly typed arguments and outputs.
    *   Learn more about
-   *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+   *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
    *   You can also use custom tools to call your own code.
    */
   tools?: Array<Tool>;
@@ -10077,7 +10998,7 @@ export interface ResponseCreateParamsBase {
    * optimizations. A stable identifier for your end-users. Used to boost cache hit
    * rates by better bucketing similar requests and to help OpenAI detect and prevent
    * abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 }
@@ -10152,10 +11073,16 @@ export namespace ResponseCreateParams {
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
    * `ttl` defaults to `30m`, which is currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   export interface PromptCacheOptions {
+    /**
+     * The ID of a response to compare when diagnosing prompt cache reuse. Supplying
+     * this field requests prompt cache diagnostics when the feature is enabled.
+     */
+    comparison_response_id?: string | null;
+
     /**
      * Controls whether OpenAI automatically creates an implicit cache breakpoint.
      * Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint
@@ -10206,7 +11133,7 @@ export interface ResponseCreateParamsNonStreaming extends ResponseCreateParamsBa
    * generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream?: false | null;
@@ -10218,7 +11145,7 @@ export interface ResponseCreateParamsStreaming extends ResponseCreateParamsBase 
    * generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream: true;
@@ -10253,7 +11180,7 @@ export interface ResponseRetrieveParamsBase {
    * generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream?: boolean;
@@ -10270,7 +11197,7 @@ export interface ResponseRetrieveParamsNonStreaming extends ResponseRetrievePara
    * generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream?: false;
@@ -10282,7 +11209,7 @@ export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsB
    * generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream: true;
@@ -10290,13 +11217,14 @@ export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsB
 
 export interface ResponseCompactParams {
   /**
-   * Model ID used to generate the response, like `gpt-5` or `o3`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * Model ID used to generate the response, like `gpt-6-astra`. OpenAI offers a wide
+   * range of models with different capabilities, performance characteristics, and
+   * price points. Refer to the
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model:
+    | 'gpt-6-astra'
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
@@ -10418,7 +11346,7 @@ export interface ResponseCompactParams {
   /**
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
-   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
    * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
@@ -10436,7 +11364,7 @@ export interface ResponseCompactParams {
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
    * `ttl` defaults to `30m`, which is currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   prompt_cache_options?: ResponseCompactParams.PromptCacheOptions | null;
@@ -10452,16 +11380,17 @@ export interface ResponseCompactParams {
    * Project settings. Unless otherwise configured, the Project will use 'default'. -
    * If set to 'default', then the request will be processed with the standard
    * pricing and performance for the selected model. - If set to
-   * '[flex](https://platform.openai.com/docs/guides/flex-processing)', then the
-   * request will be processed with the Flex Processing service tier. - To opt-in to
-   * [Fast mode](/api/docs/guides/fast-mode) at the request level, include the
-   * `service_tier=fast` or `service_tier=priority` parameter for Responses or Chat
-   * Completions. The response will show `service_tier=priority` regardless of if you
-   * specify `service_tier=fast` or `priority` in your request. - When not set, the
-   * default behavior is 'auto'. When the `service_tier` parameter is set, the
-   * response body will include the `service_tier` value based on the processing mode
-   * actually used to serve the request. This response value may be different from
-   * the value set in the parameter.
+   * '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+   * the request will be processed with the Flex Processing service tier. - To opt-in
+   * to [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+   * request level, include the `service_tier=fast` or `service_tier=priority`
+   * parameter for Responses or Chat Completions. For models with a dedicated Fast
+   * tier, either value resolves to `service_tier=fast`; for other models, either
+   * value resolves to `service_tier=priority`. - When not set, the default behavior
+   * is 'auto'. When the `service_tier` parameter is set, the response body will
+   * include the `service_tier` value based on the processing mode actually used to
+   * serve the request. This response value may be different from the value set in
+   * the parameter.
    */
   service_tier?: 'auto' | 'default' | 'fast' | 'flex' | 'priority' | null;
 }
@@ -10475,7 +11404,7 @@ export namespace ResponseCompactParams {
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
    * `ttl` defaults to `30m`, which is currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   export interface PromptCacheOptions {
@@ -10545,6 +11474,8 @@ export declare namespace Responses {
     type ResponseComputerToolCall as ResponseComputerToolCall,
     type ResponseComputerToolCallOutputItem as ResponseComputerToolCallOutputItem,
     type ResponseComputerToolCallOutputScreenshot as ResponseComputerToolCallOutputScreenshot,
+    type ResponseConfigurationUpdateItem as ResponseConfigurationUpdateItem,
+    type ResponseConfigurationUpdateItemParam as ResponseConfigurationUpdateItemParam,
     type ResponseContainerReference as ResponseContainerReference,
     type ResponseContent as ResponseContent,
     type ResponseContentPartAddedEvent as ResponseContentPartAddedEvent,
@@ -10631,6 +11562,15 @@ export declare namespace Responses {
     type ResponseShellCallOutputContentDeltaEvent as ResponseShellCallOutputContentDeltaEvent,
     type ResponseShellCallOutputContentDoneEvent as ResponseShellCallOutputContentDoneEvent,
     type ResponseStatus as ResponseStatus,
+    type ResponseSteerAcceptedEvent as ResponseSteerAcceptedEvent,
+    type ResponseSteerErrorCode as ResponseSteerErrorCode,
+    type ResponseSteerEvent as ResponseSteerEvent,
+    type ResponseSteerFailedEvent as ResponseSteerFailedEvent,
+    type ResponseSteerInput as ResponseSteerInput,
+    type ResponseSteerInputContent as ResponseSteerInputContent,
+    type ResponseSteerPendingEvent as ResponseSteerPendingEvent,
+    type ResponseSteerPendingReason as ResponseSteerPendingReason,
+    type ResponseSteerRequiredInput as ResponseSteerRequiredInput,
     type ResponseStreamEvent as ResponseStreamEvent,
     type ResponseTextConfig as ResponseTextConfig,
     type ResponseTextDeltaEvent as ResponseTextDeltaEvent,

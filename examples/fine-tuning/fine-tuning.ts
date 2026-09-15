@@ -32,6 +32,8 @@ async function main() {
 
     if (file.status === 'processed') {
       break;
+    } else if (file.status === 'error') {
+      throw new Error(`File processing failed for ${file.id}`);
     } else {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
@@ -49,7 +51,11 @@ async function main() {
 
   const events: Record<string, FineTuningJobEvent> = {};
 
-  while (fineTune.status === 'running' || fineTune.status === 'queued') {
+  while (
+    fineTune.status === 'validating_files' ||
+    fineTune.status === 'queued' ||
+    fineTune.status === 'running'
+  ) {
     fineTune = await client.fineTuning.jobs.retrieve(fineTune.id);
     console.log(`${fineTune.status}`);
 
@@ -69,6 +75,10 @@ async function main() {
     }
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+
+  if (fineTune.status !== 'succeeded') {
+    throw new Error('Fine-tuning job did not complete successfully.');
   }
 }
 

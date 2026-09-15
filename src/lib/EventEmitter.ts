@@ -14,6 +14,20 @@ export type EventParameters<Events, EventType extends keyof Events> = Record<
   EventListener<Events, EventType> extends (...args: infer P) => any ? P : never
 >[EventType];
 
+/** Result of awaiting an event: no value, one unwrapped value, or its argument tuple. */
+export type EmittedEventResult<Args extends unknown[]> = [Args] extends [[infer Param]]
+  ? Param
+  : [Args] extends [[]]
+    ? void
+    : [Args] extends [[unknown?]]
+      ? Args[0]
+      : [Args] extends [[unknown, unknown, ...unknown[]]]
+        ? Args
+        :
+            | Args
+            | ([] extends Args ? undefined : never)
+            | (Args extends [...infer Prefix, infer Last] ? ([] extends Prefix ? Last : never) : Args[0]);
+
 /** A lightweight event emitter with type-safe listeners and promise-based event waiting. */
 export class EventEmitter<EventTypes extends Record<string, (...args: any) => any>> {
   #listeners: {
@@ -145,13 +159,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
    */
   emitted<Event extends keyof EventTypes>(
     event: Event,
-  ): Promise<
-    EventParameters<EventTypes, Event> extends [infer Param]
-      ? Param
-      : EventParameters<EventTypes, Event> extends []
-        ? void
-        : EventParameters<EventTypes, Event>
-  > {
+  ): Promise<EmittedEventResult<EventParameters<EventTypes, Event>>> {
     return new Promise((resolve, reject) => {
       const onError = (error: unknown) => {
         this.off(event, onEvent as any);
@@ -184,11 +192,21 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
         }
         return !listener.once && !listener.removed;
       }) as any;
+      let listenerThrew = false;
+      let firstListenerError: unknown;
       this.#listenerDispatchDepth += 1;
       try {
         for (const registration of listeners as any) {
           if (!registration.removed) {
-            registration.listener(...(args as any));
+            try {
+              const { listener } = registration;
+              listener(...(args as any));
+            } catch (error) {
+              if (!listenerThrew) {
+                listenerThrew = true;
+                firstListenerError = error;
+              }
+            }
           }
         }
       } finally {
@@ -196,6 +214,9 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
         if (this.#listenerDispatchDepth === 0) {
           this.#cleanupEmittedListeners();
         }
+      }
+      if (listenerThrew) {
+        throw firstListenerError;
       }
     }
   }

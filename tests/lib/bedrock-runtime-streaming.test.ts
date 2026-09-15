@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import OpenAI from 'openai';
 import { bedrock as bearerBedrock } from 'openai/providers/bedrock';
 import { bedrock } from 'openai/providers/bedrock/aws';
@@ -23,6 +24,12 @@ const RUNTIME_PROVIDERS = [
     authorization: '/bedrock/aws4_request',
   },
 ] as const;
+
+beforeEach(() => {
+  // oxlint-disable-next-line unicorn/no-useless-undefined -- Vitest requires its second argument when removing an environment variable.
+  vi.stubEnv('AWS_BEDROCK_BASE_URL', undefined);
+});
+afterEach(() => vi.unstubAllEnvs());
 
 function sseResponse(events: readonly unknown[]): Response {
   const body = events

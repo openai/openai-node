@@ -14,11 +14,12 @@ export const castToError = (err: any): Error => {
   if (typeof err === 'object' && err !== null) {
     try {
       if (Object.prototype.toString.call(err) === '[object Error]') {
+        const hasCause = 'cause' in err;
         // @ts-ignore - not all envs have native support for cause yet
-        const error = new Error(err.message, err.cause ? { cause: err.cause } : {});
+        const error = new Error(err.message, hasCause ? { cause: err.cause } : {});
         if (err.stack) error.stack = err.stack;
         // @ts-ignore - not all envs have native support for cause yet
-        if (err.cause && !error.cause) error.cause = err.cause;
+        if (hasCause && !Object.prototype.hasOwnProperty.call(error, 'cause')) error.cause = err.cause;
         if (err.name) error.name = err.name;
         return error;
       }

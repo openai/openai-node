@@ -44,6 +44,8 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCall</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCallOutputItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseComputerToolCallOutputScreenshot</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseConfigurationUpdateItem</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseConfigurationUpdateItemParam</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContainerReference</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseContentPartAddedEvent</a></code>
@@ -130,6 +132,15 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseShellCallOutputContentDeltaEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseShellCallOutputContentDoneEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseStatus</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseSteerAcceptedEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseSteerErrorCode</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseSteerEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseSteerFailedEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseSteerInput</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseSteerInputContent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseSteerPendingEvent</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseSteerPendingReason</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseSteerRequiredInput</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseStreamEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextConfig</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseTextDeltaEvent</a></code>

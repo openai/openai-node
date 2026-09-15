@@ -60,8 +60,9 @@ The matching options are `apiKey`, `adminAPIKey`, `organization`, `project`, and
 
 ## Workload identity
 
-Workload identity exchanges a short-lived cloud identity token for an OpenAI
-access token. Configure the external identity provider and OpenAI service
+Workload identity exchanges either a short-lived cloud identity token or an
+enrolled X.509 client certificate for an OpenAI access token. For the
+subject-token flow, configure the external identity provider and OpenAI service
 account first, then provide:
 
 - `identityProviderId`: Your OpenAI identity-provider resource ID.
@@ -96,6 +97,40 @@ const response = await client.responses.create({
 
 console.log(response.output_text);
 ```
+
+### X.509 client certificates
+
+Enrolled Node.js applications can authenticate using an SDK-owned certificate
+credential instead of a subject-token provider. Install the optional Undici peer
+with `npm install openai "undici@^7"` and provide the full PEM certificate chain,
+matching private key, and enrolled account selectors:
+
+```ts
+import OpenAI from 'openai';
+import { workloadIdentity } from 'openai/auth/x509-transport';
+
+const credential = workloadIdentity.fromX509({
+  certificateChain: process.env['OPENAI_X509_CLIENT_CERTIFICATE_CHAIN_PEM']!,
+  privateKey: process.env['OPENAI_X509_CLIENT_PRIVATE_KEY_PEM']!,
+  identityProviderId: process.env['OPENAI_X509_IDENTITY_PROVIDER_ID']!,
+  serviceAccountId: process.env['OPENAI_X509_SERVICE_ACCOUNT_ID']!,
+});
+
+try {
+  const client = new OpenAI({
+    credential,
+    project: process.env['OPENAI_X509_PROJECT_ID'] ?? null,
+  });
+
+  console.log((await client.models.list()).data.length);
+} finally {
+  await credential.close();
+}
+```
+
+X.509 authentication supports only `https://mtls.api.openai.com/v1`. Azure,
+Bedrock, custom gateways, data-residency overrides, browsers, and WebSocket
+transports are unsupported. Call `credential.close()` when requests have drained.
 
 ### Kubernetes
 

@@ -121,6 +121,35 @@ function makeValidationOnlySchema() {
 }
 
 describe('Standard Schema helpers', () => {
+  type TestSchema = Parameters<typeof standardResponseFormat>[0];
+
+  const helperFactories = [
+    [
+      'response format',
+      (schema: TestSchema, override?: JSONSchema) =>
+        standardResponseFormat(schema, 'weather', { schema: override }),
+    ],
+    [
+      'text format',
+      (schema: TestSchema, override?: JSONSchema) =>
+        standardTextFormat(schema, 'weather', { schema: override }),
+    ],
+    [
+      'chat function',
+      (schema: TestSchema, override?: JSONSchema) =>
+        standardFunction({ name: 'get_weather', parameters: schema, schema: override }),
+    ],
+    [
+      'response function',
+      (schema: TestSchema, override?: JSONSchema) =>
+        standardResponsesFunction({ name: 'get_weather', parameters: schema, schema: override }),
+    ],
+  ] as const;
+
+  const permissiveValidation = (_value: unknown): ReturnType<typeof validateWeather> => ({
+    value: { city: 'unvalidated', unit: 'c', normalized: true },
+  });
+
   it('uses the input JSON Schema for parseable response formats', () => {
     const { standardSchema, input, output } = makeStandardSchema();
 
@@ -192,6 +221,114 @@ describe('Standard Schema helpers', () => {
 
     expect(format.json_schema.schema).toEqual(strictWeatherJSONSchema);
   });
+
+  it.each(helperFactories)('keeps %s bound to its original metadata and validator', (_name, makeHelper) => {
+    const { standardSchema } = makeStandardSchema();
+    const metadata = { ...standardSchema['~standard'] };
+    const originalInput = metadata.jsonSchema.input;
+    let metadataReads = 0;
+
+    const strictValidator = function strictValidator(this: typeof metadata, value: unknown) {
+      expect(this).toBe(metadata);
+      return validateWeather(value);
+    };
+    Object.defineProperty(strictValidator, 'call', { value: undefined });
+    metadata.validate = strictValidator;
+    metadata.jsonSchema.input = vi.fn(function convertOriginalMetadata(this: typeof metadata.jsonSchema) {
+      expect(this).toBe(metadata.jsonSchema);
+      metadata.validate = permissiveValidation;
+      return originalInput();
+    });
+
+    const schema = {
+      get '~standard'() {
+        metadataReads += 1;
+        return metadataReads === 1 ? metadata : { ...metadata, validate: permissiveValidation };
+      },
+    };
+    const helper = makeHelper(schema);
+
+    expect(metadataReads).toBe(1);
+    expect(() => helper.$parseRaw('{"city":123,"unit":"c"}')).toThrow('expected weather input');
+    expect(helper.$parseRaw('{"city":"Paris","unit":"c"}')).toEqual({
+      city: 'Paris',
+      unit: 'c',
+      normalized: true,
+    });
+    expect(metadataReads).toBe(1);
+  });
+
+  it.each(helperFactories)(
+    'defers and then reuses the %s validator for explicit schemas',
+    (_name, makeHelper) => {
+      const { standardSchema } = makeStandardSchema();
+      let metadataReads = 0;
+      const schema = {
+        get '~standard'() {
+          metadataReads += 1;
+          return metadataReads === 1
+            ? standardSchema['~standard']
+            : { ...standardSchema['~standard'], validate: permissiveValidation };
+        },
+      };
+      const helper = makeHelper(schema, weatherJSONSchema);
+
+      expect(metadataReads).toBe(0);
+      expect(() => helper.$parseRaw('{')).toThrow('invalid structured output JSON');
+      expect(metadataReads).toBe(0);
+      expect(() => helper.$parseRaw('{"city":123,"unit":"c"}')).toThrow('expected weather input');
+      expect(metadataReads).toBe(1);
+      expect(helper.$parseRaw('{"city":"Paris","unit":"c"}')).toEqual({
+        city: 'Paris',
+        unit: 'c',
+        normalized: true,
+      });
+      expect(metadataReads).toBe(1);
+    },
+  );
+
+  it.each(['chat function', 'response function'] as const)(
+    'keeps %s validation bound across reentrant option getters',
+    (name) => {
+      const { standardSchema } = makeStandardSchema();
+      const permissiveSchema = {
+        '~standard': { ...standardSchema['~standard'], validate: permissiveValidation },
+      };
+      let current = standardSchema;
+      const accesses: string[] = [];
+      const callback = vi.fn();
+      const options = {
+        get name() {
+          accesses.push('name');
+          return 'get_weather';
+        },
+        get parameters() {
+          accesses.push('parameters');
+          return current;
+        },
+        get schema() {
+          accesses.push('schema');
+          current = permissiveSchema;
+          return weatherJSONSchema;
+        },
+        get description() {
+          accesses.push('description');
+          return 'Get the weather';
+        },
+        get function() {
+          accesses.push('function');
+          return callback;
+        },
+      };
+      const helper =
+        name === 'chat function' ? standardFunction(options) : standardResponsesFunction(options);
+
+      expect(accesses).toEqual(['name', 'parameters', 'schema', 'description', 'description', 'function']);
+      expect(() => helper.$parseRaw('{"city":123,"unit":"c"}')).toThrow('expected weather input');
+      expect(accesses).toEqual(['name', 'parameters', 'schema', 'description', 'description', 'function']);
+      expect(callback).not.toHaveBeenCalled();
+    },
+  );
 
   it('normalizes provably exclusive oneOf branches before strictifying schemas', () => {
     const oneOfSchema = {

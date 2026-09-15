@@ -408,7 +408,7 @@ describe.each([
   { name: 'stable', Responses: StableResponsesWS },
   { name: 'beta', Responses: BetaResponsesWS },
 ])('$name Responses WebSocket redirect options', ({ Responses }) => {
-  test('preserves explicitly enabled redirects without sensitive headers', () => {
+  test('disables explicitly enabled redirects without sensitive headers', () => {
     const websocket = new Responses(createUnauthenticatedClient(), {
       followRedirects: true,
       headers: { 'X-Custom': 'value' },
@@ -416,7 +416,7 @@ describe.each([
 
     expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
     expect(lastNodeSocket().options).toMatchObject({
-      followRedirects: true,
+      followRedirects: false,
       headers: { 'X-Custom': 'value' },
     });
     expect(lastNodeSocket().options.headers).not.toHaveProperty('Authorization');

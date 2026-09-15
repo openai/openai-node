@@ -1,3 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
+import { vi } from 'vitest';
+
+import OpenAI from 'openai';
 import {
   APIConnectionError,
   APIConnectionTimeoutError,
@@ -18,6 +23,102 @@ import {
   SubjectTokenProviderError,
   UnprocessableEntityError,
 } from 'openai/core/error';
+
+describe('transport error causes', () => {
+  test.each([0, false, '', null, undefined, 'synthetic detail', { code: 'E_SYNTHETIC' }])(
+    'preserves a cross-realm Error cause of %s',
+    async (cause) => {
+      const failure = runInNewContext('new TypeError("synthetic transport failure", { cause })', {
+        cause,
+      }) as Error;
+      const fetch = vi.fn(async () => {
+        throw failure;
+      });
+      const client = new OpenAI({ apiKey: 'test-key', maxRetries: 0, fetch });
+
+      expect(failure).not.toBeInstanceOf(Error);
+      const requestError = await client.models.list().catch((error: unknown) => error);
+      expect(requestError).toBeInstanceOf(APIConnectionError);
+      const normalized = (requestError as APIConnectionError & { cause: Error }).cause;
+      expect(normalized).toBeInstanceOf(Error);
+      expect(normalized).not.toBe(failure);
+      expect(normalized.message).toBe(failure.message);
+      expect(normalized.name).toBe(failure.name);
+      expect(normalized.stack).toBe(failure.stack);
+      expect(Object.getOwnPropertyDescriptor(normalized, 'cause')).toEqual({
+        value: cause,
+        writable: true,
+        configurable: true,
+        enumerable: false,
+      });
+      expect(Object.getOwnPropertyDescriptor(normalized, 'cause')?.value).toBe(cause);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each([false, true])('preserves omitted causes (cross-realm: %s)', async (crossRealm) => {
+    const failure = crossRealm
+      ? (runInNewContext('new Error("synthetic transport failure")') as Error)
+      : new Error('synthetic transport failure');
+    const fetch = vi.fn(async () => {
+      throw failure;
+    });
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: 0, fetch });
+    const requestError = await client.models.list().catch((error: unknown) => error);
+
+    expect(requestError).toBeInstanceOf(APIConnectionError);
+    const normalized = (requestError as APIConnectionError & { cause: Error }).cause;
+    expect(Object.getOwnPropertyDescriptor(normalized, 'cause')).toBeUndefined();
+    if (!crossRealm) {
+      expect(normalized).toBe(failure);
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('preserves cause presence when the Error constructor ignores cause options', () => {
+    const NativeError = Error;
+    function errorWithoutCauseOptions(message?: string) {
+      return new NativeError(message);
+    }
+    const options: { cause?: unknown }[] = [
+      { cause: 0 },
+      { cause: false },
+      { cause: '' },
+      { cause: null },
+      { cause: undefined },
+      {},
+    ];
+    const failures = options.map(
+      (causeOptions) =>
+        runInNewContext('new Error("synthetic transport failure", options)', {
+          options: causeOptions,
+        }) as Error,
+    );
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'Error');
+    if (!descriptor) {
+      throw new Error('Expected a global Error constructor');
+    }
+    let results: APIError[] = [];
+
+    try {
+      Object.defineProperty(globalThis, 'Error', { ...descriptor, value: errorWithoutCauseOptions });
+      results = failures.map((failure) => APIError.generate(undefined, failure, undefined, undefined));
+    } finally {
+      Object.defineProperty(globalThis, 'Error', descriptor);
+    }
+
+    expect(results).toHaveLength(options.length);
+    for (const [index, expected] of options.entries()) {
+      const result = results[index];
+      expect(result).toBeInstanceOf(APIConnectionError);
+      const normalized = (result as APIConnectionError & { cause: Error }).cause;
+      expect(Object.getOwnPropertyDescriptor(normalized, 'cause') !== undefined).toBe(
+        Object.getOwnPropertyDescriptor(expected, 'cause') !== undefined,
+      );
+      expect(Object.getOwnPropertyDescriptor(normalized, 'cause')?.value).toBe(expected.cause);
+    }
+  });
+});
 
 describe('APIError', () => {
   const headers = new Headers({ 'x-request-id': 'req_123' });
@@ -69,6 +170,53 @@ describe('APIError', () => {
     [undefined, undefined, undefined, '(no status code or body)'],
   ] as const)('formats errors without assuming a string response body', (status, body, message, expected) => {
     expect(new APIError(status, body, message, headers).message).toBe(expected);
+  });
+});
+
+describe('README error handling', () => {
+  const section = readFileSync('README.md', 'utf-8')
+    .split('## Handling errors')[1]
+    ?.split(/\r?\n## /u)[0];
+  const example = section?.match(/```ts\r?\n(?<source>[\s\S]*?)\r?\n```/u)?.groups?.['source'];
+  if (!example) {
+    throw new Error('Expected the README error-handling example');
+  }
+
+  test.each([400, 409])('reports request IDs and narrows HTTP %i errors', async (status) => {
+    const response = Response.json(
+      { error: { message: 'Synthetic request failure', type: 'invalid_request_error' } },
+      { status, headers: { 'x-request-id': 'req_readme_example' } },
+    );
+    const fetch = vi.fn(async () => response);
+    const client = new OpenAI({ apiKey: 'synthetic-test-key', fetch, maxRetries: 0 });
+    const log = vi.fn();
+
+    await runInNewContext(`(async () => {\n${example}\n})()`, { OpenAI, client, console: { log } });
+
+    expect(log).toHaveBeenCalledTimes(4);
+    expect(log.mock.calls.slice(0, 3)).toEqual([['req_readme_example'], [status], [status === 400]]);
+    expect(log.mock.calls[3]?.[0]).toBe(response.headers);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('rethrows unexpected errors without logging them', async () => {
+    const failure = new Error('Synthetic non-API failure');
+    const fetch = vi.fn(async () => {
+      throw new Error('The rejected example operation must not reach fetch');
+    });
+    const client = new OpenAI({ apiKey: 'synthetic-test-key', fetch, maxRetries: 0 });
+    const create = vi.spyOn(client.fineTuning.jobs, 'create').mockRejectedValueOnce(failure);
+    const log = vi.fn();
+
+    try {
+      await expect(
+        runInNewContext(`(async () => {\n${example}\n})()`, { OpenAI, client, console: { log } }),
+      ).rejects.toBe(failure);
+      expect(log).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      create.mockRestore();
+    }
   });
 });
 

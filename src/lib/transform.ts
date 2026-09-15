@@ -70,6 +70,7 @@ const JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS = new Set([
   'minContains',
   'minProperties',
   'not',
+  'oneOf',
   'patternProperties',
   'prefixItems',
   'propertyNames',

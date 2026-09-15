@@ -1,3 +1,5 @@
+import type { EmittedEventResult } from '../lib/EventEmitter';
+
 /** Listener callback associated with one event name in a typed event map. */
 type EventListener<Events, EventType extends keyof Events> = Events[EventType];
 
@@ -145,13 +147,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
    */
   emitted<Event extends keyof EventTypes>(
     event: Event,
-  ): Promise<
-    EventParameters<EventTypes, Event> extends [infer Param]
-      ? Param
-      : EventParameters<EventTypes, Event> extends []
-        ? void
-        : EventParameters<EventTypes, Event>
-  > {
+  ): Promise<EmittedEventResult<EventParameters<EventTypes, Event>>> {
     return new Promise((resolve, reject) => {
       const listeners = {
         onError: (error: unknown) => {
@@ -186,11 +182,21 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
         }
         return !listener.once && !listener.removed;
       }) as any;
+      let listenerThrew = false;
+      let firstListenerError: unknown;
       this.#listenerDispatchDepth += 1;
       try {
         for (const registration of listeners as any) {
           if (!registration.removed) {
-            registration.listener(...(args as any));
+            try {
+              const { listener } = registration;
+              listener(...(args as any));
+            } catch (error) {
+              if (!listenerThrew) {
+                listenerThrew = true;
+                firstListenerError = error;
+              }
+            }
           }
         }
       } finally {
@@ -198,6 +204,9 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
         if (this.#listenerDispatchDepth === 0) {
           this.#cleanupEmittedListeners();
         }
+      }
+      if (listenerThrew) {
+        throw firstListenerError;
       }
     }
   }

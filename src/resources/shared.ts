@@ -24,6 +24,7 @@ export type AllModels =
   | 'gpt-5.6-cyber';
 
 export type ChatModel =
+  | 'gpt-6-astra'
   | 'gpt-5.6-sol'
   | 'gpt-5.6-terra'
   | 'gpt-5.6-luna'
@@ -201,6 +202,44 @@ export interface ErrorObject {
   param: string | null;
 
   type: string;
+
+  misalignment?: ErrorObject.Misalignment;
+}
+
+export namespace ErrorObject {
+  export interface Misalignment {
+    /**
+     * The public explanation for this block.
+     */
+    detailed_explanation?: string;
+
+    /**
+     * An optional classification; clients must accept additional values.
+     */
+    error_type?:
+      | (string & {})
+      | 'potentially_unintended_data_transfer'
+      | 'potentially_unintended_data_access'
+      | 'potentially_unintended_destructive_activity'
+      | 'other';
+
+    /**
+     * An optional public continuation instruction.
+     */
+    steer?: Misalignment.Steer;
+  }
+
+  export namespace Misalignment {
+    /**
+     * An optional public continuation instruction.
+     */
+    export interface Steer {
+      /**
+       * The public continuation instruction.
+       */
+      message: string;
+    }
+  }
 }
 
 export interface FunctionDefinition {
@@ -218,8 +257,8 @@ export interface FunctionDefinition {
 
   /**
    * The parameters the functions accepts, described as a JSON Schema object. See the
-   * [guide](https://platform.openai.com/docs/guides/function-calling) for examples,
-   * and the
+   * [guide](https://developers.openai.com/api/docs/guides/function-calling) for
+   * examples, and the
    * [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for
    * documentation about the format.
    *
@@ -232,15 +271,15 @@ export interface FunctionDefinition {
    * set to true, the model will follow the exact schema defined in the `parameters`
    * field. Only a subset of JSON Schema is supported when `strict` is `true`. Learn
    * more about Structured Outputs in the
-   * [function calling guide](https://platform.openai.com/docs/guides/function-calling).
+   * [function calling guide](https://developers.openai.com/api/docs/guides/function-calling).
    */
   strict?: boolean | null;
 }
 
 /**
  * The parameters the functions accepts, described as a JSON Schema object. See the
- * [guide](https://platform.openai.com/docs/guides/function-calling) for examples,
- * and the
+ * [guide](https://developers.openai.com/api/docs/guides/function-calling) for
+ * examples, and the
  * [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for
  * documentation about the format.
  *
@@ -261,10 +300,8 @@ export type Metadata = { [key: string]: string };
 export type OAuthErrorCode = 'invalid_grant' | 'invalid_subject_token' | (string & {});
 
 /**
- * **gpt-5 and o-series models only**
- *
  * Configuration options for
- * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+ * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
  */
 export interface Reasoning {
   /**
@@ -282,7 +319,7 @@ export interface Reasoning {
    * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
    * reasoning effort can result in faster responses and fewer tokens used on
    * reasoning in a response. Not all reasoning models support every value. See the
-   * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+   * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
    * model-specific support.
    */
   effort?: ReasoningEffort | null;
@@ -319,7 +356,7 @@ export interface Reasoning {
  * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
  * reasoning effort can result in faster responses and fewer tokens used on
  * reasoning in a response. Not all reasoning models support every value. See the
- * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+ * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
  * model-specific support.
  */
 export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
@@ -339,7 +376,7 @@ export interface ResponseFormatJSONObject {
 /**
  * JSON Schema response format. Used to generate structured JSON responses. Learn
  * more about
- * [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs).
+ * [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
  */
 export interface ResponseFormatJSONSchema {
   /**
@@ -381,7 +418,7 @@ export namespace ResponseFormatJSONSchema {
      * true, the model will always follow the exact schema defined in the `schema`
      * field. Only a subset of JSON Schema is supported when `strict` is `true`. To
      * learn more, read the
-     * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+     * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
      */
     strict?: boolean | null;
   }
@@ -399,7 +436,7 @@ export interface ResponseFormatText {
 
 /**
  * A custom grammar for the model to follow when generating text. Learn more in the
- * [custom grammars guide](https://platform.openai.com/docs/guides/custom-grammars).
+ * [custom grammars guide](https://developers.openai.com/api/docs/guides/function-calling#context-free-grammars).
  */
 export interface ResponseFormatTextGrammar {
   /**
@@ -415,7 +452,7 @@ export interface ResponseFormatTextGrammar {
 
 /**
  * Configure the model to generate valid Python code. See the
- * [custom grammars guide](https://platform.openai.com/docs/guides/custom-grammars)
+ * [custom grammars guide](https://developers.openai.com/api/docs/guides/function-calling#context-free-grammars)
  * for more details.
  */
 export interface ResponseFormatTextPython {

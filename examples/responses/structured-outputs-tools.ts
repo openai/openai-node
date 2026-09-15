@@ -44,11 +44,15 @@ async function main() {
     tools: [tool],
   });
 
+  if (rsp.status && rsp.status !== 'completed') {
+    throw new Error(`Response ended with status ${rsp.status}.`);
+  }
+
   console.log(rsp);
 
-  const functionCall = rsp.output[0]!;
+  const functionCall = rsp.output.find((item) => item.type === 'function_call');
 
-  if (functionCall.type !== 'function_call') {
+  if (functionCall?.type !== 'function_call') {
     throw new Error('Expected function call');
   }
 

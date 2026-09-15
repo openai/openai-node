@@ -1,367 +1,15 @@
-import { timingSafeEqual } from 'node:crypto';
-import { EventEmitter, once } from 'node:events';
-import { readFileSync } from 'node:fs';
-import { createServer } from 'node:http';
-import { runInNewContext } from 'node:vm';
-
-import ts from 'typescript';
 import { describe, expect, test, vi } from 'vitest';
 
-import OpenAI, { APIUserAbortError } from '../../src/index';
-
-const examples = ['stream-to-client-express.ts', 'stream-to-client-raw.ts'] as const;
-
-type Example = (typeof examples)[number];
-interface Completion {
-  choices: [{ delta: { content: string } }];
-}
-type RouteHandler = (request: unknown, response: unknown) => Promise<void>;
-
-interface ExampleRuntime {
-  apiCalls: number;
-  aborts: number;
-  generated: number;
-  cancellations: number;
-  consoleError: ReturnType<typeof vi.fn>;
-  handler?: RouteHandler;
-  signal?: AbortSignal;
-  onProvider?: () => void;
-  pendingCreate: boolean;
-  pendingNext: boolean;
-  abortError?: Error;
-  rejectCreate?: (error: Error) => void;
-  rejectNext?: (error: Error) => void;
-}
-
-function createNodeHTTPEmitter(): EventEmitter {
-  // Node HTTP requests and responses expose EventEmitter lifecycle events.
-  // oxlint-disable-next-line unicorn/prefer-event-target
-  return new EventEmitter();
-}
-
-function createRequest() {
-  return Object.assign(createNodeHTTPEmitter(), {
-    body: 'Tell me why dogs are better than cats',
-    get: vi.fn(),
-  });
-}
-
-function createResponse() {
-  const response = Object.assign(createNodeHTTPEmitter(), {
-    body: '',
-    destroyed: false,
-    writableEnded: false,
-    onWrite: null as (() => void) | null,
-  });
-
-  return Object.assign(response, {
-    header: vi.fn((_name: string, _value: string) => response),
-
-    write: vi.fn((chunk: unknown) => {
-      if (response.destroyed) {
-        throw new Error('Attempted to write to a destroyed socket');
-      }
-
-      response.body += String(chunk);
-      response.onWrite?.();
-      return true;
-    }),
-
-    end: vi.fn(() => {
-      if (response.destroyed) {
-        throw new Error('Attempted to end a destroyed socket');
-      }
-
-      response.writableEnded = true;
-      response.emit('finish');
-      return response;
-    }),
-  });
-}
-
-function completionChunks(runtime: ExampleRuntime, encoded: boolean): AsyncIterable<string | Completion> {
-  return {
-    [Symbol.asyncIterator]() {
-      let index = 0;
-
-      return {
-        async next() {
-          if (encoded && runtime.pendingNext) {
-            runtime.pendingNext = false;
-            const deferred = new AbortController();
-            let failure: Error | undefined;
-            const pending = once(deferred.signal, 'abort').then(() => {
-              throw failure ?? new APIUserAbortError();
-            });
-
-            runtime.rejectNext = (error) => {
-              failure = error;
-              deferred.abort();
-            };
-            runtime.signal?.addEventListener(
-              'abort',
-              () => runtime.rejectNext?.(runtime.abortError ?? new APIUserAbortError()),
-              { once: true },
-            );
-            return pending;
-          }
-
-          if (index >= 3) {
-            return { done: true as const, value: undefined };
-          }
-
-          index += 1;
-          runtime.generated += 1;
-          return {
-            done: false as const,
-            value: encoded ? 'safe chunk' : { choices: [{ delta: { content: 'safe chunk' } }] },
-          };
-        },
-
-        async return() {
-          runtime.cancellations += 1;
-          return { done: true as const, value: undefined };
-        },
-      };
-    },
-  };
-}
-
-function loadExample(
-  filename: Example,
-  options: { withoutAbortController?: boolean; client?: new () => OpenAI } = {},
-): ExampleRuntime {
-  const runtime: ExampleRuntime = {
-    apiCalls: 0,
-    aborts: 0,
-    generated: 0,
-    cancellations: 0,
-    consoleError: vi.fn(),
-    pendingCreate: false,
-    pendingNext: false,
-  };
-
-  const app = {
-    use() {
-      return app;
-    },
-
-    post(_path: string, handler: RouteHandler) {
-      runtime.handler = handler;
-      return app;
-    },
-
-    listen() {
-      return app;
-    },
-  };
-
-  const express = Object.assign(() => app, {
-    text: () => (_request: unknown, _response: unknown, next: () => void) => next(),
-  });
-
-  function configureProvider(providerOptions?: { signal?: AbortSignal }): void {
-    runtime.apiCalls += 1;
-
-    if (providerOptions?.signal) {
-      runtime.signal = providerOptions.signal;
-      runtime.signal.addEventListener(
-        'abort',
-        () => {
-          runtime.aborts += 1;
-        },
-        { once: true },
-      );
-    }
-  }
-
-  class MockOpenAI {
-    static APIUserAbortError = APIUserAbortError;
-
-    readonly chat = {
-      completions: {
-        stream: (_body: unknown, providerOptions?: { signal?: AbortSignal }) => {
-          configureProvider(providerOptions);
-          runtime.onProvider?.();
-          return {
-            toReadableStream: () => completionChunks(runtime, true),
-          };
-        },
-
-        create: (_body: unknown, providerOptions?: { signal?: AbortSignal }) => {
-          configureProvider(providerOptions);
-          const chunks = completionChunks(runtime, false) as AsyncIterable<Completion>;
-
-          if (runtime.pendingCreate) {
-            const deferred = new AbortController();
-            let failure: Error | undefined;
-            const pending = once(deferred.signal, 'abort').then(() => {
-              throw failure ?? new APIUserAbortError();
-            });
-
-            runtime.rejectCreate = (error) => {
-              failure = error;
-              deferred.abort();
-            };
-            runtime.signal?.addEventListener(
-              'abort',
-              () => runtime.rejectCreate?.(runtime.abortError ?? new APIUserAbortError()),
-              { once: true },
-            );
-            runtime.onProvider?.();
-            return pending;
-          }
-
-          runtime.onProvider?.();
-          return Promise.resolve(chunks);
-        },
-      },
-    };
-  }
-
-  const source = readFileSync(`examples/chat-completions/${filename}`, 'utf-8');
-  const transpiled = ts.transpileModule(source, {
-    compilerOptions: {
-      esModuleInterop: true,
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2022,
-    },
-    fileName: filename,
-  }).outputText;
-
-  function requireExampleModule(specifier: string): unknown {
-    if (specifier === 'openai') {
-      return { __esModule: true, default: options.client ?? MockOpenAI };
-    }
-    if (specifier === 'express') {
-      return { __esModule: true, default: express };
-    }
-    if (specifier === 'node:crypto') {
-      return { timingSafeEqual };
-    }
-    if (specifier === 'node:fs') {
-      return { readFileSync: vi.fn() };
-    }
-    if (specifier === 'node:https') {
-      return { createServer: vi.fn() };
-    }
-
-    throw new Error(`Unexpected streaming example import: ${specifier}`);
-  }
-
-  const commonJS = { exports: {} };
-  const globals: Record<string, unknown> = {
-    Buffer,
-    console: { error: runtime.consoleError, log: vi.fn() },
-    exports: commonJS.exports,
-    module: commonJS,
-    process: { env: {} },
-    require: requireExampleModule,
-  };
-
-  if (!options.withoutAbortController) {
-    globals['AbortController'] = AbortController;
-  }
-
-  runInNewContext(transpiled, globals, { filename });
-  return runtime;
-}
-
-function invoke(runtime: ExampleRuntime, request: unknown, response: unknown): Promise<void> {
-  if (!runtime.handler) {
-    throw new Error('The streaming example did not register its Express route');
-  }
-
-  return runtime.handler(request, response);
-}
-
-async function loadPublicExample(filename: Example, mode: 'pending' | 'complete' | 'failure' = 'pending') {
-  const upstreamClosed: Promise<unknown[]>[] = [];
-  const upstream = createServer((_request, response) => {
-    upstreamClosed.push(once(response, 'close'));
-
-    if (mode === 'failure') {
-      response.writeHead(500, { 'Content-Type': 'application/json' });
-      response.end(JSON.stringify({ error: { message: 'intentional public upstream failure' } }));
-      return;
-    }
-
-    if (mode === 'pending' && filename === 'stream-to-client-raw.ts') {
-      return;
-    }
-
-    response.writeHead(200, { 'Content-Type': 'text/event-stream' });
-    response.flushHeaders();
-
-    if (mode === 'complete') {
-      const base = {
-        id: 'chatcmpl-public-loopback',
-        object: 'chat.completion.chunk',
-        created: 1,
-        model: 'gpt-test',
-      };
-      const content = {
-        ...base,
-        choices: [
-          { index: 0, delta: { role: 'assistant', content: 'safe public chunk' }, finish_reason: null },
-        ],
-      };
-      const finished = {
-        ...base,
-        choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-      };
-      response.end(
-        `data: ${JSON.stringify(content)}\n\ndata: ${JSON.stringify(finished)}\n\ndata: [DONE]\n\n`,
-      );
-    }
-  });
-
-  const listening = once(upstream, 'listening');
-  upstream.listen(0, '127.0.0.1');
-  await listening;
-
-  const address = upstream.address();
-  if (address === null || typeof address === 'string') {
-    throw new Error('The public SDK loopback server has no local port');
-  }
-  const baseURL = `http://127.0.0.1:${address.port}/v1`;
-
-  let signal: AbortSignal | undefined;
-  let body: ReadableStream<Uint8Array> | null | undefined;
-  const transport = vi.fn<typeof fetch>(async (request, options) => {
-    signal = options?.signal ?? undefined;
-    const response = await fetch(request, options);
-    ({ body } = response);
-    return response;
-  });
-
-  const PublicOpenAI = OpenAI.bind(undefined, {
-    apiKey: 'public-sdk-loopback-test-key',
-    baseURL,
-    fetch: transport,
-    maxRetries: 0,
-  });
-
-  return {
-    runtime: loadExample(filename, { client: PublicOpenAI }),
-    transport,
-    upstream,
-    upstreamClosed,
-    get signal() {
-      return signal;
-    },
-    get body() {
-      return body;
-    },
-  };
-}
-
-async function closePublicExample(upstream: ReturnType<typeof createServer>): Promise<void> {
-  const closed = once(upstream, 'close');
-  upstream.closeAllConnections();
-  upstream.close();
-  await closed;
-}
+import { APIUserAbortError } from '../../src/index';
+import {
+  createRequest,
+  createResponse,
+  examples,
+  invoke,
+  loadExample,
+  loadPublicExample,
+  loadPublicHTTPExample,
+} from './streaming-example-test-utils';
 
 describe.each(examples)('%s upstream disconnect lifecycle', (filename) => {
   test('aborts upstream and closes its iterator as soon as the downstream socket closes', async () => {
@@ -478,6 +126,24 @@ describe.each(examples)('%s upstream disconnect lifecycle', (filename) => {
   });
 });
 
+test.each(examples)('%s does not rewrite an already-ended response after an error', async (filename) => {
+  const providerError = new Error('upstream failed after the response ended');
+  const runtime = loadExample(filename);
+  const request = createRequest();
+  const response = createResponse();
+  runtime.onProvider = () => {
+    response.end();
+    throw providerError;
+  };
+
+  await invoke(runtime, request, response);
+
+  expect(runtime.consoleError).toHaveBeenCalledExactlyOnceWith(providerError);
+  expect(response.status).not.toHaveBeenCalled();
+  expect(response.end).toHaveBeenCalledOnce();
+  expect(response.destroy).not.toHaveBeenCalled();
+});
+
 test.each([
   ['stream-to-client-express.ts', 'response close'],
   ['stream-to-client-express.ts', 'request abort'],
@@ -486,7 +152,9 @@ test.each([
 ] as const)(
   'the public SDK aborts %s through the real loopback transport after %s',
   async (filename, event) => {
-    const client = await loadPublicExample(filename);
+    const client = await loadPublicExample(filename, {
+      pendingHeaders: filename === 'stream-to-client-raw.ts',
+    });
     const request = createRequest();
     const response = createResponse();
 
@@ -519,7 +187,7 @@ test.each([
       expect(request.listenerCount('aborted')).toBe(0);
       expect(response.listenerCount('close')).toBe(0);
     } finally {
-      await closePublicExample(client.upstream);
+      await client.close();
     }
   },
 );
@@ -527,7 +195,7 @@ test.each([
 test.each(examples)(
   'the public SDK completes %s through the real SSE loopback transport',
   async (filename) => {
-    const client = await loadPublicExample(filename, 'complete');
+    const client = await loadPublicExample(filename, { contentCount: 1, terminalEvent: 'done' });
     const request = createRequest();
     const response = createResponse();
 
@@ -541,13 +209,13 @@ test.each(examples)(
       expect(request.listenerCount('aborted')).toBe(0);
       expect(response.listenerCount('close')).toBe(0);
     } finally {
-      await closePublicExample(client.upstream);
+      await client.close();
     }
   },
 );
 
 test.each(examples)('the public SDK still reports genuine upstream failures from %s', async (filename) => {
-  const client = await loadPublicExample(filename, 'failure');
+  const client = await loadPublicExample(filename, { httpError: 'intentional public upstream failure' });
   const request = createRequest();
   const response = createResponse();
 
@@ -559,13 +227,66 @@ test.each(examples)('the public SDK still reports genuine upstream failures from
     expect(String(client.runtime.consoleError.mock.calls[0]?.[0])).toContain(
       'intentional public upstream failure',
     );
-    expect(response.end).not.toHaveBeenCalled();
+    expect(response.status).toHaveBeenCalledExactlyOnceWith(500);
+    expect(response.end).toHaveBeenCalledExactlyOnceWith('Internal Server Error');
+    expect(response.body).toBe('Internal Server Error');
+    expect(response.destroy).not.toHaveBeenCalled();
     expect(request.listenerCount('aborted')).toBe(0);
     expect(response.listenerCount('close')).toBe(0);
   } finally {
-    await closePublicExample(client.upstream);
+    await client.close();
   }
 });
+
+test.each(
+  examples.flatMap((filename) => [
+    { filename, mode: 'failure' as const },
+    { filename, mode: 'partial' as const },
+  ]),
+)(
+  '$filename finishes the real downstream HTTP connection after an upstream $mode',
+  async ({ filename, mode }) => {
+    const downstream = await loadPublicHTTPExample(
+      filename,
+      mode === 'failure' ? { httpError: 'intentional public upstream failure' } : { contentCount: 1 },
+    );
+    const { client, controller } = downstream;
+    let receivedStatus: number | undefined;
+    const result = (async () => {
+      try {
+        const response = await fetch(downstream.url, {
+          method: 'POST',
+          body: 'A synthetic prompt',
+          signal: controller.signal,
+        });
+        receivedStatus = response.status;
+        return { status: response.status, body: await response.text() };
+      } catch (error) {
+        return { error };
+      }
+    })();
+
+    try {
+      if (mode === 'partial') {
+        await vi.waitFor(() => expect(receivedStatus).toBe(200));
+        client.upstream.closeAllConnections();
+      }
+      await vi.waitFor(() => expect(downstream.routeFinished).toBe(true));
+      expect(client.runtime.consoleError).toHaveBeenCalledOnce();
+      if (mode === 'failure') {
+        expect(downstream.outgoing?.writableEnded).toBe(true);
+        expect(await result).toEqual({ status: 500, body: 'Internal Server Error' });
+      } else {
+        expect(downstream.outgoing?.destroyed).toBe(true);
+        expect(downstream.outgoing?.writableEnded).toBe(false);
+        expect(await result).toHaveProperty('error');
+      }
+    } finally {
+      await downstream.close();
+      await result;
+    }
+  },
+);
 
 test.each(['response close', 'request abort'] as const)(
   'the Express example silently handles an SDK iterator abort after %s',
@@ -613,6 +334,9 @@ test('the Express example still reports a genuine iterator error after a client 
 
   expect(runtime.signal?.aborted).toBe(true);
   expect(runtime.consoleError).toHaveBeenCalledExactlyOnceWith(providerError);
+  expect(response.status).not.toHaveBeenCalled();
+  expect(response.end).not.toHaveBeenCalled();
+  expect(response.destroy).not.toHaveBeenCalled();
   expect(request.listenerCount('aborted')).toBe(0);
   expect(response.listenerCount('close')).toBe(0);
 });
@@ -683,6 +407,9 @@ test('the raw example still reports a genuine provider error after a client disc
 
   expect(runtime.signal?.aborted).toBe(true);
   expect(runtime.consoleError).toHaveBeenCalledExactlyOnceWith(providerError);
+  expect(response.status).not.toHaveBeenCalled();
+  expect(response.end).not.toHaveBeenCalled();
+  expect(response.destroy).not.toHaveBeenCalled();
   expect(request.listenerCount('aborted')).toBe(0);
   expect(response.listenerCount('close')).toBe(0);
 });

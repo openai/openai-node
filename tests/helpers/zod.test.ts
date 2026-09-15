@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import type OpenAI from 'openai';
 import { hasOwn } from 'openai/internal/utils/values';
 
 import {
@@ -104,6 +105,39 @@ it('converts Zod v4 discriminated unions to anyOf for strict schemas', () => {
 
   expect(JSON.stringify(schema)).not.toContain('"oneOf"');
   expect(schema.properties.data.anyOf).toHaveLength(2);
+});
+
+describe.each([
+  { version: 'v4', schema: zv4.object({ value: zv4.xor([zv4.string(), zv4.number()]) }) },
+  {
+    version: 'v4 mini',
+    schema: zv4Mini.object({ value: zv4Mini.xor([zv4Mini.string(), zv4Mini.number()]) }),
+  },
+])('Zod $version XOR schemas', ({ schema }) => {
+  it.each([
+    { name: 'response format', create: () => zodResponseFormat(schema, 'xor') },
+    { name: 'text format', create: () => zodTextFormat(schema, 'xor') },
+    { name: 'chat function', create: () => zodFunction({ name: 'xor', parameters: schema }) },
+    { name: 'Responses function', create: () => zodResponsesFunction({ name: 'xor', parameters: schema }) },
+  ])('rejects oneOf in $name without changing the input schema', ({ create }) => {
+    const original = zv4.toJSONSchema(schema, { target: 'draft-7' });
+
+    expect(create).toThrow(
+      'Schema at `properties/value` uses unsupported keyword `oneOf` and cannot be represented in strict Structured Outputs.',
+    );
+    expect(zv4.toJSONSchema(schema, { target: 'draft-7' })).toEqual(original);
+  });
+
+  it('preserves oneOf in a non-strict Realtime function', () => {
+    const tool = zodRealtimeFunction({ name: 'xor', parameters: schema });
+
+    expect(tool.parameters).toMatchObject({
+      type: 'object',
+      properties: { value: { oneOf: [{ type: 'string' }, { type: 'number' }] } },
+      required: ['value'],
+    });
+    expect(tool).not.toHaveProperty('strict');
+  });
 });
 
 describe('Zod v4 mini', () => {
@@ -794,7 +828,7 @@ describe.each([
   }
 });
 
-function _typeTests() {
+function _typeTests(client: OpenAI, maybeCallback?: (args: { hello: 'world' }) => unknown) {
   const MiniSchema = zv4Mini.object({ hello: zv4Mini.literal('world') });
   type ParsedArguments = { hello: 'world' };
 
@@ -817,4 +851,51 @@ function _typeTests() {
   compareType<Parameters<NonNullable<typeof responseTool.$callback>>[0], ParsedArguments>(true);
   compareType<ReturnType<typeof responseTool.$parseRaw>, ParsedArguments>(true);
   compareType<typeof responseTool.__arguments, ParsedArguments>(true);
+
+  const explicitGenericTool = zodFunction<typeof MiniSchema>({
+    name: 'explicit_generic',
+    parameters: MiniSchema,
+    function: (args) => {
+      expectType<ParsedArguments>(args);
+      return Promise.resolve(args);
+    },
+  });
+  expectType<true>(explicitGenericTool.__hasFunction);
+  expectType<false>(
+    zodFunction<typeof MiniSchema>({ name: 'explicit_parse_only', parameters: MiniSchema }).__hasFunction,
+  );
+
+  for (const parameters of [
+    zv3.object({ hello: zv3.literal('world') }),
+    zv4.object({ hello: zv4.literal('world') }),
+    MiniSchema,
+  ]) {
+    const options = { name: 'greet', parameters };
+    const runnable = zodFunction({
+      ...options,
+      function: (args) => expectType<ParsedArguments>(args),
+    });
+    const callbackless = zodFunction(options);
+    const undefinedCallback = zodFunction({ ...options, function: undefined });
+    const optionalCallback = zodFunction({ ...options, function: maybeCallback });
+
+    expectType<true>(runnable.__hasFunction);
+    expectType<false>(callbackless.__hasFunction);
+    expectType<false>(undefinedCallback.__hasFunction);
+    expectType<false>(optionalCallback.__hasFunction);
+    expectType<ParsedArguments>(callbackless.__arguments);
+
+    const request = { model: 'gpt-4o', messages: [] };
+    client.chat.completions.runTools({ ...request, tools: [runnable] });
+    client.chat.completions.runTools({ ...request, tools: [runnable], stream: true });
+
+    for (const tool of [callbackless, undefinedCallback, optionalCallback]) {
+      client.chat.completions.parse({ ...request, tools: [tool] });
+      client.chat.completions.stream({ ...request, tools: [tool] });
+      // @ts-expect-error a tool without a guaranteed callback cannot be executed
+      client.chat.completions.runTools({ ...request, tools: [tool] });
+      // @ts-expect-error streaming tool execution also requires a guaranteed callback
+      client.chat.completions.runTools({ ...request, tools: [tool], stream: true });
+    }
+  }
 }

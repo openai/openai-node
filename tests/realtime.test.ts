@@ -41,6 +41,29 @@ describe.each([
     );
   });
 
+  test.each([
+    ['https://example.com/custom/path?route=tenant', '/custom/path/realtime', ['tenant']],
+    ['https://example.com/custom/path/?route=tenant/', '/custom/path/realtime', ['tenant/']],
+    ['https://example.com?route=tenant', '/realtime', ['tenant']],
+    [
+      'https://example.com/custom%2Fpath/?route=first%2Ftenant&route=second#configuration',
+      '/custom%2Fpath/realtime',
+      ['first/tenant', 'second'],
+    ],
+    ['https://example.com/custom/path/#configuration', '/custom/path/realtime', []],
+    ['https://example.com/custom/path', '/custom/path/realtime', []],
+  ])('appends the endpoint to the pathname of %s', (baseURL, pathname, routes) => {
+    const client = new OpenAI({ apiKey: 'test-key', baseURL });
+    const url = buildRealtimeURL(client, { model: 'gpt-realtime' });
+
+    expect(url.origin).toBe('wss://example.com');
+    expect(url.pathname).toBe(pathname);
+    expect(url.searchParams.getAll('route')).toEqual(routes);
+    expect(url.searchParams.get('model')).toBe('gpt-realtime');
+    expect(url.hash).toBe('');
+    expect(client.baseURL).toBe(baseURL);
+  });
+
   test('preserves the legacy model string form', () => {
     expect(buildRealtimeURL(openAIClient, 'gpt-realtime').toString()).toBe(
       'wss://example.com/custom/path/realtime?model=gpt-realtime',
@@ -178,6 +201,17 @@ describe('stable realtime transcription', () => {
   test('uses transcription intent without a model for OpenAI connections', () => {
     expect(buildRealtimeURL(openAIClient, { intent: 'transcription' }).toString()).toBe(
       'wss://example.com/custom/path/realtime?intent=transcription',
+    );
+  });
+
+  test('preserves routing queries while replacing an existing transcription intent', () => {
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      baseURL: 'https://example.com/custom/path?route=tenant&intent=previous',
+    });
+
+    expect(buildRealtimeURL(client, { intent: 'transcription' }).toString()).toBe(
+      'wss://example.com/custom/path/realtime?route=tenant&intent=transcription',
     );
   });
 

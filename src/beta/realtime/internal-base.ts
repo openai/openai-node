@@ -7,6 +7,7 @@ import { EventEmitter } from '../../lib/EventEmitter';
 import { OpenAIError } from '../../error';
 import type OpenAI from '../../index';
 import { AzureOpenAI } from '../../index';
+import { assertX509WebSocketSupported } from '../../internal/auth/x509-workload-identity-auth';
 
 /** Parses frame data without exposing malformed payloads through JSON syntax errors. */
 export function parseRealtimeEvent(data: string): RealtimeServerEvent {
@@ -177,6 +178,7 @@ export function buildRealtimeURL(
   client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   connection: string | RealtimeConnectionConfig,
 ): URL {
+  assertX509WebSocketSupported(client);
   const config: RealtimeConnectionConfig =
     typeof connection === 'string' ? { model: connection } : connection;
   const baseURL = client.baseURL;
@@ -184,8 +186,9 @@ export function buildRealtimeURL(
   const hasModel = !!config.model;
   const hasCallID = !!config.callID;
 
-  const path = '/realtime';
-  const url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
+  const url = new URL(baseURL);
+  url.pathname += url.pathname.endsWith('/') ? 'realtime' : '/realtime';
+  url.hash = '';
 
   if (hasModel === hasCallID) {
     throw new Error('Pass exactly one of `model` or `callID` when opening a Realtime WebSocket.');

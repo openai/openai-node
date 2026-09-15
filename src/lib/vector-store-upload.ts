@@ -8,7 +8,8 @@ type UploadOptions = RequestOptions & { pollIntervalMs?: number; maxConcurrency?
 
 /**
  * Uploads files with a shared iterator, then creates and polls the batch. Every
- * worker settles before upload failures are propagated.
+ * worker settles before upload failures are propagated. Zero concurrency is
+ * rejected before any upload or batch-creation request.
  *
  * @internal
  */
@@ -28,6 +29,9 @@ export async function uploadAndPollVectorStoreFileBatch(
 
   const configuredConcurrency = options?.maxConcurrency ?? 5;
   const concurrencyLimit = Math.min(configuredConcurrency, files.length);
+  if (concurrencyLimit === 0) {
+    throw new RangeError('maxConcurrency must be greater than 0');
+  }
   const fileIterator = files.values();
   const allFileIds = [...fileIds];
 

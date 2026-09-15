@@ -139,6 +139,7 @@ Methods:
 
 Methods:
 
+- <code title="post /realtime/calls">client.realtime.calls.<a href="./src/resources/realtime/calls.ts">create</a>({ ...params }) -> Response</code>
 - <code title="post /realtime/calls/{call_id}/accept">client.realtime.calls.<a href="./src/resources/realtime/calls.ts">accept</a>(callID, { ...params }) -> void</code>
 - <code title="post /realtime/calls/{call_id}/hangup">client.realtime.calls.<a href="./src/resources/realtime/calls.ts">hangup</a>(callID) -> void</code>
 - <code title="post /realtime/calls/{call_id}/refer">client.realtime.calls.<a href="./src/resources/realtime/calls.ts">refer</a>(callID, { ...params }) -> void</code>

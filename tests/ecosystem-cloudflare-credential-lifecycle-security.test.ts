@@ -1,3 +1,4 @@
+import { compiledFixture } from './utils/compiled-fixtures';
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -67,7 +68,8 @@ const credentialStates: CredentialState[] = [
 ];
 
 function withFixture(run: (fixture: Fixture) => void) {
-  const directory = mkdtempSync(path.join(tmpdir(), 'openai-node-cloudflare-lifecycle-'));
+  // Exercise preload paths containing spaces regardless of the system temporary directory.
+  const directory = mkdtempSync(path.join(tmpdir(), 'openai-node-cloudflare lifecycle-'));
   const worker = path.join(directory, 'ecosystem-tests', 'cloudflare-worker');
   const bin = path.join(directory, 'bin');
   const fixture: Fixture = {
@@ -134,7 +136,7 @@ function withFixture(run: (fixture: Fixture) => void) {
       '    }',
       '  }',
       "  if (failure === 'capture-original' || failure === 'edit-original') {",
-      "    const held = '/proc/' + process.ppid + '/fd/' + process.env.CLOUDFLARE_HELD_FD;",
+      '    const held = process.env.CLOUDFLARE_HELD_LINK;',
       "    if (failure === 'capture-original') {",
       '      fs.writeFileSync(process.env.CLOUDFLARE_HELD_CAPTURE, fs.readFileSync(held), { mode: 0o600 });',
       '    } else {',
@@ -176,18 +178,29 @@ function setExistingCredentials(fixture: Fixture, state: CredentialState) {
 
 function holdOriginalCredentialDescriptor(fixture: Fixture): string {
   const preload = path.join(fixture.directory, 'hold-original-credential.cjs');
+  const heldLink = path.join(fixture.directory, 'held-original-credential');
   writeFileSync(
     preload,
     [
       "const fs = require('node:fs');",
       "const promises = require('node:fs/promises');",
+      `const heldLink = ${JSON.stringify(heldLink)};`,
       'const originalOpen = promises.open;',
+      'const originalLink = promises.link;',
       'promises.open = async (...args) => {',
       '  const file = await originalOpen(...args);',
       "  if (args[0] === '.dev.vars' && !process.env.CLOUDFLARE_HELD_FD) {",
       "    process.env.CLOUDFLARE_HELD_FD = String(fs.openSync(args[0], 'r+'));",
       '  }',
       '  return file;',
+      '};',
+      'promises.link = async (...args) => {',
+      '  const result = await originalLink(...args);',
+      "  if (args[0] === '.dev.vars' && !process.env.CLOUDFLARE_HELD_LINK) {",
+      '    fs.linkSync(args[0], heldLink);',
+      '    process.env.CLOUDFLARE_HELD_LINK = heldLink;',
+      '  }',
+      '  return result;',
       '};',
     ].join('\n'),
   );
@@ -196,6 +209,10 @@ function holdOriginalCredentialDescriptor(fixture: Fixture): string {
 
 function expectNoCloudflareCredentialArtifacts(fixture: Fixture) {
   expect(readdirSync(fixture.worker).filter((name) => name.startsWith('.dev.vars.openai-'))).toEqual([]);
+}
+
+function preloadNodeOptions(preload: string) {
+  return `--require "${preload.split('\\').join('\\\\').split('"').join('\\"')}"`;
 }
 
 function runCloudflare(
@@ -208,10 +225,7 @@ function runCloudflare(
   const result = spawnSync(
     process.execPath,
     [
-      path.join(repositoryRoot, 'node_modules/ts-node/dist/bin.js'),
-      '-r',
-      path.join(repositoryRoot, 'node_modules/tsconfig-paths/register.js'),
-      path.join(repositoryRoot, 'ecosystem-tests/cli.ts'),
+      compiledFixture('ecosystem-tests/cli.ts'),
       'cloudflare-worker',
       '--fromNpm=openai',
       '--skipPack',
@@ -294,7 +308,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
       expectScopedObservations(records, state);
       expectRestored(fixture, state);
     });
@@ -309,7 +327,12 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc', 'run deploy']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+        'run deploy',
+      ]);
       expectScopedObservations(records, state);
       expectRestored(fixture, state);
     });
@@ -324,7 +347,12 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc', 'run test:ci']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+        'run test:ci',
+      ]);
       expectScopedObservations(records, state);
       expectRestored(fixture, state);
     });
@@ -340,7 +368,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       const result = runCloudflare(fixture, ['--live'], {
         CLOUDFLARE_FAILURE: 'capture-original',
         CLOUDFLARE_HELD_CAPTURE: capture,
-        NODE_OPTIONS: `--require ${preload}`,
+        NODE_OPTIONS: preloadNodeOptions(preload),
       });
 
       expect(result.error).toBeUndefined();
@@ -360,7 +388,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       const result = runCloudflare(fixture, ['--live'], {
         CLOUDFLARE_FAILURE: 'edit-original',
-        NODE_OPTIONS: `--require ${preload}`,
+        NODE_OPTIONS: preloadNodeOptions(preload),
       });
 
       expect(result.error).toBeUndefined();
@@ -452,7 +480,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         const result = runCloudflare(fixture, ['--live', '--retry=3', '--retryDelay=0'], {
           CLOUDFLARE_FAILURE: 'deny-path-validation',
           CLOUDFLARE_DENIAL_READY: marker,
-          NODE_OPTIONS: `--require ${preload}`,
+          NODE_OPTIONS: preloadNodeOptions(preload),
         });
 
         expect(result.error).toBeUndefined();
@@ -487,7 +515,12 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc', 'run test:ci']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+        'run test:ci',
+      ]);
       expectScopedObservations(records, state);
       expectRestored(fixture, state);
     });
@@ -504,6 +537,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         expect(records.map(({ command }) => command)).toEqual([
           'install -D openai',
           'run tsc',
+          'run test:smoke',
           'run test:ci',
         ]);
         expect(readFileSync(fixture.vars)).toEqual(Buffer.alloc(0));
@@ -570,7 +604,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
           CLOUDFLARE_FAILURE: interruption.failure,
           CLOUDFLARE_INTERRUPT_COMMAND: interruption.command,
           CLOUDFLARE_INTERRUPT_SIGNAL: interruption.signal,
-          NODE_OPTIONS: `--require ${preload}`,
+          NODE_OPTIONS: preloadNodeOptions(preload),
         },
         false,
       );
@@ -646,7 +680,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         const result = runCloudflare(fixture, ['--live', '--retry=3', '--retryDelay=0'], {
           CLOUDFLARE_FAILURE: 'replace-file',
           CLOUDFLARE_IDENTITY_FIELD: field,
-          NODE_OPTIONS: `--require ${preload}`,
+          NODE_OPTIONS: preloadNodeOptions(preload),
         });
 
         expect(result.error).toBeUndefined();
@@ -759,7 +793,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         const result = runCloudflare(fixture, ['--live'], {
           CLOUDFLARE_FAILURE: 'replace-during-truncate',
           CLOUDFLARE_REPLACE_READY: marker,
-          NODE_OPTIONS: `--require ${preload}`,
+          NODE_OPTIONS: preloadNodeOptions(preload),
         });
 
         expect(result.error).toBeUndefined();
@@ -829,7 +863,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
           {
             CLOUDFLARE_ACQUISITION_PHASE: phase,
             CLOUDFLARE_ACQUISITION_SIGNAL: signal,
-            NODE_OPTIONS: `--require ${preload}`,
+            NODE_OPTIONS: preloadNodeOptions(preload),
           },
           noCleanup,
         );
@@ -888,7 +922,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         const result = runCloudflare(
           fixture,
           flags,
-          { CLOUDFLARE_STAGING_SIGNAL: signal, NODE_OPTIONS: `--require ${preload}` },
+          { CLOUDFLARE_STAGING_SIGNAL: signal, NODE_OPTIONS: preloadNodeOptions(preload) },
           noCleanup,
         );
 
@@ -920,7 +954,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('64 KiB');
       expect(statSync(fixture.vars).size).toBe(64 * 1024 + 1);
-      expect(observations(fixture).map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(observations(fixture).map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
     });
   });
 
@@ -953,13 +991,17 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         ].join('\n'),
       );
 
-      const result = runCloudflare(fixture, ['--live'], { NODE_OPTIONS: `--require ${preload}` });
+      const result = runCloudflare(fixture, ['--live'], { NODE_OPTIONS: preloadNodeOptions(preload) });
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('64 KiB');
       expect(statSync(fixture.vars).size).toBe(originalContents.length + 64 * 1024 + 1);
-      expect(observations(fixture).map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(observations(fixture).map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
     });
   });
 
@@ -977,9 +1019,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       expect(records.map(({ command }) => command)).toEqual([
         'install -D openai',
         'run tsc',
+        'run test:smoke',
         'run test:ci',
         'install -D openai',
         'run tsc',
+        'run test:smoke',
         'run test:ci',
       ]);
       expectScopedObservations(records, state);
@@ -999,6 +1043,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       expect(records.map(({ command }) => command)).toEqual([
         'install -D openai',
         'run tsc',
+        'run test:smoke',
         'run test:ci',
         'run deploy',
       ]);
@@ -1030,7 +1075,12 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc', 'run test:ci']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+        'run test:ci',
+      ]);
       expectScopedObservations(records, credentialStates[0] as CredentialState);
       expect(existsSync(fixture.vars)).toBe(false);
     });
@@ -1058,7 +1108,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
       expect(readFileSync(target)).toEqual(originalContents);
       expect(lstatSync(fixture.vars).isSymbolicLink()).toBe(true);
     });
@@ -1074,7 +1128,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
       expect(existsSync(target)).toBe(false);
       expect(lstatSync(fixture.vars).isSymbolicLink()).toBe(true);
     });
@@ -1095,7 +1153,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
       expect(statSync(fixture.vars).isFIFO()).toBe(true);
     });
   });
@@ -1111,7 +1173,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
       expect(readFileSync(target)).toEqual(originalContents);
       expect(readFileSync(fixture.vars)).toEqual(originalContents);
     });
@@ -1126,7 +1192,11 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(records.map(({ command }) => command)).toEqual(['install -D openai', 'run tsc']);
+      expect(records.map(({ command }) => command)).toEqual([
+        'install -D openai',
+        'run tsc',
+        'run test:smoke',
+      ]);
       expect(statSync(fixture.vars).isDirectory()).toBe(true);
     });
   });

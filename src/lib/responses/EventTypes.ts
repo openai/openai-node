@@ -1,40 +1,7 @@
 import type {
-  ResponseAudioDeltaEvent,
-  ResponseAudioDoneEvent,
-  ResponseAudioTranscriptDeltaEvent,
-  ResponseAudioTranscriptDoneEvent,
-  ResponseCodeInterpreterCallCodeDeltaEvent,
-  ResponseCodeInterpreterCallCodeDoneEvent,
-  ResponseCodeInterpreterCallCompletedEvent,
-  ResponseCodeInterpreterCallInProgressEvent,
-  ResponseCodeInterpreterCallInterpretingEvent,
-  ResponseCompletedEvent,
-  ResponseContentPartAddedEvent,
-  ResponseContentPartDoneEvent,
-  ResponseCreatedEvent,
-  ResponseErrorEvent,
-  ResponseFailedEvent,
-  ResponseFileSearchCallCompletedEvent,
-  ResponseFileSearchCallInProgressEvent,
-  ResponseFileSearchCallSearchingEvent,
   ResponseFunctionCallArgumentsDeltaEvent as RawResponseFunctionCallArgumentsDeltaEvent,
-  ResponseFunctionCallArgumentsDoneEvent,
-  ResponseInProgressEvent,
-  ResponseOutputItemAddedEvent,
-  ResponseOutputItemDoneEvent,
-  ResponseRefusalDeltaEvent,
-  ResponseRefusalDoneEvent,
-  ResponseShellCallCommandAddedEvent,
-  ResponseShellCallCommandDeltaEvent,
-  ResponseShellCallCommandDoneEvent,
-  ResponseShellCallOutputContentDeltaEvent,
-  ResponseShellCallOutputContentDoneEvent,
+  ResponseStreamEvent,
   ResponseTextDeltaEvent as RawResponseTextDeltaEvent,
-  ResponseTextDoneEvent,
-  ResponseIncompleteEvent,
-  ResponseWebSearchCallCompletedEvent,
-  ResponseWebSearchCallInProgressEvent,
-  ResponseWebSearchCallSearchingEvent,
 } from '../../resources/responses/responses';
 
 /** A function-argument delta enhanced with the argument JSON accumulated so far. */
@@ -51,39 +18,6 @@ export type ResponseTextDeltaEvent = RawResponseTextDeltaEvent & {
 
 /** A Responses API event, with accumulated snapshots attached to text and argument deltas. */
 export type ParsedResponseStreamEvent =
-  | ResponseAudioDeltaEvent
-  | ResponseAudioDoneEvent
-  | ResponseAudioTranscriptDeltaEvent
-  | ResponseAudioTranscriptDoneEvent
-  | ResponseCodeInterpreterCallCodeDeltaEvent
-  | ResponseCodeInterpreterCallCodeDoneEvent
-  | ResponseCodeInterpreterCallCompletedEvent
-  | ResponseCodeInterpreterCallInProgressEvent
-  | ResponseCodeInterpreterCallInterpretingEvent
-  | ResponseCompletedEvent
-  | ResponseContentPartAddedEvent
-  | ResponseContentPartDoneEvent
-  | ResponseCreatedEvent
-  | ResponseErrorEvent
-  | ResponseFileSearchCallCompletedEvent
-  | ResponseFileSearchCallInProgressEvent
-  | ResponseFileSearchCallSearchingEvent
+  | Exclude<ResponseStreamEvent, RawResponseFunctionCallArgumentsDeltaEvent | RawResponseTextDeltaEvent>
   | ResponseFunctionCallArgumentsDeltaEvent
-  | ResponseFunctionCallArgumentsDoneEvent
-  | ResponseInProgressEvent
-  | ResponseFailedEvent
-  | ResponseIncompleteEvent
-  | ResponseOutputItemAddedEvent
-  | ResponseOutputItemDoneEvent
-  | ResponseRefusalDeltaEvent
-  | ResponseRefusalDoneEvent
-  | ResponseShellCallCommandAddedEvent
-  | ResponseShellCallCommandDeltaEvent
-  | ResponseShellCallCommandDoneEvent
-  | ResponseShellCallOutputContentDeltaEvent
-  | ResponseShellCallOutputContentDoneEvent
-  | ResponseTextDeltaEvent
-  | ResponseTextDoneEvent
-  | ResponseWebSearchCallCompletedEvent
-  | ResponseWebSearchCallInProgressEvent
-  | ResponseWebSearchCallSearchingEvent;
+  | ResponseTextDeltaEvent;

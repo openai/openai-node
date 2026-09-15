@@ -1,8 +1,10 @@
+import { resolveRealtimeAPIKey } from '../../internal/realtime-credentials';
 import * as WS from 'ws';
 import { assertBedrockWebSocketOrigin } from '../../internal/bedrock';
 import { protectWebSocketOptionsFromCredentialRedirects } from '../../internal/ws';
 import type { AzureOpenAI } from '../../index';
 import { OpenAI } from '../../index';
+import { VERSION } from '../../version';
 import type { RealtimeClientEvent } from '../../resources/beta/realtime/realtime';
 import { OpenAIRealtimeEmitter, buildRealtimeURL, isAzure, parseRealtimeEvent } from './internal-base';
 import type { RealtimeConnectionConfig } from './internal-base';
@@ -50,11 +52,14 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
 
       /** Indicates that a function-based credential was resolved by an async factory. @internal */
       __resolvedApiKey?: boolean;
+      /** Credential captured by an async factory for this connection. @internal */
+      __apiKey?: string | null;
     },
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
     super();
     client ??= new OpenAI();
+    const apiKey = props.__apiKey === undefined ? client.apiKey : props.__apiKey;
     const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
     if (hasProvider && !props.__resolvedApiKey) {
       throw new Error(
@@ -68,8 +73,9 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     assertTrustedRealtimeURL(client, this.url);
     assertBedrockWebSocketOrigin(client, this.url);
     const headers = {
+      'User-Agent': `${client.constructor.name}/JS ${VERSION}`,
       ...props.options?.headers,
-      ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${client.apiKey}` }),
+      ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${apiKey}` }),
       'OpenAI-Beta': 'realtime=v1',
     };
 
@@ -138,10 +144,10 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     const url = buildRealtimeURL(client, props);
     assertTrustedRealtimeURL(client, url);
     assertBedrockWebSocketOrigin(client, url);
-    const resolvedApiKey = await client._callApiKey();
+    const { apiKey, isProvider: resolvedApiKey } = await resolveRealtimeAPIKey(client);
     assertTrustedRealtimeURL(client, url);
     assertBedrockWebSocketOrigin(client, url);
-    return new OpenAIRealtimeWS({ ...props, __resolvedApiKey: resolvedApiKey }, client);
+    return new OpenAIRealtimeWS({ ...props, __resolvedApiKey: resolvedApiKey, __apiKey: apiKey }, client);
   }
 
   /**
@@ -165,8 +171,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       options?: WS.ClientOptions | undefined;
     } = {},
   ): Promise<OpenAIRealtimeWS> {
-    const isApiKeyProvider = await client._callApiKey();
-    const apiKey = client.apiKey;
+    const { apiKey, isProvider: isApiKeyProvider } = await resolveRealtimeAPIKey(client);
     if (!apiKey) {
       throw new Error('Azure OpenAI Realtime requires an API key');
     }
@@ -185,6 +190,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
           },
         },
         __resolvedApiKey: isApiKeyProvider,
+        __apiKey: apiKey,
       },
       client,
     );

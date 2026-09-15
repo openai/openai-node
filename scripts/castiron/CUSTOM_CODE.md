@@ -39,8 +39,9 @@ The custom-code workflow pair separates candidate execution from trusted checks:
   on `pull_request` with read-only permissions.
 - `castiron-custom-code-comment.yml` handles `workflow_run` from **main**. Its
   read-only compute job runs main's reporter against candidate Git objects in a
-  new bare repository, then reuses that verified report to check main's budget.
-  It never checks out, imports, installs, or executes candidate code.
+  new bare repository. It reuses that verified report when its base is current,
+  or recomputes against current main when the PR is behind. It never checks out,
+  imports, installs, or executes candidate code.
 - An unprivileged `merge_group` job in the first workflow only signals that a candidate
   needs checking. A `workflow_run` handler whose **workflow definition is on
   main** then uses the same trusted checkout. It ignores the signal's conclusion
@@ -72,7 +73,8 @@ and [merge-queue behavior](https://docs.github.com/en/repositories/configuring-b
 The trusted run summary reports additions, deletions, total, mixed-file count,
 headroom, largest patches, and exact policy/candidate/generated revisions. The
 existing custom-code comment remains unchanged, including when the budget fails.
-The trusted compute job reuses its own report, never the candidate's artifacts.
+The trusted compute job reuses its own report only when its base is current and
+never uses the candidate's artifacts.
 The checker, policy, and workflows are maintained in the SDK and preserved
 through the normal three-way merge during generation.
 

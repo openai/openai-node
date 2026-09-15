@@ -1,6 +1,8 @@
 # Runs the repository's normal lint, build, test, benchmark, example, and ecosystem checks.
 # These checks catch generated-code, packaging, runtime, and integration
 # regressions; policy-document alignment lives in node-version-policy.yml.
+# SDK_GHA_RUNNER is trusted configuration for ephemeral GitHub-hosted capacity.
+# See docs/architecture/security-model.md#ci-runner-configuration.
 name: CI
 on:
   push:
@@ -18,7 +20,7 @@ jobs:
   lint:
     timeout-minutes: 10
     name: lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
@@ -48,7 +50,7 @@ jobs:
   build:
     timeout-minutes: 5
     name: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
@@ -88,7 +90,7 @@ jobs:
 
   node_matrix:
     name: Read Node.js test matrix
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
@@ -106,13 +108,15 @@ jobs:
 
       - name: Read policy matrix
         id: policy
-        run: echo "matrix=$(node --experimental-strip-types scripts/check-node-version-policy.ts --matrix)" >> "$GITHUB_OUTPUT"
+        run: |
+          matrix="$(node --experimental-strip-types scripts/check-node-version-policy.ts --matrix)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   test:
     name: test (${{ matrix.node-version }})
     needs: node_matrix
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     continue-on-error: ${{ matrix.experimental }}
     permissions:
@@ -144,26 +148,80 @@ jobs:
         with:
           node-version: '${{ matrix.node-version }}'
 
+      - name: Check Steady cache lifecycle
+        run: |
+          node scripts/steady/publication.test.cjs
+          node scripts/steady/cache.test.cjs
+
       - name: Run tests
+        # Reuse V8 compilation within this job only; never restore it across runs.
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
         run: ./scripts/test
 
       - name: Test packed npm package
         if: matrix.experimental == false
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
         run: |
           ./scripts/build
           node --experimental-strip-types scripts/test-packed-package.ts
 
+      - name: Prepare isolated minimum-runtime package and synthetic certificate
+        if: matrix.node-version == 22
+        run: |
+          package_tarball="$(npm pack "$GITHUB_WORKSPACE/dist" --ignore-scripts --silent --pack-destination "$RUNNER_TEMP")"
+          echo "X509_FLOOR_PACKAGE=${RUNNER_TEMP}/${package_tarball}" >> "$GITHUB_ENV"
+          node -r ts-node/register/transpile-only --eval '
+            const { writeFileSync } = require("node:fs");
+            const { join } = require("node:path");
+            const { createX509TestLab } = require("./tests/utils/x509-test-lab.ts");
+            const { firstClient } = createX509TestLab();
+            writeFileSync(join(process.env.RUNNER_TEMP, "openai-x509-minimum-fixture.json"), JSON.stringify({ certificateChain: firstClient.certificate.toString(), privateKey: firstClient.privateKey.toString() }));
+          '
+
+      - name: Set up exact minimum supported Node.js runtime
+        if: matrix.node-version == 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.0.0'
+
+      - name: Verify first-class X.509 authentication on the exact Node.js floor
+        if: matrix.node-version == 22
+        run: |
+          floor_consumer="${RUNNER_TEMP}/openai-node-minimum-runtime"
+          npm install --ignore-scripts --no-audit --no-fund --prefix "$floor_consumer" "$X509_FLOOR_PACKAGE" 'undici@^7'
+          cd "$floor_consumer"
+          node --input-type=module --eval '
+            import { readFileSync } from "node:fs";
+            import { join } from "node:path";
+            import OpenAI from "openai";
+            import { Agent, ProxyAgent } from "undici";
+            import { createX509Transport, fromX509, workloadIdentity } from "openai/auth/x509-transport";
+            if (process.version !== "v22.0.0" || workloadIdentity.fromX509 !== fromX509) throw new Error("Invalid minimum-runtime X.509 exports");
+            const material = JSON.parse(readFileSync(join(process.env.RUNNER_TEMP, "openai-x509-minimum-fixture.json"), "utf8"));
+            const credential = fromX509({ ...material, identityProviderId: "synthetic-provider", serviceAccountId: "synthetic-account" });
+            new OpenAI({ credential });
+            await credential.close();
+            for (const [proxy, dispatcher] of [["direct", new Agent()], ["http-connect", new ProxyAgent({ uri: "http://127.0.0.1:1" })], ["https-connect", new ProxyAgent({ uri: "https://127.0.0.1:1" })]]) {
+              const x509Transport = createX509Transport({ runtime: "node", dispatcher, certificateIdentity: "static", proxy });
+              new OpenAI({ apiKey: null, workloadIdentity: { type: "x509", identityProviderId: "synthetic-provider", serviceAccountId: "synthetic-account" }, x509Transport });
+              await dispatcher.close();
+            }
+          '
+
   test_matrix:
     name: ${{ (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && 'test matrix' || 'test matrix (not run)' }}
     if: ${{ always() && (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') }}
-    needs: [test, benchmarks]
-    runs-on: ubuntu-latest
+    needs: [test, benchmarks, ecosystem_tests]
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     permissions: {}
     steps:
       - name: Tests (all)
         env:
           TEST_RESULT: ${{ needs.test.result }}
           BENCHMARKS_RESULT: ${{ needs.benchmarks.result }}
+          ECOSYSTEM_RESULT: ${{ needs.ecosystem_tests.result }}
         run: |
           if [ "$TEST_RESULT" != "success" ]; then
             echo "::error::Node.js test matrix result: $TEST_RESULT"
@@ -173,11 +231,15 @@ jobs:
             echo "::error::Performance benchmarks result: $BENCHMARKS_RESULT"
             exit 1
           fi
+          if [ "$ECOSYSTEM_RESULT" != "success" ]; then
+            echo "::error::Ecosystem tests result: $ECOSYSTEM_RESULT"
+            exit 1
+          fi
 
   benchmarks:
     timeout-minutes: 20
     name: performance benchmarks
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
@@ -212,6 +274,7 @@ jobs:
   examples:
     timeout-minutes: 30
     name: examples
+    # Keep live credentials independent of the configurable CI runner pool.
     runs-on: ubuntu-latest
     if: >-
       ${{
@@ -266,13 +329,8 @@ jobs:
 
   ecosystem_tests:
     name: ecosystem tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
-    if: >-
-      ${{
-        github.ref != 'refs/heads/release-please--branches--main--components--openai' &&
-        github.head_ref != 'release-please--branches--main--components--openai'
-      }}
     permissions:
       contents: read
 

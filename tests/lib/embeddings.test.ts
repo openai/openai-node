@@ -6,9 +6,25 @@ import { compareType, expectType } from '../utils/typing';
 
 const vector = [1.25, -2.5];
 const encodedVector = Buffer.from(new Float32Array(vector).buffer).toString('base64');
+const incompleteVectors = [1, 2, 3, 5, 6, 7].map((byteLength) => ({
+  byteLength,
+  encoded: Buffer.alloc(byteLength).toString('base64'),
+}));
 const request = { input: 'hello', model: 'text-embedding-3-small' } as const;
+const nonArrayCollections = [
+  { length: 3 },
+  { length: 0 },
+  { 0: { embedding: encodedVector }, length: 1 },
+  'invalid',
+  1,
+  true,
+  null,
+  0,
+  false,
+  '',
+];
 
-function createClient(): OpenAI {
+function createClient(base64Embedding = encodedVector): OpenAI {
   return new OpenAI({
     apiKey: 'test-key',
     fetch: async (_url, init) => {
@@ -20,7 +36,7 @@ function createClient(): OpenAI {
           {
             object: 'embedding',
             index: 0,
-            embedding: body.encoding_format === 'base64' ? encodedVector : vector,
+            embedding: body.encoding_format === 'base64' ? base64Embedding : vector,
           },
         ],
         model: request.model,
@@ -44,6 +60,54 @@ function makeFixtureClient(): OpenAI {
 }
 
 describe('resource embeddings', () => {
+  test.each(nonArrayCollections)('rejects a non-array response collection: %j', async (data) => {
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async () => Response.json({ data }),
+    });
+
+    await expect(client.embeddings.create(request)).rejects.toThrow(
+      'Expected embeddings response data to be an array',
+    );
+  });
+
+  describe.each(['float', 'base64'] as const)('explicit %s encoding', (encoding) => {
+    test.each(nonArrayCollections)('preserves response passthrough: %j', async (data) => {
+      const client = new OpenAI({
+        apiKey: 'test-key',
+        fetch: async () => Response.json({ data }),
+      });
+
+      await expect(client.embeddings.create({ ...request, encoding_format: encoding })).resolves.toEqual({
+        data,
+      });
+    });
+  });
+
+  test.each([{}, { data: [] }])('preserves an absent or empty response collection: %j', async (body) => {
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async () => Response.json(body),
+    });
+
+    await expect(client.embeddings.create(request)).resolves.toEqual(body);
+  });
+
+  test.each(incompleteVectors)('default rejects $byteLength decoded embedding bytes', async ({ encoded }) => {
+    await expect(createClient(encoded).embeddings.create(request)).rejects.toBeInstanceOf(RangeError);
+  });
+
+  test.each(incompleteVectors)(
+    'explicit base64 preserves $byteLength decoded embedding bytes',
+    async ({ encoded }) => {
+      const response = await createClient(encoded).embeddings.create({
+        ...request,
+        encoding_format: 'base64',
+      });
+      expect(response.data[0]?.embedding).toBe(encoded);
+    },
+  );
+
   test('create: encoding_format=default should create float32 embeddings', async () => {
     const client = makeFixtureClient();
     const response = await client.embeddings.create({

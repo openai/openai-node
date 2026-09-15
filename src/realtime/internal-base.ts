@@ -8,6 +8,7 @@ import { EventEmitter } from '../lib/EventEmitter';
 import { OpenAIError } from '../error';
 import type OpenAI from '../index';
 import { AzureOpenAI } from '../index';
+import { assertX509WebSocketSupported } from '../internal/auth/x509-workload-identity-auth';
 
 /** Parses frame data without exposing malformed payloads through JSON syntax errors. */
 export function parseRealtimeEvent(data: string): RealtimeServerEvent {
@@ -252,6 +253,7 @@ export function buildRealtimeURL(
   client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   connection: string | RealtimeConnectionConfig,
 ): URL {
+  assertX509WebSocketSupported(client);
   const config: RealtimeConnectionConfig =
     typeof connection === 'string' ? { model: connection } : connection;
   const baseURL = client.baseURL;
@@ -279,19 +281,17 @@ export function buildRealtimeURL(
     return url;
   }
 
-  let url: URL;
+  const url = new URL(baseURL);
   if (azure) {
-    url = new URL(baseURL);
     const basePath = url.pathname.replace(/\/+/g, '/').replace(/\/+$/, '');
     const versionedPath = basePath.endsWith('/v1') ? basePath : `${basePath}/v1`;
     url.pathname = `${versionedPath}/realtime`;
     url.search = '';
-    url.hash = '';
   } else {
-    const path = '/realtime';
-    url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
+    url.pathname += url.pathname.endsWith('/') ? 'realtime' : '/realtime';
   }
 
+  url.hash = '';
   url.protocol = 'wss';
   // Sideband control connections attach to an existing call via `call_id`.
   if (hasCallID) {

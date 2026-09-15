@@ -196,6 +196,17 @@ function normalizeFilenamePath(value: string): string {
   return normalized;
 }
 
+const arrayBufferByteLengthGetter = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get;
+
+/** Recognizes native ArrayBuffers across realms without trusting their prototype or string tag. */
+export function isArrayBuffer(value: unknown): value is ArrayBuffer {
+  try {
+    return arrayBufferByteLengthGetter?.call(value) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
 /** Identifies objects that expose a callable `Symbol.asyncIterator` method. */
 export const isAsyncIterable = (value: any): value is AsyncIterable<any> =>
   value != null && typeof value === 'object' && typeof value[Symbol.asyncIterator] === 'function';
@@ -348,7 +359,8 @@ const hasStreamingUploadableValue = (value: unknown): boolean => {
     return value.some(hasStreamingUploadableValue);
   }
   if (value && typeof value === 'object' && !isBlob(value) && !(value instanceof Response)) {
-    for (const k in value) {
+    // Own properties only, matching what form encoding serializes; inherited values are never encoded.
+    for (const k of Object.keys(value)) {
       if (hasStreamingUploadableValue((value as Record<string, unknown>)[k])) {
         return true;
       }
@@ -365,7 +377,8 @@ const hasUploadableValue = (value: unknown): boolean => {
     return value.some(hasUploadableValue);
   }
   if (value && typeof value === 'object') {
-    for (const k in value) {
+    // Own properties only, matching what form encoding serializes; inherited values are never encoded.
+    for (const k of Object.keys(value)) {
       if (hasUploadableValue((value as any)[k])) {
         return true;
       }
@@ -536,7 +549,7 @@ async function* iterateBytes(value: unknown): AsyncGenerator<Uint8Array> {
     yield encodeUTF8(value);
   } else if (ArrayBuffer.isView(value)) {
     yield new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-  } else if (value instanceof ArrayBuffer) {
+  } else if (isArrayBuffer(value)) {
     yield new Uint8Array(value);
   } else if (value instanceof Response) {
     yield* iterateBytes(value.body || (await value.blob()));

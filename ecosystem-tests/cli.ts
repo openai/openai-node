@@ -21,7 +21,14 @@ async function defaultNodeRunner() {
   await installPackage();
   await run('npm', ['run', 'tsc']);
   if (state.live) {
-    await run('npm', ['test']);
+    await run('npm', ['test'], { allowApiKey: true });
+  }
+}
+
+async function commonJSEcosystemRunner() {
+  await defaultNodeRunner();
+  if (!state.live) {
+    await run('npm', ['test', '--', '--runInBand', 'tests/import.test.ts']);
   }
 }
 
@@ -402,10 +409,10 @@ async function withCloudflareCredentials(apiKey: string, runLiveTest: () => Prom
 }
 
 const projectRunners = {
-  'node-ts-cjs': defaultNodeRunner,
-  'node-ts-cjs-web': defaultNodeRunner,
-  'node-ts-cjs-auto': defaultNodeRunner,
-  'node-ts4.5-jest28': defaultNodeRunner,
+  'node-ts-cjs': commonJSEcosystemRunner,
+  'node-ts-cjs-web': commonJSEcosystemRunner,
+  'node-ts-cjs-auto': commonJSEcosystemRunner,
+  'node-ts4.5-jest28': commonJSEcosystemRunner,
   'node-ts-esm': defaultNodeRunner,
   'node-ts-esm-web': defaultNodeRunner,
   'node-ts-esm-auto': defaultNodeRunner,
@@ -418,9 +425,10 @@ const projectRunners = {
 
     await run('npm', ['run', 'tsc']);
     await run('npm', ['run', 'build']);
+    await run('npm', ['run', 'test:bundle']);
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci']);
+      await run('npm', ['run', 'test:ci'], { allowApiKey: true });
     }
   },
   'browser-direct-import': async () => {
@@ -430,54 +438,56 @@ const projectRunners = {
     await fs.symlink('../node_modules', 'public/node_modules');
 
     await run('npm', ['run', 'tsc']);
-
-    if (state.live) {
-      await run('npm', ['run', 'test:ci']);
-    }
+    await run('npm', ['run', 'test:ci'], {
+      allowApiKey: state.live,
+      env: { OPENAI_ECOSYSTEM_TEST_LIVE: String(state.live) },
+    });
   },
   'vercel-edge': async () => {
     await installPackage();
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci:dev']);
+      await run('npm', ['run', 'test:ci:dev'], { allowApiKey: true });
     }
     await run('npm', ['run', 'build']);
 
     if (state.live) {
-      await run('npm', ['run', 'test:ci']);
+      await run('npm', ['run', 'test:ci'], { allowApiKey: true });
     }
     if (state.deploy) {
-      await run('npm', ['run', 'vercel', 'deploy', '--prod', '--force']);
+      await run('npm', ['run', 'vercel', 'deploy', '--prod', '--force'], { allowApiKey: true });
     }
   },
   'cloudflare-worker': async () => {
     await installPackage();
     await run('npm', ['run', 'tsc']);
+    await run('npm', ['run', 'test:smoke']);
 
     if (state.live) {
       const apiKey = process.env['OPENAI_API_KEY'];
       assert.ok(apiKey);
       await withCloudflareCredentials(apiKey, async () => {
-        await run('npm', ['run', 'test:ci']);
+        await run('npm', ['run', 'test:ci'], { allowApiKey: true });
       });
     }
     if (state.deploy) {
-      await run('npm', ['run', 'deploy']);
+      await run('npm', ['run', 'deploy'], { allowApiKey: true });
     }
   },
   bun: async () => {
     if (state.fromNpm) {
       await run('bun', ['install', '-D', state.fromNpm]);
-      return;
+    } else {
+      const packFile = getPackFile();
+      await fs.copyFile(packFile, `./${TAR_NAME}`);
+      await run('bun', ['install', '-D', `./${TAR_NAME}`]);
     }
-
-    const packFile = getPackFile();
-    await fs.copyFile(packFile, `./${TAR_NAME}`);
-    await run('bun', ['install', '-D', `./${TAR_NAME}`]);
 
     await run('npm', ['run', 'tsc']);
 
-    await run('bun', state.live ? ['test'] : ['test', 'workload-identity-access-token.test.ts']);
+    await run('bun', state.live ? ['test'] : ['test', 'workload-identity-access-token.test.ts'], {
+      allowApiKey: state.live,
+    });
   },
   deno: async () => {
     const packageJson = {
@@ -522,13 +532,13 @@ const projectRunners = {
     await run('deno', ['task', 'check']);
 
     if (state.live) {
-      await run('deno', ['task', 'test']);
+      await run('deno', ['task', 'test'], { allowApiKey: true });
     }
   },
 };
 
 let projectNames = Object.keys(projectRunners) as (keyof typeof projectRunners)[];
-const projectNamesSet = new Set(projectNames);
+const projectNamesSet = new Set<string>(projectNames);
 
 async function startProxy() {
   const proxy = createServer((_req, res) => {
@@ -538,11 +548,22 @@ async function startProxy() {
   proxy.on('connect', (req, clientSocket, head) => {
     console.log('got proxied connection');
     const serverSocket = connect(443, 'api.openai.com', () => {
+      if (clientSocket.destroyed) {
+        serverSocket.destroy();
+        return;
+      }
       clientSocket.write('HTTP/1.1 200 Connection Established\r\nProxy-agent: Node.js-Proxy\r\n\r\n');
       serverSocket.write(head);
       serverSocket.pipe(clientSocket);
       clientSocket.pipe(serverSocket);
     });
+    const destroyTunnel = () => {
+      clientSocket.destroy();
+      serverSocket.destroy();
+    };
+    clientSocket.on('error', destroyTunnel);
+    serverSocket.on('error', destroyTunnel);
+    clientSocket.on('close', () => serverSocket.destroy());
   });
 
   await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
@@ -602,9 +623,30 @@ function parseArgs() {
         description: 'number of parallel jobs to run',
       },
       retry: {
-        type: 'number',
-        default: 0,
+        type: 'string',
+        default: '0',
         description: 'number of times to retry failing jobs',
+        coerce: (value: unknown) => {
+          const retry = Number(value);
+          const decimal = /^[+-]?(?<whole>\d*)(?:\.(?<fraction>\d*))?(?:e(?<exponent>[+-]?\d+))?$/iu.exec(
+            String(value).trim(),
+          )?.groups;
+          let hasFraction = false;
+          if (decimal) {
+            const { whole = '', fraction = '', exponent = '0' } = decimal;
+            const digits = whole + fraction;
+            let significantDigits = digits.length;
+            while (digits[significantDigits - 1] === '0') {
+              significantDigits--;
+            }
+            // Check the original digits: Number can round a fraction to an integer or zero.
+            hasFraction = significantDigits > 0 && Number(exponent) < significantDigits - whole.length;
+          }
+          if (!Number.isSafeInteger(retry) || retry < 0 || hasFraction) {
+            throw new Error('--retry must be a non-negative safe integer.');
+          }
+          return retry;
+        },
       },
       retryDelay: {
         type: 'number',
@@ -620,6 +662,14 @@ function parseArgs() {
         type: 'boolean',
         default: false,
       },
+    })
+    .check((args) => {
+      for (const project of args._) {
+        if (typeof project !== 'string' || !projectNamesSet.has(project)) {
+          throw new Error(`Unknown ecosystem project: ${JSON.stringify(project)}`);
+        }
+      }
+      return true;
     })
     .help().argv;
 }
@@ -831,10 +881,11 @@ async function main() {
                       '--skip-pack',
                       '--noCleanup',
                       `--retry=${args.retry}`,
+                      `--retryDelay=${args.retryDelay}`,
                       ...(args.live ? ['--live'] : []),
                       ...(args.verbose ? ['--verbose'] : []),
                       ...(args.deploy ? ['--deploy'] : []),
-                      ...(args.fromNpm ? ['--from-npm'] : []),
+                      ...(args.fromNpm ? [`--from-npm=${args.fromNpm}`] : []),
                     ],
                     {
                       stdio: 'pipe',
@@ -1053,16 +1104,24 @@ function getPackFile() {
 
 interface RunOpts extends execa.Options {
   alwaysPipe?: boolean;
+  allowApiKey?: boolean;
 }
 
 async function run(command: string, args: string[], config?: RunOpts): Promise<execa.ExecaReturnValue> {
-  if (state.verbose && !config?.alwaysPipe) {
-    config = { ...config, stdio: 'inherit' };
+  const { allowApiKey = false, alwaysPipe = false, ...options } = config ?? {};
+  const env = Object.fromEntries(
+    Object.entries({ ...process.env, ...options.env }).filter(
+      ([name]) => allowApiKey || name.toLowerCase() !== 'openai_api_key',
+    ),
+  );
+
+  if (state.verbose && !alwaysPipe) {
+    options.stdio = 'inherit';
   }
 
   console.debug('[run]:', command, ...args);
   try {
-    return await execa(command, args, config);
+    return await execa(command, args, { ...options, env, extendEnv: false });
   } catch (error) {
     if (error instanceof Object && !state.verbose) {
       const { stderr, stdout } = error as any;

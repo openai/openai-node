@@ -98,13 +98,13 @@ describe('resource threads', () => {
   });
 
   test('createAndRun: required and optional params', async () => {
-    const response = await client.beta.threads.createAndRun({
+    await client.beta.threads.createAndRun({
       assistant_id: 'assistant_id',
       instructions: 'instructions',
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
       metadata: { foo: 'string' },
-      model: 'gpt-5.6-sol',
+      model: 'gpt-6-astra',
       parallel_tool_calls: true,
       response_format: 'auto',
       stream: false,

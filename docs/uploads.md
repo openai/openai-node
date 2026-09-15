@@ -173,12 +173,10 @@ if (file.status !== 'completed') {
 }
 ```
 
-The helper returns files with `completed` or `failed` status; inspect `status`
-and `last_error` before assuming ingestion succeeded. It does not currently
-return for a `cancelled` file, so use an abort signal or retrieve the file
-directly when cancellation is possible. Vector-store polling uses the interval
-suggested by the API, or five seconds when none is provided; `pollIntervalMs`
-overrides that interval.
+The helper returns files with `completed`, `cancelled`, or `failed` status;
+inspect `status` and `last_error` before assuming ingestion succeeded.
+Vector-store polling uses the interval suggested by the API, or five seconds
+when none is provided; `pollIntervalMs` overrides that interval.
 
 ### Upload multiple files
 
@@ -202,6 +200,8 @@ if (batch.status !== 'completed' || batch.file_counts.failed > 0 || batch.file_c
   );
 }
 ```
+
+A zero `maxConcurrency` is rejected before any upload or batch-creation request.
 
 Use `vectorStores.files.createAndPoll` or
 `vectorStores.fileBatches.createAndPoll` when files have already been uploaded

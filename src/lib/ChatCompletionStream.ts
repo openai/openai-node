@@ -1,5 +1,6 @@
 import { MalformedJSON, partialParse } from '../_vendor/partial-json-parser/parser';
 import {
+  APIError,
   APIUserAbortError,
   ContentFilterFinishReasonError,
   LengthFinishReasonError,
@@ -1517,6 +1518,9 @@ export class ChatCompletionStream<ParsedT = null>
         );
       }
 
+      if (choiceSnapshot.finish_reason) {
+        state.done_tool_calls.add(toolCallIndex);
+      }
       this._emit('tool_calls.function.arguments.done', {
         name: toolCallSnapshot.function.name,
         index: toolCallIndex,
@@ -1771,6 +1775,10 @@ export class ChatCompletionStream<ParsedT = null>
     );
     let chatId;
     for await (const item of stream) {
+      if ('error' in item && hasOwn(item, 'error') && typeof item.error === 'object' && item.error !== null) {
+        throw new APIError(undefined, item.error, undefined, undefined);
+      }
+
       if (isChatCompletionReadableStreamMessage(item)) {
         const message = getChatCompletionReadableStreamMessage(item);
         if (this.#currentChatCompletionSnapshot) {

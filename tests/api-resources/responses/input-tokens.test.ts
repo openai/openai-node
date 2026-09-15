@@ -51,6 +51,7 @@ describe('resource inputTokens', () => {
               strict: true,
               type: 'function',
               allowed_callers: ['direct'],
+              async: true,
               defer_loading: true,
               description: 'description',
               output_schema: { foo: 'bar' },

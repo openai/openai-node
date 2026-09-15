@@ -222,16 +222,20 @@ describe('Next Edge streaming example request boundaries', () => {
   });
 
   test('accepts an authenticated command-line request with no browser-origin headers', async () => {
-    const response = await invoke(request());
+    const input = request();
+    const response = await invoke(input);
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('{"content":"safe"}\n');
     expect(openai.constructor).toHaveBeenCalledOnce();
-    expect(openai.createStream).toHaveBeenCalledWith({
-      model: 'gpt-3.5-turbo',
-      stream: true,
-      messages: [{ role: 'user', content: 'Tell me why dogs are better than cats' }],
-    });
+    expect(openai.createStream).toHaveBeenCalledWith(
+      {
+        model: 'gpt-3.5-turbo',
+        stream: true,
+        messages: [{ role: 'user', content: 'Tell me why dogs are better than cats' }],
+      },
+      { signal: input.signal },
+    );
   });
 
   test('accepts an authenticated browser request from the configured trusted origin', async () => {
@@ -244,13 +248,15 @@ describe('Next Edge streaming example request boundaries', () => {
 
   test('preserves an authenticated body at exactly the 64 KiB UTF-8 boundary', async () => {
     const body = '🐕'.repeat(maximumPromptBytes / 4);
-    const response = await invoke(request({ body }));
+    const input = request({ body });
+    const response = await invoke(input);
 
     expect(response.status).toBe(200);
     expect(openai.createStream).toHaveBeenCalledWith(
       expect.objectContaining({
         messages: [{ role: 'user', content: body }],
       }),
+      { signal: input.signal },
     );
   });
 });

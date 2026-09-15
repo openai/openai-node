@@ -56,6 +56,12 @@ export interface APIKeyCreateResponse {
    * The unredacted API key value.
    */
   value: string;
+
+  /**
+   * The Unix timestamp (in seconds) when the API key expires, or null if it does not
+   * expire.
+   */
+  expires_at?: number | null;
 }
 
 export interface APIKeyCreateParams {
@@ -63,6 +69,11 @@ export interface APIKeyCreateParams {
    * Path param: The ID of the project.
    */
   project_id: string;
+
+  /**
+   * Body param: Number of seconds until the API key expires.
+   */
+  expires_in_seconds?: number | null;
 
   /**
    * Body param: API key name.

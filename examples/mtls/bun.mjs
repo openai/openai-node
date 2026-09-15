@@ -4,13 +4,15 @@
 // stays in Bun's native fetch so the SDK can use its existing transport hooks.
 
 import OpenAI from 'openai';
+import { mtlsBaseURL } from './base-url.mjs';
 
+const baseURL = mtlsBaseURL(process.env['OPENAI_BASE_URL']);
 const cert = Bun.file(requiredEnv('OPENAI_MTLS_CERT_PATH'));
 const key = Bun.file(requiredEnv('OPENAI_MTLS_KEY_PATH'));
 
 const client = new OpenAI({
   apiKey: requiredEnv('OPENAI_API_KEY'),
-  baseURL: process.env['OPENAI_BASE_URL'] ?? 'https://mtls.api.openai.com/v1',
+  baseURL,
   fetch: (input, init) =>
     fetch(input, {
       ...init,

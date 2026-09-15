@@ -299,9 +299,12 @@ def github_evaluate(
     ):
         raise ValueError("unexpected or superseded source workflow run")
     head = report.require_sha(run["head_sha"])
+    pull_base = None
     if run["event"] == "pull_request":
-        if report.associated_pull_request(repository, run, base_ref=branch, base_sha=main) is None:
+        pull = report.associated_pull_request(repository, run, base_ref=branch)
+        if pull is None:
             raise ValueError("source run must identify exactly one current PR targeting main")
+        pull_base = pull["base"]["sha"]
     elif run["event"] == "merge_group":
         if not run["head_branch"].startswith(f"gh-readonly-queue/{branch}/"):
             raise ValueError("queue signal does not target main")
@@ -320,11 +323,14 @@ def github_evaluate(
         if run["event"] != "pull_request":
             raise ValueError("only PR runs can reuse the trusted report")
         measured = json.loads((trusted_report_dir / "report.json").read_text())
-        if measured["target_base_sha"] != main or measured["head_sha"] != head:
+        if measured["target_base_sha"] != pull_base or measured["head_sha"] != head:
             raise ValueError("trusted report is stale; rerun against current main")
         if report.git(repo, "rev-parse", "--is-bare-repository").strip() != b"true":
             raise ValueError("trusted report must use a bare object store")
-        measurement = (measured, (trusted_report_dir / "custom-code.patch").read_bytes())
+        if pull_base == main:
+            measurement = (measured, (trusted_report_dir / "custom-code.patch").read_bytes())
+        else:
+            report.git(repo, "fetch", "--quiet", "--no-tags", "origin", main)
     else:
         if repo.exists():
             raise ValueError("Git object directory must be fresh")

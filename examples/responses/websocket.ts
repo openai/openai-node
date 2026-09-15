@@ -11,7 +11,7 @@ import type {
 import { ResponsesWS } from 'openai/resources/responses/ws';
 
 type ToolName = 'get_sku_inventory' | 'get_supplier_eta' | 'get_quality_alerts';
-type ToolChoice = NonNullable<ResponsesClientEvent['tool_choice']>;
+type ToolChoice = NonNullable<ResponsesClientEvent.ResponseCreate['tool_choice']>;
 
 type DemoTurn = {
   tool_name: ToolName;
@@ -72,14 +72,6 @@ type RunResponseResult = {
 type RunTurnResult = {
   assistantText: string;
   responseID: string;
-};
-
-type OpenableSocket = {
-  readyState: number;
-  on(event: 'open' | 'close', listener: () => void): void;
-  on(event: 'error', listener: (err: Error) => void): void;
-  off(event: 'open' | 'close', listener: () => void): void;
-  off(event: 'error', listener: (err: Error) => void): void;
 };
 
 type CLIArgs = {
@@ -293,39 +285,6 @@ const callTool = (name: ToolName, args: SKUArguments): ToolOutput => {
   };
 };
 
-const ensureSocketOpen = async (socket: OpenableSocket): Promise<void> => {
-  if (socket.readyState === 1) {
-    return;
-  }
-
-  await new Promise<void>((resolve, reject) => {
-    const onOpen = (): void => {
-      cleanup();
-      resolve();
-    };
-
-    const onError = (err: Error): void => {
-      cleanup();
-      reject(err);
-    };
-
-    const onClose = (): void => {
-      cleanup();
-      reject(new Error('WebSocket closed before opening.'));
-    };
-
-    const cleanup = (): void => {
-      socket.off('open', onOpen);
-      socket.off('error', onError);
-      socket.off('close', onClose);
-    };
-
-    socket.on('open', onOpen);
-    socket.on('error', onError);
-    socket.on('close', onClose);
-  });
-};
-
 const runResponse = async ({
   ws,
   model,
@@ -359,6 +318,10 @@ const runResponse = async ({
       fail(error);
     };
 
+    const onSocketClose = (): void => {
+      fail(new Error('WebSocket closed before the response completed.'));
+    };
+
     const onEvent = (event: ResponsesServerEvent): void => {
       try {
         if (event.type === 'response.output_text.delta') {
@@ -373,11 +336,6 @@ const runResponse = async ({
             callID: event.item.call_id,
           });
           return;
-        }
-
-        if (event.type === 'error') {
-          const message = 'error' in event ? event.error?.message : event.message;
-          throw new Error(message || 'WebSocket error event');
         }
 
         if (event.type === 'response.completed') {
@@ -403,10 +361,12 @@ const runResponse = async ({
     const cleanup = (): void => {
       ws.off('event', onEvent);
       ws.off('error', onSocketError);
+      ws.off('close', onSocketClose);
     };
 
     ws.on('event', onEvent);
     ws.on('error', onSocketError);
+    ws.on('close', onSocketClose);
 
     const createEvent: ResponsesClientEvent = {
       type: 'response.create',
@@ -499,15 +459,13 @@ const main = async (): Promise<void> => {
     headers: args.useBetaHeader ? { 'OpenAI-Beta': BETA_HEADER_VALUE } : undefined,
   });
 
-  await ensureSocketOpen(ws.socket);
-
   try {
     let previousResponseID: string | null = null;
     for (const [index, turn] of DEMO_TURNS.entries()) {
       console.log(`\n=== Turn ${index + 1} ===`);
       console.log(`User: ${turn.prompt}`);
 
-      const turnResult = await runTurn({
+      const turnResult: RunTurnResult = await runTurn({
         ws,
         model: args.model,
         previousResponseID,

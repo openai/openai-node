@@ -50,8 +50,7 @@ export class Worker {
 
   public run(): number {
     if (this.data.transpileOnly) {
-      this.transpile();
-      return 0;
+      return this.transpile();
     }
 
     const builder = this.createBuilder();
@@ -375,13 +374,17 @@ export class Worker {
     );
   }
 
-  private transpile() {
+  private transpile(): number {
+    let exitCode = 0;
     for (const project of this.data.projects) {
-      this.transpileProject(project);
+      if (this.transpileProject(project) !== 0) {
+        exitCode = 1;
+      }
     }
+    return exitCode;
   }
 
-  private transpileProject(projectPath: string) {
+  private transpileProject(projectPath: string): number {
     const tsConfigPath = this.system.fileExists(projectPath)
       ? projectPath
       : nodePath.join(projectPath, 'tsconfig.json');
@@ -394,7 +397,7 @@ export class Worker {
 
     const config = this.ts.getParsedCommandLineOfConfigFile(tsConfigPath, options, parseConfigFileHost);
     if (!config) {
-      return;
+      return 1;
     }
 
     let resolvedShareHelpers: string | undefined;
@@ -420,6 +423,7 @@ export class Worker {
       ],
     };
 
+    let exitCode = 0;
     for (const inputPath of config.fileNames) {
       // - Ignore if file does not exist
       // - or if file is a declaration file, which will generate an empty file and
@@ -439,6 +443,9 @@ export class Worker {
 
       for (const diag of output.diagnostics ?? []) {
         this.reporter.reportDiagnostic(diag);
+        if (diag.category === this.ts.DiagnosticCategory.Error) {
+          exitCode = 1;
+        }
       }
 
       this.system.writeFile(outputPath, output.outputText);
@@ -453,5 +460,6 @@ export class Worker {
       assert.ok(out, 'outDir must be set when specifying shareHelpers');
       this.writeHelpers(helpersNeeded, this.system.writeFile, out, config.options);
     }
+    return exitCode;
   }
 }

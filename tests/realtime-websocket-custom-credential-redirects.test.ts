@@ -255,11 +255,11 @@ describe.each([
 
       expect(result.sourceCredentials).toEqual([value]);
       expect(result.destinationCredentials).toEqual([]);
-      expect(result.redirects).toBe(1);
-      expect(result.error.message).toBe('WebSocket was closed before the connection was established');
+      expect(result.redirects).toBe(0);
+      expect(result.error.message).toBe('Unexpected server response: 302');
       expect(result.publicErrors).toEqual([
         expect.objectContaining({
-          message: 'WebSocket was closed before the connection was established',
+          message: 'Unexpected server response: 302',
         }),
       ]);
     },
@@ -278,7 +278,11 @@ describe.each([
 
       expect(result.sourceCredentials).toEqual([value]);
       expect(result.destinationCredentials).toEqual([]);
-      expect(result.redirects).toBe(1);
+      expect(result.redirects).toBe(0);
+      expect(result.error.message).toBe(`Unexpected server response: ${status}`);
+      expect(result.publicErrors).toEqual([
+        expect.objectContaining({ message: `Unexpected server response: ${status}` }),
+      ]);
     },
   );
 
@@ -293,10 +297,14 @@ describe.each([
 
     expect(result.sourceCredentials).toEqual([value]);
     expect(result.destinationCredentials).toEqual([]);
-    expect(result.redirects).toBe(1);
+    expect(result.redirects).toBe(0);
+    expect(result.error.message).toBe('Unexpected server response: 302');
+    expect(result.publicErrors).toEqual([
+      expect.objectContaining({ message: 'Unexpected server response: 302' }),
+    ]);
   });
 
-  test.each([false, true])('preserves benign %s-origin redirect behavior', async (sameOrigin) => {
+  test.each([false, true])('disables benign %s-origin redirects', async (sameOrigin) => {
     const value = 'ordinary-nonsensitive-header-value';
     const result = await inspectRedirect({
       Responses,
@@ -306,8 +314,11 @@ describe.each([
     });
 
     expect(result.sourceCredentials).toEqual([value]);
-    expect(result.destinationCredentials).toEqual([value]);
-    expect(result.redirects).toBe(1);
-    expect(result.error.message).toBe('Unexpected server response: 200');
+    expect(result.destinationCredentials).toEqual([]);
+    expect(result.redirects).toBe(0);
+    expect(result.error.message).toBe('Unexpected server response: 302');
+    expect(result.publicErrors).toEqual([
+      expect.objectContaining({ message: 'Unexpected server response: 302' }),
+    ]);
   });
 });

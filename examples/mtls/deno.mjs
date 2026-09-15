@@ -4,21 +4,23 @@
 // stays in Deno's HTTP client so the SDK can use its existing transport hooks.
 
 import OpenAI from 'npm:openai';
+import { mtlsBaseURL } from './base-url.mjs';
 
+const baseURL = mtlsBaseURL(Deno.env.get('OPENAI_BASE_URL'));
 const cert = await Deno.readTextFile(requiredEnv('OPENAI_MTLS_CERT_PATH'));
 const key = await Deno.readTextFile(requiredEnv('OPENAI_MTLS_KEY_PATH'));
 const httpClient = Deno.createHttpClient(clientCertificateOptions(cert, key));
 
-const client = new OpenAI({
-  apiKey: requiredEnv('OPENAI_API_KEY'),
-  baseURL: Deno.env.get('OPENAI_BASE_URL') ?? 'https://mtls.api.openai.com/v1',
-  fetch: (input, init) => fetch(input, { ...init, client: httpClient }),
-  fetchOptions: {
-    redirect: 'manual',
-  },
-});
-
 try {
+  const client = new OpenAI({
+    apiKey: requiredEnv('OPENAI_API_KEY'),
+    baseURL,
+    fetch: (input, init) => fetch(input, { ...init, client: httpClient }),
+    fetchOptions: {
+      redirect: 'manual',
+    },
+  });
+
   const models = await client.models.list();
   console.log('mTLS request succeeded; received ' + models.data.length + ' models.');
 } finally {

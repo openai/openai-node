@@ -685,7 +685,12 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
         // reference context only exists once that has happened. Definition
         // insertion order would otherwise decide the output.
         materializedDefinitions.push({ key, definitionPath, materialized });
-        definitions[key] = materialized;
+        Object.defineProperty(definitions, key, {
+          value: materialized,
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         processedDefinitions.add(key);
       }
     }

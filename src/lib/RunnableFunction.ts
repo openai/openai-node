@@ -140,7 +140,7 @@ export type RunnableFunctions<FunctionsArgs extends BaseFunctionsArgs, ToolConte
 ] extends [FunctionsArgs]
   ? readonly RunnableFunction<any, ToolContext>[]
   : {
-      [Index in keyof FunctionsArgs]: Index extends number
+      [Index in keyof FunctionsArgs]: FunctionsArgs[Index] extends object | string
         ? RunnableFunction<FunctionsArgs[Index], ToolContext>
         : FunctionsArgs[Index];
     };
@@ -151,7 +151,7 @@ export type RunnableTools<FunctionsArgs extends BaseFunctionsArgs, ToolContext =
 ]
   ? readonly RunnableToolFunction<any, ToolContext>[]
   : {
-      [Index in keyof FunctionsArgs]: Index extends number
+      [Index in keyof FunctionsArgs]: FunctionsArgs[Index] extends object | string
         ? RunnableToolFunction<FunctionsArgs[Index], ToolContext>
         : FunctionsArgs[Index];
     };

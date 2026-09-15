@@ -24,7 +24,17 @@ const recordingProviders: Record<NodeJS.Platform, string> = {
 };
 
 function isResponse(stream: NodeJS.ReadableStream | Response | File): stream is Response {
-  return (stream as any).body !== undefined;
+  // Readables have event and flow-control methods, even after they have ended.
+  const nodeReadable =
+    'pipe' in stream &&
+    typeof stream.pipe === 'function' &&
+    'on' in stream &&
+    typeof stream.on === 'function' &&
+    'pause' in stream &&
+    typeof stream.pause === 'function' &&
+    'resume' in stream &&
+    typeof stream.resume === 'function';
+  return !nodeReadable && 'body' in stream && stream.body !== undefined;
 }
 
 function isFile(stream: NodeJS.ReadableStream | Response | File): stream is File {
@@ -57,10 +67,18 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
       ffplay.stderr?.resume();
       ffplay.on('error', reject);
 
+      // The player can exit before the input stream finishes its cleanup.
+      let inputFinished = false;
+      let processClosed = false;
       pipeline(source, ffplay.stdin, (error) => {
         if (error) {
           ffplay.kill();
           reject(error);
+          return;
+        }
+        inputFinished = true;
+        if (processClosed) {
+          resolve();
         }
       });
 
@@ -69,7 +87,10 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
           reject(new Error(`ffplay process exited with code ${code}`));
           return;
         }
-        resolve();
+        processClosed = true;
+        if (inputFinished) {
+          resolve();
+        }
       });
     } catch (error) {
       reject(error);
@@ -100,15 +121,23 @@ export async function playAudio(input: NodeJS.ReadableStream | Response | File):
 
 /** Controls microphone selection and when an in-progress recording is finalized. */
 type RecordAudioOptions = {
-  /** Stops recording when aborted and resolves with the audio captured so far. */
+  /** Stops recording when aborted; successful termination returns the captured audio. */
   signal?: AbortSignal;
 
-  /** Zero-based audio-input device number passed to FFmpeg; defaults to `0`. */
+  /** Zero-based audio-input index (ALSA card number on Linux); defaults to `0`. */
   device?: number;
 
   /** Positive recording duration in milliseconds; nonpositive values disable the timeout. */
   timeout?: number;
 };
+
+function removeRecordingAbortListener(signal: AbortSignal | undefined, listener: () => void): void {
+  try {
+    signal?.removeEventListener('abort', listener);
+  } catch {
+    // A cleanup callback must not replace the recording's terminal outcome.
+  }
+}
 
 function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {}): Promise<File> {
   checkFileSupport();
@@ -119,14 +148,31 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
     let internalSignal: AbortSignal | undefined;
     let wasStopped = false;
     let settled = false;
+    let callerAbortObserved = false;
+    let timeoutAbortObserved = false;
+    let rejectRecording: (error: unknown) => void = reject;
 
     const collectData = (chunk: Buffer) => {
-      data.push(chunk);
+      if (!settled) {
+        data.push(chunk);
+      }
     };
     const stopRecording = () => {
-      if (!settled && ffmpeg) {
-        wasStopped ||= ffmpeg.kill('SIGTERM');
+      if (!settled && ffmpeg?.pid) {
+        try {
+          wasStopped ||= ffmpeg.kill('SIGTERM');
+        } catch (error) {
+          rejectRecording(error);
+        }
       }
+    };
+    const stopCallerRecording = () => {
+      callerAbortObserved = true;
+      stopRecording();
+    };
+    const stopTimeoutRecording = () => {
+      timeoutAbortObserved = true;
+      stopRecording();
     };
     const cleanup = () => {
       if (settled) {
@@ -134,12 +180,16 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       }
 
       settled = true;
-      signal?.removeEventListener('abort', stopRecording);
-      internalSignal?.removeEventListener('abort', stopRecording);
-      ffmpeg?.stdout?.removeListener('data', collectData);
+      removeRecordingAbortListener(signal, stopCallerRecording);
+      removeRecordingAbortListener(internalSignal, stopTimeoutRecording);
+      try {
+        ffmpeg?.stdout?.removeListener('data', collectData);
+      } catch {
+        // Continue settling even when the output stream rejects cleanup.
+      }
       return true;
     };
-    const rejectRecording = (error: unknown) => {
+    rejectRecording = (error: unknown) => {
       if (cleanup()) {
         reject(error);
       }
@@ -154,6 +204,35 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       resolve(audioFile);
     };
 
+    const observeTimeout = () => {
+      internalSignal?.addEventListener('abort', stopTimeoutRecording, { once: true });
+      if (settled) {
+        removeRecordingAbortListener(internalSignal, stopTimeoutRecording);
+        return false;
+      }
+
+      if (internalSignal && !timeoutAbortObserved && internalSignal.aborted) {
+        stopTimeoutRecording();
+      }
+      return !settled;
+    };
+    const observeCaller = () => {
+      if (!signal) {
+        return;
+      }
+      if (signal.aborted) {
+        stopRecording();
+        return;
+      }
+
+      signal.addEventListener('abort', stopCallerRecording, { once: true });
+      if (settled) {
+        removeRecordingAbortListener(signal, stopCallerRecording);
+      } else if (!callerAbortObserved && signal.aborted) {
+        stopCallerRecording();
+      }
+    };
+
     try {
       if (typeof timeout === 'number' && (timeout > 0 || Number.isNaN(timeout))) {
         internalSignal = AbortSignal.timeout(timeout);
@@ -165,7 +244,7 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
           '-f',
           provider,
           '-i',
-          `:${device ?? 0}`, // default audio input device; adjust as needed
+          provider === 'alsa' ? `hw:${device ?? 0}` : `:${device ?? 0}`,
           '-ar',
           DEFAULT_SAMPLE_RATE.toString(),
           '-ac',
@@ -182,8 +261,16 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       ffmpeg.stdout?.on('data', collectData);
 
       ffmpeg.on('error', (error) => {
-        console.error(error);
-        rejectRecording(error);
+        if (!cleanup()) {
+          return;
+        }
+
+        try {
+          console.error(error);
+        } catch {
+          // A custom logger must not hide the original process failure.
+        }
+        reject(error);
       });
 
       ffmpeg.on('close', (code) => {
@@ -194,18 +281,23 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
         returnData();
       });
 
-      internalSignal?.addEventListener('abort', stopRecording, { once: true });
-
-      if (signal) {
-        if (signal.aborted) {
-          stopRecording();
-        } else {
-          signal.addEventListener('abort', stopRecording, { once: true });
-        }
+      if (settled || !observeTimeout()) {
+        return;
       }
+      observeCaller();
     } catch (error) {
-      stopRecording();
-      rejectRecording(error);
+      if (!cleanup()) {
+        return;
+      }
+
+      try {
+        if (!wasStopped && ffmpeg?.pid) {
+          ffmpeg?.kill('SIGTERM');
+        }
+      } catch {
+        // Preserve the original setup error when process termination also fails.
+      }
+      reject(error);
     }
   });
 }
@@ -216,13 +308,13 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
  * This helper is supported only in Node.js-compatible runtimes and requires
  * the `ffmpeg` executable from FFmpeg to be available on `PATH`. Recording
  * continues until the FFmpeg process exits, the supplied signal is aborted, or
- * a positive timeout elapses. Aborting or timing out finalizes and returns the
- * audio captured so far instead of rejecting.
+ * a positive timeout elapses. Successful cancellation returns the audio captured
+ * so far; if sending `SIGTERM` throws, recording rejects with that error.
  *
  * @param options Audio-input device, optional abort signal, and recording timeout.
  * @returns The captured WAV file with MIME type `audio/wav`.
- * @throws {Error} If recording is unsupported, `ffmpeg` cannot start, or the
- * recording process exits unsuccessfully before an intentional stop.
+ * @throws {Error} If recording is unsupported, `ffmpeg` cannot start or exits
+ * unsuccessfully before an intentional stop, or sending it `SIGTERM` throws.
  */
 export async function recordAudio(options: RecordAudioOptions = {}): Promise<File> {
   if (isNode) {

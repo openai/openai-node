@@ -847,12 +847,103 @@ describe('Azure IMDS successful-response JSON privacy', () => {
     expect(failure.cause).toBeUndefined();
   });
 
-  it('preserves successful Azure subject-token responses', async () => {
-    const provider = azureManagedIdentityTokenProvider(undefined, {
-      fetch: async () => Response.json({ access_token: VALID_SUBJECT_TOKEN }),
+  it.each([
+    { name: 'numeric token', body: { access_token: 42 } },
+    { name: 'boolean token', body: { access_token: true } },
+    { name: 'object token', body: { access_token: { value: 'not-a-token' } } },
+    { name: 'array token', body: { access_token: ['not-a-token'] } },
+    { name: 'empty token', body: { access_token: '' } },
+    { name: 'blank token', body: { access_token: ' \t\r\n ' } },
+    { name: 'null response', body: null },
+  ])('rejects $name with a typed error and releases its timer', async ({ body }) => {
+    vi.useFakeTimers();
+    const response = Response.json(body);
+    const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
+    const result = provider.getToken();
+
+    await expect(result).rejects.toBeInstanceOf(SubjectTokenProviderError);
+    await expect(result).rejects.toMatchObject({
+      message: "IMDS response missing 'access_token' field",
+      provider: 'azure-imds',
     });
+    expect(response.bodyUsed).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([VALID_SUBJECT_TOKEN, ` ${VALID_SUBJECT_TOKEN} `])(
+    'preserves nonempty Azure token text without rewriting it: %j',
+    async (token) => {
+      const provider = azureManagedIdentityTokenProvider(undefined, {
+        fetch: async () => Response.json({ access_token: token }),
+      });
+
+      await expect(provider.getToken()).resolves.toBe(token);
+    },
+  );
+
+  it('reads an own custom parsed token only once', async () => {
+    const readToken = vi.fn<() => unknown>().mockReturnValueOnce(VALID_SUBJECT_TOKEN).mockReturnValue(42);
+    const data = Object.defineProperty({}, 'access_token', { get: readToken });
+    const response = new Response(null);
+    vi.spyOn(response, 'json').mockResolvedValue(data);
+    const provider = azureManagedIdentityTokenProvider(undefined, { fetch: async () => response });
 
     await expect(provider.getToken()).resolves.toBe(VALID_SUBJECT_TOKEN);
+    expect(readToken).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['data', 'accessor'] as const)('rejects inherited token %s before exchange', async (shape) => {
+    vi.useFakeTimers();
+    const readToken = vi.fn(() => VALID_SUBJECT_TOKEN);
+    const prototype = Object.defineProperty(
+      {},
+      'access_token',
+      shape === 'data' ? { value: VALID_SUBJECT_TOKEN } : { get: readToken },
+    );
+    const response = new Response(null);
+    vi.spyOn(response, 'json').mockResolvedValue(Object.create(prototype));
+    const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+    const client = createWorkloadClient(
+      azureManagedIdentityTokenProvider(undefined, { fetch: async () => response }),
+      apiFetch,
+    );
+
+    const result = client.models.list();
+    await expect(result).rejects.toBeInstanceOf(SubjectTokenProviderError);
+    await expect(result).rejects.toMatchObject({
+      message: "IMDS response missing 'access_token' field",
+      provider: 'azure-imds',
+    });
+    expect(readToken).not.toHaveBeenCalled();
+    expect(apiFetch).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('rejects malformed token values before exchange and allows a subsequent valid request', async () => {
+    const [privateValue] = PRIVATE_VALUES;
+    const metadataFetch = vi.fn(async () => Response.json({ access_token: { private_value: privateValue } }));
+    const apiFetch = vi
+      .fn(async () => new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ access_token: 'valid-openai-access-token', expires_in: 3600 }))
+      .mockResolvedValueOnce(Response.json({ object: 'list', data: [] }));
+    const client = createWorkloadClient(
+      azureManagedIdentityTokenProvider(undefined, { fetch: metadataFetch }),
+      apiFetch,
+    );
+
+    const failure = await client.models.list().catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(SubjectTokenProviderError);
+    expect(inspect(failure, { depth: null })).not.toContain(privateValue);
+    expect(metadataFetch).toHaveBeenCalledTimes(1);
+    expect(apiFetch).not.toHaveBeenCalled();
+
+    metadataFetch.mockResolvedValueOnce(Response.json({ access_token: VALID_SUBJECT_TOKEN }));
+
+    const result = await client.models.list();
+    expect(result.data).toEqual([]);
+    expect(metadataFetch).toHaveBeenCalledTimes(2);
+    expect(apiFetch).toHaveBeenCalledTimes(2);
   });
 
   it('shares concurrent public failures and allows a subsequent valid workload exchange', async () => {
