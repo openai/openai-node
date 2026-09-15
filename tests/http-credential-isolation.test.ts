@@ -94,41 +94,128 @@ describe.each(['OpenAI', 'Azure AD', 'legacy Bedrock'] as const)('%s HTTP creden
   });
 });
 
-test('isolates requests sharing options through an asynchronous cloning build hook', async () => {
-  class CloningClient extends OpenAI {
+test.each(['forward', 'omit', 'reconstruct'] as const)(
+  'isolates requests sharing options when an asynchronous cloning builder uses %s props',
+  async (mode) => {
+    class CloningClient extends OpenAI {
+      override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+        await Promise.resolve();
+        if (mode === 'omit') {
+          return super.buildRequest({ ...args[0] });
+        }
+        return super.buildRequest(
+          { ...args[0] },
+          mode === 'forward' ? { ...args[1] } : { retryCount: args[1]?.retryCount ?? 0 },
+        );
+      }
+    }
+    let calls = 0;
+    const client = new CloningClient({
+      apiKey: async () => {
+        calls += 1;
+        return `synthetic-token-${calls}`;
+      },
+      fetch: echoAuthorization(),
+      maxRetries: 0,
+    });
+    const options: FinalRequestOptions = { method: 'get', path: '/items' };
+    const responses = await Promise.all([
+      client.request<CredentialResponse>(options),
+      client.request<CredentialResponse>(options),
+    ]);
+    expect(responses.map(({ authorization }) => authorization)).toEqual([
+      'Bearer synthetic-token-1',
+      'Bearer synthetic-token-2',
+    ]);
+    expect(calls).toBe(2);
+  },
+);
+
+test('constructs authentication after a custom builder rewrites the request path', async () => {
+  class RewritingClient extends OpenAI {
     override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
-      await Promise.resolve();
-      return super.buildRequest({ ...args[0] }, { ...args[1] });
+      return super.buildRequest({ ...args[0], path: '/rewritten' }, args[1]);
+    }
+
+    protected override async authHeaders(
+      options: FinalRequestOptions,
+      schemes?: FinalRequestOptions['__security'],
+    ) {
+      const headers = await super.authHeaders(options, schemes);
+      headers?.values.set('X-Synthetic-Signed-Path', options.path);
+      return headers;
     }
   }
-  let calls = 0;
-  const client = new CloningClient({
-    apiKey: async () => {
-      calls += 1;
-      return `synthetic-token-${calls}`;
-    },
-    fetch: echoAuthorization(),
-    maxRetries: 0,
-  });
-  const options: FinalRequestOptions = { method: 'get', path: '/items' };
-  const responses = await Promise.all([
-    client.request<CredentialResponse>(options),
-    client.request<CredentialResponse>(options),
-  ]);
-  expect(responses.map(({ authorization }) => authorization)).toEqual([
-    'Bearer synthetic-token-1',
-    'Bearer synthetic-token-2',
-  ]);
-  expect(calls).toBe(2);
+  const apiKey = vi.fn(async () => 'synthetic-key');
+  const fetch = vi.fn<NonNullable<ClientOptions['fetch']>>(async (url, init) =>
+    Response.json({
+      path: new URL(String(url)).pathname,
+      signedPath: new Headers(init?.headers).get('X-Synthetic-Signed-Path'),
+    }),
+  );
+  const client = new RewritingClient({ apiKey, fetch, baseURL: 'https://example.test' });
+  await expect(client.get('/original')).resolves.toEqual({ path: '/rewritten', signedPath: '/rewritten' });
+  expect(apiKey).toHaveBeenCalledTimes(1);
 });
 
-test('refreshes credentials before a replacement request builder, including retries and failures', async () => {
+test('constructs Azure authentication after deployment routing on every retry', async () => {
+  const paths: string[] = [];
+  class AzureSigningClient extends AzureOpenAI {
+    protected override async authHeaders(
+      options: FinalRequestOptions,
+      schemes?: FinalRequestOptions['__security'],
+    ) {
+      paths.push(options.path);
+      return super.authHeaders(options, schemes);
+    }
+  }
+  // Explicit undefined removes any inherited Azure credential.
+  // oxlint-disable-next-line unicorn/no-useless-undefined
+  vi.stubEnv('AZURE_OPENAI_API_KEY', undefined);
+  const azureADTokenProvider = vi.fn(async () => 'synthetic-token');
+  const fetch = echoAuthorization().mockResolvedValueOnce(
+    Response.json({}, { status: 429, headers: { 'retry-after-ms': '0' } }),
+  );
+  const client = new AzureSigningClient({
+    endpoint: 'https://azure.example',
+    apiVersion: '2024-10-01-preview',
+    azureADTokenProvider,
+    fetch,
+    maxRetries: 1,
+  });
+  await client.post('/chat/completions', { body: { model: 'synthetic-model' } });
+  expect(paths).toEqual([
+    '/deployments/synthetic-model/chat/completions',
+    '/deployments/synthetic-model/chat/completions',
+  ]);
+  expect(azureADTokenProvider).toHaveBeenCalledTimes(2);
+});
+
+test('uses authentication schemes selected by the request builder', async () => {
+  class AdminBuilderClient extends OpenAI {
+    override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+      return super.buildRequest({ ...args[0], __security: { adminAPIKeyAuth: true } }, args[1]);
+    }
+  }
+  const apiKey = vi.fn(async () => 'synthetic-unused');
+  const client = new AdminBuilderClient({
+    apiKey,
+    adminAPIKey: 'synthetic-admin',
+    fetch: echoAuthorization(),
+  });
+  await expect(client.get('/items')).resolves.toEqual({ authorization: 'Bearer synthetic-admin' });
+  expect(apiKey).not.toHaveBeenCalled();
+});
+
+test('lets replacement builders resolve authentication explicitly, including retries and failures', async () => {
   const builtWith: (string | null)[] = [];
   class CustomBuilderClient extends OpenAI {
     override async buildRequest(options: FinalRequestOptions) {
-      builtWith.push(this.apiKey);
+      const authentication = await this.authHeaders(options, options.__security ?? { bearerAuth: true });
+      const headers = authentication?.values ?? new Headers();
+      builtWith.push(headers.get('authorization'));
       return {
-        req: { method: options.method, headers: new Headers({ Authorization: `Bearer ${this.apiKey}` }) },
+        req: { method: options.method, headers },
         url: this.buildURL(options.path, null),
         timeout: this.timeout,
       };
@@ -148,10 +235,10 @@ test('refreshes credentials before a replacement request builder, including retr
 
   await expect(client.get('/items')).resolves.toEqual({ authorization: 'Bearer synthetic-retry' });
   await expect(client.get('/items')).rejects.toMatchObject({ cause: failure });
-  expect(builtWith).toEqual(['synthetic-first', 'synthetic-retry']);
+  expect(builtWith).toEqual(['Bearer synthetic-first', 'Bearer synthetic-retry']);
   expect(fetch).toHaveBeenCalledTimes(2);
   await expect(client.get('/items')).resolves.toEqual({ authorization: 'Bearer synthetic-next' });
-  expect(builtWith).toEqual(['synthetic-first', 'synthetic-retry', 'synthetic-next']);
+  expect(builtWith).toEqual(['Bearer synthetic-first', 'Bearer synthetic-retry', 'Bearer synthetic-next']);
   expect(apiKey).toHaveBeenCalledTimes(4);
 });
 
@@ -321,11 +408,11 @@ test('preserves authentication hooks that intentionally return no headers', asyn
   expect(apiKey).not.toHaveBeenCalled();
 });
 
-test('rejects a Bedrock builder origin change after callback authentication', async () => {
+test('rejects a Bedrock builder origin change before callback authentication', async () => {
   const bedrockTokenProvider = vi.fn(async () => 'synthetic-bedrock-token');
   class MutatingBuilderClient extends BedrockOpenAI {
     override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
-      expect(bedrockTokenProvider).toHaveBeenCalledTimes(1);
+      expect(bedrockTokenProvider).not.toHaveBeenCalled();
       return super.buildRequest({ ...args[0], path: 'https://untrusted.example/items' }, { ...args[1] });
     }
   }
@@ -338,6 +425,6 @@ test('rejects a Bedrock builder origin change after callback authentication', as
   });
 
   await expect(client.get('/items')).rejects.toThrow(/request origin/iu);
-  expect(bedrockTokenProvider).toHaveBeenCalledTimes(1);
+  expect(bedrockTokenProvider).not.toHaveBeenCalled();
   expect(fetch).not.toHaveBeenCalled();
 });

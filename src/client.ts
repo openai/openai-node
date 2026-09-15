@@ -293,12 +293,6 @@ const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
 
-const requestAuthentication = Symbol('requestAuthentication');
-type InternalRequestBuildProps = {
-  retryCount?: number;
-  [requestAuthentication]?: { headers: NullableHeaders | undefined };
-};
-
 export type ApiKeySetter = () => Promise<string>;
 
 export interface ClientOptions {
@@ -928,9 +922,9 @@ export class OpenAI {
 
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
-   * Function-based credentials are resolved after this hook, before `buildRequest()`.
-   * Direct `buildRequest()` calls also resolve credentials when no prepared
-   * authentication is forwarded. Overriding this hook does not bypass resolution.
+   * Function-based credentials are resolved later, when building authentication
+   * headers, including for direct `buildRequest()` calls. Overriding this hook
+   * does not bypass that resolution.
    */
   protected async prepareOptions(options: FinalRequestOptions): Promise<void> {}
 
@@ -1186,16 +1180,9 @@ export class OpenAI {
     x509Authentication?.beginRequestPlanning();
     let built: { req: FinalizedRequestInit; url: string; timeout: number };
     try {
-      const props: InternalRequestBuildProps = {
+      const candidate = await this.buildRequest(options, {
         retryCount: maxRetries - retriesRemaining,
-      };
-      if (!this._provider && !x509Authentication && typeof this._options.apiKey === 'function') {
-        // Refresh before replaceable builders; forwarding builders reuse this attempt's headers.
-        props[requestAuthentication] = {
-          headers: await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
-        };
-      }
-      const candidate = await this.buildRequest(options, props);
+      });
       built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
       if (x509Authentication) {
         validatePositiveInteger('timeout', built.timeout);
@@ -1714,18 +1701,15 @@ export class OpenAI {
   }
 
   /**
-   * Builds a request, resolving callback credentials for direct calls. Public requests
-   * prepare callback authentication before entering this hook. Forward `props` to
-   * `super.buildRequest()` to reuse that authentication, including when cloning options.
-   * Replacement builders reading `this.apiKey` receive the refreshed shared value and
-   * remain responsible for synchronizing their own concurrent credential reads.
+   * Builds a request, resolving callback credentials when constructing authentication
+   * headers, after any subclass request-option rewrites. Calling this method directly
+   * also resolves credentials. Complete replacement builders own authentication and
+   * can call `this.authHeaders()` to resolve headers with request-local credentials.
    */
   async buildRequest(
     inputOptions: FinalRequestOptions,
-    props: { retryCount?: number } = {},
+    { retryCount = 0 }: { retryCount?: number } = {},
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
-    // Only makeRequest supplies the private authentication context; direct callers omit it.
-    const { retryCount = 0, [requestAuthentication]: authentication } = props as InternalRequestBuildProps;
     if (this.#x509Authentication && !this.#x509Authentication.inRequest(this)) {
       const authentication = this.#x509Authentication;
       return await authentication.runRequest(async () => {
@@ -1769,9 +1753,7 @@ export class OpenAI {
     const authenticationHeaders =
       this._provider || x509Authentication
         ? undefined
-        : authentication
-          ? authentication.headers
-          : await this.authHeaders(inputOptions, inputOptions.__security ?? { bearerAuth: true });
+        : await this.authHeaders(inputOptions, inputOptions.__security ?? { bearerAuth: true });
     const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
 
     if (isStreamingBody) {
