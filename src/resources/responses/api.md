@@ -38,6 +38,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterCallInProgressEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterCallInterpretingEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCodeInterpreterToolCall</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ResponseCompactionCompactingEvent</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCompactionItem</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCompactionItemParam</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ResponseCompletedEvent</a></code>

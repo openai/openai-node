@@ -30,6 +30,25 @@ const reservedEnvelopes = ['raw', 'close', 'event', 'reconnecting', 'reconnected
 }));
 
 describe.each(websocketVariants)('$name event envelopes', ({ create }) => {
+  test('keeps full server error payloads out of serialized diagnostics', () => {
+    const websocket = create(new OpenAI({ apiKey: 'test-key' }));
+    const errors = vi.fn();
+    onWebSocketEvent(websocket, 'error', errors);
+    const event = { type: 'error', error: { detail: 'synthetic-private-payload' } };
+    try {
+      dispatchFrame(websocket, JSON.stringify(event));
+      expect(errors).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ message: 'unknown error', error: event }),
+      );
+      const error = errors.mock.calls[0]?.[0];
+      expect(JSON.stringify(error)).not.toContain('synthetic-private-payload');
+      expect({ ...error }).not.toHaveProperty('error');
+      expect({ ...error }).not.toHaveProperty('error');
+    } finally {
+      websocket.close();
+    }
+  });
+
   test.each([...invalidEnvelopes, ...reservedEnvelopes])(
     'rejects $frame without misdispatch',
     async ({ frame, message }) => {
@@ -116,13 +135,13 @@ describe.each(websocketVariants.filter(({ name }) => name.endsWith('Responses'))
     test.each<{ message: unknown; expected: string }>([
       { message: 'synthetic server error', expected: 'synthetic server error' },
       { message: '', expected: '' },
-      { message: 0, expected: '0' },
-      { message: false, expected: 'false' },
-      { message: { detail: 'synthetic detail' }, expected: '[object Object]' },
-      { message: ['synthetic', 'error'], expected: 'synthetic,error' },
-      { message: { toString: null }, expected: '[unserializable error value]' },
-      { message: { toString: {}, valueOf: null }, expected: '[unserializable error value]' },
-      { message: [{ toString: null }], expected: '[unserializable error value]' },
+      { message: 0, expected: 'unknown error' },
+      { message: false, expected: 'unknown error' },
+      { message: { detail: 'synthetic detail' }, expected: 'unknown error' },
+      { message: ['synthetic', 'error'], expected: 'unknown error' },
+      { message: { toString: null }, expected: 'unknown error' },
+      { message: { toString: {}, valueOf: null }, expected: 'unknown error' },
+      { message: [{ toString: null }], expected: 'unknown error' },
     ])('delivers flat and nested message $message safely', async ({ message, expected }) => {
       const websocket = create(new OpenAI({ apiKey: 'test-key' }));
       const errors = vi.fn();
@@ -162,7 +181,7 @@ describe.each(websocketVariants.filter(({ name }) => name.endsWith('Responses'))
         expect(() => dispatchFrame(websocket, JSON.stringify(event))).not.toThrow();
         expect(reject).toHaveBeenCalledExactlyOnceWith(
           expect.objectContaining({
-            message: expect.stringContaining('[unserializable error value]'),
+            message: expect.stringContaining('unknown error'),
             error: event,
           }),
         );
