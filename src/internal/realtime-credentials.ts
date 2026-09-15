@@ -9,7 +9,7 @@ export function getRealtimeAPIKey(
 }
 
 /**
- * Captures the key belonging to this factory invocation while retaining the
+ * Captures the key belonging to this request or factory invocation while retaining the
  * existing boolean credential-hook contract. Legacy overrides that do not
  * capture a key keep their shared-property behavior and remain responsible for
  * synchronizing concurrent credential updates.
