@@ -98,7 +98,7 @@ test('isolates requests sharing options through an asynchronous cloning build ho
   class CloningClient extends OpenAI {
     override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
       await Promise.resolve();
-      return super.buildRequest({ ...args[0] }, args[1]);
+      return super.buildRequest({ ...args[0] }, { ...args[1] });
     }
   }
   let calls = 0;
@@ -120,6 +120,39 @@ test('isolates requests sharing options through an asynchronous cloning build ho
     'Bearer synthetic-token-2',
   ]);
   expect(calls).toBe(2);
+});
+
+test('refreshes credentials before a replacement request builder, including retries and failures', async () => {
+  const builtWith: (string | null)[] = [];
+  class CustomBuilderClient extends OpenAI {
+    override async buildRequest(options: FinalRequestOptions) {
+      builtWith.push(this.apiKey);
+      return {
+        req: { method: options.method, headers: new Headers({ Authorization: `Bearer ${this.apiKey}` }) },
+        url: this.buildURL(options.path, null),
+        timeout: this.timeout,
+      };
+    }
+  }
+  const failure = new Error('synthetic provider failure');
+  const apiKey = vi
+    .fn<() => Promise<string>>()
+    .mockResolvedValueOnce('synthetic-first')
+    .mockResolvedValueOnce('synthetic-retry')
+    .mockRejectedValueOnce(failure)
+    .mockResolvedValueOnce('synthetic-next');
+  const fetch = echoAuthorization().mockResolvedValueOnce(
+    Response.json({}, { status: 429, headers: { 'retry-after-ms': '0' } }),
+  );
+  const client = new CustomBuilderClient({ apiKey, fetch, maxRetries: 1 });
+
+  await expect(client.get('/items')).resolves.toEqual({ authorization: 'Bearer synthetic-retry' });
+  await expect(client.get('/items')).rejects.toMatchObject({ cause: failure });
+  expect(builtWith).toEqual(['synthetic-first', 'synthetic-retry']);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  await expect(client.get('/items')).resolves.toEqual({ authorization: 'Bearer synthetic-next' });
+  expect(builtWith).toEqual(['synthetic-first', 'synthetic-retry', 'synthetic-next']);
+  expect(apiKey).toHaveBeenCalledTimes(4);
 });
 
 test('refreshes the provider exactly once per HTTP retry attempt', async () => {
@@ -265,4 +298,46 @@ test('does not resolve the ordinary API-key provider for an OpenAI admin-only ro
     client.request({ method: 'get', path: '/items', __security: { adminAPIKeyAuth: true } }),
   ).resolves.toEqual({ authorization: 'Bearer synthetic-admin' });
   expect(apiKey).not.toHaveBeenCalled();
+});
+
+test('preserves authentication hooks that intentionally return no headers', async () => {
+  const authentication = vi.fn<() => undefined>();
+  class CustomAuthenticationClient extends OpenAI {
+    // oxlint-disable-next-line eslint/class-methods-use-this -- This override deliberately omits client authentication.
+    protected override async authHeaders(): Promise<undefined> {
+      return authentication();
+    }
+  }
+  const apiKey = vi.fn(async () => 'synthetic-unused');
+  const fetch = vi.fn<NonNullable<ClientOptions['fetch']>>(async (_url, init) =>
+    Response.json({ authorization: new Headers(init?.headers).get('authorization') }),
+  );
+  const client = new CustomAuthenticationClient({ apiKey, fetch });
+
+  await expect(client.get('/items', { headers: { Authorization: null } })).resolves.toEqual({
+    authorization: null,
+  });
+  expect(authentication).toHaveBeenCalledTimes(1);
+  expect(apiKey).not.toHaveBeenCalled();
+});
+
+test('rejects a Bedrock builder origin change after callback authentication', async () => {
+  const bedrockTokenProvider = vi.fn(async () => 'synthetic-bedrock-token');
+  class MutatingBuilderClient extends BedrockOpenAI {
+    override async buildRequest(...args: Parameters<OpenAI['buildRequest']>) {
+      expect(bedrockTokenProvider).toHaveBeenCalledTimes(1);
+      return super.buildRequest({ ...args[0], path: 'https://untrusted.example/items' }, { ...args[1] });
+    }
+  }
+  const fetch = vi.fn<NonNullable<ClientOptions['fetch']>>(async () => Response.json({}));
+  const client = new MutatingBuilderClient({
+    baseURL: 'https://bedrock.example/openai/v1',
+    bedrockTokenProvider,
+    fetch,
+    maxRetries: 0,
+  });
+
+  await expect(client.get('/items')).rejects.toThrow(/request origin/iu);
+  expect(bedrockTokenProvider).toHaveBeenCalledTimes(1);
+  expect(fetch).not.toHaveBeenCalled();
 });
