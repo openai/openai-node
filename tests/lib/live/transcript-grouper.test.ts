@@ -72,6 +72,68 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('public Live transcript grouping', () => {
+  it.each([
+    ['overlapping text', 'x', 200, false],
+    ['overlapping punctuation', '.', 200, false],
+    ['standalone acknowledgment suffix', '.', 700, false],
+    ['changing duration eligibility', '.', 200, true],
+  ] as const)('bounds repeated normalization for %s', (_name, delta, startMs, changeDuration) => {
+    const { grouper, contents } = recording();
+    grouper.push(text('user', 'Tell me', 0));
+    grouper.push(text('assistant', 'yes', 200, 201));
+    const { toLowerCase } = String.prototype;
+    let normalizedCharacters = 0;
+    const normalize = vi
+      .spyOn(String.prototype, 'toLowerCase')
+      .mockImplementation(function normalize(this: string) {
+        normalizedCharacters += this.length;
+        return toLowerCase.call(this);
+      });
+    const count = 4000;
+    try {
+      for (let index = 0; index < count; index += 1) {
+        const duration = changeDuration && index % 2 === 0 ? 1000 : 1 + (index % 2);
+        grouper.push(text('assistant', delta, startMs, startMs + duration));
+      }
+      grouper.close();
+    } finally {
+      normalize.mockRestore();
+    }
+    expect(normalizedCharacters).toBeLessThan(count * 10);
+    expect(contents()).toEqual([
+      ['user', 'Tell me'],
+      ['assistant', `yes${delta.repeat(count)}`],
+    ]);
+  });
+
+  it.each([
+    ['ος', ['Ο', 'Σ'], true],
+    ['οσα', ['ΟΣ', 'Α'], true],
+    ['𐐨', ['\uD801', '\uDC00'], true],
+    ['i\u0307', ['İ'], true],
+    ['a.b', ['a', '.', 'b'], true],
+    ['ab', ['a', '.', 'b'], false],
+    ['a b', ['a', '-', '\uFEFF', 'b'], true],
+    ['x'.repeat(128), Array.from({ length: 128 }, () => 'x'), true],
+  ] as const)('preserves split custom acknowledgment %j', (phrase, parts, suppress) => {
+    const { grouper, contents } = recording({ additionalAcknowledgments: [phrase] });
+    grouper.push(text('user', 'Tell me', 0));
+    for (const [index, part] of parts.entries()) {
+      grouper.push(text('assistant', part, 200, 201 + (index % 2)));
+    }
+    grouper.push(text('user', 'more', 800));
+    grouper.close();
+    expect(contents()).toEqual(
+      suppress
+        ? [['user', 'Tell me more']]
+        : [
+            ['user', 'Tell me'],
+            ['assistant', parts.join('')],
+            ['user', 'more'],
+          ],
+    );
+  });
+
   it.each(['.', ' '])(
     'preserves a large transcript with interior %j without blocking normalization',
     (padding) => {
