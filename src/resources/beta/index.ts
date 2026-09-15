@@ -164,6 +164,7 @@ export {
   type BetaResponseCodeInterpreterCallInProgressEvent,
   type BetaResponseCodeInterpreterCallInterpretingEvent,
   type BetaResponseCodeInterpreterToolCall,
+  type BetaResponseCompactionCompactingEvent,
   type BetaResponseCompactionItem,
   type BetaResponseCompactionItemParam,
   type BetaResponseCompletedEvent,

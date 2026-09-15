@@ -688,6 +688,7 @@ Types:
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCodeInterpreterCallInProgressEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCodeInterpreterCallInterpretingEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCodeInterpreterToolCall</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCompactionCompactingEvent</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCompactionItem</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCompactionItemParam</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaResponseCompletedEvent</a></code>
