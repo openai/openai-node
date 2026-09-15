@@ -5,6 +5,7 @@ import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestIni
 import { uuid4 } from './internal/utils/uuid';
 import { validatePositiveInteger, isAbsoluteURL, safeJSON, hasOwn } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
+import { addRequestAbortListener, retainRequestAbortCallback } from './internal/utils/abort';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
 import { addRequestID, defaultParseResponse, type APIResponseProps } from './internal/parse';
@@ -1573,7 +1574,8 @@ export class OpenAI {
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
     const composed = !!signal && composedCallerSignals.get(controller) === signal;
-    if (signal && !composed) signal.addEventListener('abort', abort, { once: true });
+    const cleanup =
+      signal && !composed ? addRequestAbortListener(signal, abort, controller.signal) : undefined;
 
     const timeout = setTimeout(abort, ms);
 
@@ -1595,9 +1597,13 @@ export class OpenAI {
 
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await (this.#x509Fetch ?? this.fetch).call(undefined, url, fetchOptions);
+      const response = await (this.#x509Fetch ?? this.fetch).call(undefined, url, fetchOptions);
+      if (cleanup) {
+        retainRequestAbortCallback(response.body ?? response, abort, controller.signal);
+      }
+      return response;
     } catch (err) {
-      if (signal && !composed) signal.removeEventListener('abort', abort);
+      cleanup?.();
       throw err;
     } finally {
       clearTimeout(timeout);

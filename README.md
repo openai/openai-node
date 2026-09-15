@@ -455,6 +455,12 @@ On timeout, an `APIConnectionTimeoutError` is thrown.
 
 Note that requests which time out will be [retried twice by default](#retries).
 
+### Cancellation
+
+Pass an `AbortSignal` in the request's `signal` option to cancel a request, including while its response body is being read.
+
+When native signal composition is unavailable or incompatible with the supplied signal, the SDK shares one listener per caller signal and holds request callbacks weakly. Cleanup depends on garbage collection; keeping a raw response or its body alive can keep its cancellation subscription alive after consumption. Older runtimes without `WeakRef` or `FinalizationRegistry` keep the existing fallback, which can retain a listener for each successful request until the caller aborts.
+
 ## Request IDs
 
 > For more information on debugging requests, see [these docs](https://platform.openai.com/docs/api-reference/debugging-requests)
