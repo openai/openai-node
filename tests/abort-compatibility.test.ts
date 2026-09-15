@@ -432,7 +432,7 @@ describe('fallback caller abort subscriptions', () => {
   });
 
   test.each(['shared body', 'reused bodyless response'])(
-    'retains every request callback for a %s through collection',
+    'retains active callbacks and releases aborted requests for a %s through collection',
     (mode) => {
       const result = spawnSync(
         process.execPath,
@@ -447,9 +447,27 @@ describe('fallback caller abort subscriptions', () => {
           const bodyless = process.argv[2] === 'reused bodyless response';
           AbortSignal.any = undefined;
           const deadline = setTimeout(() => { throw new Error('shared owner cancellation did not finish'); }, 5000);
+          async function collect() {
+            for (let index = 0; index < 20; index++) { await nextTurn(); global.gc(); }
+            await nextTurn();
+          }
+          async function releaseSharedOwner() {
+            const response = new Response(bodyless ? null : new ReadableStream());
+            const callers = [new AbortController(), new AbortController()];
+            const signals = [];
+            const client = new OpenAI({ apiKey: 'test-key', fetch: async (_url, init) => {
+              signals.push(init.signal);
+              return response;
+            } });
+            await client.get('/items', { signal: callers[0].signal }).asResponse();
+            await client.get('/items', { signal: callers[1].signal }).asResponse();
+            return { callers, retained: signals[0], released: new WeakRef(signals[1]) };
+          }
           (async () => {
             const callers = [new AbortController(), new AbortController()];
             const cancellations = [];
+            const requestSignals = [];
+            const cancellationError = new DOMException('cancelled', 'AbortError');
             let rejectRead;
             const body = new ReadableStream({ start(controller) { rejectRead = error => controller.error(error); } });
             const reused = new Response(null, { status: 204 });
@@ -457,9 +475,10 @@ describe('fallback caller abort subscriptions', () => {
             let requests = 0;
             const client = new OpenAI({ apiKey: 'test-key', fetch: async (_url, init) => {
               const index = requests++;
+              requestSignals.push(new WeakRef(init.signal));
               init.signal.addEventListener('abort', () => {
                 cancellations.push(index);
-                rejectRead(new DOMException('cancelled', 'AbortError'));
+                rejectRead(cancellationError);
               }, { once: true });
               return bodyless ? reused : new Response(body);
             } });
@@ -467,16 +486,40 @@ describe('fallback caller abort subscriptions', () => {
             const second = await client.get('/items', { signal: callers[1].signal }).asResponse();
             const reader = bodyless ? undefined : first.body.getReader();
             const reading = assert.rejects(bodyless ? first.text() : reader.read(), { name: 'AbortError' });
-            for (let index = 0; index < 20; index++) { await nextTurn(); global.gc(); }
-            await nextTurn();
+            await collect();
             assert.equal(first.body, second.body);
             if (bodyless) assert.equal(first, second);
             for (const caller of callers) assert.equal(getEventListeners(caller.signal, 'abort').length, 1);
             callers[0].abort();
             await reading;
+            await collect();
+            assert.equal(requestSignals[0].deref(), undefined);
+            assert.ok(requestSignals[1].deref());
             callers[1].abort();
             assert.deepEqual(cancellations, [0, 1]);
             reader?.releaseLock();
+            await collect();
+            assert.equal(requestSignals[1].deref(), undefined);
+            assert.equal(first.body, second.body);
+            if (bodyless) assert.equal(first, second);
+            const lateCaller = new AbortController();
+            const lateResponse = new Response(bodyless ? null : new ReadableStream());
+            let lateSignal;
+            const lateClient = new OpenAI({ apiKey: 'test-key', fetch: async (_url, init) => {
+              lateSignal = new WeakRef(init.signal);
+              lateCaller.abort();
+              return lateResponse;
+            } });
+            const delivered = await lateClient.get('/items', { signal: lateCaller.signal }).asResponse();
+            await collect();
+            assert.equal(lateSignal.deref(), undefined);
+            assert.equal(delivered, lateResponse);
+            const orphaned = await releaseSharedOwner();
+            await collect();
+            assert.equal(orphaned.released.deref(), undefined);
+            assert.equal(getEventListeners(orphaned.callers[1].signal, 'abort').length, 0);
+            orphaned.callers[0].abort();
+            assert.equal(orphaned.retained.aborted, true);
             clearTimeout(deadline);
           })().catch(error => { console.error(error); process.exitCode = 1; clearTimeout(deadline); });
           `,

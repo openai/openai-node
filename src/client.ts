@@ -1600,7 +1600,7 @@ export class OpenAI {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
       const response = await (this.#x509Fetch ?? this.fetch).call(undefined, url, fetchOptions);
       if (cleanup) {
-        retainRequestAbortCallback(response.body ?? response, abort);
+        retainRequestAbortCallback(response.body ?? response, abort, controller.signal);
       }
       return response;
     } catch (err) {
