@@ -651,39 +651,24 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
       for (const [key, schema] of newDefinitions) {
         const def = zodDef(schema);
         const definitionPath = [...refs.basePath, refs.definitionPath, key];
-        // A definition extracted from a property has to be parsed as though it were still
-        // in that property, or the wrapper parsers encode it differently from the inline
-        // occurrence of the same Zod schema -- `parseOptionalDef` falls back to its
-        // standalone `anyOf: [{ not: {} }, ...]` form. Definitions reached from anywhere
-        // else keep no property context: that is what they were parsed with the first
-        // time, and the standalone encoding is the correct one for them.
+        // Parsed with no property context. A path prefix matches the whole subtree, so
+        // giving the def a property context would change how everything nested inside it
+        // parses, and a container that holds an entry by position or by branch loses that
+        // entry when its parser returns nothing. `parseDef` still runs, so `override` and
+        // `.describe()` behave exactly as they did.
         //
-        // Parsed with no property context, so nothing below the definition is
-        // treated as though it sat directly in a property -- a path prefix matches
-        // the whole subtree, and a nested union or array would lose the entries it
-        // holds by branch or by position. The one thing a property-derived
-        // definition does need, dropping its outer optional wrapper, is the same
-        // identity the strict reduction applies, so it is done afterwards on the
-        // finished schema. The def itself still goes through `parseDef`, so
-        // `override` and `.describe()` behave exactly as they did.
+        // The cost is the outer wrapper: `parseOptionalDef` falls back to its standalone
+        // `anyOf: [{ not: {} }, ...]` form, which the inline occurrence of the same Zod
+        // schema does not use, and `not` is outside the subset strict Structured Outputs
+        // accepts (see `toStrictJsonSchema` in `lib/transform`). So the wrapper is dropped
+        // afterwards, on the finished schema, leaving everything below it untouched -- and
+        // it stays wherever removing it would strand a pointer generated against the
+        // uncollapsed shape.
         const materialized = parseDef(def, { ...refs, currentPath: definitionPath }, true) ?? {};
-        // `not` is outside the subset strict Structured Outputs accepts (see
-        // `toStrictJsonSchema` in `lib/transform`), so a standalone optional cannot keep
-        // its `anyOf: [{ not: {} }, ...]` spelling there. Rewriting the finished
-        // definition is deliberate: giving it a property context instead would change how
-        // everything nested inside it parses, and a container that holds an entry by
-        // position or by branch loses that entry when its parser returns nothing.
-        // The one thing a property-derived definition needs is its outer optional
-        // wrapper dropped: the inline occurrence of the same Zod schema is encoded
-        // without it, and the two have to agree. Nothing below the definition is
-        // touched, and the wrapper stays wherever removing it would strand a
-        // pointer generated against the uncollapsed shape.
-        // Collapse decided below, once every definition exists: a definition
-        // materialized later can add a reference into a branch removed here.
-        // Whether this one collapses cannot be answered yet: the property that
-        // references it may live in a definition materialized later, and the
-        // reference context only exists once that has happened. Definition
-        // insertion order would otherwise decide the output.
+        // Whether this one collapses cannot be answered here: the property that references
+        // it may live in a definition materialized later, and that reference context only
+        // exists once every definition has been materialized. Deciding now would let
+        // definition insertion order pick the output, so the collapse runs below.
         materializedDefinitions.push({ key, definitionPath, materialized });
         Object.defineProperty(definitions, key, {
           value: materialized,
