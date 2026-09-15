@@ -138,6 +138,9 @@ export class ChatCompletionStreamingRunner<ParsedT = null>
       // @ts-expect-error TODO these types are incompatible
       params,
     );
+    // Fail unfinished turns like the non-streaming runner, so a `length` or
+    // `content_filter` completion never reaches a tool callback or the next request.
+    runner._rejectsUnfinishedTurns = true;
     const opts = {
       ...options,
       __metadata: { ...options?.__metadata, helperMethod: 'runTools' },

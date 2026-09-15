@@ -416,6 +416,10 @@ one tool call at a time and execute any returned group sequentially.
 If you pass `tool_choice: {function: {name: …}}` instead of `auto`,
 it returns immediately after calling that function (and only loops to auto-recover parsing errors).
 
+If a turn ends with `finish_reason` set to `length` or `content_filter`, `runTools` rejects with
+`LengthFinishReasonError` / `ContentFilterFinishReasonError` instead of calling a tool with truncated
+arguments, whether or not `stream: true` is set.
+
 ```ts
 import OpenAI from 'openai';
 
