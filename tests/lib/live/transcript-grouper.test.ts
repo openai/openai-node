@@ -72,6 +72,68 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('public Live transcript grouping', () => {
+  it.each([
+    ['overlapping text', 'x', 200, false],
+    ['overlapping punctuation', '.', 200, false],
+    ['standalone acknowledgment suffix', '.', 700, false],
+    ['changing duration eligibility', '.', 200, true],
+  ] as const)('bounds repeated normalization for %s', (_name, delta, startMs, changeDuration) => {
+    const { grouper, contents } = recording();
+    grouper.push(text('user', 'Tell me', 0));
+    grouper.push(text('assistant', 'yes', 200, 201));
+    const { toLowerCase } = String.prototype;
+    let normalizedCharacters = 0;
+    const normalize = vi
+      .spyOn(String.prototype, 'toLowerCase')
+      .mockImplementation(function normalize(this: string) {
+        normalizedCharacters += this.length;
+        return toLowerCase.call(this);
+      });
+    const count = 4000;
+    try {
+      for (let index = 0; index < count; index += 1) {
+        const duration = changeDuration && index % 2 === 0 ? 1000 : 1 + (index % 2);
+        grouper.push(text('assistant', delta, startMs, startMs + duration));
+      }
+      grouper.close();
+    } finally {
+      normalize.mockRestore();
+    }
+    expect(normalizedCharacters).toBeLessThan(count * 10);
+    expect(contents()).toEqual([
+      ['user', 'Tell me'],
+      ['assistant', `yes${delta.repeat(count)}`],
+    ]);
+  });
+
+  it.each([
+    ['ος', ['Ο', 'Σ'], true],
+    ['οσα', ['ΟΣ', 'Α'], true],
+    ['𐐨', ['\uD801', '\uDC00'], true],
+    ['i\u0307', ['İ'], true],
+    ['a.b', ['a', '.', 'b'], true],
+    ['ab', ['a', '.', 'b'], false],
+    ['a b', ['a', '-', '\uFEFF', 'b'], true],
+    ['x'.repeat(128), Array.from({ length: 128 }, () => 'x'), true],
+  ] as const)('preserves split custom acknowledgment %j', (phrase, parts, suppress) => {
+    const { grouper, contents } = recording({ additionalAcknowledgments: [phrase] });
+    grouper.push(text('user', 'Tell me', 0));
+    for (const [index, part] of parts.entries()) {
+      grouper.push(text('assistant', part, 200, 201 + (index % 2)));
+    }
+    grouper.push(text('user', 'more', 800));
+    grouper.close();
+    expect(contents()).toEqual(
+      suppress
+        ? [['user', 'Tell me more']]
+        : [
+            ['user', 'Tell me'],
+            ['assistant', parts.join('')],
+            ['user', 'more'],
+          ],
+    );
+  });
+
   it.each(['.', ' '])(
     'preserves a large transcript with interior %j without blocking normalization',
     (padding) => {
@@ -93,6 +155,37 @@ describe('public Live transcript grouping', () => {
         `,
           compiledFixture('src/helpers/live.ts'),
           padding,
+        ],
+        { encoding: 'utf-8', timeout: 5000 },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.stderr).toBe('');
+      expect(result.status).toBe(0);
+    },
+  );
+
+  it.each([400, 1400])(
+    'preserves a large alternating transcript ending at %i ms within a small heap',
+    (endMs) => {
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--max-old-space-size=64',
+          '-e',
+          `
+          const assert = require('node:assert/strict');
+          const { TranscriptGrouper } = require(process.argv[1]);
+          const transcript = Buffer.alloc(12 * 1024 * 1024, 'a ').toString('utf8');
+          const grouper = new TranscriptGrouper();
+          const segments = [];
+          grouper.on('segment.closed', ({ segment }) => segments.push([segment.speaker, segment.text]));
+          grouper.push({ type: 'session.input_transcript.delta', event_id: 'user', delta: 'Tell me', start_ms: 0, end_ms: 200 });
+          grouper.push({ type: 'session.output_transcript.delta', event_id: 'assistant', delta: transcript, start_ms: 200, end_ms: Number(process.argv[2]) });
+          grouper.close();
+          assert.deepEqual(segments, [['user', 'Tell me'], ['assistant', transcript]]);
+        `,
+          compiledFixture('src/helpers/live.ts'),
+          String(endMs),
         ],
         { encoding: 'utf-8', timeout: 5000 },
       );
