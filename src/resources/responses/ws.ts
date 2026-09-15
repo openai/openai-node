@@ -6,6 +6,8 @@ import { ResponsesWSBase, type ResponsesWSBaseOptions } from './ws-base';
 import { OpenAI } from '../../client';
 import { VERSION } from '../../version';
 
+export type { WebSocketStreamOptions } from '../../internal/ws';
+
 export type { ResponsesWSReconnectOptions } from './ws-base';
 
 export interface ResponsesWSClientOptions extends WS.ClientOptions, ResponsesWSBaseOptions {}

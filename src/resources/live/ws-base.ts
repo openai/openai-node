@@ -6,6 +6,8 @@ import { sleep } from '../../internal/utils/sleep';
 import { type WebSocketLike, ReadyState } from '../../internal/ws-adapter';
 import {
   SendQueue,
+  getMaxBufferedEvents,
+  type WebSocketStreamOptions,
   flattenRawData,
   isRecoverableClose,
   type RawWebSocketData,
@@ -165,6 +167,11 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
    * The iterator will exit if the socket closes but exiting the iterator
    * does not close the socket.
    *
+   * Pass `maxBufferedEvents` to limit queued records for this iterator, including
+   * lifecycle events. Overflow discards its backlog and rejects `next()` with a
+   * WebSocketError; the shared socket and other iterators remain active.
+   * Omitted means unlimited. This is an event-count limit, not a byte limit.
+   *
    * @example
    * ```ts
    * for await (const event of client.stream()) {
@@ -182,14 +189,16 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
    * }
    * ```
    */
-  stream(): AsyncIterableIterator<LiveStreamMessage> {
-    return this[Symbol.asyncIterator]();
+  stream(options?: WebSocketStreamOptions): AsyncIterableIterator<LiveStreamMessage> {
+    return options === undefined ? this[Symbol.asyncIterator]() : this[Symbol.asyncIterator](options);
   }
 
-  [Symbol.asyncIterator](): AsyncIterableIterator<LiveStreamMessage> {
+  [Symbol.asyncIterator](options?: WebSocketStreamOptions): AsyncIterableIterator<LiveStreamMessage> {
     if (!this.socket) {
       throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
     }
+
+    const maxBufferedEvents = getMaxBufferedEvents(options);
 
     // Two-queue async iterator: `queue` buffers incoming messages,
     // `resolvers` buffers waiting next() calls. A push wakes the
@@ -199,6 +208,7 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
     let queueHead = 0;
     let resolverHead = 0;
     let done = false;
+    let failure: WebSocketError | undefined;
     let currentSocket = this.socket;
 
     const wakeResolver = () => {
@@ -216,6 +226,19 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
 
     const push = (msg: LiveStreamMessage) => {
       if (done) return;
+
+      if (maxBufferedEvents !== undefined && queue.length - queueHead >= maxBufferedEvents) {
+        failure = new WebSocketError(
+          `WebSocket stream exceeded maxBufferedEvents (${maxBufferedEvents})`,
+          null,
+        );
+        done = true;
+        queue.length = 0;
+        queueHead = 0;
+        cleanup();
+        flushResolvers();
+        return;
+      }
 
       queue.push(msg);
       wakeResolver();
@@ -265,8 +288,9 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
       cleanup();
     };
 
-    const onSocketSwap = (oldSocket: TSocket, newSocket: TSocket) => {
-      oldSocket.off('open', onOpen);
+    const onSocketSwap = (_oldSocket: TSocket, newSocket: TSocket) => {
+      if (currentSocket === newSocket) return;
+      currentSocket.off('open', onOpen);
       newSocket.on('open', onOpen);
       currentSocket = newSocket;
     };
@@ -323,8 +347,13 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
       }
     }
 
-    const resolve = (res: (value: IteratorResult<LiveStreamMessage>) => void) => {
-      if (queueHead < queue.length) {
+    const resolve = (
+      res: (value: IteratorResult<LiveStreamMessage>) => void,
+      reject: (error: WebSocketError) => void,
+    ) => {
+      if (failure) {
+        reject(failure);
+      } else if (queueHead < queue.length) {
         const queued = queue[queueHead]!;
         queue[queueHead] = undefined;
         queueHead += 1;
@@ -342,10 +371,10 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
     };
 
     const next = (): Promise<IteratorResult<LiveStreamMessage>> =>
-      new Promise((res) => {
-        if (resolve(res)) return;
+      new Promise((res, reject) => {
+        if (resolve(res, reject)) return;
         resolvers.push(() => {
-          resolve(res);
+          resolve(res, reject);
         });
       });
 
