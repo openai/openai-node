@@ -217,6 +217,35 @@ describe('fallback caller abort subscriptions', () => {
     expect(getEventListeners(caller.signal, 'abort')).toEqual([]);
   });
 
+  test.each([false, true])('reinstalls a listener after registration throws (retry: %s)', async (retry) => {
+    Object.defineProperty(AbortSignal, 'any', { value: undefined, configurable: true });
+    const caller = new AbortController();
+    const installationError = new Error('listener installation failed');
+    const addListener = vi.spyOn(caller.signal, 'addEventListener');
+    addListener.mockImplementationOnce(() => {
+      throw installationError;
+    });
+    let requestSignal: AbortSignal | null | undefined;
+    const fetch = vi.fn(async (...[_url, init]: Parameters<OpenAI['fetch']>) => {
+      requestSignal = init?.signal;
+      return new Response(null, { status: 204 });
+    });
+    const client = new OpenAI({ apiKey: 'test-key', maxRetries: retry ? 1 : 0, fetch });
+    if (!retry) {
+      await expect(client.get('/items', { signal: caller.signal })).rejects.toMatchObject({
+        cause: installationError,
+      });
+      expect(fetch).not.toHaveBeenCalled();
+    }
+    const response = await client.get('/items', { signal: caller.signal }).asResponse();
+    expect(response.status).toBe(204);
+    caller.abort();
+    expect(requestSignal?.aborted).toBe(true);
+    expect(addListener).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(getEventListeners(caller.signal, 'abort')).toEqual([]);
+  });
+
   test('keeps custom body methods abortable when the response has no readable body', async () => {
     Object.defineProperty(AbortSignal, 'any', { value: undefined, configurable: true });
     const caller = new AbortController();
@@ -354,6 +383,113 @@ describe('fallback caller abort subscriptions', () => {
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
   });
+
+  test('contains finalizer removal errors and allows the caller signal to be reused', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--expose-gc',
+        '-e',
+        `
+        const assert = require('node:assert/strict');
+        const { getEventListeners } = require('node:events');
+        const { setImmediate: nextTurn } = require('node:timers/promises');
+        const OpenAI = require(process.argv[1]).default;
+        AbortSignal.any = undefined;
+        (async () => {
+          const caller = new AbortController();
+          const remove = caller.signal.removeEventListener.bind(caller.signal);
+          let removals = 0;
+          caller.signal.removeEventListener = (...args) => {
+            removals++;
+            remove(...args);
+            throw new Error('caller removal failed');
+          };
+          let cancelled = false;
+          const client = new OpenAI({ apiKey: 'test-key', fetch: async (_url, init) => {
+            init.signal.addEventListener('abort', () => { cancelled = true; }, { once: true });
+            return Response.json({ ok: true });
+          } });
+          await client.get('/items', { signal: caller.signal }).asResponse();
+          for (let index = 0; index < 20; index++) { await nextTurn(); global.gc(); }
+          await nextTurn();
+          assert.equal(removals, 1);
+          assert.equal(getEventListeners(caller.signal, 'abort').length, 0);
+          const response = await client.get('/items', { signal: caller.signal }).asResponse();
+          assert.equal(getEventListeners(caller.signal, 'abort').length, 1);
+          assert.equal(response.status, 200);
+          caller.abort();
+          assert.equal(cancelled, true);
+        })().catch(error => { console.error(error); process.exitCode = 1; });
+        `,
+        compiledFixture('src/index.ts'),
+      ],
+      { encoding: 'utf-8', timeout: 5000 },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+  });
+
+  test.each(['shared body', 'reused bodyless response'])(
+    'retains every request callback for a %s through collection',
+    (mode) => {
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--expose-gc',
+          '-e',
+          `
+          const assert = require('node:assert/strict');
+          const { getEventListeners } = require('node:events');
+          const { setImmediate: nextTurn } = require('node:timers/promises');
+          const OpenAI = require(process.argv[1]).default;
+          const bodyless = process.argv[2] === 'reused bodyless response';
+          AbortSignal.any = undefined;
+          const deadline = setTimeout(() => { throw new Error('shared owner cancellation did not finish'); }, 5000);
+          (async () => {
+            const callers = [new AbortController(), new AbortController()];
+            const cancellations = [];
+            let rejectRead;
+            const body = new ReadableStream({ start(controller) { rejectRead = error => controller.error(error); } });
+            const reused = new Response(null, { status: 204 });
+            reused.text = () => new Promise((_, reject) => { rejectRead = reject; });
+            let requests = 0;
+            const client = new OpenAI({ apiKey: 'test-key', fetch: async (_url, init) => {
+              const index = requests++;
+              init.signal.addEventListener('abort', () => {
+                cancellations.push(index);
+                rejectRead(new DOMException('cancelled', 'AbortError'));
+              }, { once: true });
+              return bodyless ? reused : new Response(body);
+            } });
+            const first = await client.get('/items', { signal: callers[0].signal }).asResponse();
+            const second = await client.get('/items', { signal: callers[1].signal }).asResponse();
+            const reader = bodyless ? undefined : first.body.getReader();
+            const reading = assert.rejects(bodyless ? first.text() : reader.read(), { name: 'AbortError' });
+            for (let index = 0; index < 20; index++) { await nextTurn(); global.gc(); }
+            await nextTurn();
+            assert.equal(first.body, second.body);
+            if (bodyless) assert.equal(first, second);
+            for (const caller of callers) assert.equal(getEventListeners(caller.signal, 'abort').length, 1);
+            callers[0].abort();
+            await reading;
+            callers[1].abort();
+            assert.deepEqual(cancellations, [0, 1]);
+            reader?.releaseLock();
+            clearTimeout(deadline);
+          })().catch(error => { console.error(error); process.exitCode = 1; clearTimeout(deadline); });
+          `,
+          compiledFixture('src/index.ts'),
+          mode,
+        ],
+        { encoding: 'utf-8', timeout: 10_000 },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.stderr).toBe('');
+      expect(result.status).toBe(0);
+    },
+  );
 
   test('keeps the existing fallback in runtimes without weak references', () => {
     const result = spawnSync(

@@ -14,9 +14,15 @@ const weakGlobals = globalThis as typeof globalThis & {
 };
 const finalizer =
   typeof weakGlobals.FinalizationRegistry === 'function'
-    ? new weakGlobals.FinalizationRegistry((cleanup) => cleanup())
+    ? new weakGlobals.FinalizationRegistry((cleanup) => {
+        try {
+          cleanup();
+        } catch {
+          // Caller-provided signal methods must not throw out of a GC callback.
+        }
+      })
     : undefined;
-const callbackOwners = new WeakMap<object, AbortCallback>();
+const callbackOwners = new WeakMap<object, Set<AbortCallback>>();
 const subscriptions = new WeakMap<AbortSignal, { callbacks: Set<WeakAbortCallback>; abort: AbortCallback }>();
 
 // This scope receives only a weak reference, so its closures cannot retain the callback.
@@ -33,8 +39,8 @@ function subscribeWeakly(signal: AbortSignal, reference: WeakAbortCallback, regi
       callbacks.clear();
     };
     subscription = { callbacks, abort };
-    subscriptions.set(signal, subscription);
     signal.addEventListener('abort', abort, { once: true });
+    subscriptions.set(signal, subscription);
   }
   const owner = subscription;
   owner.callbacks.add(reference);
@@ -42,12 +48,24 @@ function subscribeWeakly(signal: AbortSignal, reference: WeakAbortCallback, regi
     owner.callbacks.delete(reference);
     registry.unregister(reference);
     if (owner.callbacks.size === 0) {
-      signal.removeEventListener('abort', owner.abort);
       if (subscriptions.get(signal) === owner) {
         subscriptions.delete(signal);
       }
+      signal.removeEventListener('abort', owner.abort);
     }
   };
+}
+
+/** Keep cancellation alive while a response body or bodyless custom response remains reachable. */
+export function retainRequestAbortCallback(owner: object, abort: AbortCallback): void {
+  if (typeof weakGlobals.WeakRef === 'function' && finalizer) {
+    let callbacks = callbackOwners.get(owner);
+    if (!callbacks) {
+      callbacks = new Set();
+      callbackOwners.set(owner, callbacks);
+    }
+    callbacks.add(abort);
+  }
 }
 
 /**
@@ -73,13 +91,6 @@ export function addRequestAbortListener(
   const reference = new weakGlobals.WeakRef(abort);
   const cleanup = subscribeWeakly(signal, reference, finalizer);
   finalizer.register(abort, cleanup, reference);
-  callbackOwners.set(requestSignal, abort);
+  retainRequestAbortCallback(requestSignal, abort);
   return cleanup;
-}
-
-/** Keep cancellation alive while a response body or bodyless custom response remains reachable. */
-export function retainRequestAbortCallback(owner: object, abort: AbortCallback): void {
-  if (typeof weakGlobals.WeakRef === 'function' && finalizer) {
-    callbackOwners.set(owner, abort);
-  }
 }
