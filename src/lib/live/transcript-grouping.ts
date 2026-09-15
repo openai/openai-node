@@ -367,12 +367,22 @@ export class TranscriptGrouping {
 
   private acknowledgment(fragment: TranscriptFragment, withinDuration: boolean): Acknowledgment {
     const previous = this.buffered?.acknowledgment;
-    const added = fragment.text.split(/[\s.,!?;:"'()[\]{}-]+/u).join('').length;
-    const characters = (previous?.characters ?? 0) + added;
+    const previousCharacters = previous?.characters ?? 0;
+    let characters = previousCharacters;
+    const separator = /[\s.,!?;:"'()[\]{}-]/u;
+    for (
+      let index = 0;
+      index < fragment.text.length && characters <= this.maxAcknowledgmentLength;
+      index += 1
+    ) {
+      if (!separator.test(fragment.text.charAt(index))) {
+        characters += 1;
+      }
+    }
     // Significant characters cannot disappear during normalization. Once they
-    // outgrow the configured phrases, this turn can never be an acknowledgment.
+    // outgrow the configured phrases, stop counting without allocating tokens.
     let text: string | undefined;
-    if (added === 0 && previous?.text !== undefined) {
+    if (characters === previousCharacters && previous?.text !== undefined) {
       // Keep the raw suffix in the turn: later text can make punctuation internal.
       ({ text } = previous);
     } else if (withinDuration && characters <= this.maxAcknowledgmentLength) {

@@ -164,6 +164,37 @@ describe('public Live transcript grouping', () => {
     },
   );
 
+  it.each([400, 1400])(
+    'preserves a large alternating transcript ending at %i ms within a small heap',
+    (endMs) => {
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--max-old-space-size=64',
+          '-e',
+          `
+          const assert = require('node:assert/strict');
+          const { TranscriptGrouper } = require(process.argv[1]);
+          const transcript = Buffer.alloc(12 * 1024 * 1024, 'a ').toString('utf8');
+          const grouper = new TranscriptGrouper();
+          const segments = [];
+          grouper.on('segment.closed', ({ segment }) => segments.push([segment.speaker, segment.text]));
+          grouper.push({ type: 'session.input_transcript.delta', event_id: 'user', delta: 'Tell me', start_ms: 0, end_ms: 200 });
+          grouper.push({ type: 'session.output_transcript.delta', event_id: 'assistant', delta: transcript, start_ms: 200, end_ms: Number(process.argv[2]) });
+          grouper.close();
+          assert.deepEqual(segments, [['user', 'Tell me'], ['assistant', transcript]]);
+        `,
+          compiledFixture('src/helpers/live.ts'),
+          String(endMs),
+        ],
+        { encoding: 'utf-8', timeout: 5000 },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.stderr).toBe('');
+      expect(result.status).toBe(0);
+    },
+  );
+
   it('emits append-only snapshots, stable IDs, predecessors and one final event', () => {
     const { grouper, updates, closed } = recording();
     grouper.push(text('user', 'Can you ', 0));
