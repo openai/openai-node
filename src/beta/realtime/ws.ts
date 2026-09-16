@@ -74,14 +74,13 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     this.url = buildRealtimeURL(client, props);
     assertTrustedRealtimeURL(client, this.url);
     assertBedrockWebSocketOrigin(client, this.url);
-    const headers: NonNullable<WS.ClientOptions['headers']> = {
+    const headers = {
       'User-Agent': `${client.constructor.name}/JS ${VERSION}`,
       ...props.options?.headers,
+      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- A credential must be an own data property without invoking an inherited setter.
+      ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${apiKey}` }),
+      'OpenAI-Beta': 'realtime=v1',
     };
-    if (!isAzure(client) || props.__resolvedApiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    }
-    headers['OpenAI-Beta'] = 'realtime=v1';
 
     this.socket = new WS.WebSocket(
       this.url,
@@ -185,16 +184,17 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     if (!deploymentName) {
       throw new Error('No deployment name provided');
     }
-    const socketOptions = { ...props.options };
-    const headers: NonNullable<WS.ClientOptions['headers']> = { ...props.options?.headers };
-    if (!isApiKeyProvider) {
-      headers['api-key'] = apiKey;
-    }
-    socketOptions.headers = headers;
     return new OpenAIRealtimeWS(
       {
         model: deploymentName,
-        options: socketOptions,
+        options: {
+          ...props.options,
+          headers: {
+            ...props.options?.headers,
+            // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- A credential must be an own data property without invoking an inherited setter.
+            ...(isApiKeyProvider ? {} : { 'api-key': apiKey }),
+          },
+        },
         __resolvedApiKey: isApiKeyProvider,
         __apiKey: apiKey,
       },

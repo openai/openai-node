@@ -68,13 +68,12 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     }
     this.url = buildRealtimeURL(client, props);
     assertBedrockWebSocketOrigin(client, this.url);
-    const headers: NonNullable<WS.ClientOptions['headers']> = {
+    const headers = {
       'User-Agent': `${client.constructor.name}/JS ${VERSION}`,
       ...props.options?.headers,
+      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- A credential must be an own data property without invoking an inherited setter.
+      ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${apiKey}` }),
     };
-    if (!isAzure(client) || props.__resolvedApiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    }
 
     this.socket = new WS.WebSocket(
       this.url,
@@ -177,16 +176,17 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     if (!apiKey) {
       throw new Error('Azure OpenAI Realtime requires an API key');
     }
-    const socketOptions = { ...props.options };
-    const headers: NonNullable<WS.ClientOptions['headers']> = { ...props.options?.headers };
-    if (!isApiKeyProvider) {
-      headers['api-key'] = apiKey;
-    }
-    socketOptions.headers = headers;
     return new OpenAIRealtimeWS(
       {
         ...connection,
-        options: socketOptions,
+        options: {
+          ...props.options,
+          headers: {
+            ...props.options?.headers,
+            // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- A credential must be an own data property without invoking an inherited setter.
+            ...(isApiKeyProvider ? {} : { 'api-key': apiKey }),
+          },
+        },
         __resolvedApiKey: isApiKeyProvider,
         __apiKey: apiKey,
       },
