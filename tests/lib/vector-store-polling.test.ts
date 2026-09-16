@@ -4,6 +4,7 @@ import type { Fetch } from 'openai/internal/builtin-types';
 import { sleep } from 'openai/internal/utils/sleep';
 import type { RequestOptions } from 'openai/internal/request-options';
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Compatibility tests observe exact sleep arguments, including negative intervals, before native timer normalization.
 vi.mock('openai/internal/utils/sleep', () => ({
   sleep: vi.fn(async () => {}),
 }));

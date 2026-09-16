@@ -20,6 +20,7 @@ type FakeNodeSocket = {
   dispatch: (event: string, value: unknown) => void;
 };
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Capture public adapter handshakes and dispatch deterministic transport events without network I/O.
 vi.mock('ws', () => ({
   WebSocket: vi.fn().mockImplementation(function WebSocket(url: URL, options: FakeNodeSocket['options']) {
     const listeners = new Map<string, Listener>();

@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { Readable, Writable } from 'node:stream';
 import { playAudio } from 'openai/helpers/audio';
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Exercise native pipe and process failure contracts without requiring ffplay or audio hardware.
 vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
 
 const spawnMock = spawn as MockedFunction<typeof spawn>;

@@ -24,6 +24,7 @@ const openai = vi.hoisted(() => {
   return { constructor, createStream, toReadableStream };
 });
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- The regression asserts that rejected requests never construct the billed SDK client; the example exposes no constructor seam.
 vi.mock('openai', () => ({ default: openai.constructor }));
 
 const token = '0123456789abcdef0123456789abcdef';

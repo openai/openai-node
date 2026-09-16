@@ -34,6 +34,7 @@ function createNodeSocket(url: URL, options: WS.ClientOptions) {
   return { url, options, on: vi.fn(), send: vi.fn(), close: vi.fn() };
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Capture constructor options to verify credential and browser checks before a transport can send secrets.
 vi.mock('ws', () => ({
   WebSocket: vi.fn(createNodeSocket),
 }));

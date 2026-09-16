@@ -63,6 +63,7 @@ interface AuditedEmitter {
   emitted: (event: keyof AuditedEvents) => Promise<unknown>;
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Exercise deterministic event dispatch across the public WebSocket adapters without network scheduling.
 vi.mock('ws', () => {
   function WebSocket(): FakeNodeSocket {
     const listeners = new Map<string, Listener[]>();

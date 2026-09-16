@@ -12,6 +12,7 @@ import { VERSION } from 'openai/version';
 // SDK-owned input-contract tests. No network connections are opened.
 const { handshake } = vi.hoisted(() => ({ handshake: vi.fn() }));
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Validate public handshake options and constructor failures before network I/O; socket constructors are not injectable.
 vi.mock('ws', async () => {
   const { EventEmitter } = await import('node:events');
   return {

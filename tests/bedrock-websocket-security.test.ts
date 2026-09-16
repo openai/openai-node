@@ -31,6 +31,7 @@ function CapturingWebSocket(url: URL, options: FakeNodeSocket['options']): FakeN
   };
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Verify credential and origin rejection before public WebSocket adapters construct their transports.
 vi.mock('ws', () => ({ WebSocket: vi.fn(CapturingWebSocket) }));
 
 class FakeBrowserSocket {

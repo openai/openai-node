@@ -5,6 +5,7 @@ import { EventEmitter, getEventListeners, once } from 'node:events';
 import { PassThrough, Readable, Writable } from 'node:stream';
 import { playAudio, recordAudio } from 'openai/helpers/audio';
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Control ffmpeg/ffplay process failures and pipe events without requiring executables or audio hardware.
 vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
 
 const spawnMock = spawn as MockedFunction<typeof spawn>;

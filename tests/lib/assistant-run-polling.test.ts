@@ -5,6 +5,7 @@ import type { NullableHeaders } from 'openai/internal/headers';
 import type { RequestOptions } from 'openai/internal/request-options';
 import { sleep } from 'openai/internal/utils/sleep';
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Compatibility tests observe exact sleep arguments, including negative intervals, before native timer normalization.
 vi.mock('openai/internal/utils/sleep', () => ({
   sleep: vi.fn(async () => {}),
 }));

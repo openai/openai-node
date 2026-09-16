@@ -5,12 +5,14 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { recordAudio } from 'openai/helpers/audio';
 
 const runtime = vi.hoisted(() => ({ platform: 'linux' }));
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Exercise OS-specific ffmpeg arguments from one host without changing the public audio helper API.
 vi.mock('node:process', () => ({
   get platform() {
     return runtime.platform;
   },
   versions: process.versions,
 }));
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Capture platform-specific ffmpeg arguments without launching a microphone capture process.
 vi.mock('node:child_process', async (importOriginal) => ({
   ...(await importOriginal<typeof ChildProcessModule>()),
   spawn: vi.fn(),

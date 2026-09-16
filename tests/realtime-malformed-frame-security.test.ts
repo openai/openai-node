@@ -14,6 +14,7 @@ interface FakeSocket {
   dispatch: (event: string, value: unknown) => void;
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- The public Node adapter must reject adversarial transport values before invoking their coercion hooks.
 vi.mock('ws', () => {
   function FakeNodeSocket() {
     const listeners = new Map<string, Listener>();

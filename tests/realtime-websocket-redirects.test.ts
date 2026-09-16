@@ -21,6 +21,7 @@ interface FakeNodeSocket {
   close: Mock;
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Assert unsafe redirect options fail before the public adapter constructs any transport.
 vi.mock('ws', () => ({ WebSocket: vi.fn() }));
 
 const nodeSocketConstructor = WS.WebSocket as unknown as Mock;

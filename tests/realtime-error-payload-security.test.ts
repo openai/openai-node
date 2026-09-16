@@ -14,6 +14,7 @@ interface FakeSocket {
   dispatch: (event: string, value: unknown) => void;
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Deliver hostile error frames through the public Node adapter to test payload normalization without network I/O.
 vi.mock('ws', () => {
   function FakeNodeSocket() {
     const listeners = new Map<string, Listener>();

@@ -1,5 +1,7 @@
 import { vi } from 'vitest';
-import type { Mock } from 'vitest';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 import {
   k8sServiceAccountTokenProvider,
@@ -8,25 +10,28 @@ import {
 } from 'openai/auth/subject-token-providers';
 import { SubjectTokenProviderError } from 'openai';
 
-vi.mock('fs/promises');
-
 const originalFetch = global.fetch;
 
 describe('Kubernetes Service Account Token Provider', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  let directory: string;
+
+  beforeEach(async () => {
+    directory = await mkdtemp(path.join(tmpdir(), 'openai-k8s-token-'));
+  });
+
+  afterEach(async () => {
+    await rm(directory, { recursive: true, force: true });
   });
 
   test('reads token from file', async () => {
-    const fsPromises = await import('node:fs/promises');
-    (fsPromises.readFile as Mock).mockResolvedValue('  my-k8s-token  \n');
+    const tokenPath = path.join(directory, 'token');
+    await writeFile(tokenPath, '  my-k8s-token  \n');
 
-    const provider = k8sServiceAccountTokenProvider('/custom/path/token');
+    const provider = k8sServiceAccountTokenProvider(tokenPath);
     expect(provider.tokenType).toBe('jwt');
     const token = await provider.getToken();
 
     expect(token).toBe('my-k8s-token');
-    expect(fsPromises.readFile).toHaveBeenCalledWith('/custom/path/token', 'utf-8');
   });
 
   test('uses default path when none provided', async () => {
@@ -35,10 +40,7 @@ describe('Kubernetes Service Account Token Provider', () => {
   });
 
   test('throws SubjectTokenProviderError on file read failure', async () => {
-    const fsPromises = await import('node:fs/promises');
-    (fsPromises.readFile as Mock).mockRejectedValue(new Error('ENOENT: no such file or directory'));
-
-    const provider = k8sServiceAccountTokenProvider('/nonexistent/path');
+    const provider = k8sServiceAccountTokenProvider(path.join(directory, 'missing-token'));
     await expect(provider.getToken()).rejects.toThrow(SubjectTokenProviderError);
     await expect(provider.getToken()).rejects.toThrow('Failed to read Kubernetes service account token');
   });

@@ -7,6 +7,7 @@ import type { ClientOptions } from 'ws';
 
 const { handshake } = vi.hoisted(() => ({ handshake: vi.fn() }));
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Capture the public adapter handshake to verify its User-Agent header without opening a network connection.
 vi.mock('ws', async () => {
   const { EventEmitter } = await import('node:events');
   return {

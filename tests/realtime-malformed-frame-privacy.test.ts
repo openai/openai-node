@@ -24,6 +24,7 @@ interface RealtimeFailure {
   event_id?: string | undefined;
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Inject malformed transport events into the public Node adapter to verify confidential frame data never enters errors.
 vi.mock('ws', () => {
   function FakeNodeSocket() {
     const listeners = new Map<string, Listener>();

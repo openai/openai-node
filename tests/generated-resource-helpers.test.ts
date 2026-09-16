@@ -6,6 +6,7 @@ import { AssistantStream } from 'openai/lib/AssistantStream';
 import { sleep } from 'openai/internal/utils/sleep';
 import type { NullableHeaders } from 'openai/internal/headers';
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Observe polling interval selection at the shared sleep boundary without changing generated helper APIs.
 vi.mock('openai/internal/utils/sleep', () => ({
   sleep: vi.fn(async () => {}),
 }));

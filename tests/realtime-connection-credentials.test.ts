@@ -32,6 +32,7 @@ const { MockSocket, sockets } = vi.hoisted(() => {
   return { MockSocket: Socket, sockets: instances };
 });
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Capture constructor headers and protocols across public adapters to verify credential precedence before network I/O.
 vi.mock('ws', () => ({ WebSocket: MockSocket }));
 
 const surfaces = [
