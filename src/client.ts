@@ -856,8 +856,8 @@ export class OpenAI {
     return Errors.APIError.generate(status, normalizedError, message, headers);
   }
 
-  _hasUnresolvedApiKey(): boolean {
-    return this.apiKey == null && typeof this._options.apiKey === 'function';
+  _hasApiKeyProvider(): boolean {
+    return typeof this._options.apiKey === 'function';
   }
 
   /**

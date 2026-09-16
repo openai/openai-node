@@ -98,6 +98,33 @@ describe.each([
     expect(handshake).not.toHaveBeenCalled();
   });
 
+  test.each([
+    { headers: { 'OpenAI-Beta': 'responses_websockets=2026-02-06', 'X-Trace-Id': 'trace' } },
+    { headers: { 'X-Auth-Token': '   ' } },
+    { headers: { Authorization: 'Bearer overwritten', authorization: '' } },
+    { auth: 'user:pass', headers: { Authorization: '' } },
+  ])('rejects socket options without a usable final credential: %j', (options) => {
+    const client = new OpenAI({ apiKey: async () => 'SYNTHETIC_KEY' });
+
+    expect(() => new Responses(client, options)).toThrow(/unresolved function-based apiKey/u);
+    expect(handshake).not.toHaveBeenCalled();
+  });
+
+  test('validates the captured API key without reading a changing accessor again', () => {
+    const client = new OpenAI({ apiKey: async () => 'SYNTHETIC_KEY' });
+    let reads = 0;
+    Object.defineProperty(client, 'apiKey', {
+      get() {
+        reads += 1;
+        return reads === 1 ? null : 'SYNTHETIC_LATER_KEY';
+      },
+    });
+
+    expect(() => new Responses(client)).toThrow(/unresolved function-based apiKey/u);
+    expect(reads).toBe(1);
+    expect(handshake).not.toHaveBeenCalled();
+  });
+
   test('accepts a function api key after it has been resolved', async () => {
     const apiKey = vi.fn(async () => 'sk-refreshed');
     const client = new OpenAI({ apiKey });
@@ -130,6 +157,21 @@ describe.each([
         expect.objectContaining({
           headers: expect.objectContaining({ Authorization: 'Bearer caller-managed-token' }),
         }),
+      );
+    } finally {
+      responses.close();
+    }
+  });
+
+  test('preserves explicit header overrides after a function key is resolved', async () => {
+    const client = new OpenAI({ apiKey: async () => 'SYNTHETIC_KEY' });
+    await client._callApiKey();
+
+    const responses = new Responses(client, { headers: { Authorization: '' } });
+    try {
+      expect(handshake).toHaveBeenCalledWith(
+        expect.any(URL),
+        expect.objectContaining({ headers: expect.objectContaining({ Authorization: '' }) }),
       );
     } finally {
       responses.close();

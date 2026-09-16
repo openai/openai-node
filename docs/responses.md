@@ -156,9 +156,15 @@ socket.send({
 
 The connection inherits endpoint configuration from the `OpenAI` client and automatically adds authentication only
 when the client has a static `apiKey` string. It does not resolve async `apiKey` functions or workload identity; for
-those clients, pass a resolved `Authorization` header in the WebSocket options. Attach an `error` listener; unhandled
-WebSocket errors otherwise become unhandled promise rejections. You can also iterate over `socket` or `socket.stream()`
-to receive connection lifecycle events and server messages.
+those clients, pass a resolved `Authorization` header in the WebSocket options. A function-backed client can also
+reuse a key already resolved by a previous request. For function-backed clients without a resolved key or
+caller-supplied credential, the Node constructor throws before opening a socket. Compatible endpoints can use
+custom credential headers or the Node `ws` transport's `auth` option. Custom `ResponsesWSBase` transports are
+responsible for supplying or validating their final authentication in `_createSocket`; the base cannot inspect
+transport-managed credentials.
+
+Attach an `error` listener; unhandled WebSocket errors otherwise become unhandled promise rejections. You can also
+iterate over `socket` or `socket.stream()` to receive connection lifecycle events and server messages.
 
 Each iterator buffers incoming records independently. To limit an iterator's backlog, pass a positive safe integer
 to `socket.stream({ maxBufferedEvents: 256 })`; choose the count for your application's processing capacity.

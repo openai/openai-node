@@ -99,7 +99,11 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     this.socket = this._connect();
   }
 
-  /** Creates a platform-specific WebSocket for the given URL and auth headers. */
+  /**
+   * Creates a platform-specific WebSocket for the given URL and captured client auth headers.
+   * The transport must supply or validate its final credentials before connecting;
+   * these headers may be empty when authentication is managed by the transport.
+   */
   protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
 
   send(event: ResponsesAPI.ResponsesClientEvent) {
@@ -693,6 +697,6 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
 
   protected _authHeaders(): Record<string, string> {
     const apiKey = this._client.apiKey;
-    return typeof apiKey === 'string' ? { Authorization: `Bearer ${apiKey}` } : {};
+    return typeof apiKey === 'string' && apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
   }
 }

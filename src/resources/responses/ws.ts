@@ -6,6 +6,7 @@ import { ResponsesWSBase, type ResponsesWSBaseOptions } from './ws-base';
 import { OpenAI } from '../../client';
 import { VERSION } from '../../version';
 import { OpenAIError } from '../../core/error';
+import { snapshotWebSocketCredentials } from '../../internal/ws';
 
 export type { WebSocketStreamOptions } from '../../internal/ws';
 
@@ -14,20 +15,6 @@ export type { ResponsesWSReconnectOptions } from './ws-base';
 export interface ResponsesWSClientOptions extends WS.ClientOptions, ResponsesWSBaseOptions {
   /** Basic authentication forwarded by the Node `ws` transport. */
   auth?: string;
-}
-
-const CREDENTIAL_HEADERS = new Set(['authorization', 'proxy-authorization', 'cookie', 'x-api-key']);
-
-function hasCredentialValue(value: unknown): boolean {
-  if (Array.isArray(value)) return value.some(hasCredentialValue);
-  return value != null && String(value).trim().length > 0;
-}
-
-function hasExplicitWebSocketCredential(options: ResponsesWSClientOptions): boolean {
-  if (hasCredentialValue(options.auth)) return true;
-  return Object.entries(options.headers ?? {}).some(
-    ([name, value]) => CREDENTIAL_HEADERS.has(name.toLowerCase()) && hasCredentialValue(value),
-  );
 }
 
 export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
@@ -46,16 +33,21 @@ export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
   }
 
   protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
+    const capturedAuthHeaders = { ...authHeaders };
     const socketOptions: ResponsesWSClientOptions = {
       ...this._wsOptions,
       headers: {
         'User-Agent': `${this._client.constructor.name}/JS ${VERSION}`,
-        ...authHeaders,
+        ...capturedAuthHeaders,
         ...this._wsOptions?.headers,
       },
       followRedirects: false,
     };
-    if (this._client._hasUnresolvedApiKey() && !hasExplicitWebSocketCredential(socketOptions)) {
+    if (
+      this._client._hasApiKeyProvider() &&
+      !capturedAuthHeaders['Authorization'] &&
+      !snapshotWebSocketCredentials(socketOptions)
+    ) {
       throw new OpenAIError(
         'Cannot open a Responses WebSocket with an unresolved function-based apiKey. Resolve it before constructing the WebSocket or provide explicit WebSocket credentials.',
       );
