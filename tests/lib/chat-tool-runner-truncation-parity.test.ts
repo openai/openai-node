@@ -2,7 +2,10 @@ import { vi } from 'vitest';
 import OpenAI from 'openai';
 import { ContentFilterFinishReasonError, LengthFinishReasonError } from 'openai/error';
 import type { Fetch } from 'openai/internal/builtin-types';
+import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
+import { ChatCompletionStreamingRunner } from 'openai/lib/ChatCompletionStreamingRunner';
 import type { RunnableToolFunction } from 'openai/lib/RunnableFunction';
+import { Stream } from 'openai/streaming';
 import type {
   ChatCompletion,
   ChatCompletionChunk,
@@ -121,6 +124,21 @@ function mockClient(firstTurn: Turn) {
   return { client: new OpenAI({ apiKey: 'synthetic-key', fetch, maxRetries: 0 }), requests };
 }
 
+it('preserves subclass-owned properties with noImplicitOverride enabled', () => {
+  class ApplicationStream extends ChatCompletionStream {
+    private _rejectsUnfinishedTurns = 'application state';
+
+    get applicationState() {
+      return this._rejectsUnfinishedTurns;
+    }
+  }
+
+  const stream = new ApplicationStream(null);
+  const compatibleStream: ChatCompletionStream = stream;
+  expect(compatibleStream).toBeInstanceOf(ChatCompletionStream);
+  expect(stream.applicationState).toBe('application state');
+});
+
 describe.each(['length', 'content_filter'] as const)(
   'runTools on a %s turn',
   (finishReason: UnfinishedReason) => {
@@ -154,6 +172,23 @@ describe.each(['length', 'content_filter'] as const)(
         function: { name: 'lookup', arguments: truncatedArguments },
       });
       expect(requests).toHaveLength(1);
+    });
+
+    it.each([
+      { name: 'chat stream', StreamClass: ChatCompletionStream },
+      { name: 'tool runner', StreamClass: ChatCompletionStreamingRunner },
+    ])('leaves replayed $name completions reporting the finish reason', async ({ StreamClass }) => {
+      const readable = new Stream(async function* chunks() {
+        yield* streamedTurn({ shape: 'tool call', finishReason });
+      }, new AbortController()).toReadableStream();
+
+      const completion = await StreamClass.fromReadableStream(readable).finalChatCompletion();
+
+      expect(completion.choices[0]?.finish_reason).toBe(finishReason);
+      expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({
+        type: 'function',
+        function: { name: 'lookup', arguments: truncatedArguments },
+      });
     });
   },
 );

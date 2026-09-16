@@ -1,6 +1,7 @@
 import { MalformedJSON, partialParse } from '../_vendor/partial-json-parser/parser';
 import { APIError, ContentFilterFinishReasonError, LengthFinishReasonError, OpenAIError } from '../error';
 import type OpenAI from '../index';
+import { chatCompletionToolRunners } from '../internal/chat-completion-runner-state';
 import { observeJSONRequestBody, type RequestOptions } from '../internal/request-options';
 import type { ReadableStream } from '../internal/shim-types';
 import { uuid4 } from '../internal/utils/uuid';
@@ -1289,14 +1290,6 @@ export class ChatCompletionStream<ParsedT = null>
   }
 
   /**
-   * Whether a `length` or `content_filter` finish reason fails the request even
-   * without auto-parseable input. Plain streams report the finish reason instead,
-   * leaving the truncated completion for the caller to inspect; the tool runner
-   * enables this so streaming and non-streaming `runTools()` agree.
-   */
-  protected _rejectsUnfinishedTurns = false;
-
-  /**
    * Intended for use on the frontend, consuming a stream produced with
    * `.toReadableStream()` on the backend.
    *
@@ -1898,7 +1891,7 @@ export class ChatCompletionStream<ParsedT = null>
       if (finish_reason) {
         choice.finish_reason = finish_reason;
 
-        if (this.#params && (this._rejectsUnfinishedTurns || hasAutoParseableInput(this.#params))) {
+        if (this.#params && (chatCompletionToolRunners.has(this) || hasAutoParseableInput(this.#params))) {
           if (finish_reason === 'length') {
             throw new LengthFinishReasonError();
           }
