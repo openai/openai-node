@@ -1,5 +1,33 @@
 # Changelog
 
+## [7.17.0](https://github.com/openai/openai-node/compare/v7.16.0...v7.17.0) (2026-09-16)
+
+
+### Features
+
+* **api:** add compaction progress events ([#2749](https://github.com/openai/openai-node/issues/2749)) ([425502d](https://github.com/openai/openai-node/commit/425502d2bf2da1bdd37efda3b0fa5add96fc8a51))
+
+
+### Bug Fixes
+
+* **ci:** retry transient Deno download failures ([#2752](https://github.com/openai/openai-node/issues/2752)) ([e39037b](https://github.com/openai/openai-node/commit/e39037b169234de022ba1d98e0cdb7c5cd8374bd))
+* preserve chat runner abort reasons ([#2607](https://github.com/openai/openai-node/issues/2607)) ([eda4d0c](https://github.com/openai/openai-node/commit/eda4d0cd54271ac9fc05a3e44dfe7fd1c16d2d77))
+* **realtime:** preserve native WebSocket error causes ([#2715](https://github.com/openai/openai-node/issues/2715)) ([58fa72a](https://github.com/openai/openai-node/commit/58fa72a5a241521412775e691e6a1331f89ee245))
+* **responses:** reject function-based API keys in WebSocket constructors ([#2586](https://github.com/openai/openai-node/issues/2586)) ([eea7618](https://github.com/openai/openai-node/commit/eea76181986620d25bae16d8b86e71ee2e5aed4d))
+* **runners:** reject unfinished turns in streaming runTools ([#2716](https://github.com/openai/openai-node/issues/2716)) ([937ed67](https://github.com/openai/openai-node/commit/937ed670ba33ba213771096abffe25e554fc32f7))
+* **streaming:** emit terminal SSE events missing a trailing blank line ([#2726](https://github.com/openai/openai-node/issues/2726)) ([94d6418](https://github.com/openai/openai-node/commit/94d6418a6f9aa32d9196f225ea5efaae92b4135d))
+* **zod:** omit impossible optional branch in strict schemas ([#2751](https://github.com/openai/openai-node/issues/2751)) ([2b4c2c7](https://github.com/openai/openai-node/commit/2b4c2c7f0f37aedad7adeda21bb51a1ab087ac09))
+
+
+### Chores
+
+* update lint tooling and tailor anti-slop for the SDK ([#2753](https://github.com/openai/openai-node/issues/2753)) ([21a03c2](https://github.com/openai/openai-node/commit/21a03c2939c004ffca5555d838adff77e8a74cc8))
+
+
+### Documentation
+
+* **examples:** preserve split UTF-8 in raw stream consumer ([#2714](https://github.com/openai/openai-node/issues/2714)) ([f44152a](https://github.com/openai/openai-node/commit/f44152a6cb5b23efb61a103c976b3bb507df3812))
+
 ## [7.16.0](https://github.com/openai/openai-node/compare/v7.15.0...v7.16.0) (2026-09-15)
 
 
