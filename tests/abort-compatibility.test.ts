@@ -239,9 +239,10 @@ describe('fallback caller abort subscriptions', () => {
     }
     const response = await client.get('/items', { signal: caller.signal }).asResponse();
     expect(response.status).toBe(204);
+    // The temporary backoff listener must be gone; only the request subscription should remain.
+    expect(getEventListeners(caller.signal, 'abort')).toHaveLength(1);
     caller.abort();
     expect(requestSignal?.aborted).toBe(true);
-    expect(addListener).toHaveBeenCalledTimes(2);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(getEventListeners(caller.signal, 'abort')).toEqual([]);
   });
