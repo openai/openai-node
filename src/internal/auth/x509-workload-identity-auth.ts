@@ -267,13 +267,15 @@ export class X509WorkloadIdentityAuth {
       type: 'x509',
       identityProviderId: this.#identityProviderId,
       serviceAccountId: this.#serviceAccountId,
+      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      ...(this.#configuredRefreshBufferMs === undefined
+        ? {}
+        : { refreshBufferMs: this.#configuredRefreshBufferMs }),
+      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      ...(this.#configuredRefreshBufferSeconds === undefined
+        ? {}
+        : { refreshBufferSeconds: this.#configuredRefreshBufferSeconds }),
     };
-    if (this.#configuredRefreshBufferMs !== undefined) {
-      identity.refreshBufferMs = this.#configuredRefreshBufferMs;
-    }
-    if (this.#configuredRefreshBufferSeconds !== undefined) {
-      identity.refreshBufferSeconds = this.#configuredRefreshBufferSeconds;
-    }
     return identity;
   }
 
@@ -549,19 +551,15 @@ export class X509WorkloadIdentityAuth {
       wallStartedAt,
       monotonicStartedAt,
       owner: this,
+      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      ...(deadlineArmed ? { deadlineArmed } : {}),
+      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      ...(request ? { request } : {}),
+      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      ...(effectiveSignal ? { effectiveSignal } : {}),
+      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      ...(requestOwner ? { requestOwner } : {}),
     };
-    if (deadlineArmed) {
-      scope.deadlineArmed = deadlineArmed;
-    }
-    if (request) {
-      scope.request = request;
-    }
-    if (effectiveSignal) {
-      scope.effectiveSignal = effectiveSignal;
-    }
-    if (requestOwner) {
-      scope.requestOwner = requestOwner;
-    }
     return (operation) =>
       this.#transport.resume(scope, async () => {
         try {

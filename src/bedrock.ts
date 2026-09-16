@@ -284,11 +284,11 @@ export class BedrockOpenAI extends OpenAI {
     const bedrockTokenProvider =
       options.apiKey === undefined ? (options.bedrockTokenProvider ?? this.bedrockTokenProvider) : undefined;
 
-    const clientOptions = { ...options };
-    if (bedrockTokenProvider) {
-      clientOptions.apiKey = undefined;
-      clientOptions.bedrockTokenProvider = bedrockTokenProvider;
-    }
+    const clientOptions = {
+      ...options,
+      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      ...(bedrockTokenProvider ? { apiKey: undefined, bedrockTokenProvider } : {}),
+    };
     // SAFETY: Bedrock options extend the base client options; forwarding them preserves the subclass's existing withOptions construction behavior.
     return super.withOptions(clientOptions as Partial<ClientOptions>);
   }

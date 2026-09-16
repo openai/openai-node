@@ -190,17 +190,15 @@ export class WorkloadIdentityAuth {
     this.config = {
       identityProviderId,
       serviceAccountId,
+      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      ...(clientId === undefined ? {} : { clientId }),
+      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      ...(refreshBufferSeconds === undefined ? {} : { refreshBufferSeconds }),
       provider: {
         tokenType: provider.tokenType,
         getToken: provider.getToken.bind(provider),
       },
     };
-    if (clientId !== undefined) {
-      this.config.clientId = clientId;
-    }
-    if (refreshBufferSeconds !== undefined) {
-      this.config.refreshBufferSeconds = refreshBufferSeconds;
-    }
     this.fetch = fetch ?? Shims.getDefaultFetch();
   }
 

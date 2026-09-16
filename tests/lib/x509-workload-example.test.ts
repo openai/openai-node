@@ -68,11 +68,9 @@ describe('X.509 workload-identity runnable example', () => {
   });
 
   test('preserves an explicitly empty encrypted-key passphrase', () => {
-    expect(example).toMatch(
-      /if \(passphrase !== undefined\) \{\s+credentialOptions\.passphrase = passphrase;/u,
-    );
-    expect(readFileSync(path.resolve(process.cwd(), 'examples/mtls/node.mjs'), 'utf-8')).toMatch(
-      /if \(passphrase !== undefined\) \{\s+connect\.passphrase = passphrase;/u,
+    expect(example).toContain('passphrase === undefined ? {} : { passphrase }');
+    expect(readFileSync(path.resolve(process.cwd(), 'examples/mtls/node.mjs'), 'utf-8')).toContain(
+      'passphrase === undefined ? {} : { passphrase }',
     );
   });
 

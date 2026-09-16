@@ -224,10 +224,9 @@ export function makeChatCompletionReadableStreamMessageChunk(
   const payload: ChatCompletionReadableStreamMessage = {
     type: 'message',
     message,
+    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+    ...(toolCallIds ? { tool_call_ids: toolCallIds } : {}),
   };
-  if (toolCallIds) {
-    payload.tool_call_ids = toolCallIds;
-  }
 
   return {
     id: chunk.id,
@@ -2437,10 +2436,9 @@ function finalizeChatCompletion<ParsedT>(
     created,
     model,
     object: 'chat.completion',
+    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+    ...(system_fingerprint ? { system_fingerprint } : {}),
   };
-  if (system_fingerprint) {
-    completion.system_fingerprint = system_fingerprint;
-  }
 
   return maybeParseChatCompletion(completion, params);
 }

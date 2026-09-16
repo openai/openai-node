@@ -99,10 +99,9 @@ function validateStaticCredentials(options: BedrockProviderOptions): AwsCredenti
   const credentials: AwsCredentialIdentity = {
     accessKeyId: options.accessKeyId,
     secretAccessKey: options.secretAccessKey,
+    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+    ...(options.sessionToken ? { sessionToken: options.sessionToken } : {}),
   };
-  if (options.sessionToken) {
-    credentials.sessionToken = options.sessionToken;
-  }
   return credentials;
 }
 
@@ -243,16 +242,14 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
         const signable: Parameters<typeof signer.sign>[0] = {
           protocol: parsedURL.protocol,
           hostname: parsedURL.hostname,
+          // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+          ...(parsedURL.port ? { port: Number(parsedURL.port) } : {}),
           method,
           ...target,
           headers: Object.fromEntries(headers.entries()),
+          // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+          ...(body === undefined ? {} : { body }),
         };
-        if (parsedURL.port) {
-          signable.port = Number(parsedURL.port);
-        }
-        if (body !== undefined) {
-          signable.body = body;
-        }
         return signer.sign(signable);
       },
       failureMessage: this.options.usesDefaultChain

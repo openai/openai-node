@@ -26,10 +26,9 @@ async function createProvider(region: string) {
     region,
     // Ignore a stale AWS_BEARER_TOKEN_BEDROCK when using AWS credentials.
     apiKey: null,
+    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+    ...(profile ? { profile } : {}),
   };
-  if (profile) {
-    options.profile = profile;
-  }
   return bedrock(options);
 }
 

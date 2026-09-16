@@ -190,10 +190,11 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
       this.#stream = subscription.data;
       this.#response = subscription.response;
       this.#checkAbort();
-      const input: Parameters<Sessions['events']['create']>[1] = { events: [this.#input] };
-      if (this.#inputKey !== undefined) {
-        input['Idempotency-Key'] = this.#inputKey;
-      }
+      const input: Parameters<Sessions['events']['create']>[1] = {
+        events: [this.#input],
+        // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+        ...(this.#inputKey === undefined ? {} : { 'Idempotency-Key': this.#inputKey }),
+      };
       await this.#sessions.events.create(this.#sessionID, input, {
         ...options,
         headers: buildHeaders([options.headers, { 'Idempotency-Key': this.#inputKey ?? null }]),
