@@ -151,6 +151,9 @@ describe.each(['length', 'content_filter'] as const)(
           ? client.chat.completions.runTools({ ...params, stream: true })
           : client.chat.completions.runTools(params);
 
+        // Consumer-owned fields cannot disable rejection before the deferred tool run starts.
+        Object.assign(runner, { _rejectsUnfinishedTurns: false });
+
         await expect(runner.done()).rejects.toThrow(unfinishedErrors[finishReason]);
 
         expect(lookup).not.toHaveBeenCalled();
@@ -162,9 +165,9 @@ describe.each(['length', 'content_filter'] as const)(
     it('leaves chat.completions.stream() reporting the finish reason', async () => {
       const { client, requests } = mockClient({ shape: 'tool call', finishReason });
 
-      const completion = await client.chat.completions
-        .stream({ model: 'gpt-test', messages, tools: [lookupTool] })
-        .finalChatCompletion();
+      const stream = client.chat.completions.stream({ model: 'gpt-test', messages, tools: [lookupTool] });
+      Object.assign(stream, { _rejectsUnfinishedTurns: true });
+      const completion = await stream.finalChatCompletion();
 
       expect(completion.choices[0]?.finish_reason).toBe(finishReason);
       expect(completion.choices[0]?.message.tool_calls?.[0]).toMatchObject({

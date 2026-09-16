@@ -10,7 +10,6 @@ import { ChatCompletionStream, makeChatCompletionReadableStreamMessageChunk } fr
 import type { ChatCompletionReadableStreamItem, ChatCompletionSnapshot } from './ChatCompletionStream';
 import { OpenAIError } from '../error';
 import type OpenAI from '../index';
-import { chatCompletionToolRunners } from '../internal/chat-completion-runner-state';
 import type { AutoParseableTool } from '../lib/parser';
 import { Stream } from '../streaming';
 import { isAssistantMessage, isToolMessage } from './chatCompletionUtils';
@@ -139,9 +138,6 @@ export class ChatCompletionStreamingRunner<ParsedT = null>
       // @ts-expect-error TODO these types are incompatible
       params,
     );
-    // Fail unfinished turns like the non-streaming runner, so a `length` or
-    // `content_filter` completion never reaches a tool callback or the next request.
-    chatCompletionToolRunners.add(runner);
     const opts = {
       ...options,
       __metadata: { ...options?.__metadata, helperMethod: 'runTools' },
