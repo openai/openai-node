@@ -71,6 +71,7 @@ function onRealtimeEvent(
   event: string,
   listener: Listener,
 ): void {
+  // SAFETY: Each listed realtime wrapper implements on; this helper registers only the shared event listener contract and discards the return value.
   (realtime as { on: (event: string, listener: Listener) => void }).on(event, listener);
 }
 
@@ -129,6 +130,7 @@ function expectPrivateFailure(
   expect(failure.cause).toBeInstanceOf(SyntaxError);
   expect(failure.cause).not.toBe(original);
 
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   const cause = failure.cause as SyntaxError & { cause?: unknown };
   expect(cause.message).toBe(privateSyntaxMessage);
   expect(cause.cause).toBeUndefined();
@@ -188,6 +190,7 @@ describe.each([
       new OpenAI({ apiKey: 'safe-client-key', baseURL: 'https://example.com/v1/' }),
     );
 
+    // SAFETY: The injected WebSocket constructor creates this FakeSocket; the cast exposes its test-only dispatch controls.
     // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The socket constructor is replaced by FakeSocket in this fixture; retain access to its malformed-frame injection method.
     return { realtime, socket: realtime.socket as unknown as FakeSocket };
   }
@@ -216,6 +219,7 @@ describe.each([
     'never exposes $name through unhandled error rejections',
     ({ value: secret }) => {
       const { socket } = connect();
+      // SAFETY: This rejection spy intentionally returns a resolved placeholder to avoid an unrelated unhandled rejection while inspecting the captured error.
       const reject = vi.spyOn(Promise, 'reject').mockReturnValue(Promise.resolve() as Promise<never>);
 
       const original = dispatchSensitiveFrame(socket, transport, secret);
@@ -223,6 +227,7 @@ describe.each([
       expect(reject).toHaveBeenCalledTimes(1);
       const [[failure] = []] = reject.mock.calls;
       expect(failure).toBeInstanceOf(RealtimeError);
+      // SAFETY: The preceding instance assertion establishes RealtimeError; this view exposes its cause for privacy checks.
       expectPrivateFailure(failure as RealtimeFailure, secret, original, true);
     },
   );
@@ -267,6 +272,7 @@ describe.each([
   test('preserves unreadable transport SyntaxError causes in unhandled rejections', () => {
     const { socket } = connect();
     const frameFailure = new SyntaxError('frame contains an invalid transport byte sequence');
+    // SAFETY: This rejection spy intentionally returns a resolved placeholder to avoid an unrelated unhandled rejection while inspecting the captured error.
     const reject = vi.spyOn(Promise, 'reject').mockReturnValue(Promise.resolve() as Promise<never>);
 
     dispatchFrame(socket, transport, {

@@ -104,6 +104,7 @@ function escapeSchemaDefinitionRefs<T extends object>(
     }
 
     visited.add(value);
+    // SAFETY: The traversal has excluded primitives, null, arrays, and previously visited objects; schema property values remain unknown for validation.
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Schema reference rewriting traverses arbitrary keyword and literal values without claiming they are valid schemas.
     const record = value as Record<string, unknown>;
     const ref = record['$ref'];
@@ -139,8 +140,10 @@ function zodV3ToJsonSchema(
   options: { name: string; schemaDefinitions?: ZodSchemaDefinitions | undefined },
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The converter returns extensible JSON Schema objects with arbitrary literal/default and annotation values.
 ): Record<string, unknown> {
+  // SAFETY: This is the Zod v3 conversion path; assertSupportedZodV3Schema verifies the root and named definitions before conversion.
   assertSupportedZodV3Schema(schema, options.schemaDefinitions as Record<string, z3.ZodType> | undefined);
   const rootName = getZodV3RootName(options.name, options.schemaDefinitions);
+  // SAFETY: This is the Zod v3 conversion path; assertSupportedZodV3Schema verifies the root and named definitions before conversion.
   const jsonSchema = _zodToJsonSchema(schema, {
     openaiStrictMode: true,
     name: rootName,
@@ -171,9 +174,11 @@ function zodV4ToJsonSchema(
     // Avoid `/` and `~` so Zod versions that escape JSON Pointer tokens emit the same IDs.
     const id = encodeURIComponent(name).replace(/~/g, '%7E');
     definitionNames.set(id, name);
+    // SAFETY: The Zod v4 conversion path registers these definitions with the v4 metadata registry before toJSONSchema uses them.
     metadata?.add(definition as z4.ZodType, { id });
   }
 
+  // SAFETY: The v4 schema converter produces JSON Schema; the following normalization checks and rewrites its schema records.
   const jsonSchema = z4.toJSONSchema(schema, {
     target: 'draft-7',
     ...(metadata ? { metadata } : undefined),
@@ -214,6 +219,7 @@ function zodV4ToJsonSchema(
     );
   }
 
+  // SAFETY: Strict conversion returns the normalized object schema; the record view exposes keywords without trusting arbitrary values.
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The helper preserves the public JSON Schema dictionary contract after strict-schema validation.
   return toStrictJsonSchema(escapedSchema) as Record<string, unknown>;
 }
@@ -230,6 +236,7 @@ function zodV3ToNonStrictJsonSchema(schema: z3.ZodType, options: { name: string 
 
 // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Non-strict conversion retains arbitrary Zod literal/default values and schema extension keywords.
 function zodV4ToNonStrictJsonSchema(schema: ZodV4Schema): Record<string, unknown> {
+  // SAFETY: Zod v4 owns this JSON Schema output; the record return preserves arbitrary supported keyword properties.
   return z4.toJSONSchema(schema, {
     target: 'draft-7',
     io: 'input',
@@ -250,13 +257,16 @@ function parseZodObject<ZodInput extends ZodTypeLike>(
 
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Custom schema references and optional parser hooks require validation before traversal or invocation.
   if (typeof parser === 'function') {
+    // SAFETY: The schema's parse method is invoked with its original receiver and owns the inferred output type.
     const result = parser.call(zodObject, parsed) as InferZodType<ZodInput>;
+    // SAFETY: This read only identifies the supported Zod version before applying its corresponding serialization checks.
     if (!isZodV4(zodObject as ZodSchema)) {
       assertJSONSerializableSchema(result);
     }
     return result;
   }
 
+  // SAFETY: Schemas without a parse method use the supported Zod v4 core parser, which validates the input and supplies the inferred output.
   return z4.parse(zodObject as ZodV4Schema, parsed) as InferZodType<ZodInput>;
 }
 
@@ -308,6 +318,7 @@ export function zodResponseFormat<ZodInput extends ZodTypeLike>(
   name: string,
   props?: ZodResponseFormatProps,
 ): AutoParseableResponseFormat<InferZodType<ZodInput>> {
+  // SAFETY: The public structural Zod input is dispatched by version below; each version-specific converter validates its supported schema contract.
   const zodSchema = zodObject as ZodSchema;
   const { schemaDefinitions, ...responseFormatProps } = props ?? {};
   validateSchemaDefinitions(schemaDefinitions);
@@ -354,6 +365,7 @@ export function zodTextFormat<ZodInput extends ZodTypeLike>(
   name: string,
   props?: Omit<ResponseFormatTextJSONSchemaConfig, 'schema' | 'type' | 'strict' | 'name'>,
 ): AutoParseableTextFormat<InferZodType<ZodInput>> {
+  // SAFETY: The public structural Zod input is dispatched by version below; each version-specific converter validates its supported schema contract.
   const zodSchema = zodObject as ZodSchema;
 
   return makeParseableTextFormat<InferZodType<ZodInput>>(
@@ -427,6 +439,7 @@ export function zodFunction<Parameters extends ZodTypeLike>(
 /** Builds a strict Chat Completions function tool from the supplied Zod schema. */
 export function zodFunction<Parameters extends ZodTypeLike>(options: ZodFunctionOptions<Parameters>) {
   const parameters = options.parameters;
+  // SAFETY: The public structural Zod input is dispatched by version below; each version-specific converter validates its supported schema contract.
   const zodSchema = parameters as ZodSchema;
 
   return makeParseableTool<any>(
@@ -484,6 +497,7 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
   function: (args: InferZodType<Parameters>) => unknown;
 }> {
   const parameters = options.parameters;
+  // SAFETY: The public structural Zod input is dispatched by version below; each version-specific converter validates its supported schema contract.
   const zodSchema = parameters as ZodSchema;
 
   return makeParseableResponseTool<any>(
@@ -524,6 +538,7 @@ export function zodRealtimeFunction<Parameters extends ZodTypeLike>(options: {
   /** Optional model-visible explanation of when and how the function should be used. */
   description?: string | undefined;
 }): RealtimeFunctionTool {
+  // SAFETY: The public structural Zod input is dispatched by version below; each version-specific converter validates its supported schema contract.
   const zodSchema = options.parameters as ZodSchema;
 
   return {

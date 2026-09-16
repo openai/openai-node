@@ -76,7 +76,7 @@ function measureArrayMovement<T>(operation: () => T) {
 }
 
 function createChatStream(chunks: OpenAI.Chat.ChatCompletionChunk[]): ChatCompletionStream {
-  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The queue fixture implements only completions.create and supplies deterministic async chunks.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The queue fixture implements only completions.create and supplies deterministic async chunks.
   const client = {
     chat: {
       completions: {
@@ -350,9 +350,9 @@ describe('EventStream iterator queue lifecycle', () => {
       const stream = new QueueTestStream();
       const iterator = stream.events('value');
 
-      expect(
-        ['value', 'end', 'error', 'abort'].every((event) => stream.hasListener(event as keyof QueueEvents)),
-      ).toBe(true);
+      expect((['value', 'end', 'error', 'abort'] as const).every((event) => stream.hasListener(event))).toBe(
+        true,
+      );
 
       if (termination === 'return') {
         await iterator.return?.();

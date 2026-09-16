@@ -23,12 +23,14 @@ export function parseNullableDef(
     (!def.innerType._def.checks || !def.innerType._def.checks.length)
   ) {
     if (refs.target === 'openApi3' || refs.nullableStrategy === 'property') {
+      // SAFETY: The preceding primitive discriminator check permits the mapping lookup; the nullable-property target uses its existing extension representation.
       return {
         type: primitiveMappings[def.innerType._def.typeName as keyof typeof primitiveMappings],
         nullable: true,
       } as any;
     }
 
+    // SAFETY: The preceding primitive discriminator check permits the mapping lookup; the nullable-property target uses its existing extension representation.
     return {
       type: [primitiveMappings[def.innerType._def.typeName as keyof typeof primitiveMappings], 'null'],
     };
@@ -45,9 +47,11 @@ export function parseNullableDef(
     );
 
     if (base && '$ref' in base) {
+      // SAFETY: The OpenAPI branch adds nullable to the converted base schema, an extension not represented by the shared JSON Schema union.
       return { allOf: [base], nullable: true } as any;
     }
 
+    // SAFETY: The OpenAPI branch adds nullable to the converted base schema, an extension not represented by the shared JSON Schema union.
     return base && ({ ...base, nullable: true } as any);
   }
 

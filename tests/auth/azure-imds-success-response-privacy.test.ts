@@ -315,7 +315,9 @@ describe('Azure IMDS successful-response JSON privacy', () => {
   )(
     'sanitizes a $failureKind foreign syntax error with $tag containing $privateValue through $boundary',
     async ({ privateValue, boundary, tag, failureKind }) => {
+      // SAFETY: The controlled VM expression constructs this cross-realm fixture; the test keeps its foreign prototype while inspecting the declared value.
       const parserFailure = createCrossRealmJSONFailure(privateValue) as object;
+      // SAFETY: The cross-realm Error fixture has an object prototype; this test adds a hostile descriptor to that prototype.
       const tagged = tag.startsWith('own') ? parserFailure : (Object.getPrototypeOf(parserFailure) as object);
       const readTag = vi.fn(() => {
         throw new Error(`${privateValue} escaped through an untrusted parser tag`);
@@ -362,6 +364,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
   )(
     'follows a $failureKind $tag foreign wrapper to its $parser containing $privateValue through $boundary',
     async ({ privateValue, boundary, tag, parser, failureKind }) => {
+      // SAFETY: The controlled VM expression constructs this cross-realm fixture; the test keeps its foreign prototype while inspecting the declared value.
       const foreign = createCrossRealmJSONFailure(privateValue, true) as object;
       if (parser === 'marked fetch') {
         Object.defineProperty(foreign, 'cause', {
@@ -369,6 +372,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
           value: createCauseFreeJSONFailure(privateValue),
         });
       }
+      // SAFETY: The cross-realm Error fixture has an object prototype; this test adds a hostile descriptor to that prototype.
       const tagged = tag.startsWith('own') ? foreign : (Object.getPrototypeOf(foreign) as object);
       const readTag = vi.fn(() => {
         throw new Error(`${privateValue} escaped through an untrusted foreign wrapper tag`);
@@ -506,6 +510,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
   it.each(['safe foreign cause', 'fake native marker', 'cause accessor'] as const)(
     'preserves a tagged foreign parser wrapper with a $0 without invoking untrusted getters',
     async (failureKind) => {
+      // SAFETY: Both controlled VM expressions construct foreign Error objects or their deliberately forged prototype carriers.
       const foreign =
         failureKind === 'fake native marker'
           ? (runInNewContext('Object.create(Error.prototype)') as object)
@@ -549,6 +554,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
   );
 
   it('never invokes cross-realm name, message, tag, toString, or cause getters', async () => {
+    // SAFETY: The controlled VM expression constructs this cross-realm fixture; the test keeps its foreign prototype while inspecting the declared value.
     const foreign = runInNewContext("new Error('safe foreign parser failure')") as object;
     const reads = vi.fn(() => {
       throw new Error('an untrusted cross-realm diagnostic getter was invoked');
@@ -639,6 +645,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
       if (failureKind === 'non-parser marker') {
         Object.defineProperty(original, 'type', { configurable: true, value: 'system' });
       } else if (failureKind === 'inherited marker') {
+        // SAFETY: Object.create constructs the deliberate prototype fixture; only object identity or explicitly defined properties are used here.
         const prototype = Object.create(Error.prototype) as object;
         Object.defineProperty(prototype, 'type', { configurable: true, value: 'invalid-json' });
         Object.setPrototypeOf(original, prototype);

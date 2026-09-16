@@ -141,6 +141,7 @@ export function isX509WorkloadIdentity(
       }
       break;
     }
+    // SAFETY: Object.getPrototypeOf returns an object or null; the traversal checks descriptors rather than assuming a credential-provider subtype.
     providerOwner = Object.getPrototypeOf(providerOwner) as object | null;
   }
 
@@ -153,6 +154,7 @@ export function isX509WorkloadIdentity(
       }
       return discriminator.value === 'x509';
     }
+    // SAFETY: Object.getPrototypeOf returns an object or null; the traversal checks descriptors rather than assuming a credential-provider subtype.
     current = Object.getPrototypeOf(current) as object | null;
   }
   return false;

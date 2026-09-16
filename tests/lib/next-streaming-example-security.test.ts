@@ -72,6 +72,7 @@ function invoke(input: Request): Promise<Response> {
     response: { send: (stream: ReadableStream<Uint8Array>) => Response },
   ) => Promise<Response>;
 
+  // SAFETY: The imported edge example uses Request and response.send; this fixture provides those Web API values and returns a Response from send.
   return (handler as EdgeHandler)(input, {
     send: (stream) => new Response(stream),
   });

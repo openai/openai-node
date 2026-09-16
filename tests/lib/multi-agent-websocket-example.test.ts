@@ -97,6 +97,7 @@ async function runExample(
 
   let outcome: Promise<{ error: unknown }> | undefined;
   try {
+    // SAFETY: The locally transpiled example source ends with its main promise; the VM captures that promise to observe completion and teardown.
     const main = runInNewContext(
       source,
       {

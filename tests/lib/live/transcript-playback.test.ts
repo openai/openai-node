@@ -14,6 +14,7 @@ beforeEach(() => {
   source = undefined;
   vi.mocked(playAudio).mockReset();
   vi.mocked(playAudio).mockImplementation(async (input) => {
+    // SAFETY: createPCMPlayback supplies its owned PassThrough to the mocked player; retain that stream to check playback completion and destruction.
     source = input as PassThrough;
     for await (const chunk of source) {
       chunks.push(chunk);

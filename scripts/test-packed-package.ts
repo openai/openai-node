@@ -73,9 +73,11 @@ const packedPackagePath = require('node:path');
     return stdout;
   };
   const readPackage = (file: string): PackageMetadata =>
+    // SAFETY: This reads the package manifest produced by the local pack step; the checks below validate its engine and peer metadata.
     JSON.parse(fs.readFileSync(file, 'utf-8')) as PackageMetadata;
   const findSourceMaps = (directory: string): string[] => {
     const maps: string[] = [];
+    // SAFETY: withFileTypes requests native Dirent entries; the dynamically required fs module does not retain that overload in its inferred type.
     const entries = fs.readdirSync(directory, { withFileTypes: true }) as Dirent[];
     for (const entry of entries) {
       const resolved = path.join(directory, entry.name);
@@ -389,6 +391,7 @@ const packedPackagePath = require('node:path');
       'assert.doesNotThrow(direct); assert.throws(httpConnect, /CONNECT.*Undici 5\\.5\\.1 or later/u); assert.throws(httpsConnect, /CONNECT.*Undici 5\\.5\\.1 or later/u);';
     const supportedTransports =
       'assert.doesNotThrow(direct); assert.doesNotThrow(httpConnect); assert.doesNotThrow(httpsConnect);';
+    // SAFETY: The controlled certificate-fixture subprocess serializes exactly certificateChain and privateKey for this local packing test.
     const certificateFixture = JSON.parse(
       run(
         process.execPath,
@@ -527,6 +530,7 @@ const packedPackagePath = require('node:path');
     const sourceMaps = findSourceMaps(installedPackageRoot);
     sourceMaps.sort();
     for (const mapPath of sourceMaps) {
+      // SAFETY: These files are emitted source maps discovered in the built package; the validator checks their source paths and contents.
       const sourceMap = JSON.parse(fs.readFileSync(mapPath, 'utf-8')) as SourceMap;
       for (const source of sourceMap.sources) {
         const resolvedSource: string = path.resolve(

@@ -90,6 +90,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
   });
 
   test('rejects a forged X.509 transport capability before token exchange', () => {
+    // SAFETY: Deliberately supply an empty transport to verify required X.509 capabilities are rejected at initialization.
     expect(() => new OpenAI(options({ x509Transport: {} as X509Transport }))).toThrow(/X\.509.*transport/iu);
   });
 
@@ -858,6 +859,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       x509Transport: transport,
     };
 
+    // SAFETY: Deliberately pass unsupported X.509 transport options to the alternate client so runtime rejection is exercised.
     expect(() => new AzureOpenAI(unsafe as ConstructorParameters<typeof AzureOpenAI>[0])).toThrow(/X\.509/iu);
   });
 
@@ -868,6 +870,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       x509Transport: transport,
     };
 
+    // SAFETY: Deliberately pass unsupported X.509 transport options to the alternate client so runtime rejection is exercised.
     expect(() => new BedrockOpenAI(unsafe as ConstructorParameters<typeof BedrockOpenAI>[0])).toThrow(
       /Bedrock.*authentication/iu,
     );

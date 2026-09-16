@@ -70,6 +70,7 @@ describe('ResponseAccumulator', () => {
           status: 'completed',
           output: [
             {
+              // SAFETY: The preceding added-item event creates the message at output index zero; inspect its content for delta accumulation.
               ...(snapshot.output[0]! as ResponseOutputMessage),
               status: 'completed',
             },
@@ -163,6 +164,7 @@ describe('ResponseAccumulator', () => {
         },
       ],
     });
+    // SAFETY: Deliberately omit the derived output_text field from this wire fixture so accumulation must reconstruct it.
     delete (terminalResponse as Partial<Response>).output_text;
 
     const initial = accumulateResponse({
@@ -170,10 +172,7 @@ describe('ResponseAccumulator', () => {
       sequence_number: 0,
       response: makeResponse(),
     });
-    const snapshot = accumulateResponse(
-      { type, sequence_number: 1, response: terminalResponse } as ResponseStreamEvent,
-      initial,
-    );
+    const snapshot = accumulateResponse({ type, sequence_number: 1, response: terminalResponse }, initial);
 
     expect(snapshot.status).toBe(status);
     expect(snapshot.output_text).toBe('terminal text');
@@ -240,6 +239,7 @@ function accumulateEvents(events: ResponseStreamEvent[]): Response {
 }
 
 function makeResponse(overrides: Partial<Response> = {}): Response {
+  // SAFETY: This synthetic wire response intentionally uses nullable legacy metadata defaults; the accumulator tests only lifecycle and output fields.
   return {
     id: 'resp_123',
     object: 'response',

@@ -82,6 +82,7 @@ function onRealtimeEvent(
   event: string,
   listener: Listener,
 ): void {
+  // SAFETY: Each listed realtime wrapper implements on; this helper registers only the shared event listener contract and discards the return value.
   (realtime as { on: (event: string, listener: Listener) => void }).on(event, listener);
 }
 
@@ -135,6 +136,7 @@ describe.each([
       new OpenAI({ apiKey: 'test-key', baseURL: 'https://example.com/v1/' }),
     );
 
+    // SAFETY: The injected WebSocket constructor creates this FakeSocket; the cast exposes its test-only dispatch controls.
     // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The socket constructor is replaced by FakeSocket in this fixture; retain access to its error injection method.
     return { realtime, socket: realtime.socket as unknown as FakeSocket };
   }
@@ -225,6 +227,7 @@ describe.each([
 
   test('retains asynchronous rejection for an unhandled malformed server error', () => {
     const { socket } = connect();
+    // SAFETY: This rejection spy intentionally returns a resolved placeholder to avoid an unrelated unhandled rejection while inspecting the captured error.
     const reject = vi.spyOn(Promise, 'reject').mockReturnValue(Promise.resolve() as Promise<never>);
 
     expect(() =>

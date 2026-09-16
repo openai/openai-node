@@ -413,7 +413,7 @@ describe('.stream()', () => {
         yield* events;
       },
     };
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The test client implements only responses.create to supply the controlled transport.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The test client implements only responses.create to supply the controlled transport.
     const client = { responses: { create: vi.fn(async () => transport) } } as unknown as OpenAI;
     const stream = ResponseStream.createResponse(client, { model: 'gpt-test', input: 'route safely' });
     const emitted = vi.fn();
@@ -730,7 +730,9 @@ describe('.stream()', () => {
 
     expect(rejection).toBeInstanceOf(OpenAIError);
     expect(rejection).toBeInstanceOf(APIError);
+    // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
     expect((rejection as APIError).message).toBe('The server had an error while processing your request.');
+    // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
     expect((rejection as APIError).code).toBe('server_error');
     // `.on('error')` must observe the converted error, not the raw stream frame.
     expect(listenerErrors).toHaveLength(1);
@@ -1202,7 +1204,7 @@ describe('.stream()', () => {
         item: { id: 'msg_1', type: 'message', role: 'assistant', status: 'in_progress', content: [] },
       },
     ];
-    const malformedEvent = {
+    const malformedEvent: ResponseStreamEvent = {
       type: 'response.output_text.delta',
       sequence_number: 2,
       item_id: 'msg_1',
@@ -1210,7 +1212,7 @@ describe('.stream()', () => {
       content_index: 0,
       delta: 'boom',
       logprobs: [],
-    } as ResponseStreamEvent;
+    };
 
     const stream = ResponseStream.fromReadableStream(
       readableStreamFromEvents([...validEvents, malformedEvent]),
@@ -1236,6 +1238,7 @@ describe('.stream()', () => {
     );
 
     expect(failure).toBeInstanceOf(OpenAIError);
+    // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
     expect((failure as OpenAIError).message).toBe('missing output at index 99');
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
@@ -1247,6 +1250,7 @@ function readableStreamFromEvents(events: ResponseStreamEvent[]) {
 }
 
 function makeResponse(overrides: Partial<APIResponse> = {}): APIResponse {
+  // SAFETY: This synthetic wire response intentionally uses nullable legacy metadata defaults; the stream tests exercise its lifecycle and output.
   return {
     id: 'resp_123',
     object: 'response',

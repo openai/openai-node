@@ -300,6 +300,7 @@ export class SendQueue<T = unknown> {
       if (entry.kind === 'raw') {
         return { type: 'raw', data: entry.data };
       }
+      // SAFETY: T is the transport caller's event contract; JSON syntax is parsed here without imposing a runtime schema on forward-compatible events.
       return { type: 'message', message: JSON.parse(entry.data) as T };
     });
     this._queue = [];

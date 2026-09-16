@@ -14,7 +14,7 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
   /** Attaches listeners without negotiating, opening, or taking ownership of the channel. */
   constructor(channel: WebRTCDataChannel) {
     this.channel = channel;
-    this.dataChannel = channel as BrowserDataChannel;
+    this.dataChannel = channel;
     channel.addEventListener('message', this.onMessage);
     channel.addEventListener('error', this.onError);
     channel.addEventListener('open', this.onOpen);
@@ -29,6 +29,7 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
   ): () => void {
     this.assertActive();
     // The shared dispatcher matches the original discriminator before invoking this callback.
+    // SAFETY: The dispatcher checks the event discriminator against type before invoking this handler, preserving the corresponding union member.
     return this.events.add((event) => handler(event as Extract<ServerEvent, { type: Type }>), type);
   }
 
@@ -90,6 +91,7 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
     }
     let event: unknown;
     try {
+      // SAFETY: The message event boundary reads only optional data and then checks it is a string before parsing.
       const { data } = message as { data?: unknown };
       // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted data-channel JSON and its own event discriminator before dispatch.
       if (typeof data !== 'string') {
@@ -116,6 +118,7 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
       return;
     }
     // Like the generated SDK, accept future event types without a runtime schema registry.
+    // SAFETY: The parsed event passed the object and string-discriminator checks; future server event types remain intentionally accepted.
     this.events.emit(event as ServerEvent);
   };
 

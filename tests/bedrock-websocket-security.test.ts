@@ -60,8 +60,11 @@ const nodeSocketConstructor = vi.mocked(WS.WebSocket);
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function expectPrivateBedrockCredentialFailure(failure: unknown, credential: string): void {
   expect(failure).toBeInstanceOf(TypeError);
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   expect((failure as Error).message).toBe('Bedrock bearer credential contains an invalid HTTP header value.');
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   expect((failure as Error).stack).not.toContain(credential);
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   expect((failure as Error & { cause?: unknown }).cause).toBeUndefined();
   expect(nodeSocketConstructor).not.toHaveBeenCalled();
   expect(FakeBrowserSocket.instances).toHaveLength(0);
@@ -77,6 +80,7 @@ function lastBrowserSocket(): FakeBrowserSocket {
 
 function lastNodeSocket(): FakeNodeSocket {
   const [result] = nodeSocketConstructor.mock.results.slice(-1);
+  // SAFETY: The injected ws constructor records only FakeNodeSocket results; the following check rejects a missing construction.
   const socket = result?.value as FakeNodeSocket | undefined;
   if (!socket) {
     throw new Error('Expected a Node WebSocket instance');

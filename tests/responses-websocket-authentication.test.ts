@@ -80,6 +80,7 @@ describe.each([
       Responses,
       (baseURL) => new OpenAI({ baseURL, apiKey: async () => 'SYNTHETIC_KEY' }),
       // JavaScript callers can pass values that Node serializes into header strings.
+      // SAFETY: The credential fixture intentionally passes a non-string value to verify Node header serialization and credential rejection.
       { headers: { Authorization: credential as string } },
     );
     expect(headers.authorization).toBe('Bearer SYNTHETIC_TOKEN');

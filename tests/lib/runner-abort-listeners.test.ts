@@ -156,6 +156,7 @@ test.each([false, true])('settles a throwing reason getter (already aborted=%s)'
       },
     },
   });
+  // SAFETY: This EventTarget fixture supplies aborted and a throwing reason getter to reproduce malformed structural AbortSignals without altering a native signal.
   const signal = target as AbortSignal;
   const unrelated = vi.fn();
   signal.addEventListener('abort', unrelated);

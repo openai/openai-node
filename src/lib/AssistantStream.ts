@@ -120,7 +120,9 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent) {
   ) {
     const messageID = Object.getOwnPropertyDescriptor(data, 'id');
     if (messageID && 'value' in messageID && data.id !== messageID.value) {
+      // SAFETY: Descriptor values are untyped; retaining this value as unknown avoids trusting a mutable message identifier.
       const canonicalID = messageID.value as unknown;
+      // SAFETY: The proxy retains the event data and substitutes only its captured own id; all other properties forward to the original receiver.
       stableData = new Proxy(data, {
         get(target, property) {
           // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys with the original target as accessor receiver.
@@ -129,6 +131,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent) {
       }) as AssistantStreamEvent['data'];
     }
   }
+  // SAFETY: The captured event discriminator and data originate from the same event; TypeScript loses their correlation when constructing the stabilized copy.
   const stableEvent = Object.freeze({ event: eventType, data: stableData }) as AssistantStreamEvent;
   const ordinaryEvent =
     eventDescriptor !== undefined &&
@@ -139,6 +142,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent) {
     dataDescriptor.value === data &&
     stableData === data;
 
+  // SAFETY: The captured event discriminator and data originate from the same event; TypeScript loses their correlation when constructing the stabilized copy.
   return {
     event: stableEvent,
     exposedEvent: ordinaryEvent ? event : ({ event: eventType, data: stableData } as AssistantStreamEvent),
@@ -778,6 +782,7 @@ export class AssistantStream
         ) {
           for (const toolCall of delta.step_details.tool_calls) {
             if (toolCall.index === this.#currentToolCallIndex) {
+              // SAFETY: The indexed tool call comes from this run-step snapshot after applying the delta for the same tool-call index.
               this.#emitExposed(
                 'toolCallDelta',
                 toolCall,
@@ -808,7 +813,7 @@ export class AssistantStream
         this.#activeRunStepID = undefined;
         const details = event.data.step_details;
         if (details.type === 'tool_calls' && this.#currentToolCall) {
-          this.#emitExposed('toolCallDone', this.#currentToolCall as ToolCall);
+          this.#emitExposed('toolCallDone', this.#currentToolCall);
         }
         this.#emitExposed('runStepDone', event.data, accumulatedRunStep);
         this.#currentToolCallIndex = undefined;
@@ -845,6 +850,7 @@ export class AssistantStream
       }
 
       case 'thread.run.step.delta': {
+        // SAFETY: Run-step snapshots are stored by their canonical run-step id; the delta path checks that the snapshot exists before updating it.
         const snapshot = this.#runStepSnapshots[runStepID] as Runs.RunStep;
         if (!snapshot) {
           throw new Error('Received a RunStepDelta before creation of a snapshot');
@@ -857,10 +863,11 @@ export class AssistantStream
           if (hasOwn(delta, 'id')) {
             throw new OpenAIError('Run-step deltas must not contain an id field');
           }
-          const accumulated = accumulateAssistantStreamDelta(snapshot, delta, true) as Runs.RunStep;
+          const accumulated = accumulateAssistantStreamDelta(snapshot, delta, true);
           this.#runStepSnapshots[runStepID] = accumulated;
         }
 
+        // SAFETY: Run-step snapshots are stored by their canonical run-step id; the delta path checks that the snapshot exists before updating it.
         return this.#runStepSnapshots[runStepID] as Runs.RunStep;
       }
 
@@ -875,7 +882,7 @@ export class AssistantStream
     }
 
     if (this.#runStepSnapshots[runStepID]) {
-      return this.#runStepSnapshots[runStepID] as Runs.RunStep;
+      return this.#runStepSnapshots[runStepID];
     }
     throw new Error('No snapshot available');
   }
@@ -952,6 +959,7 @@ export class AssistantStream
     currentContent: MessageContent | undefined,
     cacheArrays: boolean,
   ): TextContentBlock | ImageFileContentBlock {
+    // SAFETY: The accumulator merges the matching message-content delta into its existing block; the public return remains the text/image block union.
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public accumulateDelta helper retains its legacy open dictionary contract for heterogeneous delta fields.
     return accumulateAssistantStreamDelta(currentContent as Record<any, any>, contentElement, cacheArrays) as
       | TextContentBlock

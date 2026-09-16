@@ -140,7 +140,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
             let data;
 
             try {
-              data = JSON.parse(sse.data) as any;
+              data = JSON.parse(sse.data);
             } catch {
               logger.error(`Could not parse message into JSON:`);
               logger.error(`From chunk:`);
@@ -165,6 +165,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
               logger.error(`From chunk:`);
               throw new SyntaxError('Error reading response: malformed server-sent event JSON.');
             }
+            // SAFETY: Named SSE events use the public stream's event/data envelope; Item is the caller-selected API event contract.
             yield { event: sse.event, data } as any;
           }
         }
@@ -265,6 +266,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
           if (line) {
             let data: Item;
             try {
+              // SAFETY: Item is the caller's NDJSON response contract; JSON syntax is parsed here without a per-resource runtime schema.
               data = JSON.parse(line) as Item;
             } catch (error) {
               if (error instanceof SyntaxError) {
@@ -533,6 +535,7 @@ export async function* _iterSSEMessages(
 ): AsyncGenerator<ServerSentEvent, void, unknown> {
   if (!response.body) {
     controller.abort();
+    // SAFETY: navigator is optional across SDK runtimes; this compatibility branch checks its presence before identifying React Native.
     if (
       (globalThis as any).navigator !== undefined &&
       (globalThis as any).navigator.product === 'ReactNative'

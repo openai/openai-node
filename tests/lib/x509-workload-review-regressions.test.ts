@@ -649,6 +649,7 @@ describe('X.509 review regressions', () => {
     let apiRequests = 0;
     vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url, request) => {
       if (url.origin === 'https://mtls.auth.openai.com') {
+        // SAFETY: The intercepted token-exchange request is serialized from the synthetic service-account configuration; inspect its account id.
         const payload = JSON.parse(String(request.body)) as { service_account_id: string };
         exchangedAccounts.push(payload.service_account_id);
         return Response.json({
@@ -855,12 +856,14 @@ describe('X.509 review regressions', () => {
   });
 
   test('recognizes an inherited plain-data X.509 identity discriminator', () => {
+    // SAFETY: The fixture intentionally preserves inherited or accessor-based identity fields so validation must inspect their descriptors safely.
     const inheritedIdentity = Object.assign(Object.create({ type: 'x509' }) as object, {
       identityProviderId: 'synthetic-inherited-provider',
       serviceAccountId: 'synthetic-inherited-account',
     });
 
     const client = new OpenAI(
+      // SAFETY: Deliberately bypass the static workload-identity shape with inherited or accessor fields to test runtime identity validation.
       options({ workloadIdentity: inheritedIdentity as ClientOptions['workloadIdentity'] }),
     );
 
@@ -873,12 +876,14 @@ describe('X.509 review regressions', () => {
       identityProviderId: 'synthetic-undefined-provider',
       serviceAccountId: 'synthetic-service-account',
     };
+    // SAFETY: The fixture intentionally preserves inherited or accessor-based identity fields so validation must inspect their descriptors safely.
     const workloadIdentity =
       location === 'own'
         ? { ...identity, provider: undefined }
         : Object.assign(Object.create({ provider: undefined }) as object, identity);
 
     const client = new OpenAI(
+      // SAFETY: Deliberately bypass the static workload-identity shape with inherited or accessor fields to test runtime identity validation.
       options({ workloadIdentity: workloadIdentity as ClientOptions['workloadIdentity'] }),
     );
 
@@ -921,6 +926,7 @@ describe('X.509 review regressions', () => {
         identityProviderId: 'synthetic-accessor-provider',
         serviceAccountId: 'synthetic-accessor-account',
       };
+      // SAFETY: The fixture intentionally preserves inherited or accessor-based identity fields so validation must inspect their descriptors safely.
       const workloadIdentity =
         location === 'own'
           ? Object.defineProperty(base, 'type', { get: getter })
@@ -928,6 +934,7 @@ describe('X.509 review regressions', () => {
 
       expect(
         () =>
+          // SAFETY: Deliberately bypass the static workload-identity shape with inherited or accessor fields to test runtime identity validation.
           new OpenAI(options({ workloadIdentity: workloadIdentity as ClientOptions['workloadIdentity'] })),
       ).toThrow(/plain data property/iu);
       expect(getter).not.toHaveBeenCalled();

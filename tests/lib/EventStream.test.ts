@@ -39,6 +39,7 @@ class TestStream extends EventStream<TestEvents> {
   }
 
   emitNamed(event: string, value: string, index: number) {
+    // SAFETY: The test deliberately dispatches prototype-property names outside the declared event map to verify listener isolation.
     this._emit(event as 'foo', value, index);
   }
 
@@ -91,6 +92,7 @@ describe('EventStream listeners', () => {
     'safely emits unobserved Object.prototype event %s',
     (eventName) => {
       const stream = new TestStream();
+      // SAFETY: The test deliberately dispatches prototype-property names outside the declared event map to verify listener isolation.
       const event = eventName as 'foo';
 
       expect(() => stream.off(event, vi.fn())).not.toThrow();
@@ -102,6 +104,7 @@ describe('EventStream listeners', () => {
     'supports regular and one-time Object.prototype event listeners for %s',
     (eventName) => {
       const stream = new TestStream();
+      // SAFETY: The test deliberately dispatches prototype-property names outside the declared event map to verify listener isolation.
       const event = eventName as 'foo';
       const repeated = vi.fn();
       const once = vi.fn();
@@ -237,7 +240,8 @@ describe('EventStream terminal lifecycle', () => {
 
     const failure = await doneFailure;
     expect(failure).toBeInstanceOf(OpenAIError);
-    expect((failure as OpenAIError).message).toBe('listener failed');
+    expect(failure).toHaveProperty('message', 'listener failed');
+    // SAFETY: The preceding OpenAIError assertion establishes the error object; its optional cause remains unknown until the identity assertion.
     expect((failure as Error & { cause?: unknown }).cause).toBe(listenerFailure);
     expect(laterListener).not.toHaveBeenCalled();
     expect(stream.ended).toBe(true);
@@ -524,6 +528,7 @@ describe('EventStream.events', () => {
   test('rejects a producer-owned SDK Error subclass prototype without invoking its callable', async () => {
     const retained = 'x'.repeat(9 * 1024 * 1024);
     const inspectRetained = vi.fn(() => retained);
+    // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
     const prototype = Object.create(OpenAIError.prototype) as object;
     Object.defineProperty(prototype, 'inspectRetained', { value: inspectRetained });
     const error = new OpenAIError('producer-controlled subclass');
@@ -586,6 +591,7 @@ describe('EventStream.events', () => {
   test('does not suppress errors after iterator cleanup', async () => {
     const stream = new TestStream();
     const iterator = stream.events('foo');
+    // SAFETY: The spy substitutes a resolved promise solely to count reject calls without creating unhandled rejections; no resolved value is consumed.
     const reject = vi.spyOn(Promise, 'reject').mockImplementation(() => Promise.resolve() as Promise<never>);
     const error = new OpenAIError('oops');
 
@@ -613,7 +619,9 @@ describe('EventStream iterator buffer limits', () => {
     expect(stream.controller.signal.aborted).toBe(false);
     const first = await iterator.next();
     const last = await Promise.all(Array.from({ length: 767 }, () => iterator.next()));
+    // SAFETY: Only the locally constructed { shared } payloads enter this queue; the property read tests preservation of the producer object identity.
     expect((first.value[0] as { shared: object }).shared).toBe(shared);
+    // SAFETY: Only the locally constructed { shared } payloads enter this queue; the property read tests preservation of the producer object identity.
     expect((last.pop()?.value[0] as { shared: object } | undefined)?.shared).toBe(shared);
     stream.end();
   });
@@ -630,6 +638,7 @@ describe('EventStream iterator buffer limits', () => {
 
     expect(stream.controller.signal.aborted).toBe(false);
     const first = await iterator.next();
+    // SAFETY: Only the locally constructed { shared } payloads enter this queue; the property read tests preservation of the producer object identity.
     expect((first.value[0] as { shared: typeof shared }).shared).toBe(shared);
     expect(shared.text).toHaveLength(640 * 32);
     await iterator.return?.();
@@ -647,6 +656,7 @@ describe('EventStream iterator buffer limits', () => {
     expect(stream.controller.signal.aborted).toBe(false);
     const values = await Promise.all(Array.from({ length: 4 }, () => iterator.next()));
     for (const value of values) {
+      // SAFETY: The producer enqueues Uint8Array views over backing; the assertion checks that the queued view retains that exact buffer.
       expect((value.value[0] as { view: Uint8Array }).view.buffer).toBe(backing);
     }
     stream.end();
@@ -676,6 +686,7 @@ describe('EventStream iterator buffer limits', () => {
     shared.child = { text: 'x'.repeat(3 * 1024 * 1024) };
     const first = await iterator.next();
 
+    // SAFETY: Only the locally constructed { shared } payloads enter this queue; the property read tests preservation of the producer object identity.
     expect((first.value[0] as { shared: typeof shared }).shared).toBe(shared);
     expect(stream.controller.signal.aborted).toBe(false);
 
@@ -720,6 +731,7 @@ describe('EventStream iterator buffer limits', () => {
 
   test.each([
     { name: 'local Date', create: () => new Date(1_725_000_000_000) },
+    // SAFETY: The fixed VM expression constructs a Date; retaining the foreign instance is required to test cross-realm inspection.
     { name: 'cross-realm Date', create: () => runInNewContext('new Date(1725000000000)') as Date },
   ])('preserves a buffered genuine $name and its exact identity', async ({ create }) => {
     const payload = create();
@@ -736,7 +748,9 @@ describe('EventStream iterator buffer limits', () => {
   });
 
   test.each([
+    // SAFETY: This is deliberately a prototype-only spoof without native slots; it is passed only to stream validation, which must reject it.
     { name: 'local', create: () => Object.create(Date.prototype) as Date },
+    // SAFETY: This is deliberately a prototype-only spoof without native slots; it is passed only to stream validation, which must reject it.
     { name: 'cross-realm', create: () => runInNewContext('Object.create(Date.prototype)') as Date },
   ])('rejects a $name Date-prototype spoof without genuine timestamp storage', async ({ create }) => {
     const stream = new TestStream();
@@ -751,9 +765,11 @@ describe('EventStream iterator buffer limits', () => {
   test.each(['accessor', 'callable'] as const)(
     'rejects a custom genuine Date prototype %s without invoking it',
     async (kind) => {
+      // SAFETY: The fixed VM expression constructs a Date; retaining the foreign instance is required to test cross-realm inspection.
       const payload = runInNewContext('new Date(123)') as Date;
       const inspectRetained = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
-      const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+      // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
+      const prototype = Object.create(Object.getPrototypeOf(payload)) as object;
       Object.defineProperty(
         prototype,
         'retained',
@@ -773,10 +789,12 @@ describe('EventStream iterator buffer limits', () => {
 
   test.each([
     { name: 'local', create: () => new Date(123) },
+    // SAFETY: The fixed VM expression constructs a Date; retaining the foreign instance is required to test cross-realm inspection.
     { name: 'cross-realm', create: () => runInNewContext('new Date(123)') as Date },
   ])('charges oversized custom prototype data on a genuine $name Date', async ({ create }) => {
     const payload = create();
-    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
+    const prototype = Object.create(Object.getPrototypeOf(payload)) as object;
     Object.defineProperty(prototype, 'hidden', { value: 'x'.repeat(5 * 1024 * 1024) });
     Object.setPrototypeOf(payload, prototype);
     const stream = new TestStream();
@@ -789,8 +807,10 @@ describe('EventStream iterator buffer limits', () => {
   });
 
   test('preserves safe custom Date prototype data and buffered identity', async () => {
+    // SAFETY: The fixed VM expression constructs a Date; retaining the foreign instance is required to test cross-realm inspection.
     const payload = runInNewContext('new Date(123)') as Date;
-    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
+    const prototype = Object.create(Object.getPrototypeOf(payload)) as object;
     Object.defineProperty(prototype, 'safe', { value: 'small retained data' });
     Object.setPrototypeOf(payload, prototype);
     const stream = new TestStream();
@@ -807,6 +827,7 @@ describe('EventStream iterator buffer limits', () => {
     { name: 'local Headers', create: () => new Headers([['x-safe', 'small']]) },
     {
       name: 'injected-realm Headers',
+      // SAFETY: The VM expression constructs Headers using the supplied constructor; the fixture tests its retained data without serializing it.
       create: () => runInNewContext('new Headers([["x-safe", "small"]])', { Headers }) as Headers,
     },
   ])('preserves a queued genuine $name and its identity', async ({ create }) => {
@@ -841,6 +862,7 @@ describe('EventStream iterator buffer limits', () => {
   );
 
   test('rejects a Headers-prototype spoof without genuine hidden internal slots', async () => {
+    // SAFETY: This is deliberately a prototype-only spoof without native slots; it is passed only to stream validation, which must reject it.
     const spoof = Object.create(Headers.prototype) as Headers;
     const stream = new TestStream();
     const iterator = stream.events('payload');
@@ -1053,6 +1075,7 @@ describe('EventStream iterator buffer limits', () => {
     { name: 'unsupported RegExp internal slots', create: () => /private/u },
     {
       name: 'an unsupported custom object prototype',
+      // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
       create: () => Object.create({ inspect: () => 'private' }) as object,
     },
   ])('rejects $name before it enters a detached queue', async ({ create }) => {
@@ -1138,7 +1161,8 @@ describe('EventStream iterator buffer limits', () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
     const payload = create();
-    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
+    const prototype = Object.create(Object.getPrototypeOf(payload)) as object;
     Object.defineProperty(prototype, 'hidden', { value: 'x'.repeat(5 * 1024 * 1024) });
     Object.setPrototypeOf(payload, prototype);
 
@@ -1159,7 +1183,8 @@ describe('EventStream iterator buffer limits', () => {
     const payload = create();
     const retained = 'x'.repeat(9 * 1024 * 1024);
     const readAccessor = vi.fn(() => retained);
-    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
+    const prototype = Object.create(Object.getPrototypeOf(payload)) as object;
     Object.defineProperty(prototype, Symbol('hidden closure'), { get: readAccessor });
     Object.setPrototypeOf(payload, prototype);
 
@@ -1179,7 +1204,8 @@ describe('EventStream iterator buffer limits', () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
     const payload = create();
-    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
+    const prototype = Object.create(Object.getPrototypeOf(payload)) as object;
     Object.defineProperty(prototype, 'safe', { value: 'small retained data' });
     Object.setPrototypeOf(payload, prototype);
 
@@ -1195,7 +1221,9 @@ describe('EventStream iterator buffer limits', () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
     const payload = new Map();
+    // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
     const first = Object.create(Map.prototype) as object;
+    // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
     const second = Object.create(first) as object;
     Object.defineProperty(first, 'hidden', { value: 'x'.repeat(5 * 1024 * 1024) });
     Object.setPrototypeOf(payload, second);
@@ -1270,6 +1298,7 @@ describe('EventStream iterator buffer limits', () => {
     const invokeConstructor = vi.fn(() => {
       throw new Error('producer constructor must not run');
     });
+    // SAFETY: The controlled VM program returns an Error instance, possibly with deliberately hostile descriptors, for stream inspection to accept or reject.
     const payload = runInNewContext(
       `const error = new Error('safe');
        const custom = Object.create(Error.prototype);
@@ -1292,6 +1321,7 @@ describe('EventStream iterator buffer limits', () => {
     const invokeConstructor = vi.fn(() => {
       throw new Error('proxied constructor must not run');
     });
+    // SAFETY: The controlled VM program returns an Error instance, possibly with deliberately hostile descriptors, for stream inspection to accept or reject.
     const payload = runInNewContext(
       `const RealError = Error;
        const proxy = new Proxy(RealError, {
@@ -1314,6 +1344,7 @@ describe('EventStream iterator buffer limits', () => {
     const iterator = stream.events('payload');
     const readTag = vi.fn(() => 'Error');
     const readStack = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+    // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
     const payload = Object.create(null) as object;
     Object.defineProperty(payload, Symbol.toStringTag, { get: readTag });
     Object.defineProperty(payload, 'stack', { get: readStack });
@@ -1336,15 +1367,18 @@ describe('EventStream iterator buffer limits', () => {
     async ({ location, accessor }) => {
       const stream = new TestStream();
       const iterator = stream.events('payload');
+      // SAFETY: The controlled VM program returns an Error instance, possibly with deliberately hostile descriptors, for stream inspection to accept or reject.
       const genuine = runInNewContext("new Error('safe foreign error')") as Error;
-      const payload = Object.create(Object.getPrototypeOf(genuine) as object) as object;
+      // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
+      const payload = Object.create(Object.getPrototypeOf(genuine)) as object;
       const stack = Object.getOwnPropertyDescriptor(genuine, 'stack');
       if (!stack) {
         throw new Error('Expected a native Error stack descriptor');
       }
       Object.defineProperty(payload, 'stack', stack);
 
-      const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+      // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
+      const prototype = Object.create(Object.getPrototypeOf(payload)) as object;
       const target = location === 'own' ? payload : prototype;
       const readTag = vi.fn(() => 'Error');
       Object.defineProperty(target, Symbol.toStringTag, accessor ? { get: readTag } : { value: 'Error' });
@@ -1363,8 +1397,10 @@ describe('EventStream iterator buffer limits', () => {
   test('preserves safe custom prototype data on a genuine cross-realm Error', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
+    // SAFETY: The controlled VM program returns an Error instance, possibly with deliberately hostile descriptors, for stream inspection to accept or reject.
     const payload = runInNewContext("new Error('safe foreign error')") as Error;
-    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
+    const prototype = Object.create(Object.getPrototypeOf(payload)) as object;
     Object.defineProperty(prototype, 'safe', { value: 'small' });
     Object.setPrototypeOf(payload, prototype);
 
@@ -1423,6 +1459,7 @@ describe('EventStream iterator buffer limits', () => {
     // oxlint-disable-next-line anti-slop/no-known-value-widening -- A later listener adds the optional hidden field to the same object during dispatch.
     const payload: { text: string; hidden?: string } = { text: 'small' };
     stream.on('payload', (value) => {
+      // SAFETY: This listener receives the single payload object emitted immediately below; adding hidden data tests mutation during dispatch.
       (value as typeof payload).hidden = 'x'.repeat(5 * 1024 * 1024);
     });
 
@@ -1439,6 +1476,7 @@ describe('EventStream iterator buffer limits', () => {
     const payload: { text: string; hidden?: string } = { text: 'small' };
     stream.on('payload', (value) => {
       void iterator.return?.();
+      // SAFETY: This listener receives the single payload object emitted immediately below; adding hidden data tests mutation during dispatch.
       (value as typeof payload).hidden = 'x'.repeat(5 * 1024 * 1024);
     });
 
@@ -1458,6 +1496,7 @@ describe('EventStream iterator buffer limits', () => {
     const payload: { text: string; hidden?: string } = { text: 'small' };
     stream.on('payload', (value) => {
       void returned.return?.();
+      // SAFETY: This listener receives the single payload object emitted immediately below; adding hidden data tests mutation during dispatch.
       (value as typeof payload).hidden = 'x'.repeat(5 * 1024 * 1024);
     });
 
@@ -1634,6 +1673,7 @@ describe('EventStream iterator buffer limits', () => {
   ])('accepts a small genuine cross-realm $name and preserves its identity', async ({ expression }) => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
+    // SAFETY: The controlled VM program returns an Error instance, possibly with deliberately hostile descriptors, for stream inspection to accept or reject.
     const payload = runInNewContext(expression) as Error;
 
     stream.emitPayload(payload);
@@ -1649,6 +1689,7 @@ describe('EventStream iterator buffer limits', () => {
     async (accessor) => {
       const stream = new TestStream();
       const iterator = stream.events('payload');
+      // SAFETY: The controlled VM program returns an Error instance, possibly with deliberately hostile descriptors, for stream inspection to accept or reject.
       const payload = runInNewContext("new Error('safe foreign error')") as Error;
       const descriptor = Object.getOwnPropertyDescriptor(payload, 'stack');
       const readAccessor = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
@@ -1668,6 +1709,7 @@ describe('EventStream iterator buffer limits', () => {
       const stream = new TestStream();
       const iterator = stream.events('payload');
       const invokeAccessor = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+      // SAFETY: The controlled VM program returns an Error instance, possibly with deliberately hostile descriptors, for stream inspection to accept or reject.
       const payload = runInNewContext(
         `const error = new Error('safe foreign error');
          const descriptor = Object.getOwnPropertyDescriptor(error, 'stack');
@@ -1697,8 +1739,10 @@ describe('EventStream iterator buffer limits', () => {
   ])('charges custom prototype data retained by a cross-realm $name', async ({ expression }) => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
+    // SAFETY: Every expression in this local VM fixture constructs an object; the test then inspects its identity or installs hostile descriptors.
     const payload = runInNewContext(expression) as object;
-    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
+    const prototype = Object.create(Object.getPrototypeOf(payload)) as object;
     Object.defineProperty(prototype, 'hidden', { value: 'x'.repeat(5 * 1024 * 1024) });
     Object.setPrototypeOf(payload, prototype);
 
@@ -1725,6 +1769,7 @@ describe('EventStream iterator buffer limits', () => {
   ])('charges oversized data added directly to a foreign $name intrinsic prototype', async (scenario) => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
+    // SAFETY: Every expression in this local VM fixture constructs an object; the test then inspects its identity or installs hostile descriptors.
     const payload = runInNewContext(
       `Object.defineProperty(${scenario.prototype}, 'retained', {
          value: 'x'.repeat(5 * 1024 * 1024),
@@ -1744,6 +1789,7 @@ describe('EventStream iterator buffer limits', () => {
       const stream = new TestStream();
       const iterator = stream.events('payload');
       const readAccessor = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+      // SAFETY: The controlled VM program returns a Map; modified intrinsic descriptors are intentional inputs to the stream validator.
       const payload = runInNewContext(
         `Object.defineProperty(${prototype}, 'retained', { get: readAccessor }); new Map()`,
         { readAccessor },
@@ -1761,6 +1807,7 @@ describe('EventStream iterator buffer limits', () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
     const invokeMethod = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+    // SAFETY: The controlled VM program returns a Map; modified intrinsic descriptors are intentional inputs to the stream validator.
     const payload = runInNewContext('Map.prototype.get = invokeMethod; new Map()', { invokeMethod }) as Map<
       unknown,
       unknown
@@ -1777,6 +1824,7 @@ describe('EventStream iterator buffer limits', () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
     const readSize = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+    // SAFETY: The controlled VM program returns a Map; modified intrinsic descriptors are intentional inputs to the stream validator.
     const payload = runInNewContext(
       "Object.defineProperty(Map.prototype, 'size', { get: readSize }); new Map()",
       { readSize },
@@ -1799,6 +1847,7 @@ describe('EventStream iterator buffer limits', () => {
       const stream = new TestStream();
       const iterator = stream.events('payload');
       const invokeMethod = vi.fn(() => 'x'.repeat(9 * 1024 * 1024));
+      // SAFETY: The controlled VM program constructs a Uint8Array; any hostile intrinsic changes are intentional inputs to stream inspection.
       const payload = runInNewContext(`Uint8Array.prototype.${method} = invokeMethod; new Uint8Array(8)`, {
         invokeMethod,
       }) as Uint8Array;
@@ -1821,6 +1870,7 @@ describe('EventStream iterator buffer limits', () => {
     const invokeConstructor = vi.fn(() => {
       throw new Error('producer Function constructor must not run');
     });
+    // SAFETY: The controlled VM program constructs a Uint8Array; any hostile intrinsic changes are intentional inputs to stream inspection.
     const payload = runInNewContext(
       `const prototype = Object.getPrototypeOf(Uint8Array.prototype.toHex);
        const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor').value;
@@ -1841,9 +1891,10 @@ describe('EventStream iterator buffer limits', () => {
   test('revalidates a foreign intrinsic prototype changed by a later listener', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
+    // SAFETY: The controlled VM program returns a Map; modified intrinsic descriptors are intentional inputs to the stream validator.
     const payload = runInNewContext('new Map()') as Map<unknown, unknown>;
     stream.on('payload', () => {
-      Object.defineProperty(Object.getPrototypeOf(payload) as object, 'retained', {
+      Object.defineProperty(Object.getPrototypeOf(payload), 'retained', {
         value: 'x'.repeat(5 * 1024 * 1024),
       });
     });
@@ -1859,6 +1910,7 @@ describe('EventStream iterator buffer limits', () => {
     async (prototype) => {
       const stream = new TestStream();
       const iterator = stream.events('payload');
+      // SAFETY: The controlled VM program returns a Map; modified intrinsic descriptors are intentional inputs to the stream validator.
       const payload = runInNewContext(
         `Object.defineProperty(${prototype}, 'safe', { value: 'small' }); new Map()`,
       ) as Map<unknown, unknown>;
@@ -1875,8 +1927,10 @@ describe('EventStream iterator buffer limits', () => {
   test('preserves safe custom prototype data on a genuine cross-realm Map', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
+    // SAFETY: The controlled VM program returns a Map; modified intrinsic descriptors are intentional inputs to the stream validator.
     const payload = runInNewContext("new Map([['safe', 'value']])") as Map<string, string>;
-    const prototype = Object.create(Object.getPrototypeOf(payload) as object) as object;
+    // SAFETY: Object.create always returns an object; this view exposes no assumed fields while the test adds hostile prototype descriptors.
+    const prototype = Object.create(Object.getPrototypeOf(payload)) as object;
     Object.defineProperty(prototype, 'safe', { value: 'small' });
     Object.setPrototypeOf(payload, prototype);
 
@@ -1910,6 +1964,7 @@ describe('EventStream iterator buffer limits', () => {
   test('charges non-enumerable data retained by a cross-realm DataView', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
+    // SAFETY: The fixed VM expression constructs a DataView over its own ArrayBuffer for cross-realm retained-byte accounting.
     const payload = runInNewContext('new DataView(new ArrayBuffer(16))') as DataView;
     Object.defineProperty(payload, 'hidden', { value: 'x'.repeat(5 * 1024 * 1024) });
 
@@ -1942,6 +1997,7 @@ describe('EventStream iterator buffer limits', () => {
     async ({ expression, method }) => {
       const stream = new TestStream();
       const iterator = stream.events('payload');
+      // SAFETY: Every expression in this local VM fixture constructs an object; the test then inspects its identity or installs hostile descriptors.
       const payload = runInNewContext(expression) as object;
       const invokeHostileIterator = vi.fn(() => {
         throw new Error('hostile iterator');
@@ -2094,6 +2150,7 @@ describe('EventStream iterator buffer limits', () => {
     { name: 'Buffer', create: (length: number) => Buffer.alloc(length) },
     {
       name: 'cross-realm Uint8Array',
+      // SAFETY: The controlled VM program constructs a Uint8Array; any hostile intrinsic changes are intentional inputs to stream inspection.
       create: (length: number) => runInNewContext(`new Uint8Array(${length})`) as Uint8Array,
     },
   ])('buffers a $name at the own-key inspection boundary', async ({ create }) => {
@@ -2113,6 +2170,7 @@ describe('EventStream iterator buffer limits', () => {
     { name: 'Buffer', create: (length: number) => Buffer.alloc(length) },
     {
       name: 'cross-realm Uint8Array',
+      // SAFETY: The controlled VM program constructs a Uint8Array; any hostile intrinsic changes are intentional inputs to stream inspection.
       create: (length: number) => runInNewContext(`new Uint8Array(${length})`) as Uint8Array,
     },
   ])('rejects a detached $name above the bounded own-key inspection threshold', async ({ create }) => {

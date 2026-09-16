@@ -8,6 +8,7 @@ const example = readFileSync(
 );
 const exampleDocumentation = readFileSync(path.resolve(process.cwd(), 'examples/mtls/README.md'), 'utf-8');
 const packageDocumentation = readFileSync(path.resolve(process.cwd(), 'README.md'), 'utf-8');
+// SAFETY: Read the repository-owned package.json fixture to verify its documented X.509 validation script.
 const packageScripts = JSON.parse(readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8')) as {
   scripts: Record<string, string>;
 };
@@ -34,6 +35,7 @@ describe('X.509 workload-identity runnable example', () => {
     'https://mtls.api.openai.com.attacker.example/v1',
     'https://mtls.api.openai.com/v1?api_key=synthetic-secret',
   ])('rejects unsafe API-key mTLS example endpoint %s', async (configured) => {
+    // SAFETY: This exact local .mjs example exports mtlsBaseURL with the declared string contract; dynamic import has no generated declarations.
     const { mtlsBaseURL } = (await import(mtlsBaseURLModule)) as {
       mtlsBaseURL: (configured: string) => string;
     };
@@ -44,6 +46,7 @@ describe('X.509 workload-identity runnable example', () => {
   test.each(['https://mtls.api.openai.com/v1', 'https://mtls-eu.api.openai.com/v1'])(
     'preserves documented API-key mTLS endpoint %s',
     async (configured) => {
+      // SAFETY: This exact local .mjs example exports mtlsBaseURL with the declared string contract; dynamic import has no generated declarations.
       const { mtlsBaseURL } = (await import(mtlsBaseURLModule)) as {
         mtlsBaseURL: (configured: string) => string;
       };

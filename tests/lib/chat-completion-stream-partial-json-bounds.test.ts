@@ -30,7 +30,7 @@ const nonStrictTool: OpenAI.Chat.ChatCompletionFunctionTool = {
 };
 
 function createClient(chunks: AsyncIterable<Chunk>): OpenAI {
-  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The deterministic stream client implements only completions.create, avoiding unrelated SDK transport behavior.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The deterministic stream client implements only completions.create, avoiding unrelated SDK transport behavior.
   return {
     chat: {
       completions: {
@@ -297,6 +297,7 @@ it.each(['strict', 'auto-parseable'] as const)(
         ? strictTool
         : makeParseableTool(
             { ...strictTool, function: { ...strictTool.function, strict: false } },
+            // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
             { parser: (value: string) => JSON.parse(value) as unknown, callback: vi.fn() },
           );
     const stream = ChatCompletionStream.createChatCompletion(createClient(accessorChunks()), {
@@ -549,6 +550,7 @@ it.each([false, true] as const)(
     let serializedStrict: boolean | undefined;
     const create = vi.fn(async (request: OpenAI.Chat.ChatCompletionCreateParams) => {
       const serializedBody = JSON.stringify(request);
+      // SAFETY: This is the captured JSON request serialized by the SDK for the local fixture; the test inspects its dispatched tool and format fields.
       const serialized = JSON.parse(serializedBody) as OpenAI.Chat.ChatCompletionCreateParams;
       const dispatched = serialized.tools?.[0];
       if (dispatched?.type !== 'function') {
@@ -562,7 +564,7 @@ it.each([false, true] as const)(
         [Symbol.asyncIterator]: () => chunks[Symbol.asyncIterator](),
       };
     });
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The deterministic stream client implements only completions.create, avoiding unrelated SDK transport behavior.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The deterministic stream client implements only completions.create, avoiding unrelated SDK transport behavior.
     const client = { chat: { completions: { create } } } as unknown as OpenAI;
     const stream = ChatCompletionStream.createChatCompletion(client, {
       model: 'gpt-test',
@@ -615,6 +617,7 @@ it.each([
     const argumentsJSON = `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
     let wireStrict: boolean | undefined;
     const client = createSerializedClient(argumentFragments([argumentsJSON]), (body) => {
+      // SAFETY: This is the captured JSON request serialized by the SDK for the local fixture; the test inspects its dispatched tool and format fields.
       const wire = JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams;
       const dispatched = wire.tools?.[0];
       if (dispatched?.type !== 'function') {
@@ -662,6 +665,7 @@ it('keeps a genuinely serialized non-strict tool above the structured byte limit
     fragments.push(argumentsJSON.slice(offset, offset + maximumFrameBytes));
   }
   const client = createSerializedClient(argumentFragments(fragments), (body) => {
+    // SAFETY: This is the captured JSON request serialized by the SDK for the local fixture; the test inspects its dispatched tool and format fields.
     const dispatched = (JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams).tools?.[0];
     expect(dispatched).toMatchObject({ function: { strict: false } });
   });
@@ -782,6 +786,7 @@ it.each(['removed', 'accessor', 'serializer', 'oversized', 'cyclic source'] as c
 );
 
 it('preserves a branded tool parser for an equivalent reordered canonical wire schema', async () => {
+  // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
   const parser = vi.fn((value: string) => ({ owned: JSON.parse(value) as unknown }));
   const callback = vi.fn();
   const required = ['ignored', 'value'];
@@ -858,6 +863,7 @@ it('drops a branded response parser when its owner serializes a different nested
 });
 
 it('preserves a branded response parser for equivalent reordered serialized schema data', async () => {
+  // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
   const parser = vi.fn((value: string) => ({ owned: JSON.parse(value) as unknown }));
   const responseFormat = makeParseableResponseFormat(
     {
@@ -893,6 +899,7 @@ it('preserves a branded response parser for equivalent reordered serialized sche
 });
 
 it('drops an ambiguous accessor-backed response schema without reading it twice', async () => {
+  // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
   const parser = vi.fn((value: string) => ({ unsafe: JSON.parse(value) as unknown }));
   const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
   const readSchema = vi.fn(() => ({ name: 'accessor_output', schema: { type: 'object' } }));
@@ -946,7 +953,9 @@ it('drops a nested accessor-backed response schema without invoking its getter t
 });
 
 it('never binds a descriptor tool parser to a different value actually read through an array Proxy', async () => {
+  // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
   const parseDescriptorTool = vi.fn((value: string) => ({ stale: JSON.parse(value) as unknown }));
+  // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
   const parseActualTool = vi.fn((value: string) => ({ actual: JSON.parse(value) as unknown }));
   const descriptorTool = makeParseableTool(
     { ...strictTool, function: { ...strictTool.function, name: 'descriptor_tool' } },
@@ -967,6 +976,7 @@ it('never binds a descriptor tool parser to a different value actually read thro
 
   const completion = await ChatCompletionStream.createChatCompletion(
     createSerializedClient(namedArgumentFragments('actual_wire_tool', [argumentsJSON]), (body) => {
+      // SAFETY: This is the captured JSON request serialized by the SDK for the local fixture; the test inspects its dispatched tool and format fields.
       const dispatched = (JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams).tools?.[0];
       expect(dispatched).toMatchObject({ function: { name: 'actual_wire_tool' } });
     }),
@@ -986,12 +996,14 @@ it('never binds a descriptor tool parser to a different value actually read thro
 });
 
 it('ignores global stringify replacement inside a tool serializer when comparing wire schemas', async () => {
+  // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
   const parseStaleSchema = vi.fn((value: string) => ({ stale: JSON.parse(value) as unknown }));
   const tool = makeParseableTool(strictTool, { parser: parseStaleSchema, callback: vi.fn() });
   const originalStringify = JSON.stringify;
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The JSON serializer spy receives arbitrary serializable values and preserves the original stringify boundary.
   const forgePrimitive = vi.fn((value: unknown) => originalStringify(value === 'wire' ? 'value' : value));
   const serialize = vi.fn(() => {
+    // SAFETY: The test deliberately replaces JSON.stringify with a forged primitive result and restores it afterward to exercise serialization validation.
     JSON.stringify = forgePrimitive as typeof JSON.stringify;
     return {
       type: 'function',
@@ -1008,6 +1020,7 @@ it('ignores global stringify replacement inside a tool serializer when comparing
     const completion = await ChatCompletionStream.createChatCompletion(
       createSerializedClient(argumentFragments([argumentsJSON]), (body) => {
         JSON.stringify = originalStringify;
+        // SAFETY: This is the captured JSON request serialized by the SDK for the local fixture; the test inspects its dispatched tool and format fields.
         const dispatched = (JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams).tools?.[0];
         expect(dispatched).toMatchObject({
           function: { parameters: { properties: { wire: { type: 'string' } } } },
@@ -1035,7 +1048,9 @@ it('ignores global stringify replacement inside a tool serializer when comparing
 it.each(['own override', 'array subclass'] as const)(
   'binds parser owners to numeric tool slots without invoking a caller %s map',
   async (kind) => {
+    // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
     const parseFirst = vi.fn((value: string) => ({ first: JSON.parse(value) as unknown }));
+    // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
     const parseSecond = vi.fn((value: string) => ({ second: JSON.parse(value) as unknown }));
     const first = makeParseableTool(
       { ...strictTool, function: { ...strictTool.function, name: 'first_indexed_tool' } },
@@ -1076,6 +1091,7 @@ it.each(['own override', 'array subclass'] as const)(
 );
 
 it('leaves accessor-backed tool slots unbound without reading the request getter twice', async () => {
+  // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
   const parser = vi.fn((value: string) => ({ unsafe: JSON.parse(value) as unknown }));
   const tool = makeParseableTool(strictTool, { parser, callback: vi.fn() });
   const tools: OpenAI.Chat.ChatCompletionFunctionTool[] = [tool];
@@ -1102,6 +1118,7 @@ it.each(['late tool', 'response format'] as const)(
   'keeps an independent bounded schema budget for the %s parser contract',
   async (target) => {
     const parsers = Array.from({ length: 6 }, (_, index) =>
+      // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
       vi.fn((value: string) => ({ owner: index, value: JSON.parse(value) as unknown })),
     );
     const largeSchema = {
@@ -1119,6 +1136,7 @@ it.each(['late tool', 'response format'] as const)(
         { parser, callback: vi.fn() },
       ),
     );
+    // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
     const parseResponse = vi.fn((value: string) => ({ response: JSON.parse(value) as unknown }));
     const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parseResponse);
     const value = '{"value":"independent"}';
@@ -1161,6 +1179,7 @@ it.each(['tool', 'response format'] as const)(
 
     if (target === 'tool') {
       const inherited = makeParseableTool(strictTool, { parser: staleParser, callback: vi.fn() });
+      // SAFETY: The fixture inherits the declared tool/format properties from inherited; ownership checks must still distinguish them from own fields.
       const tool = Object.create(inherited) as typeof inherited;
       Object.defineProperties(tool, {
         type: { configurable: true, enumerable: true, value: 'function' },
@@ -1190,6 +1209,7 @@ it.each(['tool', 'response format'] as const)(
       });
     } else {
       const inherited = makeParseableResponseFormat(structuredResponseFormat, staleParser);
+      // SAFETY: The fixture inherits the declared tool/format properties from inherited; ownership checks must still distinguish them from own fields.
       const responseFormat = Object.create(inherited) as typeof inherited;
       Object.defineProperties(responseFormat, {
         type: { configurable: true, enumerable: true, value: 'json_schema' },
@@ -1224,11 +1244,13 @@ it.each(['tool', 'response format'] as const)(
 it.each(['tool', 'response format'] as const)(
   'preserves an inherited %s parser when its serialized schema remains equivalent',
   async (target) => {
+    // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
     const parser = vi.fn((value: string) => ({ inherited: JSON.parse(value) as unknown }));
     const value = '{"value":"safe"}';
 
     if (target === 'tool') {
       const inherited = makeParseableTool(strictTool, { parser, callback: vi.fn() });
+      // SAFETY: The fixture inherits the declared tool/format properties from inherited; ownership checks must still distinguish them from own fields.
       const tool = Object.create(inherited) as typeof inherited;
       Object.defineProperties(tool, {
         type: { configurable: true, enumerable: true, value: 'function' },
@@ -1249,6 +1271,7 @@ it.each(['tool', 'response format'] as const)(
       });
     } else {
       const inherited = makeParseableResponseFormat(structuredResponseFormat, parser);
+      // SAFETY: The fixture inherits the declared tool/format properties from inherited; ownership checks must still distinguish them from own fields.
       const responseFormat = Object.create(inherited) as typeof inherited;
       Object.defineProperties(responseFormat, {
         type: { configurable: true, enumerable: true, value: 'json_schema' },
@@ -1272,6 +1295,7 @@ it.each(['tool', 'response format'] as const)(
 );
 
 it('preserves the branded parser identity while a tool.toJSON changes its dispatched name', async () => {
+  // SAFETY: This test parser is fed the locally constructed JSON fixture; its declared result describes the value whose parsing or isolation the assertions verify.
   const parser = vi.fn((value: string) => JSON.parse(value) as { value: string });
   const callback = vi.fn();
   const tool = makeParseableTool(strictTool, { parser, callback });
@@ -1288,6 +1312,7 @@ it('preserves the branded parser identity while a tool.toJSON changes its dispat
   const client = createSerializedClient(
     namedArgumentFragments('serialized_tool', [argumentsJSON]),
     (body) => {
+      // SAFETY: This is the captured JSON request serialized by the SDK for the local fixture; the test inspects its dispatched tool and format fields.
       const dispatched = (JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams).tools?.[0];
       expect(dispatched).toMatchObject({ function: { name: 'serialized_tool', strict: true } });
     },
@@ -1315,6 +1340,7 @@ it('preserves the branded parser identity while a tool.toJSON changes its dispat
 it.each(['format', 'request'] as const)(
   'does not parse a response format serialized as text by the %s owner without tools',
   async (owner) => {
+    // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
     const parser = vi.fn((content: string) => JSON.parse(content) as unknown);
     const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
     const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
@@ -1344,6 +1370,7 @@ it.each(['format', 'request'] as const)(
 );
 
 it('keeps the original response parser for its own serialized JSON schema', async () => {
+  // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
   const parser = vi.fn((content: string) => ({ owned: JSON.parse(content) as unknown }));
   const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
   const serialize = vi.fn(function serializeOwnedSchema(this: typeof responseFormat) {
@@ -1367,6 +1394,7 @@ it('keeps the original response parser for its own serialized JSON schema', asyn
 });
 
 it('drops a branded response parser for an unrelated synthesized JSON schema', async () => {
+  // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
   const parser = vi.fn((content: string) => ({ unsafe: JSON.parse(content) as unknown }));
   const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
   const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
@@ -1393,7 +1421,9 @@ it('drops a branded response parser for an unrelated synthesized JSON schema', a
 it.each(['tools', 'request', 'tools-and-tool'] as const)(
   'keeps branded parser ownership when the %s serializer reorders actual tools',
   async (owner) => {
+    // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
     const parseFirst = vi.fn((content: string) => ({ wrong: JSON.parse(content) as unknown }));
+    // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
     const parseSecond = vi.fn((content: string) => ({ correct: JSON.parse(content) as unknown }));
     const first = makeParseableTool(
       { ...strictTool, function: { ...strictTool.function, name: 'first_tool' } },
@@ -1427,6 +1457,7 @@ it.each(['tools', 'request', 'tools-and-tool'] as const)(
     });
     const argumentsJSON = '{"value":"correct owner"}';
     const client = createSerializedClient(namedArgumentFragments('second_tool', [argumentsJSON]), (body) => {
+      // SAFETY: This is the captured JSON request serialized by the SDK for the local fixture; the test inspects its dispatched tool and format fields.
       const dispatched = JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams;
       expect(dispatched.tools?.map((tool) => tool.type === 'function' && tool.function.name)).toEqual([
         'second_tool',
@@ -1447,6 +1478,7 @@ it.each(['tools', 'request', 'tools-and-tool'] as const)(
 );
 
 it('never transfers a configured tool parser to an unrelated serialized tool', async () => {
+  // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
   const parser = vi.fn((content: string) => ({ unsafe: JSON.parse(content) as unknown }));
   const original = makeParseableTool(strictTool, { parser, callback: vi.fn() });
   const tools = [original];
@@ -1517,6 +1549,7 @@ it('tracks the actual serialized tool contract again when a request is retried',
       if (typeof init?.body !== 'string') {
         throw new TypeError('Expected a JSON-serialized retry request');
       }
+      // SAFETY: This is the captured JSON request serialized by the SDK for the local fixture; the test inspects its dispatched tool and format fields.
       const parsed = JSON.parse(init.body) as OpenAI.Chat.ChatCompletionCreateParams;
       const wireTool = parsed.tools?.[0];
       if (wireTool?.type !== 'function') {
@@ -1569,6 +1602,7 @@ it('isolates concurrent serialized contracts that share the same caller-owned to
   };
   const dispatched: boolean[] = [];
   const client = createSerializedClient(chunks, (body) => {
+    // SAFETY: This is the captured JSON request serialized by the SDK for the local fixture; the test inspects its dispatched tool and format fields.
     const parsed = JSON.parse(body) as OpenAI.Chat.ChatCompletionCreateParams;
     const wireTool = parsed.tools?.[0];
     if (wireTool?.type !== 'function') {
@@ -1594,19 +1628,24 @@ it('isolates concurrent serialized contracts that share the same caller-owned to
   expect(bounded.status).toBe('rejected');
   if (bounded.status === 'rejected') {
     expect(bounded.reason).toBeInstanceOf(Error);
-    expect((bounded.reason as Error).message).toMatch(/structured JSON nesting depth limit/u);
+    expect(bounded.reason).toHaveProperty(
+      'message',
+      expect.stringMatching(/structured JSON nesting depth limit/u),
+    );
   }
   expect(dispatched).toEqual([false, true]);
   expect(serialize).toHaveBeenCalledTimes(2);
 });
 
 it('preserves the serialized branded response parser while the streaming response is pending', async () => {
+  // SAFETY: This test parser is fed the locally constructed JSON fixture; its declared result describes the value whose parsing or isolation the assertions verify.
   const parser = vi.fn((value: string) => JSON.parse(value) as { value: string });
   const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
   const chunks = contentFragments(['{"value":"dispatched"}']);
   let serializedType: string | undefined;
   const create = vi.fn(async (request: OpenAI.Chat.ChatCompletionCreateParams) => {
     const serializedBody = JSON.stringify(request);
+    // SAFETY: This is the captured JSON request serialized by the SDK for the local fixture; the test inspects its dispatched tool and format fields.
     const serialized = JSON.parse(serializedBody) as OpenAI.Chat.ChatCompletionCreateParams;
     serializedType = serialized.response_format?.type;
     await Promise.resolve();
@@ -1616,7 +1655,7 @@ it('preserves the serialized branded response parser while the streaming respons
       [Symbol.asyncIterator]: () => chunks[Symbol.asyncIterator](),
     };
   });
-  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The deterministic stream client implements only completions.create, avoiding unrelated SDK transport behavior.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The deterministic stream client implements only completions.create, avoiding unrelated SDK transport behavior.
   const client = { chat: { completions: { create } } } as unknown as OpenAI;
 
   const completion = await ChatCompletionStream.createChatCompletion(client, {
@@ -1964,6 +2003,7 @@ it('refunds provisional unmatched fragments before parsing another strict tool',
 });
 
 it('preserves non-enumerable tool parsing brands and executable callbacks in private snapshots', async () => {
+  // SAFETY: This test parser is fed the locally constructed JSON fixture; its declared result describes the value whose parsing or isolation the assertions verify.
   const parser = vi.fn((content: string) => JSON.parse(content) as { value: string });
   const callback = vi.fn();
   const tool = makeParseableTool(strictTool, { parser, callback });
@@ -1985,6 +2025,7 @@ it('preserves non-enumerable tool parsing brands and executable callbacks in pri
 });
 
 it('preserves branded structured-output parsing when caller formats mutate during streaming', async () => {
+  // SAFETY: This test parser is fed the locally constructed JSON fixture; its declared result describes the value whose parsing or isolation the assertions verify.
   const parser = vi.fn((content: string) => JSON.parse(content) as { value: number });
   const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
 
@@ -2203,6 +2244,7 @@ it.each(['byte', 'depth', 'fragment'] as const)(
 it('retains the structured JSON budget for a branded auto-parseable non-strict tool', async () => {
   const autoTool = makeParseableTool(
     { ...strictTool, function: { ...strictTool.function, strict: false } },
+    // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
     { parser: (value: string) => JSON.parse(value) as unknown, callback: vi.fn() },
   );
   const stream = ChatCompletionStream.createChatCompletion(
@@ -2458,6 +2500,7 @@ it.each(
       (error: unknown) => error,
     );
     expect(failure).toBeInstanceOf(Error);
+    // SAFETY: The captured failure is asserted to be Error before its message or optional cause is inspected for the expected validation failure.
     expect((failure as Error).message).toMatch(
       limit === 'byte' ? /structured JSON byte limit/u : /structured JSON nesting depth limit/u,
     );
@@ -2497,7 +2540,7 @@ it.each(['content', 'tool'] as const)(
       (error: unknown) => error,
     );
     expect(failure).toBeInstanceOf(Error);
-    expect((failure as Error).message).toMatch(/structured JSON byte limit/u);
+    expect(failure).toHaveProperty('message', expect.stringMatching(/structured JSON byte limit/u));
   },
 );
 
@@ -2544,6 +2587,7 @@ it.each(['data', 'accessor'] as const)(
       if (!message) {
         return;
       }
+      // SAFETY: Object.create returns an object; the fixture adds hostile prototype data without assuming any existing fields.
       const prototype = Object.create(Object.prototype) as object;
       Object.defineProperty(prototype, 'content', kind === 'data' ? { value: unsafe } : { get: readContent });
       Reflect.deleteProperty(message, 'content');
@@ -2557,7 +2601,7 @@ it.each(['data', 'accessor'] as const)(
     );
 
     expect(failure).toBeInstanceOf(Error);
-    expect((failure as Error).message).toMatch(/unsafe structured JSON snapshot/u);
+    expect(failure).toHaveProperty('message', expect.stringMatching(/unsafe structured JSON snapshot/u));
     expect(readContent).not.toHaveBeenCalled();
   },
 );
@@ -2600,7 +2644,7 @@ it.each(['refusal', 'message'] as const)(
     );
 
     expect(failure).toBeInstanceOf(Error);
-    expect((failure as Error).message).toMatch(/unsafe structured JSON snapshot/u);
+    expect(failure).toHaveProperty('message', expect.stringMatching(/unsafe structured JSON snapshot/u));
     expect(read).not.toHaveBeenCalled();
     expect(parse.mock.calls.every(([value]) => value.length < 16 * 1024 * 1024)).toBe(true);
   },
@@ -2632,7 +2676,7 @@ it('rejects an inherited structured refusal accessor without invoking it', async
   );
 
   expect(failure).toBeInstanceOf(Error);
-  expect((failure as Error).message).toMatch(/unsafe structured JSON snapshot/u);
+  expect(failure).toHaveProperty('message', expect.stringMatching(/unsafe structured JSON snapshot/u));
   expect(read).not.toHaveBeenCalled();
 });
 
@@ -2660,7 +2704,7 @@ it('rejects an inherited structured choice message without invoking its getter',
   );
 
   expect(failure).toBeInstanceOf(Error);
-  expect((failure as Error).message).toMatch(/unsafe structured JSON snapshot/u);
+  expect(failure).toHaveProperty('message', expect.stringMatching(/unsafe structured JSON snapshot/u));
   expect(read).not.toHaveBeenCalled();
 });
 
@@ -2721,6 +2765,7 @@ it.each(['strict', 'auto-parseable'] as const)(
       kind === 'strict'
         ? `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`
         : `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+    // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
     const parser = vi.fn((value: string) => JSON.parse(value) as unknown);
     const tool =
       kind === 'auto-parseable' ? makeParseableTool(strictTool, { parser, callback: vi.fn() }) : strictTool;
@@ -2766,6 +2811,7 @@ it.each(['strict', 'auto-parseable'] as const)(
 it.each(['strict', 'auto-parseable'] as const)(
   'rejects an uncaptured %s tool entry revealed after collection validation',
   async (kind) => {
+    // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
     const parser = vi.fn((value: string) => JSON.parse(value) as unknown);
     const tool =
       kind === 'auto-parseable' ? makeParseableTool(strictTool, { parser, callback: vi.fn() }) : strictTool;
@@ -2859,6 +2905,7 @@ it.each([
       limit === 'byte'
         ? `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`
         : `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
+    // SAFETY: This test parser is fed the locally constructed JSON fixture; its declared result describes the value whose parsing or isolation the assertions verify.
     const parser = vi.fn((value: string) => JSON.parse(value) as { value?: string });
     const tool =
       kind === 'auto-parseable' ? makeParseableTool(strictTool, { parser, callback: vi.fn() }) : strictTool;
@@ -2906,6 +2953,7 @@ it.each(['choices', 'tool_calls'] as const)(
   'finalizes validated %s without invoking caller-owned map or array species',
   async (collection) => {
     const unsafe = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
+    // SAFETY: This test parser is fed the locally constructed JSON fixture; its declared result describes the value whose parsing or isolation the assertions verify.
     const parser = vi.fn((value: string) => JSON.parse(value) as { value?: string });
     const responseFormat = makeParseableResponseFormat(structuredResponseFormat, parser);
     const tool = makeParseableTool(strictTool, { parser, callback: vi.fn() });
@@ -2993,7 +3041,7 @@ it.each(['choices', 'tool_calls'] as const)(
     );
 
     expect(failure).toBeInstanceOf(Error);
-    expect((failure as Error).message).toMatch(/snapshot.*(?:choice|tool).*limit/iu);
+    expect(failure).toHaveProperty('message', expect.stringMatching(/snapshot.*(?:choice|tool).*limit/iu));
     expect(iterate).not.toHaveBeenCalled();
   },
 );
@@ -3043,13 +3091,14 @@ it('enforces an aggregate final budget across independently bounded public parse
   );
 
   expect(failure).toBeInstanceOf(Error);
-  expect((failure as Error).message).toMatch(/structured JSON byte limit/u);
+  expect(failure).toHaveProperty('message', expect.stringMatching(/structured JSON byte limit/u));
 });
 
 it.each(['content', 'tool'] as const)(
   'rejects a combined oversized %s snapshot before invoking any done-event parser',
   async (kind) => {
     const oversizedTogether = `{"value":"${'x'.repeat(9 * 1024 * 1024)}"}`;
+    // SAFETY: JSON.parse returns any; widening the parser result to unknown preserves the unvalidated value without granting property access.
     const parse = vi.fn((value: string) => JSON.parse(value) as unknown);
 
     async function* events(): AsyncGenerator<Chunk> {
@@ -3107,7 +3156,7 @@ it.each(['content', 'tool'] as const)(
     );
 
     expect(failure).toBeInstanceOf(Error);
-    expect((failure as Error).message).toMatch(/structured JSON byte limit/u);
+    expect(failure).toHaveProperty('message', expect.stringMatching(/structured JSON byte limit/u));
     expect(parse.mock.calls.length).toBe(0);
   },
 );
@@ -3134,7 +3183,7 @@ it('bounds a new strict tool appended to the public snapshot before its final pa
     (error: unknown) => error,
   );
   expect(failure).toBeInstanceOf(Error);
-  expect((failure as Error).message).toMatch(/structured JSON byte limit/u);
+  expect(failure).toHaveProperty('message', expect.stringMatching(/structured JSON byte limit/u));
   expect(
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
     parse.mock.calls.every(([value]) => typeof value !== 'string' || value.length < 16 * 1024 * 1024),
@@ -3175,6 +3224,7 @@ it.each(['content', 'tool'] as const)(
   async (kind) => {
     const expected = new SyntaxError('User-owned structured parser diagnostic');
     const expectedCause = new Error('User-owned structured parser cause');
+    // SAFETY: expected is the locally caught SyntaxError; this optional cause slot is deliberately installed and later checked for original identity.
     (expected as SyntaxError & { cause?: unknown }).cause = expectedCause;
     const parser = vi.fn(() => {
       throw expected;
@@ -3198,7 +3248,9 @@ it.each(['content', 'tool'] as const)(
       (error: unknown) => error,
     );
 
+    // SAFETY: The captured failure is asserted to be Error before its message or optional cause is inspected for the expected validation failure.
     expect((failure as Error & { cause?: unknown }).cause).toBe(expected);
+    // SAFETY: expected is the locally caught SyntaxError; this optional cause slot is deliberately installed and later checked for original identity.
     expect((expected as SyntaxError & { cause?: unknown }).cause).toBe(expectedCause);
     expect(parser).toHaveBeenCalledTimes(1);
   },
@@ -3295,7 +3347,7 @@ it('charges repeated whole-snapshot strict-tool scans to the cumulative parse-wo
   );
 
   expect(failure).toBeInstanceOf(Error);
-  expect((failure as Error).message).toMatch(/structured JSON parse-work limit/u);
+  expect(failure).toHaveProperty('message', expect.stringMatching(/structured JSON parse-work limit/u));
   expect(parse.mock.calls.length).toBeLessThan(toolCount);
 });
 

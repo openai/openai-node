@@ -56,6 +56,7 @@ export function createResponse() {
     statusCode: 200,
     writableEnded: false,
     writeResult: true,
+    // SAFETY: This mutable callback slot starts empty; individual tests install a write hook before triggering the fake HTTP response.
     onWrite: null as (() => void) | null,
   });
 
@@ -216,6 +217,7 @@ export function loadExample(
           providerOptions?: { signal?: AbortSignal },
         ) => {
           configureProvider(providerOptions);
+          // SAFETY: completionChunks with false yields Completion objects; its shared implementation also supports the encoded-stream branch.
           const chunks = completionChunks(runtime, false) as AsyncIterable<Completion>;
 
           if (runtime.pendingCreate) {

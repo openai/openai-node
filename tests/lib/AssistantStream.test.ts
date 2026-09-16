@@ -15,6 +15,7 @@ function iterableEvents(events: Event[], controller = new AbortController()) {
     controller,
     async *[Symbol.asyncIterator]() {
       for (const event of events) {
+        // SAFETY: Raw fixtures intentionally include incomplete and invalid wire events; only the stream validation under test consumes them.
         yield event as AssistantStreamEvent;
       }
     },
@@ -287,6 +288,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     events.push({ event: 'thread.message.completed', data: message }, completedRun());
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       { create: vi.fn().mockResolvedValue(iterableEvents(events)) } as any,
       { assistant_id: 'assistant_123' },
     );
@@ -304,6 +306,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     const createdEvent = { event: 'thread.message.created', data: message };
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       {
         create: vi
           .fn()
@@ -476,6 +479,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     Object.defineProperty(createdEvent, 'data', { enumerable: true, get: readData });
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       {
         create: vi
           .fn()
@@ -516,6 +520,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     const createdEvent = { event: 'thread.message.created', data: message };
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       {
         create: vi
           .fn()
@@ -532,7 +537,9 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     const createdMessages: unknown[] = [];
     runner.on('event', (event) => {
       if (Object.is(event, createdEvent)) {
+        // SAFETY: The callback deliberately changes the dispatched wire event to test that the stream retains its original event identity.
         (event as Event)['event'] = 'thread.run.completed';
+        // SAFETY: The callback deliberately changes the dispatched wire event to test that the stream retains its original event identity.
         (event as Event)['data'] = replacement;
       }
     });
@@ -555,6 +562,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     Object.defineProperty(createdEvent, 'event', { enumerable: true, get: readEvent });
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       {
         create: vi
           .fn()
@@ -594,6 +602,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     });
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       {
         create: vi
           .fn()
@@ -659,6 +668,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
       const firstEvent = { event: 'thread.message.created', data: first };
       const runner = AssistantStream.createAssistantStream(
         'thread_123',
+        // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
         {
           create: vi.fn().mockResolvedValue(
             iterableEvents([
@@ -759,6 +769,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     const alias = { id: 'msg_proxy_alias', role: 'assistant', content: [] };
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       {
         create: vi.fn().mockResolvedValue(
           iterableEvents([
@@ -794,6 +805,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     'rejects an %s message ID before exposing the event or invoking a getter',
     async (kind) => {
       const readID = vi.fn(() => 'msg_injected');
+      // SAFETY: Object.create installs the hostile inherited id getter; the fixture supplies role/content and tests rejection before reading that getter.
       const message: Event =
         kind === 'inherited'
           ? Object.assign(Object.create(Object.defineProperty({}, 'id', { get: readID })) as Event, {
@@ -807,6 +819,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
 
       const runner = AssistantStream.createAssistantStream(
         'thread_123',
+        // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
         {
           create: vi
             .fn()
@@ -1478,7 +1491,7 @@ describe('AssistantStream factories and async iteration', () => {
 
   test('surfaces an error event with malformed data as an APIError instead of crashing', async () => {
     const readable = new Stream(async function* errorEvents() {
-      yield { event: 'error' as const, data: null as any };
+      yield { event: 'error' as const, data: null };
     }, new AbortController()).toReadableStream();
 
     const runner = AssistantStream.fromReadableStream(readable);
@@ -1496,6 +1509,7 @@ describe('AssistantStream factories and async iteration', () => {
     const headers = new Headers({ 'x-custom': 'value' });
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       runs as any,
       { assistant_id: 'assistant_123' },
       { headers, __metadata: { requestID: 'request_123' } },
@@ -1518,6 +1532,7 @@ describe('AssistantStream factories and async iteration', () => {
     const headers: [string, string][] = [['x-custom', 'value']];
     const runner = AssistantStream.createThreadAssistantStream(
       { assistant_id: 'assistant_123' },
+      // SAFETY: The partial Threads fixture implements createAndRun, the only resource method used by this stream factory.
       threads as any,
       { headers },
     );
@@ -1538,6 +1553,7 @@ describe('AssistantStream factories and async iteration', () => {
     const runs = { submitToolOutputs: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
     const runner = AssistantStream.createToolAssistantStream(
       'run_123',
+      // SAFETY: The partial Runs fixture implements submitToolOutputs, the only resource method used by this stream factory.
       runs as any,
       { thread_id: 'thread_123', tool_outputs: [] },
       { headers: { 'x-custom': 'value' } },
@@ -1604,6 +1620,7 @@ describe('AssistantStream factories and async iteration', () => {
     const event = completedRun('run_original');
     const error = new OpenAIError('stream failed after an event');
 
+    // SAFETY: This fixture deliberately emits its synthetic raw event through the public event path to exercise queue behavior.
     runner._emit('event', event as AssistantStreamEvent);
     event.data.id = 'run_mutated_after_emit';
     runner._emit('error', error);
@@ -1622,6 +1639,7 @@ describe('AssistantStream factories and async iteration', () => {
     const event = completedRun();
     const error = new APIUserAbortError();
 
+    // SAFETY: This fixture deliberately emits its synthetic raw event through the public event path to exercise queue behavior.
     runner._emit('event', event as AssistantStreamEvent);
     runner._emit('abort', error);
 
@@ -1692,12 +1710,14 @@ describe('AssistantStream factories and async iteration', () => {
         case 'run': {
           runner = AssistantStream.createAssistantStream(
             'thread_123',
+            // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
             { create: vi.fn().mockResolvedValue(stream) } as any,
             { assistant_id: 'assistant_123' },
           );
           break;
         }
         case 'thread': {
+          // SAFETY: The partial Threads fixture implements createAndRun, the only resource method used by this stream factory.
           runner = AssistantStream.createThreadAssistantStream({ assistant_id: 'assistant_123' }, {
             createAndRun: vi.fn().mockResolvedValue(stream),
           } as any);
@@ -1706,6 +1726,7 @@ describe('AssistantStream factories and async iteration', () => {
         case 'tool': {
           runner = AssistantStream.createToolAssistantStream(
             'run_123',
+            // SAFETY: The partial Runs fixture implements submitToolOutputs, the only resource method used by this stream factory.
             { submitToolOutputs: vi.fn().mockResolvedValue(stream) } as any,
             { thread_id: 'thread_123', tool_outputs: [] },
             undefined,

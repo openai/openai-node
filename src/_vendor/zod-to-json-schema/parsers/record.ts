@@ -23,6 +23,7 @@ export function parseRecordDef(
   refs: Refs,
 ): JsonSchema7RecordType {
   if (refs.target === 'openApi3' && def.keyType?._def.typeName === ZodFirstPartyTypeKind.ZodEnum) {
+    // SAFETY: The OpenAPI enum-key path emits an explicitly checked object schema while preserving the vendored record parser's public return type.
     return {
       type: 'object',
       required: def.keyType._def.values,
@@ -53,6 +54,7 @@ export function parseRecordDef(
   }
 
   if (def.keyType?._def.typeName === ZodFirstPartyTypeKind.ZodString && def.keyType._def.checks?.length) {
+    // SAFETY: Removing only type from the parsed string schema leaves the keyword subset allowed in propertyNames.
     const keyType = Object.fromEntries(
       Object.entries(parseStringDef(def.keyType._def, refs)).filter(([key]) => key !== 'type'),
     ) as JsonSchema7RecordPropertyNamesType;

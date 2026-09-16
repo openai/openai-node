@@ -139,6 +139,7 @@ async function expectPrivateCredentialFailure(
   }
 
   expect(failure.message).toBe(SAFE_ERROR);
+  // SAFETY: The preceding runtime class check verifies the error; the optional cause stays unknown and is inspected only for absence or original identity.
   expect((failure as TypeError & { cause?: unknown }).cause).toBeUndefined();
 
   for (const diagnostic of [failure.message, failure.stack ?? '']) {
@@ -285,7 +286,8 @@ describe('Bedrock bearer credential diagnostic privacy', () => {
       }
 
       expect(failure).toBeInstanceOf(TypeError);
-      expect((failure as Error).message).toContain(callerValue);
+      expect(failure).toHaveProperty('message', expect.stringContaining(callerValue));
+      // SAFETY: The preceding runtime class check verifies the error; the optional cause stays unknown and is inspected only for absence or original identity.
       expect((failure as Error).message).not.toBe(SAFE_ERROR);
       expect(fetch).not.toHaveBeenCalled();
     },
@@ -316,6 +318,7 @@ describe('Bedrock bearer credential diagnostic privacy', () => {
       expect(failure).toBe(originalFailure);
     } else {
       expect(failure).toBeInstanceOf(OpenAIError);
+      // SAFETY: The preceding runtime class check verifies the error; the optional cause stays unknown and is inspected only for absence or original identity.
       expect((failure as Error & { cause?: unknown }).cause).toBe(originalFailure);
     }
     expect(tokenProvider).toHaveBeenCalledTimes(1);
@@ -323,8 +326,8 @@ describe('Bedrock bearer credential diagnostic privacy', () => {
   });
 
   test.each(
-    ['dependency-free', 'AWS'].flatMap((entrypoint) =>
-      authenticationModes.map((authentication) => ({ entrypoint: entrypoint as Entrypoint, authentication })),
+    (['dependency-free', 'AWS'] as const).flatMap((entrypoint) =>
+      authenticationModes.map((authentication) => ({ entrypoint, authentication })),
     ),
   )(
     'leaves $entrypoint $authentication caller headers and redirect policy untouched',

@@ -405,6 +405,7 @@ function validateOutputItemIdentity(
     return;
   }
 
+  // SAFETY: The event type was classified as item-scoped; the following checks validate its own item_id before use.
   const itemEvent = event as ResponseItemScopedEvent;
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
   if (!hasOwn(event, 'item_id') || typeof itemEvent.item_id !== 'string' || itemEvent.item_id.length === 0) {
@@ -561,15 +562,18 @@ function sanitizeResponseEvent(
   try {
     descriptor = Object.getOwnPropertyDescriptor(event, 'type');
   } catch {
+    // SAFETY: assertNever always throws; the cast routes invalid runtime events through the existing unsupported-event error path.
     return assertNever(event as never);
   }
 
   const type: unknown = descriptor?.value;
+  // SAFETY: The string is used only as a Set lookup key; membership performs the supported-event check.
   if (
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
     typeof type !== 'string' ||
     !supportedResponseEventTypes.has(type as ResponseAccumulatorEvent['type'])
   ) {
+    // SAFETY: assertNever always throws; the cast routes invalid runtime events through the existing unsupported-event error path.
     return assertNever(event as never);
   }
 
@@ -597,6 +601,7 @@ function sanitizeResponseEvent(
         stableValues.set('part', structuredClone(event.part));
       }
     } catch {
+      // SAFETY: assertNever always throws; the cast routes invalid runtime events through the existing unsupported-event error path.
       return assertNever(event as never);
     }
   }
@@ -795,6 +800,7 @@ function accumulateOutputTextEvent(
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
         validateArrayIndex(content.annotations, event.annotation_index, 'annotation', true);
+        // SAFETY: The output_text discriminator and annotation index were checked; the annotation is cloned from the corresponding API event contract.
         content.annotations[event.annotation_index] = structuredClone(
           event.annotation,
         ) as ResponseOutputText['annotations'][number];

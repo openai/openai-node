@@ -24,7 +24,7 @@ function makeResponse(output: OutputItem[] = []): Response {
     tool_choice: 'auto',
     tools: [],
     top_p: null,
-  } as Response;
+  };
 }
 
 // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Accumulator fixtures intentionally construct incomplete or malformed wire objects before invoking validation.
@@ -34,6 +34,7 @@ function outputItem(value: Record<string, unknown>): OutputItem {
   if (type === 'function_call' || type === 'custom_tool_call') {
     Object.assign(defaults, { call_id: 'call_123' });
   }
+  // SAFETY: These partial wire-item fixtures intentionally include malformed fields; the accumulator, not the fixture helper, must validate them.
   return { ...defaults, ...value } as OutputItem;
 }
 
@@ -67,6 +68,7 @@ function applyEvent(snapshot: Response, event: Record<string, unknown>): Respons
   if (requiresItemID && !hasOwn(event, 'item_id')) {
     Object.assign(defaults, { item_id: output?.id ?? 'item_123' });
   }
+  // SAFETY: Deliberately send partial or invalid event fields through the public accumulator to test its runtime validation.
   return accumulateResponse({ ...defaults, ...event } as ResponseStreamEvent, snapshot);
 }
 
@@ -205,7 +207,9 @@ describe('ResponseAccumulator output and content events', () => {
     });
 
     expect(snapshot.output_text).toBe('final');
+    // SAFETY: The preceding snapshot fixture supplies this content or summary collection; inspect the same array to verify rejected events preserve it.
     expect((snapshot.output[0] as { content: unknown[] }).content[0]).toEqual(finalPart);
+    // SAFETY: The preceding snapshot fixture supplies this content or summary collection; inspect the same array to verify rejected events preserve it.
     expect((snapshot.output[0] as { content: unknown[] }).content[0]).not.toBe(finalPart);
   });
 
@@ -268,6 +272,7 @@ describe('ResponseAccumulator output and content events', () => {
       part: replayedContent,
     });
 
+    // SAFETY: The preceding snapshot fixture supplies this content or summary collection; inspect the same array to verify rejected events preserve it.
     const contentOutput = contentSnapshot.output[0] as { content: unknown[] };
     expect(contentOutput.content).toHaveLength(2);
     expect(contentOutput.content[1]).toEqual(replayedContent);
@@ -285,6 +290,7 @@ describe('ResponseAccumulator output and content events', () => {
       part: replayedSummary,
     });
 
+    // SAFETY: The preceding snapshot fixture supplies this content or summary collection; inspect the same array to verify rejected events preserve it.
     const summaryOutput = summarySnapshot.output[0] as { summary: unknown[] };
     expect(summaryOutput.summary).toHaveLength(2);
     expect(summaryOutput.summary[1]).toEqual(replayedSummary);
@@ -391,6 +397,7 @@ describe('ResponseAccumulator hosted shell events', () => {
         get: readIndex,
       });
 
+      // SAFETY: Deliberately send partial or invalid event fields through the public accumulator to test its runtime validation.
       accumulateResponse(event as ResponseStreamEvent, snapshot);
 
       const [output] = snapshot.output;
@@ -702,6 +709,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
           content: [{ type: 'output_text', text: 'authoritative', annotations: [] }],
         }),
       ]);
+      // SAFETY: Deliberately omit the derived output_text field from this wire fixture so accumulation must reconstruct it.
       delete (authoritative as Partial<Response>).output_text;
 
       const result = applyEvent(snapshot, { type, response: authoritative });
@@ -810,6 +818,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
     ['reasoning', { type: 'reasoning_text', text: 'injected' }],
   ])('rejects inherited %s content indices before replacing the content array prototype', (type, part) => {
     const snapshot = snapshotFor({ type, summary: [], content: [] });
+    // SAFETY: The preceding snapshot fixture supplies this content or summary collection; inspect the same array to verify rejected events preserve it.
     const output = snapshot.output[0] as { content: unknown[] };
 
     expect(() =>
@@ -832,6 +841,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
         type: 'message',
         content: [{ type: 'output_text', text: 'unchanged', annotations: [] }],
       });
+      // SAFETY: The preceding snapshot fixture supplies this content or summary collection; inspect the same array to verify rejected events preserve it.
       const output = snapshot.output[0] as { content: unknown[] };
       const [original] = output.content;
 
@@ -852,6 +862,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
 
   test('rejects inherited summary indices before replacing the summary array prototype', () => {
     const snapshot = snapshotFor({ type: 'reasoning', summary: [] });
+    // SAFETY: The preceding snapshot fixture supplies this content or summary collection; inspect the same array to verify rejected events preserve it.
     const output = snapshot.output[0] as { summary: unknown[] };
 
     expect(() =>
@@ -874,6 +885,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
         type: 'reasoning',
         summary: [{ type: 'summary_text', text: 'unchanged' }],
       });
+      // SAFETY: The preceding snapshot fixture supplies this content or summary collection; inspect the same array to verify rejected events preserve it.
       const output = snapshot.output[0] as { summary: unknown[] };
       const [original] = output.summary;
 
@@ -923,6 +935,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
     if (kind === 'output') {
       expect(snapshot.output).toHaveLength(0);
     } else {
+      // SAFETY: The preceding snapshot fixture supplies this content or summary collection; inspect the same array to verify rejected events preserve it.
       const output = snapshot.output[0] as { content: unknown[]; summary: unknown[] };
       expect(kind === 'content' ? output.content : output.summary).toHaveLength(0);
     }
@@ -975,6 +988,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       expect(snapshot.output).toHaveLength(0);
       expect(Object.getPrototypeOf(snapshot.output)).toBe(Array.prototype);
     } else {
+      // SAFETY: The preceding snapshot fixture supplies this content or summary collection; inspect the same array to verify rejected events preserve it.
       const output = snapshot.output[0] as { content: unknown[]; summary: unknown[] };
       const collection = kind === 'content' ? output.content : output.summary;
       expect(collection).toHaveLength(0);
@@ -998,7 +1012,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       type: 'message',
       content: [{ type: 'output_text', text: '', annotations: [] }],
     });
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
     const output = snapshot.output[0] as unknown as { content: [{ annotations: unknown[] }] };
     const [{ annotations }] = output.content;
 
@@ -1038,6 +1052,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
           summary: [{ type: 'summary_text', text: 'original' }],
         });
       }
+      // SAFETY: The preceding snapshot fixture supplies this content or summary collection; inspect the same array to verify rejected events preserve it.
       const output = snapshot.output[0] as { content: unknown[]; summary: unknown[] };
       let collection: unknown[];
       if (kind === 'output') {
@@ -1048,6 +1063,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
         collection = output.summary;
       }
       let inheritedSetterCalled = false;
+      // SAFETY: The test deliberately creates an array impostor with Array.prototype but no array slots to exercise descriptor-safe validation.
       const collectionPrototype = Object.create(Array.prototype) as object;
       Object.defineProperty(collectionPrototype, 1, {
         configurable: true,
@@ -1085,10 +1101,11 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       type: 'message',
       content: [{ type: 'output_text', text: '', annotations: [] }],
     });
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
     const output = snapshot.output[0] as unknown as { content: [{ annotations: unknown[] }] };
     const [{ annotations }] = output.content;
     let inheritedSetterCalled = false;
+    // SAFETY: The test deliberately creates an array impostor with Array.prototype but no array slots to exercise descriptor-safe validation.
     const annotationPrototype = Object.create(Array.prototype) as object;
     Object.defineProperty(annotationPrototype, 0, {
       configurable: true,
@@ -1118,6 +1135,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
 
   test('rejects inherited values in sparse output, content, summary, and annotation arrays', () => {
     const inheritedOutput = { type: 'message', content: [] };
+    // SAFETY: The test deliberately creates an array impostor with Array.prototype but no array slots to exercise descriptor-safe validation.
     const outputPrototype = Object.create(Array.prototype) as Record<number, typeof inheritedOutput>;
     outputPrototype[0] = inheritedOutput;
     const sparseOutput: OutputItem[] = [];
@@ -1139,11 +1157,12 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       type: 'message',
       content: [{ type: 'output_text', text: 'unchanged', annotations: [] }],
     });
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
     const contentOutput = contentSnapshot.output[0] as unknown as {
       content: [{ type: string; text: string; annotations: unknown[] }];
     };
     const [inheritedContent] = contentOutput.content;
+    // SAFETY: The test deliberately creates an array impostor with Array.prototype but no array slots to exercise descriptor-safe validation.
     const contentPrototype = Object.create(Array.prototype) as Record<number, typeof inheritedContent>;
     contentPrototype[0] = inheritedContent;
     Reflect.deleteProperty(contentOutput.content, 0);
@@ -1164,11 +1183,12 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       type: 'reasoning',
       summary: [{ type: 'summary_text', text: 'unchanged' }],
     });
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
     const summaryOutput = summarySnapshot.output[0] as unknown as {
       summary: [{ type: string; text: string }];
     };
     const [inheritedSummary] = summaryOutput.summary;
+    // SAFETY: The test deliberately creates an array impostor with Array.prototype but no array slots to exercise descriptor-safe validation.
     const summaryPrototype = Object.create(Array.prototype) as Record<number, typeof inheritedSummary>;
     summaryPrototype[0] = inheritedSummary;
     Reflect.deleteProperty(summaryOutput.summary, 0);
@@ -1189,11 +1209,12 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       type: 'message',
       content: [{ type: 'output_text', text: '', annotations: [{}] }],
     });
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
     const annotationOutput = annotationSnapshot.output[0] as unknown as {
       content: [{ annotations: unknown[] }];
     };
     const [{ annotations }] = annotationOutput.content;
+    // SAFETY: The test deliberately creates an array impostor with Array.prototype but no array slots to exercise descriptor-safe validation.
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The sparse array fixture supplies an inherited arbitrary annotation to verify own-index filtering.
     const annotationPrototype = Object.create(Array.prototype) as Record<number, unknown>;
     [annotationPrototype[0]] = annotations;

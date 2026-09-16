@@ -824,16 +824,18 @@ describe('hostile Bedrock bearer AbortSignal lifecycle', () => {
       const controller = new AbortController();
       const failure = new Error('signal registration failed');
       const original = controller.signal.addEventListener.bind(controller.signal);
-      vi.spyOn(controller.signal, 'addEventListener').mockImplementation(((
-        type: string,
-        listener: Parameters<AbortSignal['addEventListener']>[1],
-        options?: Parameters<AbortSignal['addEventListener']>[2],
-      ) => {
-        if (timing === 'after install') {
-          original(type, listener, options);
-        }
-        throw failure;
-      }) as typeof controller.signal.addEventListener);
+      vi.spyOn(controller.signal, 'addEventListener').mockImplementation(
+        (
+          type: string,
+          listener: Parameters<AbortSignal['addEventListener']>[1],
+          options?: Parameters<AbortSignal['addEventListener']>[2],
+        ) => {
+          if (timing === 'after install') {
+            original(type, listener, options);
+          }
+          throw failure;
+        },
+      );
       const tokenProvider = vi.fn<TokenProvider>(() => Promise.race([]));
       const { client, fetch } = createClient(tokenProvider);
 
@@ -851,18 +853,20 @@ describe('hostile Bedrock bearer AbortSignal lifecycle', () => {
     const controller = new AbortController();
     const reason = new Error('registration raced with cancellation');
     const original = controller.signal.addEventListener.bind(controller.signal);
-    vi.spyOn(controller.signal, 'addEventListener').mockImplementation(((
-      type: string,
-      listener: Parameters<AbortSignal['addEventListener']>[1],
-      options?: Parameters<AbortSignal['addEventListener']>[2],
-    ) => {
-      controller.abort(reason);
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The signal fixture preserves both listener-function and handleEvent-object forms of EventTarget callbacks.
-      if (deliver && typeof listener === 'function') {
-        listener.call(controller.signal, new Event('abort'));
-      }
-      original(type, listener, options);
-    }) as typeof controller.signal.addEventListener);
+    vi.spyOn(controller.signal, 'addEventListener').mockImplementation(
+      (
+        type: string,
+        listener: Parameters<AbortSignal['addEventListener']>[1],
+        options?: Parameters<AbortSignal['addEventListener']>[2],
+      ) => {
+        controller.abort(reason);
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The signal fixture preserves both listener-function and handleEvent-object forms of EventTarget callbacks.
+        if (deliver && typeof listener === 'function') {
+          listener.call(controller.signal, new Event('abort'));
+        }
+        original(type, listener, options);
+      },
+    );
     const tokenProvider = vi.fn<TokenProvider>(() => Promise.race([]));
     const { client, fetch } = createClient(tokenProvider);
 

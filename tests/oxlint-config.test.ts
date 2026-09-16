@@ -98,10 +98,12 @@ test('inherits Ultracite native and anti-slop plugins and enforces their rules',
 
   expect(printed.status).toBe(0);
 
+  // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
   const configuration = JSON.parse(printed.stdout) as {
     plugins: string[];
     rules: Record<string, string>;
   };
+  // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
   // oxlint-disable-next-line node/global-require -- This test verifies the CommonJS config dependency used by oxlint.config.ts.
   const preset = require('ultracite/oxlint/core').default as { plugins: string[] };
 
@@ -127,6 +129,7 @@ test('inherits Ultracite native and anti-slop plugins and enforces their rules',
 
     expect(linted.status).toBe(1);
 
+    // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
     const { diagnostics } = JSON.parse(linted.stdout) as { diagnostics: { code: string }[] };
     expect(diagnostics.map(({ code }) => code)).toContain('unicorn(no-instanceof-array)');
     expect(diagnostics.map(({ code }) => code)).toContain('anti-slop(no-reflect-get)');
@@ -163,6 +166,7 @@ test('recognizes generated SDK files and explicitly listed legacy files', () => 
     mkdirSync(legacyDirectory, { recursive: true });
     writeFileSync(path.join(legacyDirectory, 'env.ts'), 'export const legacy = true;\n');
 
+    // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
     // oxlint-disable-next-line node/global-require -- The fixture module path is created dynamically for this test.
     const generatedFiles = require(generatedFilesScript) as string[];
     expect(generatedFiles).toEqual(['castiron.ts', 'src/internal/utils/env.ts']);
@@ -197,6 +201,7 @@ test('formats generated SDK files without linting them', () => {
 
   expect(linted.status).toBe(0);
 
+  // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
   const result = JSON.parse(linted.stdout) as { number_of_files: number };
   expect(result.number_of_files).toBe(0);
 });
@@ -213,6 +218,7 @@ test('keeps explicitly listed legacy SDK files under the generated lint profile'
   );
 
   expect(linted.status).toBe(0);
+  // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
   expect((JSON.parse(linted.stdout) as { number_of_files: number }).number_of_files).toBe(0);
 
   const generatedLinted = spawnSync(

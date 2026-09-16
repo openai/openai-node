@@ -62,6 +62,7 @@ describe('webhook signature compatibility', () => {
       payload,
       headers,
       secret,
+      // SAFETY: Deliberately include JavaScript null tolerance in the table to preserve its runtime timestamp-validation behavior.
       tolerance as number | undefined,
     );
 

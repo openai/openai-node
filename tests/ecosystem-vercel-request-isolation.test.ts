@@ -141,6 +141,7 @@ function createHandlerHarness(runtime: Runtime, failedClientIDs: number[] = []):
     callsPerRequest,
     async runRequest(): Promise<HandlerResult> {
       if (runtime === 'edge') {
+        // SAFETY: The VM executes the selected edge route whose response fixture supplies body and status; the harness verifies those fields per request.
         const response = (await handler({})) as HandlerResult;
         return { body: response.body, status: response.status };
       }

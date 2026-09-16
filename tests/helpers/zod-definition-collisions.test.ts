@@ -33,6 +33,7 @@ const helpers: Helper[] = [
     name: 'zodResponseFormat',
     convert: (schema) => {
       const format = zodResponseFormat(schema, 'root');
+      // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
       return { schema: format.json_schema.schema as JsonSchema, parseRaw: format.$parseRaw };
     },
   },
@@ -40,6 +41,7 @@ const helpers: Helper[] = [
     name: 'zodTextFormat',
     convert: (schema) => {
       const format = zodTextFormat(schema, 'root');
+      // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
       return { schema: format.schema as JsonSchema, parseRaw: format.$parseRaw };
     },
   },
@@ -47,6 +49,7 @@ const helpers: Helper[] = [
     name: 'zodFunction',
     convert: (schema) => {
       const tool = zodFunction({ name: 'root', parameters: schema });
+      // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
       return { schema: tool.function.parameters as JsonSchema, parseRaw: tool.$parseRaw };
     },
   },
@@ -54,12 +57,14 @@ const helpers: Helper[] = [
     name: 'zodResponsesFunction',
     convert: (schema) => {
       const tool = zodResponsesFunction({ name: 'root', parameters: schema });
+      // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
       return { schema: tool.parameters as JsonSchema, parseRaw: tool.$parseRaw };
     },
   },
   {
     name: 'zodRealtimeFunction',
     convert: (schema) => ({
+      // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
       schema: zodRealtimeFunction({ name: 'root', parameters: schema }).parameters as JsonSchema,
     }),
   },
@@ -107,6 +112,7 @@ describe('Zod v3 generated definition names', () => {
     const definitions = { root_properties_first: providedNumber };
     const sharedString = zv3.string();
     const root = zv3.object({ first: sharedString, again: sharedString });
+    // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
     const schema = zodResponseFormat(root, 'root', {
       schemaDefinitions: definitions,
     }).json_schema.schema as JsonSchema;
@@ -119,6 +125,7 @@ describe('Zod v3 generated definition names', () => {
 
   it('keeps the original readable name when no other definition occupies it', () => {
     const shared = zv3.string();
+    // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
     const schema = zodResponseFormat(zv3.object({ first: shared, again: shared }), 'root').json_schema
       .schema as JsonSchema;
 
@@ -138,6 +145,7 @@ describe('Zod v3 generated definition names', () => {
       }),
       a_properties_b: zv3.object({ c: sharedBoolean, again: sharedBoolean }),
     });
+    // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
     const schema = zodResponseFormat(root, 'root').json_schema.schema as JsonSchema;
     const nested = schema.properties?.['a']?.properties;
     const stringRef = nested?.['b']?.properties?.['again']?.$ref;
@@ -164,6 +172,7 @@ describe('Zod v3 generated definition names', () => {
       hasOwnProperty: shadowedProperty,
     };
     const shared = zv3.string();
+    // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
     const schema = zodResponseFormat(zv3.object({ first: shared, again: shared }), 'root', {
       schemaDefinitions: definitions,
     }).json_schema.schema as JsonSchema;
@@ -189,6 +198,7 @@ describe('Zod v3 generated definition names', () => {
     const definitions = Object.freeze({ existing: providedNumber });
     const sharedString = zv3.string();
     const root = zv3.object({ first: sharedString, again: sharedString });
+    // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
     const schema = zodResponseFormat(root, 'root', {
       schemaDefinitions: definitions,
     }).json_schema.schema as JsonSchema;
@@ -201,9 +211,11 @@ describe('Zod v3 generated definition names', () => {
 
   it('ignores inherited definition names when checking for generated-name collisions', () => {
     const inherited = { root_properties_first: zv3.number() };
+    // SAFETY: This fresh definitions object receives only the Zod schema values assigned below; its special prototype is part of the fixture.
     const definitions = Object.create(inherited) as Record<string, zv3.ZodType>;
     definitions['existing'] = zv3.boolean();
     const shared = zv3.string();
+    // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
     const schema = zodResponseFormat(zv3.object({ first: shared, again: shared }), 'root', {
       schemaDefinitions: definitions,
     }).json_schema.schema as JsonSchema;
@@ -214,9 +226,11 @@ describe('Zod v3 generated definition names', () => {
   });
 
   it('accepts null-prototype caller definitions without mutating them', () => {
+    // SAFETY: This fresh definitions object receives only the Zod schema values assigned below; its special prototype is part of the fixture.
     const definitions = Object.create(null) as Record<string, zv3.ZodType>;
     definitions['root_properties_first'] = zv3.number();
     const shared = zv3.string();
+    // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
     const schema = zodResponseFormat(zv3.object({ first: shared, again: shared }), 'root', {
       schemaDefinitions: definitions,
     }).json_schema.schema as JsonSchema;
@@ -236,6 +250,7 @@ describe('Zod v3 generated definition names', () => {
         'schema alias': new zv3.ZodString(shared._def),
       }[representation];
       const definitions = { root_properties_first: definition };
+      // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
       const schema = zodToJsonSchema(zv3.object({ first: shared, again: shared, third: shared }), {
         name: 'root',
         nameStrategy: 'duplicate-ref',
@@ -257,6 +272,7 @@ describe('Zod v3 generated definition names', () => {
     const providedRenamedRoot = zv3.boolean();
     const definitions = { root: providedRoot, root_root: providedRenamedRoot };
     const shared = zv3.string();
+    // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
     const schema = zodResponseFormat(zv3.object({ first: shared, again: shared }), 'root', {
       schemaDefinitions: definitions,
     }).json_schema.schema as JsonSchema;
@@ -275,6 +291,7 @@ describe('Zod v3 generated definition names', () => {
     const root: zv3.ZodTypeAny = zv3.lazy(() =>
       zv3.object({ first: provided, second: provided, children: zv3.array(root) }),
     );
+    // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
     const schema = zodResponseFormat(root, 'foo_properties_bar', {
       schemaDefinitions: { foo: provided, foo_properties_bar_1: occupiedSuffix },
     }).json_schema.schema as JsonSchema;
@@ -335,6 +352,7 @@ describe('Zod v4 definition compatibility', () => {
     const shared = zv4.object({ value: zv4.string() });
     const definitions = Object.freeze({ provided: shared });
     const root = zv4.object({ first: shared, again: shared });
+    // SAFETY: The converter receives the explicit object schema in this fixture; this test checks the resulting properties and definition references.
     const schema = zodResponseFormat(root, 'root', {
       schemaDefinitions: definitions,
     }).json_schema.schema as JsonSchema;

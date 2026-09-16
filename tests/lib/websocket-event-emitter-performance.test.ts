@@ -126,17 +126,20 @@ function installBrowserSocket(): void {
 
 // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
 function dispatchBrowser(connection: PublicWebSocket, event: Record<string, unknown>): void {
+  // SAFETY: The matching variant installs this controlled browser or Node socket fake before dispatch; inspect its test-only event delivery method.
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
   (connection.socket as { dispatch: (value: Record<string, unknown>) => void }).dispatch(event);
 }
 
 // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
 function dispatchNodeRealtime(connection: PublicWebSocket, event: Record<string, unknown>): void {
+  // SAFETY: The matching variant installs this controlled browser or Node socket fake before dispatch; inspect its test-only event delivery method.
   (connection.socket as FakeNodeSocket).emit('message', Buffer.from(JSON.stringify(event)));
 }
 
 // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
 function dispatchResponses(connection: PublicWebSocket, event: Record<string, unknown>): void {
+  // SAFETY: The matching variant installs this controlled browser or Node socket fake before dispatch; inspect its test-only event delivery method.
   (connection.socket as { platformSocket: FakeNodeSocket }).platformSocket.emit(
     'message',
     Buffer.from(JSON.stringify(event)),
@@ -148,36 +151,42 @@ const websocketVariants: WebSocketVariant[] = [
   {
     name: 'stable browser Realtime',
     event: 'response.done',
+    // SAFETY: The stable and beta adapters implement the on/once/emitted/socket surface used by this shared deterministic event harness.
     create: (client) => new StableBrowserRealtime({ model: 'gpt-realtime' }, client) as PublicWebSocket,
     dispatch: dispatchBrowser,
   },
   {
     name: 'beta browser Realtime',
     event: 'response.done',
+    // SAFETY: The stable and beta adapters implement the on/once/emitted/socket surface used by this shared deterministic event harness.
     create: (client) => new BetaBrowserRealtime({ model: 'gpt-realtime' }, client) as PublicWebSocket,
     dispatch: dispatchBrowser,
   },
   {
     name: 'stable Node Realtime',
     event: 'response.done',
+    // SAFETY: The stable and beta adapters implement the on/once/emitted/socket surface used by this shared deterministic event harness.
     create: (client) => new StableNodeRealtime({ model: 'gpt-realtime' }, client) as PublicWebSocket,
     dispatch: dispatchNodeRealtime,
   },
   {
     name: 'beta Node Realtime',
     event: 'response.done',
+    // SAFETY: The stable and beta adapters implement the on/once/emitted/socket surface used by this shared deterministic event harness.
     create: (client) => new BetaNodeRealtime({ model: 'gpt-realtime' }, client) as PublicWebSocket,
     dispatch: dispatchNodeRealtime,
   },
   {
     name: 'stable Responses WebSocket',
     event: 'response.completed',
+    // SAFETY: The stable and beta adapters implement the on/once/emitted/socket surface used by this shared deterministic event harness.
     create: (client) => new StableResponsesWS(client) as PublicWebSocket,
     dispatch: dispatchResponses,
   },
   {
     name: 'beta Responses WebSocket',
     event: 'response.completed',
+    // SAFETY: The stable and beta adapters implement the on/once/emitted/socket surface used by this shared deterministic event harness.
     create: (client) => new BetaResponsesWS(client) as PublicWebSocket,
     dispatch: dispatchResponses,
   },
@@ -232,12 +241,12 @@ function measureListenerMovement(operation: () => void) {
 }
 
 function emit(emitter: AuditedEmitter, event: keyof AuditedEvents, ...values: unknown[]): void {
-  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Exercise the shared protected emitter hook on each concrete emitter without changing its public API.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Exercise the shared protected emitter hook on each concrete emitter without changing its public API.
   (emitter as unknown as { _emit: (name: string, ...args: unknown[]) => void })._emit(event, ...values);
 }
 
 function hasListener(emitter: AuditedEmitter, event: keyof AuditedEvents): boolean | undefined {
-  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Exercise the shared protected emitter hook on each concrete emitter without changing its public API.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Exercise the shared protected emitter hook on each concrete emitter without changing its public API.
   return (emitter as unknown as { _hasListener: (name: string) => boolean | undefined })._hasListener(event);
 }
 
@@ -374,7 +383,7 @@ test.each([
 
 describe.each(emitterVariants)('$name listener compatibility', ({ create }) => {
   function createEmitter(): AuditedEmitter {
-    return create() as AuditedEmitter;
+    return create();
   }
 
   test.each([undefined, false, new Error('first listener failure')] as const)(

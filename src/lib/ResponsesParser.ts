@@ -88,6 +88,7 @@ export function maybeParseResponse<
     };
 
     if (needsOutputText(response, parsed)) {
+      // SAFETY: The copy retains every response field and only adds parsed metadata; addOutputText accepts that original response structure.
       addOutputText(parsed as Response);
     }
 
@@ -160,6 +161,7 @@ export function parseResponse<
     },
   });
 
+  // SAFETY: The output_parsed getter was installed immediately above and returns the first parsed content or null.
   return parsed as ParsedResponse<ParsedT>;
 }
 
@@ -249,6 +251,7 @@ export function makeParseableResponseTool<OptionsT extends ToolOptions>(
     },
   });
 
+  // SAFETY: The non-enumerable parser brand and callbacks were installed on this copied tool immediately above.
   return obj as AutoParseableResponseTool<OptionsT>;
 }
 

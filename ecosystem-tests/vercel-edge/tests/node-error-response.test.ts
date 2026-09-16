@@ -11,6 +11,7 @@ it('does not expose stack traces from unexpected Node runtime errors', async () 
   delete process.env.OPENAI_ADMIN_KEY;
 
   try {
+    // SAFETY: The isolated route fixture supplies only the request or response methods this error/cleanup path touches; assertions verify the recorded effects.
     // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- This error-path response fake implements only status/end, the operations the handler may call.
     await handler({} as NextApiRequest, { status } as unknown as NextApiResponse);
 
@@ -40,6 +41,7 @@ it('does not expose stack traces from failed Node test handlers', async () => {
   process.env.OPENAI_API_KEY = 'test-key';
 
   try {
+    // SAFETY: The isolated route fixture supplies only the request or response methods this error/cleanup path touches; assertions verify the recorded effects.
     // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- This error-path response fake implements only status/end, the operations the handler may call.
     await handler({} as NextApiRequest, { status } as unknown as NextApiResponse);
 

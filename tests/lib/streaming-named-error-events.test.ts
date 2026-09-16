@@ -112,6 +112,7 @@ function expectProviderError(error: unknown, response: Response): asserts error 
     error: providerError,
   });
 
+  // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
   const apiError = error as APIError;
   expect(apiError.status).toBeUndefined();
   expect(apiError.headers).toBe(response.headers);
@@ -232,6 +233,7 @@ describe('named SSE provider errors', () => {
       requestID,
       error: nested,
     });
+    // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
     expect((error as APIError).headers).toBe(response.headers);
     expect(controller.signal.aborted).toBe(true);
   });
@@ -247,6 +249,7 @@ describe('named SSE provider errors', () => {
 
     expect(error).toBeInstanceOf(APIError);
     expect(error).toMatchObject({ requestID, error: value });
+    // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
     expect((error as APIError).headers).toBe(response.headers);
     expect(controller.signal.aborted).toBe(true);
   });
@@ -302,15 +305,15 @@ describe('named SSE provider errors', () => {
       const error = await rejection(stream);
 
       expect(error).toBeInstanceOf(SyntaxError);
-      expect((error as SyntaxError).message).toBe(
-        'Error reading response: malformed server-sent event JSON.',
-      );
-      expect((error as SyntaxError).message).toMatch(
+      // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
+      const syntaxError = error as SyntaxError & { cause?: unknown };
+      expect(syntaxError.message).toBe('Error reading response: malformed server-sent event JSON.');
+      expect(syntaxError.message).toMatch(
         /Expected depth to be zero|unexpected end of JSON input|Error reading response|Unexpected end of JSON input|Expecting value|unexpected token/u,
       );
-      expect((error as SyntaxError).message).not.toContain(credential);
-      expect((error as SyntaxError).stack).not.toContain(credential);
-      expect((error as SyntaxError & { cause?: unknown }).cause).toBeUndefined();
+      expect(syntaxError.message).not.toContain(credential);
+      expect(syntaxError.stack).not.toContain(credential);
+      expect(syntaxError.cause).toBeUndefined();
       expect(stream.controller.signal.aborted).toBe(true);
       expect(logger.error).not.toHaveBeenCalled();
     },
@@ -324,10 +327,12 @@ describe('named SSE provider errors', () => {
     const error = await rejection(stream);
 
     expect(error).toBeInstanceOf(SyntaxError);
-    expect((error as SyntaxError).message).toBe('Error reading response: malformed server-sent event JSON.');
-    expect((error as SyntaxError).message).not.toContain(credential);
-    expect((error as SyntaxError).stack).not.toContain(credential);
-    expect((error as SyntaxError & { cause?: unknown }).cause).toBeUndefined();
+    // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
+    const syntaxError = error as SyntaxError & { cause?: unknown };
+    expect(syntaxError.message).toBe('Error reading response: malformed server-sent event JSON.');
+    expect(syntaxError.message).not.toContain(credential);
+    expect(syntaxError.stack).not.toContain(credential);
+    expect(syntaxError.cause).toBeUndefined();
     expect(stream.controller.signal.aborted).toBe(true);
     expect(logger.error).not.toHaveBeenCalled();
   });

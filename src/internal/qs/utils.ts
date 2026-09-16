@@ -7,6 +7,7 @@ let cachedHas: ((obj: object, key: PropertyKey) => boolean) | undefined;
 
 // oxlint-disable-next-line anti-slop/no-object-parameters -- Own-property lookup is a generic object primitive and must preserve array and callable inputs.
 export const has = (obj: object, key: PropertyKey): boolean => {
+  // SAFETY: Object.hasOwn is an optional native capability; older runtimes use the bound hasOwnProperty fallback with the same own-key semantics.
   // oxlint-disable-next-line anti-slop/no-object-parameters -- The native or compatibility own-property predicate has the same generic object contract.
   const resolvedHas: (obj: object, key: PropertyKey) => boolean =
     cachedHas ?? (Object as any).hasOwn ?? Function.prototype.call.bind(Object.prototype.hasOwnProperty);
@@ -297,6 +298,7 @@ function prepareMergeSource(target: any, source: any, state: MergeState, assign 
 
   if (isArray(target) && sourceIsArray && !assign) {
     const sourceLength = source.length;
+    // SAFETY: prepared was constructed as an array when sourceIsArray is true, which this branch requires.
     (prepared as any[]).length = sourceLength;
     for (let index = 0; index < sourceLength; index += 1) {
       if (!(index in source)) {

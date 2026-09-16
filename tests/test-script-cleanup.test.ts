@@ -22,6 +22,7 @@ function isRunning(pid: number): boolean {
     process.kill(pid, 0);
     return true;
   } catch (error) {
+    // SAFETY: process.kill reports missing processes with the Node errno code ESRCH; this check only reads that optional error code.
     if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
       return false;
     }

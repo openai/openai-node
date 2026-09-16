@@ -54,6 +54,7 @@ export type BedrockAuthFactory = () => BedrockRequestAuth;
 
 /** Wraps a provider failure in an SDK error while preserving its original cause. */
 export function errorWithCause(message: string, cause: unknown): Errors.OpenAIError {
+  // SAFETY: This SDK error is created locally and receives its optional cause immediately below; no existing error shape is trusted.
   const error = new Errors.OpenAIError(message) as Errors.OpenAIError & { cause?: unknown };
   error.cause = cause;
   return error;
@@ -262,6 +263,7 @@ export function assertBedrockWebSocketOrigin(client: unknown, requestURL: URL): 
     normalizedRequestURL.protocol = 'http:';
   }
 
+  // SAFETY: The private Bedrock brand checked above identifies the client whose baseURL is validated against the finalized request origin.
   assertBedrockRequestOrigin(
     // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The private Bedrock client brand checked above identifies the client baseURL contract.
     (client as unknown as { baseURL: string }).baseURL,

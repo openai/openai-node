@@ -538,6 +538,7 @@ const projectRunners = {
   },
 };
 
+// SAFETY: projectRunners is the closed object literal above, so every enumerated own key names one registered runner.
 let projectNames = Object.keys(projectRunners) as (keyof typeof projectRunners)[];
 const projectNamesSet = new Set<string>(projectNames);
 
@@ -684,7 +685,7 @@ let state: Args & { rootDir: string };
 type ChildOutputChunk = { dest: 'stdout' | 'stderr'; data: string | Buffer };
 
 async function main() {
-  const args = (await parseArgs()) as Args;
+  const args = await parseArgs();
 
   if ((args.live || args.deploy) && !process.env['OPENAI_API_KEY']) {
     throw new Error('The environment variable OPENAI_API_KEY must be set when using --live or --deploy.');
@@ -700,10 +701,12 @@ async function main() {
       args.skip[idx] = (projectName + '').toLowerCase();
     }
 
+    // SAFETY: The loop above normalizes every skip entry to a lowercase string before this membership check.
     projectNames = projectNames.filter((projectName) => !(args.skip as string[]).includes(projectName));
 
     for (const projectName of args.skip) {
-      projectNamesSet.delete(projectName as any);
+      // SAFETY: Every skip entry was converted to a lowercase string by the normalization loop above.
+      projectNamesSet.delete(projectName as string);
     }
   }
 
@@ -725,11 +728,13 @@ async function main() {
   // For some reason `yargs` doesn't pick up the positional args correctly
   let projectsToRun: typeof projectNames;
   if (args.projects?.length) {
+    // SAFETY: Yargs choices and the explicit project-name membership check reject unregistered project names before runner lookup.
     projectsToRun = args.projects as typeof projectNames;
   } else if (positionalArgs.length) {
+    // SAFETY: Yargs choices and the explicit project-name membership check reject unregistered project names before runner lookup.
     projectsToRun = positionalArgs.filter(
       // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The ecosystem harness validates runtime package, process, and command-line data before using it.
-      (n) => typeof n === 'string' && (projectNamesSet as Set<string>).has(n),
+      (n) => typeof n === 'string' && projectNamesSet.has(n),
     ) as typeof projectNames;
   } else {
     projectsToRun = projectNames;
@@ -762,6 +767,7 @@ async function main() {
     }
 
     for (let i = 0; i < projectNames.length; i++) {
+      // SAFETY: The loop bounds i by this fixed project-name array length; the selected element is one registered project name.
       const projectName = (projectNames as any)[i] as string;
 
       await defaultNodeCleanup(projectName).catch((err: any) => {
@@ -950,7 +956,9 @@ async function main() {
           console.error('\n');
           console.error(`✅ ${project}`);
         } catch (err) {
+          // SAFETY: This command failure inspection reads optional execa fields for logging or crash classification; absent fields are handled by the surrounding fallback.
           if (err && (err as any).shortMessage) {
+            // SAFETY: This command failure inspection reads optional execa fields for logging or crash classification; absent fields are handled by the surrounding fallback.
             console.error((err as any).shortMessage);
           } else {
             console.error(err);
@@ -1025,15 +1033,16 @@ function errorMessage(err: unknown): string {
     typeof err === 'object' &&
     'shortMessage' in err &&
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The ecosystem harness validates runtime package, process, and command-line data before using it.
-    typeof (err as any).shortMessage === 'string'
+    typeof err.shortMessage === 'string'
   ) {
-    return (err as any).shortMessage;
+    return err.shortMessage;
   }
   return String(err);
 }
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function isLikelyNodeCrash(err: unknown): boolean {
+  // SAFETY: This command failure inspection reads optional execa fields for logging or crash classification; absent fields are handled by the surrounding fallback.
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The ecosystem harness validates runtime package, process, and command-line data before using it.
   const signal = err && typeof err === 'object' ? (err as any).signal : undefined;
   if (signal === 'SIGABRT' || signal === 'SIGSEGV' || signal === 'SIGBUS' || signal === 'SIGILL') {
@@ -1041,6 +1050,7 @@ function isLikelyNodeCrash(err: unknown): boolean {
   }
 
   const output =
+    // SAFETY: This command failure inspection reads optional execa fields for logging or crash classification; absent fields are handled by the surrounding fallback.
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The ecosystem harness validates runtime package, process, and command-line data before using it.
     err && typeof err === 'object' ? `${(err as any).stderr || ''}\n${(err as any).stdout || ''}` : '';
   return /Fatal error in|Check failed:|Segmentation fault|core dumped/i.test(output);
@@ -1084,6 +1094,7 @@ async function buildPackage() {
   assert.ok(Array.isArray(pack), `Expected pack output to be an array but got ${typeof pack}`);
   assert.ok(pack.length === 1, `Expected pack output to be an array of length 1 but got ${pack.length}`);
 
+  // SAFETY: npm pack --json supplies the first package result with its filename; this harness uses that produced package archive.
   const filename = path.join('dist', (pack[0] as any).filename);
   console.error({ filename });
 
@@ -1137,6 +1148,7 @@ async function run(command: string, args: string[], config?: RunOpts): Promise<e
     return await execa(command, args, { ...options, env, extendEnv: false });
   } catch (error) {
     if (error instanceof Object && !state.verbose) {
+      // SAFETY: This command failure inspection reads optional execa fields for logging or crash classification; absent fields are handled by the surrounding fallback.
       const { stderr, stdout } = error as any;
       if (stderr) {
         process.stderr.write(stderr);

@@ -168,6 +168,7 @@ describe('SDK-owned X.509 credential transport', () => {
     const { privateKey, ...ownOptions } = credentialOptions();
     const getter = vi.fn(() => privateKey);
     const options = Object.assign(
+      // SAFETY: This synthetic transport/credential fixture deliberately omits or alters runtime capabilities to exercise the registration and option validators.
       Object.create({
         get privateKey() {
           return getter();
@@ -185,6 +186,7 @@ describe('SDK-owned X.509 credential transport', () => {
       throw new Error('attacker-controlled credential prototype trap');
     });
     const prototype = new Proxy({}, { has: trap });
+    // SAFETY: Object.create constructs the deliberate prototype fixture; only object identity or explicitly defined properties are used here.
     const options = Object.assign(Object.create(prototype) as object, credentialOptions());
 
     expect(() => fromX509(options)).toThrow(/prototype|plain|proxy/iu);
@@ -197,6 +199,7 @@ describe('SDK-owned X.509 credential transport', () => {
       const { ca, ...ownOptions } = credentialOptions();
       const getter = vi.fn(() => ca);
       const options = Object.assign(
+        // SAFETY: This synthetic transport/credential fixture deliberately omits or alters runtime capabilities to exercise the registration and option validators.
         Object.create({
           get [name]() {
             return getter();
@@ -213,6 +216,7 @@ describe('SDK-owned X.509 credential transport', () => {
   test('rejects inherited proxy configuration without invoking its accessor', () => {
     const getter = vi.fn(() => 'http://127.0.0.1:1');
     const proxy = Object.assign(
+      // SAFETY: This synthetic transport/credential fixture deliberately omits or alters runtime capabilities to exercise the registration and option validators.
       Object.create({
         get url() {
           return getter();
@@ -313,6 +317,7 @@ describe('explicit X.509 transport capability', () => {
     const exchange = vi.fn(async () => ({ accessToken: 'synthetic-forged-token', expiresIn: 3600 }));
 
     expect(() =>
+      // SAFETY: This synthetic transport/credential fixture deliberately omits or alters runtime capabilities to exercise the registration and option validators.
       registerX509Transport(Object.freeze({}) as X509Transport, {
         dispatch,
         exchange,
@@ -357,6 +362,7 @@ describe('explicit X.509 transport capability', () => {
 
     try {
       const approved = createX509Transport(directOptions(ownedDispatcher));
+      // SAFETY: This synthetic transport/credential fixture deliberately omits or alters runtime capabilities to exercise the registration and option validators.
       const counterfeit = Object.freeze(Object.create(Object.getPrototypeOf(approved))) as X509Transport;
       expect(() =>
         registerX509Transport(counterfeit, {
@@ -384,6 +390,7 @@ describe('explicit X.509 transport capability', () => {
 
     try {
       expect(() =>
+        // SAFETY: This synthetic transport/credential fixture deliberately omits or alters runtime capabilities to exercise the registration and option validators.
         createX509Transport({ ...directOptions(dispatcher), runtime } as X509TransportOptions),
       ).toThrow(/Node\.js/iu);
     } finally {
@@ -417,6 +424,7 @@ describe('explicit X.509 transport capability', () => {
 
   test('rejects opaque custom dispatchers without touching their methods', () => {
     const dispatch = vi.fn();
+    // SAFETY: This synthetic transport/credential fixture deliberately omits or alters runtime capabilities to exercise the registration and option validators.
     // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- This dispatcher lookalike must be rejected because it is not a genuine Undici Agent.
     const dispatcher = { dispatch } as unknown as Agent;
 
@@ -595,6 +603,7 @@ describe('explicit X.509 transport capability', () => {
 
   test('rejects forged capability objects before dispatch', async () => {
     await expect(
+      // SAFETY: This synthetic transport/credential fixture deliberately omits or alters runtime capabilities to exercise the registration and option validators.
       sendX509Request({} as X509Transport, new URL('https://example.invalid'), {}),
     ).rejects.toThrow(/invalid.*transport/iu);
   });

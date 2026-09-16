@@ -149,6 +149,7 @@ const convertStrictRoot = (root: unknown) =>
   zodToJsonSchema(z3.object({ value: z3.string() }), {
     target: 'openApi3',
     openaiStrictMode: true,
+    // SAFETY: This deliberately malformed schema carrier crosses the typed boundary only to verify rejection or ownership normalization.
     override: () => root as { type: 'object' },
   });
 
@@ -160,6 +161,7 @@ describe('canonical strict vendor-converter roots', () => {
     { name: 'a boxed number', value: Reflect.construct(Number, [42]) },
     { name: 'a boxed boolean', value: Reflect.construct(Boolean, [true]) },
     { name: 'a boxed BigInt', value: Reflect.construct(Object, [1n]) },
+    // SAFETY: Object.create constructs the deliberate prototype fixture; only object identity or explicitly defined properties are used here.
     { name: 'a custom prototype', value: Object.create({ inherited: true }) as object },
   ])('rejects $name carriers through the same plain-record boundary', ({ value }) => {
     expect(() => convertStrictRoot(Object.assign(value, { type: 'object' as const }))).toThrow(
@@ -185,6 +187,7 @@ describe('canonical strict vendor-converter roots', () => {
   });
 
   it.each(['plain', 'null prototype'] as const)('owns and returns a stable %s root snapshot', (kind) => {
+    // SAFETY: Object.create supplies the deliberate null-prototype object; only the explicitly assigned type property is used here.
     const source =
       kind === 'plain'
         ? { type: 'object' }

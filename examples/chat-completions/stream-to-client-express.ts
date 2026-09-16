@@ -135,6 +135,7 @@ function rethrowUnlessClientAbort(
   error: unknown,
   disconnect: ReturnType<typeof watchClientDisconnect>,
 ): void {
+  // SAFETY: openai is constructed by this example from the OpenAI class; its constructor supplies the static stream helpers used below.
   const clientConstructor = openai.constructor as typeof OpenAI;
 
   if (!disconnect?.signal.aborted || !(error instanceof clientConstructor.APIUserAbortError)) {

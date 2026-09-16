@@ -36,6 +36,7 @@ function isProcessRunning(pid: number): boolean {
     process.kill(pid, 0);
     return true;
   } catch (error) {
+    // SAFETY: process.kill reports missing processes with the Node errno code ESRCH; this check only reads that optional error code.
     if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
       return false;
     }
@@ -132,6 +133,7 @@ describe('Steady mock launcher', () => {
       expect(existsSync(pnpmInvocation)).toBe(false);
       expect(existsSync(path.join(checkout, 'shell-injection'))).toBe(false);
 
+      // SAFETY: The local command stub writes these exact JSON fields; parsing only recovers the recorded invocation for assertions.
       const observations = readFileSync(observationsFile, 'utf-8')
         .trim()
         .split('\n')

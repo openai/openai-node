@@ -43,6 +43,7 @@ function isRunningInBrowserOrBrowserWorker(): boolean {
     return true;
   }
 
+  // SAFETY: RuntimeScope describes optional host capabilities; the following predicates verify their presence and value before use.
   const scope = globalThis as RuntimeScope;
   return (
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Probe browser-worker and server-runtime capabilities before choosing WebSocket credential transport.
@@ -64,6 +65,7 @@ function isRunningInBrowserOrBrowserWorker(): boolean {
 
 /** Reports whether the runtime supports request headers in native WebSocket options. */
 function supportsWebSocketRequestHeaders(): boolean {
+  // SAFETY: RuntimeScope describes optional host capabilities; the following predicates verify their presence and value before use.
   const scope = globalThis as RuntimeScope;
   if (
     isRunningInBrowserOrBrowserWorker() ||
@@ -188,8 +190,10 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
   ) {
     super();
     let apiKey = getRealtimeAPIKey(client, props.__apiKey);
+    // SAFETY: The supplied OpenAI client owns _options; these compatibility reads preserve its provider and browser-consent settings.
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The native WebSocket boundary must validate runtime capabilities, credentials, and incoming JSON frames.
     const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
+    // SAFETY: The supplied OpenAI client owns _options; these compatibility reads preserve its provider and browser-consent settings.
     const dangerouslyAllowBrowser =
       props.dangerouslyAllowBrowser ??
       (client as any)?._options?.dangerouslyAllowBrowser ??

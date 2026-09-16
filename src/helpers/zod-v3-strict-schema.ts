@@ -116,6 +116,7 @@ function nativeEnumDomains(def: SchemaDefinition): JSONDomain[] {
   if (!definitionValues || Array.isArray(definitionValues)) {
     return [];
   }
+  // SAFETY: The preceding guard accepts a non-array object; its values remain unknown until individual definition checks.
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Native enum definition entries are unvalidated until the string/number checks establish their domains.
   const object = definitionValues as Record<string, unknown>;
   const values = Object.keys(object)
@@ -441,8 +442,10 @@ export function assertSupportedZodV3Schema(
   definitions: Record<string, ZodV3Schema> | undefined,
 ): void {
   const visited = new Set<SchemaDefinition>();
+  // SAFETY: The public Zod v3 input is viewed through the validator's minimal schema-node contract; visit checks its definition and rejects unsupported kinds.
   visit(schema as SchemaNode, '$', visited);
   for (const [name, definition] of Object.entries(definitions ?? {})) {
+    // SAFETY: The public Zod v3 input is viewed through the validator's minimal schema-node contract; visit checks its definition and rejects unsupported kinds.
     visit(definition as SchemaNode, `$.definitions.${name}`, visited);
   }
 }

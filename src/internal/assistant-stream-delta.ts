@@ -120,6 +120,7 @@ function getAssistantStreamDeltaIndex(
     );
   }
 
+  // SAFETY: Number.isSafeInteger rejects non-numbers before numeric comparisons; the remaining checks enforce the permitted index range.
   if (
     !Number.isSafeInteger(index) ||
     (index as number) < 0 ||
@@ -131,6 +132,7 @@ function getAssistantStreamDeltaIndex(
     throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${safeIndex}`);
   }
 
+  // SAFETY: Number.isSafeInteger rejects non-numbers before numeric comparisons; the remaining checks enforce the permitted index range.
   return index as number;
 }
 
@@ -335,6 +337,7 @@ function applyAssistantStreamArrayDelta(
         }
         accumulator[index] = deltaEntry;
       } else {
+        // SAFETY: The preceding validation accepts this accumulated record before recursively merging the matching delta entry.
         accumulator[index] = applyRecord(accumulatedEntry as AssistantStreamRecord, deltaEntry);
       }
     } else {
@@ -418,7 +421,9 @@ export function accumulateAssistantStreamDelta<Accumulator extends object>(
   cacheArrays = false,
 ): Accumulator {
   assertSafeAssistantStreamDelta(delta);
+  // SAFETY: The generic accumulator uses record entries after delta validation; recursive merge retains the original accumulator's public type.
   const accumulatorRecord = accumulator as AssistantStreamRecord;
+  // SAFETY: The generic accumulator uses record entries after delta validation; recursive merge retains the original accumulator's public type.
   const deltaRecord = delta as AssistantStreamRecord;
   const projection = createAssistantStreamDeltaProjection(
     cacheArrays && !isAssistantStreamValueExternallyMutable(accumulator),

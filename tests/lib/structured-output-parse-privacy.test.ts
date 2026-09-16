@@ -63,10 +63,11 @@ const privacyStandardSchema = {
   '~standard': {
     version: 1 as const,
     vendor: 'structured-output-privacy',
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Standard Schema types is phantom input/output evidence, intentionally undefined at runtime.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Standard Schema types is phantom input/output evidence, intentionally undefined at runtime.
     types: undefined as unknown as { input: { ok: boolean }; output: { ok: boolean } },
     // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Standard Schema validator receives untrusted parser input before validating its fields.
     validate(value: unknown) {
+      // SAFETY: This pass-through validator fixture isolates JSON parsing and validator-error ownership; successful test payloads use the declared ok boolean.
       return { value: value as { ok: boolean } };
     },
     jsonSchema: { input: () => schema },
@@ -124,7 +125,7 @@ function makeChatCompletion(
         message,
       },
     ],
-  } as OpenAI.Chat.ChatCompletion;
+  };
 }
 
 function makeResponse(
@@ -132,6 +133,7 @@ function makeResponse(
   args?: string,
   status: NonNullable<OpenAI.Responses.Response['status']> = 'completed',
 ): OpenAI.Responses.Response {
+  // SAFETY: The synthetic response intentionally combines lifecycle status and message fields to exercise structured-output error privacy.
   return {
     id: 'resp_privacy',
     created_at: 0,
@@ -419,6 +421,7 @@ for (const family of helperFamilies) {
 
 function expectPrivateSyntaxError(error: unknown): asserts error is SyntaxError & { cause?: unknown } {
   expect(error).toBeInstanceOf(SyntaxError);
+  // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
   const syntaxError = error as SyntaxError & { cause?: unknown };
 
   for (const sensitive of [patient, credential, malformedContent]) {
@@ -443,6 +446,7 @@ async function expectPrivateStreamingFailure<ParsedT>(stream: ChatCompletionStre
   const [failure] = failures;
 
   expect(failure).toBeInstanceOf(OpenAIError);
+  // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
   const streamFailure = failure as OpenAIError & { cause?: unknown };
   expect(streamFailure.message).toBe(safeErrorMessage);
   for (const sensitive of [patient, credential, malformedContent]) {
@@ -653,6 +657,7 @@ describe('built-in structured JSON parse diagnostic privacy', () => {
     (kind) => {
       const validatorFailure = new SyntaxError('Validator-owned diagnostic must be preserved.');
       const validatorCause = new Error('Validator-owned cause must be preserved.');
+      // SAFETY: This locally constructed SyntaxError intentionally carries a cause to verify that user-owned error identity and diagnostics survive.
       (validatorFailure as SyntaxError & { cause?: unknown }).cause = validatorCause;
 
       const failingZodSchema = zv4.object({ ok: zv4.boolean() }).superRefine(() => {
@@ -690,6 +695,7 @@ describe('built-in structured JSON parse diagnostic privacy', () => {
         }
 
         expect(failure).toBe(validatorFailure);
+        // SAFETY: The identity assertion proves this is the constructed validator SyntaxError whose cause was set above.
         expect((failure as SyntaxError & { cause?: unknown }).cause).toBe(validatorCause);
       }
     },
@@ -749,6 +755,7 @@ describe('public chat streaming structured-tool diagnostic privacy', () => {
     })),
     {
       title: 'user-owned structured-response parser',
+      // SAFETY: The custom parser is invoked with the literal validContent fixture containing the declared ok boolean.
       format: makeParseableResponseFormat(chatFormat, (content) => JSON.parse(content) as { ok: boolean }),
     },
   ];
@@ -832,6 +839,7 @@ describe('public chat streaming structured-tool diagnostic privacy', () => {
   test('preserves exact user-owned structured-response parser failures after valid partial parsing', async () => {
     const customFailure = new SyntaxError('User-owned structured response diagnostic.');
     const customCause = new Error('User-owned structured response cause.');
+    // SAFETY: This locally constructed SyntaxError intentionally carries a cause to verify that user-owned error identity and diagnostics survive.
     (customFailure as SyntaxError & { cause?: unknown }).cause = customCause;
     const parser = vi.fn(() => {
       throw customFailure;
@@ -847,7 +855,9 @@ describe('public chat streaming structured-tool diagnostic privacy', () => {
     }
 
     expect(failure).toBeInstanceOf(OpenAIError);
+    // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
     expect((failure as OpenAIError & { cause?: unknown }).cause).toBe(customFailure);
+    // SAFETY: This locally constructed SyntaxError intentionally carries a cause to verify that user-owned error identity and diagnostics survive.
     expect((customFailure as SyntaxError & { cause?: unknown }).cause).toBe(customCause);
     expect(parser).toHaveBeenCalledTimes(1);
   });
@@ -868,6 +878,7 @@ describe('public chat streaming structured-tool diagnostic privacy', () => {
       const [failure] = failures;
 
       expect(failure).toBeInstanceOf(OpenAIError);
+      // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
       const streamFailure = failure as OpenAIError & { cause?: unknown };
       expect(streamFailure.message).toBe(safeErrorMessage);
       for (const sensitive of [patient, credential, malformedContent]) {
@@ -901,6 +912,7 @@ describe('public chat streaming structured-tool diagnostic privacy', () => {
   test('preserves exact custom streaming parser errors and their causes', async () => {
     const customFailure = new SyntaxError('User-owned streaming parser diagnostic.');
     const customCause = new Error('User-owned streaming parser cause.');
+    // SAFETY: This locally constructed SyntaxError intentionally carries a cause to verify that user-owned error identity and diagnostics survive.
     (customFailure as SyntaxError & { cause?: unknown }).cause = customCause;
     const parser = vi.fn(() => {
       throw customFailure;
@@ -916,8 +928,10 @@ describe('public chat streaming structured-tool diagnostic privacy', () => {
     }
 
     expect(failure).toBeInstanceOf(OpenAIError);
+    // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
     expect((failure as OpenAIError & { cause?: unknown }).cause).toBe(customFailure);
     expect(parser).toHaveBeenCalledTimes(1);
+    // SAFETY: This locally constructed SyntaxError intentionally carries a cause to verify that user-owned error identity and diagnostics survive.
     expect((customFailure as SyntaxError & { cause?: unknown }).cause).toBe(customCause);
   });
 

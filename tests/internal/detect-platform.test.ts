@@ -21,6 +21,7 @@ async function withGlobals<T>(overrides: PlatformGlobals, run: (detection: Platf
     for (const [name, value] of Object.entries(overrides)) {
       descriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
       if (value === undefined) {
+        // SAFETY: The test temporarily replaces or removes these host globals and restores their original descriptors in cleanup.
         // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Platform fixtures temporarily remove runtime-selected globals whose values depend on the simulated environment.
         delete (globalThis as Record<string, unknown>)[name];
       } else {
@@ -34,6 +35,7 @@ async function withGlobals<T>(overrides: PlatformGlobals, run: (detection: Platf
       if (descriptor) {
         Object.defineProperty(globalThis, name, descriptor);
       } else {
+        // SAFETY: The test temporarily replaces or removes these host globals and restores their original descriptors in cleanup.
         // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Platform fixtures temporarily remove runtime-selected globals whose values depend on the simulated environment.
         delete (globalThis as Record<string, unknown>)[name];
       }
@@ -125,6 +127,7 @@ describe('platform detection', () => {
 
     try {
       Object.defineProperty(globalThis, 'EdgeRuntime', { configurable: true, value: 'edge-runtime' });
+      // SAFETY: The test temporarily replaces or removes these host globals and restores their original descriptors in cleanup.
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Platform fixtures temporarily remove runtime-selected globals whose values depend on the simulated environment.
       delete (globalThis as Record<string, unknown>)['process'];
       result = await client.models.list();
@@ -135,6 +138,7 @@ describe('platform detection', () => {
         if (descriptor) {
           Object.defineProperty(globalThis, name, descriptor);
         } else {
+          // SAFETY: The test temporarily replaces or removes these host globals and restores their original descriptors in cleanup.
           // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Platform fixtures temporarily remove runtime-selected globals whose values depend on the simulated environment.
           delete (globalThis as Record<string, unknown>)[name];
         }

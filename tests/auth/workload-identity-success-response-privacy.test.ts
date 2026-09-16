@@ -71,12 +71,14 @@ const NodeFetchBody = class Body {
     const body = await this.text();
     if (this.nodeFetchVersion === 'v2') {
       try {
+        // SAFETY: JSON parsing has not validated the payload; unknown prevents callers from trusting its fields before validation.
         return JSON.parse(body) as unknown;
       } catch {
         throw new Error(`invalid json response body at ${OAUTH_URL}: ${body}`);
       }
     }
 
+    // SAFETY: JSON parsing has not validated the payload; unknown prevents callers from trusting its fields before validation.
     return JSON.parse(body) as unknown;
   }
 
@@ -140,6 +142,7 @@ const nodeFetchTransports = [
   {
     name: 'node-fetch v2 mixed-in Body',
     Response: NodeFetch2Response,
+    // SAFETY: This fixture deliberately substitutes the node-fetch body implementation to exercise its json parser; only the shared response operations are used.
     // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- This node-fetch v2 fixture mixes Body methods into its Response prototype at runtime.
     parserPrototype: NodeFetch2Response.prototype as unknown as typeof NodeFetchBody.prototype,
     preservesBOM: true,
@@ -327,6 +330,7 @@ describe('successful workload OAuth response JSON privacy', () => {
     'sanitizes malformed $transport.name successful OAuth bodies on $surface',
     async ({ surface, transport }) => {
       const readJSON = vi.spyOn(transport.parserPrototype, 'json');
+      // SAFETY: This fixture deliberately substitutes the node-fetch body implementation to exercise its json parser; only the shared response operations are used.
       // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Exercise a deliberately minimal node-fetch-compatible response without requiring native Response internals.
       const response = new transport.Response(
         `${PRIVATE_TOKEN} customer-private-record`,
@@ -346,6 +350,7 @@ describe('successful workload OAuth response JSON privacy', () => {
     'preserves $transport.name tokens, body consumption, and caching on $surface',
     async ({ surface, transport }) => {
       const readJSON = vi.spyOn(transport.parserPrototype, 'json');
+      // SAFETY: This fixture deliberately substitutes the node-fetch body implementation to exercise its json parser; only the shared response operations are used.
       // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Exercise a deliberately minimal node-fetch-compatible response without requiring native Response internals.
       const response = new transport.Response(
         JSON.stringify({ access_token: 'safe-body-token', expires_in: 3600 }),
@@ -368,6 +373,7 @@ describe('successful workload OAuth response JSON privacy', () => {
     'preserves $transport.name UTF-8 BOM decoding behavior on $surface',
     async ({ surface, transport }) => {
       const body = `\uFEFF${JSON.stringify({ access_token: 'safe-body-token', expires_in: 3600 })}`;
+      // SAFETY: This fixture deliberately substitutes the node-fetch body implementation to exercise its json parser; only the shared response operations are used.
       // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Exercise a deliberately minimal node-fetch-compatible response without requiring native Response internals.
       const response = new transport.Response(body) as unknown as Response;
       const harness = createHarness(async () => response);

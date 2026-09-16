@@ -60,6 +60,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     super();
     client ??= new OpenAI();
     const apiKey = props.__apiKey === undefined ? client.apiKey : props.__apiKey;
+    // SAFETY: The supplied OpenAI client owns _options; this read detects its existing API-key provider without changing its public surface.
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The public beta Node WebSocket boundary accepts refreshable credentials and untrusted JSON frames.
     const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
     if (hasProvider && !props.__resolvedApiKey) {

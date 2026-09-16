@@ -117,7 +117,7 @@ describe.each(variants)('Live $name WebSocket inputs', ({ connect, path, query }
         followRedirects,
         headers: { 'X-Test': 'custom', 'User-Agent': 'custom-client/1', 'X-Optional': 'custom' },
         reconnect: { onReconnecting, maxRetries: 1, initialDelay: 0, maxDelay: 0 },
-      } as LiveOptions);
+      });
       try {
         const expected = expect.objectContaining({
           followRedirects: false,

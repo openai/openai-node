@@ -125,6 +125,7 @@ export function parseDef(
   refs.seen.set(def, newItem);
 
   try {
+    // SAFETY: The vendored Zod definition carries its typeName discriminator; selectParser dispatches on that discriminator and handles unsupported definitions.
     const jsonSchema = selectParser(def, (def as any).typeName, refs, forceResolution);
 
     if (jsonSchema) {

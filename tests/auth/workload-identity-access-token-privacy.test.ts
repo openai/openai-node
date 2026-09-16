@@ -163,6 +163,7 @@ async function expectPrivateFailure(
   }
 
   expect(failure.message).toBe(SAFE_ERROR);
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   expect((failure as Error & { cause?: unknown }).cause).toBeUndefined();
 
   let current: unknown = failure;
@@ -172,6 +173,7 @@ async function expectPrivateFailure(
       expect(diagnostic).not.toContain(ACCESS_SECRET);
       expect(diagnostic).not.toContain(PRIVATE_PATIENT);
     }
+    // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
     current = (current as Error & { cause?: unknown }).cause;
   }
 
@@ -528,6 +530,7 @@ describe('workload identity OAuth access-token confidentiality and integrity', (
     for (const attempt of attempts) {
       if (attempt.status === 'rejected') {
         expect(attempt.reason).toBeInstanceOf(OpenAIError);
+        // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
         expect((attempt.reason as Error).message).toBe(SAFE_ERROR);
       }
     }

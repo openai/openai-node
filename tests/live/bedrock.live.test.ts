@@ -79,6 +79,7 @@ function readAuthModes(): AuthMode[] {
     throw new Error(`${configuredEnv} must include at least one authentication mode.`);
   }
 
+  // SAFETY: These literal mode names are strings; widening only allows includes to reject arbitrary environment input.
   const invalidModes = values.filter((value) => !(authModes as readonly string[]).includes(value));
   if (invalidModes.length > 0) {
     throw new Error(
@@ -87,12 +88,15 @@ function readAuthModes(): AuthMode[] {
     );
   }
 
+  // SAFETY: The preceding membership check rejects every value outside the declared mode list before this narrowed value is returned.
   return [...new Set(values)] as AuthMode[];
 }
 
 function readEndpointMode(): EndpointMode {
   const value = process.env[ENDPOINT_MODE_ENV]?.trim() || 'mantle';
+  // SAFETY: These literal mode names are strings; widening only allows includes to reject arbitrary environment input.
   if ((endpointModes as readonly string[]).includes(value)) {
+    // SAFETY: The preceding membership check rejects every value outside the declared mode list before this narrowed value is returned.
     return value as EndpointMode;
   }
   throw new Error(`${ENDPOINT_MODE_ENV} must be one of: ${endpointModes.join(', ')}.`);

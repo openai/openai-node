@@ -77,7 +77,9 @@ export function makeParseableResponseFormat<ParsedT>(
 ): AutoParseableResponseFormat<ParsedT> {
   const obj = { ...response_format, type: 'json_schema' as const };
   obj.json_schema = { ...obj.json_schema };
+  // SAFETY: The fresh copy may retain a caller-provided toJSON property; deleting it prevents serialization from replacing the validated schema.
   delete (obj as typeof obj & { toJSON?: unknown }).toJSON;
+  // SAFETY: The fresh copy may retain a caller-provided toJSON property; deleting it prevents serialization from replacing the validated schema.
   delete (obj.json_schema as { toJSON?: unknown }).toJSON;
 
   Object.defineProperties(obj, {
@@ -91,6 +93,7 @@ export function makeParseableResponseFormat<ParsedT>(
     },
   });
 
+  // SAFETY: Object.defineProperties installed the parser brand and callbacks required by the returned helper type.
   return obj as AutoParseableResponseFormat<ParsedT>;
 }
 
@@ -111,6 +114,7 @@ export function makeParseableTextFormat<ParsedT>(
   parser: (content: string) => ParsedT,
 ): AutoParseableTextFormat<ParsedT> {
   const obj = { ...response_format, type: 'json_schema' as const };
+  // SAFETY: The fresh copy may retain a caller-provided toJSON property; deleting it prevents serialization from replacing the validated schema.
   delete (obj as typeof obj & { toJSON?: unknown }).toJSON;
 
   Object.defineProperties(obj, {
@@ -124,6 +128,7 @@ export function makeParseableTextFormat<ParsedT>(
     },
   });
 
+  // SAFETY: Object.defineProperties installed the parser brand and callbacks required by the returned helper type.
   return obj as AutoParseableTextFormat<ParsedT>;
 }
 
@@ -151,6 +156,7 @@ export function isAutoParsableResponseFormat<ParsedT>(
  */
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This public parser boundary accepts caller-supplied formats and validates their parser metadata at runtime.
 export function isParseableResponseFormat(format: unknown): boolean {
+  // SAFETY: Only the optional discriminator is read; arbitrary input is not treated as a validated response-format schema.
   return isAutoParsableResponseFormat(format) || (format as { type?: string } | null)?.type === 'json_schema';
 }
 
@@ -174,10 +180,12 @@ export function parseResponseFormatContent<ParsedT>(format: unknown, content: st
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A caller-supplied response format may expose a callable parser; validate that hook before invoking it.
     typeof format.$parseRaw === 'function'
   ) {
+    // SAFETY: The format's captured parser owns the ParsedT output contract; this function forwards its result without coercion.
     return format.$parseRaw(content) as ParsedT;
   }
 
   try {
+    // SAFETY: ParsedT represents the caller's response schema; JSON syntax is checked here and schema validation remains with the configured format.
     return JSON.parse(content) as ParsedT;
   } catch (error) {
     if (error instanceof SyntaxError) {
@@ -273,6 +281,7 @@ export function makeParseableTool<OptionsT extends ToolOptions>(
     },
   });
 
+  // SAFETY: Object.defineProperties installed the parser brand and callbacks required by the returned helper type.
   return obj as AutoParseableTool<OptionsT, boolean>;
 }
 
@@ -371,12 +380,14 @@ function parseToolCall<Params extends ChatCompletionCreateParams>(
   }
 
   if (toolCall.type !== 'function') {
+    // SAFETY: This branch handles unsupported JavaScript discriminators that the current TypeScript union excludes; the value is only used in the error.
     const unsupportedType = (toolCall as { type: string }).type;
     throw new OpenAIError(
       `Currently only \`function\` and \`custom\` tool calls are supported; Received \`${unsupportedType}\``,
     );
   }
 
+  // SAFETY: The find predicate checks the function-tool discriminator before matching its name; the cast retains that narrowing through find.
   const inputTool = params.tools?.find(
     (inputTool) =>
       isChatCompletionFunctionTool(inputTool) && inputTool.function?.name === toolCall.function.name,
@@ -466,6 +477,7 @@ export function validateInputTools(tools: ChatCompletionCreateParamsBase['tools'
     }
 
     if (tool.type !== 'function') {
+      // SAFETY: This branch handles unsupported JavaScript discriminators that the current TypeScript union excludes; the value is only used in the error.
       const unsupportedType = (tool as { type: string }).type;
       throw new OpenAIError(
         `Currently only \`function\` and \`custom\` tool types are supported; Received \`${unsupportedType}\``,

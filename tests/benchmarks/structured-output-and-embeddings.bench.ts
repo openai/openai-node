@@ -202,6 +202,7 @@ describe(`embeddings (${embeddingDimensions} dimensions)`, () => {
   bench(
     'parse a float-encoded embedding response',
     () => {
+      // SAFETY: The parsed JSON was serialized from the adjacent typed embedding fixture, and dimension checks validate the benchmark result.
       const response = JSON.parse(floatEmbeddingResponse) as typeof floatEmbeddingFixture;
       assertEmbeddingDimensions(response.data[0]?.embedding);
     },
@@ -211,6 +212,7 @@ describe(`embeddings (${embeddingDimensions} dimensions)`, () => {
   bench(
     'parse and decode a base64-encoded embedding response',
     () => {
+      // SAFETY: The parsed JSON was serialized from the adjacent typed embedding fixture, and dimension checks validate the benchmark result.
       const response = JSON.parse(base64EmbeddingResponse) as typeof base64EmbeddingFixture;
       assertEmbeddingDimensions(toFloat32Array(response.data[0]!.embedding));
     },

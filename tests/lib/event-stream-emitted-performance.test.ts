@@ -191,6 +191,7 @@ describe('EventStream.emitted companion-listener performance', () => {
     const stream = new EmittedTestStream();
     const register = vi.spyOn(stream, 'once');
     stream.on('value', () => {
+      // SAFETY: The mock-call search selects the exact event name associated with this callback signature, and the presence guard runs before invoking or removing it.
       const callback = register.mock.calls.find(([event]) => event === 'value')?.[1] as
         | ((value: number) => void)
         | undefined;
@@ -215,6 +216,7 @@ describe('EventStream.emitted companion-listener performance', () => {
     const register = vi.spyOn(stream, 'once');
     const failure = new OpenAIError('snapshot failure');
     stream.on('error', () => {
+      // SAFETY: The mock-call search selects the exact event name associated with this callback signature, and the presence guard runs before invoking or removing it.
       const callback = register.mock.calls.find(([event]) => event === 'error')?.[1] as
         | ((error: OpenAIError) => void)
         | undefined;
@@ -241,6 +243,7 @@ describe('EventStream.emitted companion-listener performance', () => {
       stream.emitOther('nested');
     });
     stream.on('other', () => {
+      // SAFETY: The mock-call search selects the exact event name associated with this callback signature, and the presence guard runs before invoking or removing it.
       const callback = register.mock.calls.find(([event]) => event === 'value')?.[1] as
         | ((value: number) => void)
         | undefined;
@@ -278,6 +281,7 @@ describe('EventStream.emitted companion-listener performance', () => {
       });
 
       const pending = stream.emitted('value');
+      // SAFETY: The mock-call search selects the exact event name associated with this callback signature, and the presence guard runs before invoking or removing it.
       const callback = register.mock.calls.find(([event]) => event === 'value')?.[1] as
         | ((value: number) => void)
         | undefined;
@@ -440,6 +444,7 @@ describe('EventStream.emitted companion-listener performance', () => {
   test('continues reporting genuinely unhandled stream errors', () => {
     const stream = new EmittedTestStream();
     const failure = new OpenAIError('unhandled');
+    // SAFETY: The spy returns a resolved promise only to count reject calls without creating unhandled rejections; no resolved value is consumed.
     const reject = vi.spyOn(Promise, 'reject').mockImplementation(() => Promise.resolve() as Promise<never>);
 
     try {

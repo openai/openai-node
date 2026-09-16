@@ -59,6 +59,7 @@ export function mockFetch() {
           return response;
         } catch (err) {
           reject(err);
+          // SAFETY: This path rejects the controlling handleRequest promise first; the returned error is only the mock transport placeholder for that failed handler.
           return err as any;
         }
       });

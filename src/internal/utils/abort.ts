@@ -9,6 +9,7 @@ interface AbortFinalizer {
 }
 
 // Keep these optional runtime features out of the SDK's ES2020 type requirements.
+// SAFETY: These host features are optional and checked before use; the structural view avoids requiring newer ambient library declarations.
 const weakGlobals = globalThis as typeof globalThis & {
   WeakRef?: new <T extends object>(target: T) => WeakReference<T>;
   FinalizationRegistry?: new (cleanup: (value: AbortCallback) => void) => AbortFinalizer;

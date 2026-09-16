@@ -311,6 +311,7 @@ describe('fallback caller abort subscriptions', () => {
       expect(response.body?.locked).toBe(false);
 
       if (mode === 'sse') {
+        // SAFETY: The sse branch requests stream mode, so this pending operation resolves to the async Stream consumed below.
         const stream = (await pending) as Stream<unknown>;
         const reading = stream[Symbol.asyncIterator]().next();
         caller.abort(new Error('caller cancellation'));

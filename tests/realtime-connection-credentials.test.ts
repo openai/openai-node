@@ -43,6 +43,7 @@ const surfaces = [
 ] as const;
 
 function credential(connection: { socket: unknown }): string | undefined {
+  // SAFETY: The case selects the matching Azure/client constructor and injected MockSocket; the helper reads only the recorded credential options.
   const socket = connection.socket as InstanceType<typeof MockSocket>;
   return (
     socket.headers['Authorization']?.replace(/^Bearer /u, '') ??
@@ -80,6 +81,7 @@ afterEach(() => {
 describe.each(surfaces)('$name connection credentials', ({ Realtime }) => {
   describe.each([false, true])('Azure: %s', (azure) => {
     const connect = (client: OpenAI) =>
+      // SAFETY: The case selects the matching Azure/client constructor and injected MockSocket; the helper reads only the recorded credential options.
       azure ? Realtime.azure(client as AzureOpenAI) : Realtime.create(client, { model: 'gpt-realtime' });
 
     test('keeps simultaneously resolved provider credentials with their initiating connections', async () => {

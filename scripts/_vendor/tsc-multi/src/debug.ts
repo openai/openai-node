@@ -6,9 +6,9 @@ type DebugLogger = ((formatter: string, ...args: unknown[]) => void) & {
 
 function createLogger(namespace: string): DebugLogger {
   const log = debuglog(namespace);
-  const logger = ((formatter: string, ...args: unknown[]) => {
+  const logger = (formatter: string, ...args: unknown[]) => {
     log(formatter, ...args);
-  }) as DebugLogger;
+  };
   logger.extend = (name: string) => createLogger(`${namespace}:${name}`);
   return logger;
 }

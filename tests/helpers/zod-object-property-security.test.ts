@@ -103,12 +103,14 @@ describe.each(schemaHelpers)('$name object property security', ({ getSchema }) =
   it('preserves safe properties and valid Object.prototype-like property names', () => {
     const fieldNames = ['safe', 'constructor', 'toString', 'prototype', 'hasOwnProperty'];
     const properties = Object.fromEntries(fieldNames.map((name) => [name, zv3.string()]));
+    // SAFETY: The Zod fixture explicitly declares the tested property names; JSON serialization preserves this generated schema for the wire-format assertions.
     const jsonSchema = getSchema(zv3.object(properties)) as {
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The test inspects schema properties with hostile names without treating their unvalidated values as trusted schemas.
       properties: Record<string, unknown>;
       required: string[];
     };
     const serializedSchema = JSON.stringify(jsonSchema);
+    // SAFETY: The Zod fixture explicitly declares the tested property names; JSON serialization preserves this generated schema for the wire-format assertions.
     const wireSchema = JSON.parse(serializedSchema) as typeof jsonSchema;
 
     expect(Object.getPrototypeOf(jsonSchema.properties)).toBe(Object.prototype);

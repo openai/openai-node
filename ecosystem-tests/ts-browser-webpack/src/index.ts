@@ -94,6 +94,7 @@ const correctAnswer =
 const model = 'whisper-1';
 
 const apiKey = (
+  // SAFETY: The browser test launcher injects this optional global flag; the code handles its absence before running the configured path.
   globalThis as typeof globalThis & { __OPENAI_ECOSYSTEM_TEST_API_KEY__?: string }
 ).__OPENAI_ECOSYSTEM_TEST_API_KEY__;
 
@@ -228,6 +229,7 @@ describe('toFile', () => {
 });
 
 const bundleOnly = (
+  // SAFETY: The browser test launcher injects this optional global flag; the code handles its absence before running the configured path.
   globalThis as typeof globalThis & { __OPENAI_ECOSYSTEM_TEST_BUNDLE_ONLY__?: boolean }
 ).__OPENAI_ECOSYSTEM_TEST_BUNDLE_ONLY__;
 

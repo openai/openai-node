@@ -206,6 +206,7 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
   }
 
   async prepareRequest(request: FinalizedRequestInit, context: ProviderRequestContext): Promise<void> {
+    // SAFETY: process is optional outside Node; the native process tag is checked before using Node-specific signing and credential behavior.
     if (Object.prototype.toString.call((globalThis as any).process) !== '[object process]') {
       throw new Errors.OpenAIError(
         'Bedrock AWS credential authentication is only supported in Node.js and compatible server runtimes. Use bearer authentication in this runtime.',

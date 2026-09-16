@@ -16,6 +16,7 @@ const errorFunctionToString = Function.prototype.toString;
 const nativeErrorSource = errorFunctionToString.call(Error);
 const nativeSyntaxErrorSource = errorFunctionToString.call(SyntaxError);
 const nativeErrorBrandDescriptor = getOwnErrorDescriptor(Error, 'isError');
+// SAFETY: The captured Error.isError data property was checked to be callable and follows the native error-brand predicate contract.
 const nativeErrorBrand =
   nativeErrorBrandDescriptor &&
   'value' in nativeErrorBrandDescriptor &&
@@ -58,6 +59,7 @@ function classifyCrossRealmAzureError(error: object): AzureJSONErrorKind {
   try {
     const prototypes: object[] = [];
     let tagged = false;
+    // SAFETY: Object.getPrototypeOf returns an object or null; the traversal never treats the prototype as a more specific instance.
     for (
       let prototype: object | null = error;
       prototype !== null;

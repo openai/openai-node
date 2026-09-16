@@ -212,6 +212,7 @@ function getSchemaTypes(schema: unknown): Set<string> | undefined {
     return undefined;
   }
 
+  // SAFETY: The preceding guard excludes null, primitives, and arrays; property values remain unknown until their individual schema checks.
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The schema type keyword is unvalidated input until the supported-type checks below succeed.
   const type = (schema as Record<string, unknown>)['type'];
   if (type === undefined) {
@@ -244,6 +245,7 @@ function getLiteralValues(schema: unknown): JSONPrimitive[] | undefined {
     return undefined;
   }
 
+  // SAFETY: The preceding guard excludes null, primitives, and arrays; property values remain unknown until their individual schema checks.
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Const and enum literals are arbitrary schema values until the JSON primitive checks establish their types.
   const record = schema as Record<string, unknown>;
   if ('const' in record && isJSONPrimitive(record['const'])) {
@@ -305,8 +307,10 @@ function haveDisjointObjectDiscriminator(left: unknown, right: unknown, root: JS
     return false;
   }
 
+  // SAFETY: The preceding guard excludes null, primitives, and arrays; property values remain unknown until their individual schema checks.
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Schema property maps remain unvalidated while exclusivity analysis checks the keywords it understands.
   const leftRecord = left as Record<string, unknown>;
+  // SAFETY: The preceding guard excludes null, primitives, and arrays; property values remain unknown until their individual schema checks.
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Schema property maps remain unvalidated while exclusivity analysis checks the keywords it understands.
   const rightRecord = right as Record<string, unknown>;
   const leftProperties = leftRecord['properties'];
@@ -323,6 +327,7 @@ function haveDisjointObjectDiscriminator(left: unknown, right: unknown, root: JS
   }
 
   for (const property of leftRequired) {
+    // SAFETY: Both properties maps were checked as non-null non-array objects; the selected values remain untrusted inputs to reference resolution.
     if (
       // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate externally produced JSON Schema keywords before using them to prove schema compatibility.
       typeof property === 'string' &&
@@ -349,6 +354,7 @@ function getClosedObjectPropertySet(
     return undefined;
   }
 
+  // SAFETY: The preceding guard excludes null, primitives, and arrays; property values remain unknown until their individual schema checks.
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Closed-object analysis validates properties, required, and additionalProperties values before deriving their constraints.
   const record = schema as Record<string, unknown>;
   const properties = record['properties'];
@@ -364,6 +370,7 @@ function getClosedObjectPropertySet(
   }
 
   const propertySet = new Set(Object.keys(properties));
+  // SAFETY: The preceding every check proved each required-property name is a string.
   const requiredProperties = required as string[];
   // A required undeclared property makes a closed branch unsatisfiable, but
   // the strictifier rejects that shape rather than representing it. Keep this
@@ -425,6 +432,7 @@ function resolveLocalRefForExclusivity(
     return schema;
   }
 
+  // SAFETY: The preceding guard excludes null, primitives, and arrays; property values remain unknown until their individual schema checks.
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Exclusivity analysis reads unvalidated schema keywords and declines unsupported value shapes.
   const record = schema as Record<string, unknown>;
   const ref = record['$ref'];
@@ -432,6 +440,7 @@ function resolveLocalRefForExclusivity(
     // Annotation keywords do not affect Draft 7 validation, so they are safe
     // to retain while proving the referenced branches are mutually exclusive.
     // Keep the proof conservative for every other sibling constraint.
+    // SAFETY: The helper only checks allowed sibling keys on this object; it does not assume that arbitrary property values form a valid schema.
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate externally produced JSON Schema keywords before using them to prove schema compatibility.
     if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(record as JSONSchema)) {
       return undefined;
@@ -452,6 +461,7 @@ function resolveLocalRefForExclusivity(
     if (!Array.isArray(record['allOf'])) {
       return undefined;
     }
+    // SAFETY: The allOf value was checked as an array; normalization performs the remaining branch-shape checks before proving exclusivity.
     const normalized = normalizeObjectAllOfForExclusivity(record as JSONSchema, root);
     if (normalized === undefined) {
       return undefined;
@@ -493,6 +503,7 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
     if (!isObj(value)) {
       return;
     }
+    // SAFETY: The preceding guard excludes null, primitives, and arrays; property values remain unknown until their individual schema checks.
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The traversal preserves arbitrary schema fields and validates only the keywords it normalizes.
     const record = value as Record<string, unknown>;
     if (visitedSchemas.has(record)) {
@@ -573,6 +584,7 @@ function parseStandardSchema<Schema extends StandardSchemaLike>(
     throw new OpenAIError(`Standard Schema validation failed: ${formatStandardSchemaIssues(result.issues)}`);
   }
 
+  // SAFETY: The captured Standard Schema validator completed synchronously without issues, so its value follows that schema's inferred output contract.
   return result.value as InferStandardOutput<Schema>;
 }
 
@@ -582,6 +594,7 @@ function resolveStandardJSONSchema<Schema extends StandardSchemaLike>(
   schemaOverride?: JSONSchema | Record<string, unknown> | undefined,
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Strict schemas retain arbitrary annotation/default values in the published schema dictionary contract.
 ): Record<string, unknown> {
+  // SAFETY: The override or Standard Schema input converter supplies the schema; normalization and strict conversion below validate the supported structure.
   const schema = (schemaOverride ?? getBinding().standard.jsonSchema?.input({ target: 'draft-07' })) as
     | JSONSchema
     | undefined;
@@ -592,6 +605,7 @@ function resolveStandardJSONSchema<Schema extends StandardSchemaLike>(
     );
   }
 
+  // SAFETY: Strict conversion returns an object schema here; the record view exposes its JSON keyword properties without narrowing their values.
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The converter preserves the public JSON Schema dictionary contract, including literal/default and extension values.
   return toStrictJsonSchema(normalizeStructuredOutputSchema(schema)) as Record<string, unknown>;
 }

@@ -37,11 +37,13 @@ function unencodedAssistantStream(events: Event[]): AssistantStream {
   const controller = new AbortController();
   return AssistantStream.createAssistantStream(
     'thread_123',
+    // SAFETY: The partial Runs mock supplies create with this test event stream; no other resource method is used by the factory.
     {
       create: vi.fn().mockResolvedValue({
         controller,
         async *[Symbol.asyncIterator]() {
           for (const event of events) {
+            // SAFETY: These synthetic wire events intentionally omit or corrupt identity fields so the stream validates them at runtime.
             yield event as AssistantStreamEvent;
           }
         },
@@ -329,7 +331,8 @@ describe('AssistantStream run-step identity security', () => {
       const failure = await runner.done().catch((error: unknown) => error);
 
       expect(failure).toBeInstanceOf(OpenAIError);
-      expect((failure as Error).message).toMatch(/already been created/u);
+      expect(failure).toHaveProperty('message', expect.stringMatching(/already been created/u));
+      // SAFETY: The captured failure is asserted to be Error above before its message is checked for credential disclosure.
       expect((failure as Error).message).not.toContain('sk-synthetic-never-dispatch');
       expect(stepCreated).toHaveBeenCalledTimes(2);
       expect(stepDone).toHaveBeenCalledTimes(1);
@@ -514,6 +517,7 @@ describe('AssistantStream run-step identity security', () => {
     'rejects an %s run-step ID without invoking an attacker-controlled getter',
     async (kind) => {
       const readID = vi.fn(() => 'step_injected');
+      // SAFETY: Object.create installs the hostile inherited id getter; the fixture tests rejection before invoking that getter.
       const data: Event =
         kind === 'inherited'
           ? Object.assign(Object.create(Object.defineProperty({}, 'id', { get: readID })) as Event, {

@@ -99,6 +99,7 @@ function isResponseBodyPrototype(prototype: object, responsePrototype: object | 
 }
 
 function decodeNativeResponseBody(body: ArrayBuffer): string {
+  // SAFETY: Bun is an optional runtime global; its version is checked before selecting Bun-specific decoding behavior.
   const scope = globalThis as typeof globalThis & { Bun?: { version?: unknown } };
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bun needs its specific response-decoding behavior; probe the actual host runtime marker.
   return new TextDecoder('utf-8', { ignoreBOM: typeof scope.Bun?.version === 'string' }).decode(body);
@@ -154,6 +155,7 @@ async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
 }
 
 function isUnsafeAccessToken(accessToken: string): boolean {
+  // SAFETY: Bun is an optional runtime global; its version is checked before selecting Bun-specific decoding behavior.
   const scope = globalThis as typeof globalThis & { Bun?: { version?: unknown } };
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bun needs its specific response-decoding behavior; probe the actual host runtime marker.
   if (typeof scope.Bun?.version === 'string') {
@@ -280,7 +282,7 @@ export class WorkloadIdentityAuth {
       }
 
       if (response.status === 400 || response.status === 401 || response.status === 403) {
-        throw new OAuthError(response.status as 400 | 401 | 403, body, response.headers);
+        throw new OAuthError(response.status, body, response.headers);
       }
       throw APIError.generate(
         response.status,
@@ -305,6 +307,7 @@ export class WorkloadIdentityAuth {
       throw new OpenAIError("Token exchange response missing 'access_token' field");
     }
 
+    // SAFETY: The token response was checked as an object with a valid access token; expires_in is still validated by calculateExpiresAt.
     const expiresIn = (tokenResponse as Partial<TokenExchangeResponse>).expires_in ?? 3600;
     const expiresAt = calculateExpiresAt(expiresIn, exchangeStartedAt);
 

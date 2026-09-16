@@ -336,6 +336,7 @@ describe('Stream.fromReadableStream', () => {
       cancel: vi.fn().mockResolvedValue(undefined),
       releaseLock: vi.fn(),
     };
+    // SAFETY: The stream adapter calls only getReader and the instrumented reader methods here; the partial fake exposes cancellation and lock-release ordering.
     const stream = Stream.fromReadableStream({ getReader: () => reader } as any, controller);
 
     await expect(collect(stream)).resolves.toEqual([]);
@@ -354,6 +355,7 @@ describe('Stream.fromReadableStream', () => {
       cancel: vi.fn().mockResolvedValue(undefined),
       releaseLock: vi.fn(),
     };
+    // SAFETY: The stream adapter calls only getReader and the instrumented reader methods here; the partial fake exposes cancellation and lock-release ordering.
     const stream = Stream.fromReadableStream({ getReader: () => reader } as any, controller);
 
     await expect(collect(stream)).resolves.toEqual([]);

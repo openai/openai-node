@@ -86,6 +86,7 @@ function safeOptionRecord(
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`X.509 ${label} options must have only own plain data properties.`);
   }
+  // SAFETY: The snapshot starts empty with no prototype; only checked own data properties are copied into it below.
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Credential option snapshots contain unvalidated descriptor values; each option is validated before use.
   const snapshot = Object.create(null) as Record<string, unknown>;
   for (const name of Reflect.ownKeys(value)) {

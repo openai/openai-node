@@ -50,6 +50,7 @@ const nodeVersionPolicyPath = require('node:path');
 
   const root = path.resolve(__dirname, '..');
   const read = (file: string): string => fs.readFileSync(path.join(root, file), 'utf-8');
+  // SAFETY: This helper reads repository-owned JSON files using the caller-selected manifest/workflow contract; policy assertions validate the consumed fields.
   const readJSON = <Value>(file: string): Value => JSON.parse(read(file)) as Value;
   const unique = <Value>(values: Value[]): Value[] => [...new Set(values)];
 

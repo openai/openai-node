@@ -16,6 +16,7 @@ function ownStrictRootSchema(
     throw new TypeError('Root schema must be a plain JSON-schema record');
   }
 
+  // SAFETY: Object.getPrototypeOf returns an object or null; the following comparison permits only plain or null-prototype schemas.
   const prototype = Object.getPrototypeOf(schema) as object | null;
   if (![null, Object.prototype].includes(prototype)) {
     throw new TypeError('Root schema must be a plain JSON-schema record');
@@ -74,6 +75,7 @@ function ownStrictRootSchema(
     throw new Error("Root schema must have type: 'object' but got type: undefined");
   }
 
+  // SAFETY: The copied schema preserves the validated JSON fields while taking ownership of the mutable converter result.
   return owned as JsonSchema7Type;
 }
 

@@ -291,6 +291,7 @@ export class Worker {
       }
 
       if (this.data.shareHelpers) {
+        // SAFETY: The selected TypeScript compiler exposes getCommonSourceDirectoryOfConfig internally; this vendored build adapter uses that compiler API despite its omitted public declaration.
         const root = (this.ts as any).getCommonSourceDirectoryOfConfig(config);
         config.options.importHelpers = true;
         resolvedShareHelpers = nodePath.resolve(root, this.data.shareHelpers);
@@ -403,6 +404,7 @@ export class Worker {
 
     let resolvedShareHelpers: string | undefined;
     if (this.data.shareHelpers) {
+      // SAFETY: The selected TypeScript compiler exposes getCommonSourceDirectoryOfConfig internally; this vendored build adapter uses that compiler API despite its omitted public declaration.
       const root = (this.ts as any).getCommonSourceDirectoryOfConfig(config);
       config.options.importHelpers = true;
       resolvedShareHelpers = nodePath.resolve(root, this.data.shareHelpers);

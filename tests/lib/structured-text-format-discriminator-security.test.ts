@@ -56,38 +56,23 @@ const formatFactories: FormatFactory[] = [
   {
     name: 'Zod v3',
     expectedParsed: { city: 'Paris' },
-    create: (metadata) =>
-      zodTextFormat(
-        zodV3.object({ city: zodV3.string() }),
-        trustedName,
-        metadata as Parameters<typeof zodTextFormat>[2],
-      ),
+    create: (metadata) => zodTextFormat(zodV3.object({ city: zodV3.string() }), trustedName, metadata),
   },
   {
     name: 'Zod v4',
     expectedParsed: { city: 'Paris' },
-    create: (metadata) =>
-      zodTextFormat(
-        zodV4.object({ city: zodV4.string() }),
-        trustedName,
-        metadata as Parameters<typeof zodTextFormat>[2],
-      ),
+    create: (metadata) => zodTextFormat(zodV4.object({ city: zodV4.string() }), trustedName, metadata),
   },
   {
     name: 'Zod v4 mini',
     expectedParsed: { city: 'Paris' },
     create: (metadata) =>
-      zodTextFormat(
-        zodV4Mini.object({ city: zodV4Mini.string() }),
-        trustedName,
-        metadata as Parameters<typeof zodTextFormat>[2],
-      ),
+      zodTextFormat(zodV4Mini.object({ city: zodV4Mini.string() }), trustedName, metadata),
   },
   {
     name: 'Standard Schema',
     expectedParsed: { city: 'Paris', normalized: true },
-    create: (metadata) =>
-      standardTextFormat(standardSchema, trustedName, metadata as Parameters<typeof standardTextFormat>[2]),
+    create: (metadata) => standardTextFormat(standardSchema, trustedName, metadata),
   },
 ];
 
@@ -195,6 +180,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
   });
 
   test('ignores inherited and non-enumerable metadata discriminators', () => {
+    // SAFETY: This locally constructed hostile metadata fixture deliberately retains inherited, symbol, or prototype-named fields for the security regression.
     const inherited = Object.assign(Object.create({ type: 'text' }), {
       description: trustedDescription,
     }) as UnsafeFormatMetadata;
@@ -207,13 +193,14 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
 
   test('preserves enumerable symbols and prototype-safe metadata entries', () => {
     const metadataSymbol = Symbol('synthetic-format-metadata');
+    // SAFETY: This locally constructed hostile metadata fixture deliberately retains inherited, symbol, or prototype-named fields for the security regression.
     const metadata = JSON.parse(
       '{"type":"text","description":"Return validated weather details","__proto__":{"polluted":"no"}}',
     ) as UnsafeFormatMetadata;
     metadata[metadataSymbol] = 'preserved';
 
     const format = create(metadata);
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Deliberately mutate format metadata beyond its declared discriminator to test captured parser invariants.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Deliberately mutate format metadata beyond its declared discriminator to test captured parser invariants.
     const record = format as unknown as UnsafeFormatMetadata;
 
     expectTrustedFormat(format);
@@ -301,6 +288,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary text-format metadata until assertions inspect the actual wire values.
       let requestBody: { text?: { format?: Record<string, unknown> } } | undefined;
       const fetch = vi.fn(async (_request: string | URL | Request, init?: RequestInit) => {
+        // SAFETY: Decode the synthetic request or serialized format produced in this test to inspect the protected discriminator and schema fields.
         requestBody = JSON.parse(init?.body as string) as typeof requestBody;
         return Response.json(makeResponsePayload(), { status: 200 });
       });
@@ -333,7 +321,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
       expect(serializer).not.toHaveBeenCalled();
       expect(getter).toHaveBeenCalledTimes(useAccessor ? 1 : 0);
       expect(Object.getOwnPropertyDescriptor(format, 'toJSON')).toBeUndefined();
-      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect the synthetic symbol property preserved outside the published text format type.
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Inspect the synthetic symbol property preserved outside the published text format type.
       expect((format as unknown as UnsafeFormatMetadata)[metadataSymbol]).toBe('preserved');
       expect(Object.isFrozen(metadata)).toBe(true);
       expect(response.output_parsed).toEqual(expectedParsed);
@@ -343,6 +331,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
   test('ignores inherited and non-enumerable metadata serialization hooks', () => {
     const inheritedSerializer = vi.fn(() => ({ type: 'text' }));
     const hiddenSerializer = vi.fn(() => ({ type: 'json_object' }));
+    // SAFETY: This locally constructed hostile metadata fixture deliberately retains inherited, symbol, or prototype-named fields for the security regression.
     const inherited = Object.assign(Object.create({ toJSON: inheritedSerializer }), {
       description: trustedDescription,
     }) as UnsafeFormatMetadata;
@@ -369,6 +358,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary text-format metadata until assertions inspect the actual wire values.
       let requestBody: { text?: { format?: Record<string, unknown> } } | undefined;
       const fetch = vi.fn(async (_request: string | URL | Request, init?: RequestInit) => {
+        // SAFETY: Decode the synthetic request or serialized format produced in this test to inspect the protected discriminator and schema fields.
         requestBody = JSON.parse(init?.body as string) as typeof requestBody;
         return Response.json(makeResponsePayload(), { status: 200 });
       });
@@ -416,7 +406,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
     expect(format.$parseRaw(responseText)).toEqual(expectedParsed);
     expect(() => format.$parseRaw('{"city":42}')).toThrow();
 
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Deliberately mutate format metadata beyond its declared discriminator to test captured parser invariants.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Deliberately mutate format metadata beyond its declared discriminator to test captured parser invariants.
     const mutableFormat = format as unknown as UnsafeFormatMetadata;
     mutableFormat['type'] = 'text';
     mutableFormat['strict'] = false;
@@ -439,8 +429,10 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
 
 describe('shared structured text-format factory', () => {
   test('normalizes a direct malformed factory input without mutating its frozen configuration', () => {
+    // SAFETY: The custom parser consumes the literal responseText fixture containing the declared city string.
     const parser = vi.fn((content: string) => JSON.parse(content) as ParsedWeather);
     const original = Object.freeze({
+      // SAFETY: Deliberately supply the wrong discriminator while keeping a parser attached to test runtime discriminator validation.
       type: 'text' as 'json_schema',
       name: trustedName,
       strict: true,
@@ -468,6 +460,7 @@ describe('shared structured text-format factory', () => {
       strict: false,
       schema: { type: 'string' },
     }));
+    // SAFETY: The custom parser consumes the literal responseText fixture containing the declared city string.
     const parser = vi.fn((content: string) => JSON.parse(content) as ParsedWeather);
     const original = Object.freeze({
       type: 'json_schema' as const,
@@ -485,6 +478,7 @@ describe('shared structured text-format factory', () => {
 
     const format = makeParseableTextFormat(original, parser);
     const wire = JSON.stringify({ text: { format } });
+    // SAFETY: Decode the synthetic request or serialized format produced in this test to inspect the protected discriminator and schema fields.
     const serialized = JSON.parse(wire) as {
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary text-format metadata until assertions inspect the actual wire values.
       text: { format: Record<string, unknown> };
@@ -511,6 +505,7 @@ describe('shared structured text-format factory', () => {
       properties: { city: { type: 'string', minLength: 2 } },
       required: ['city'],
     };
+    // SAFETY: Deliberately include caller-controlled format/schema metadata to verify protected structured-format fields cannot be replaced.
     const format = standardTextFormat(standardSchema, trustedName, {
       schema: customSchema,
       description: trustedDescription,

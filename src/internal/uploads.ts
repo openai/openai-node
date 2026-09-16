@@ -105,6 +105,7 @@ type NamedBlob = Blob & {
  */
 export const checkFileSupport = () => {
   if (typeof File === 'undefined') {
+    // SAFETY: This optional Node global is inspected only to improve the missing-File diagnostic in runtimes without process.
     const { process } = globalThis as any;
     const isOldNode =
       // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
@@ -149,6 +150,7 @@ export function makeFile(
   options?: FilePropertyBag,
 ): File {
   checkFileSupport();
+  // SAFETY: The SDK BlobPart union supports Node and web binary inputs; the native File constructor handles those parts across their differing ambient types.
   return new File(fileBits as any, fileName ?? 'unknown_file', options);
 }
 
@@ -270,6 +272,7 @@ const supportsFormDataMap = /* @__PURE__ */ new WeakMap<Fetch, Promise<boolean>>
  * confusing error messages later on.
  */
 function supportsFormData(fetchObject: OpenAI | Fetch): Promise<boolean> {
+  // SAFETY: The union has already excluded callable fetch values; the remaining OpenAI client owns the fetch implementation used by this probe.
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
   const fetch: Fetch = typeof fetchObject === 'function' ? fetchObject : (fetchObject as any).fetch;
   const cached = supportsFormDataMap.get(fetch);
@@ -280,10 +283,12 @@ function supportsFormData(fetchObject: OpenAI | Fetch): Promise<boolean> {
     try {
       let FetchResponse: typeof Response;
       if ('Response' in fetch) {
+        // SAFETY: Custom fetch implementations may expose their matching Response constructor; the enclosing probe catches incompatible constructors.
         FetchResponse = fetch.Response as typeof Response;
       } else {
         const response = await fetch('data:,');
         await response.arrayBuffer();
+        // SAFETY: The successful fetch response supplies the constructor used to test its own FormData support; failures remain inside the probe's catch.
         FetchResponse = response.constructor as typeof Response;
       }
       const data = new FormData();
@@ -355,6 +360,7 @@ const isUploadable = (value: unknown): value is Uploadable =>
     isStreamingFile(value) ||
     isBlob(value));
 
+// SAFETY: The enclosing object guard and own-key enumeration allow reading these property values without assigning them a trusted value type.
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
 const hasStreamingUploadableValue = (value: unknown): boolean => {
   if (isStreamingFile(value) || isAsyncIterable(value) || isReadableStream(value)) {
@@ -376,6 +382,7 @@ const hasStreamingUploadableValue = (value: unknown): boolean => {
   return false;
 };
 
+// SAFETY: The enclosing object guard and own-key enumeration allow reading these property values without assigning them a trusted value type.
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
 const hasUploadableValue = (value: unknown): boolean => {
   if (isUploadable(value)) {

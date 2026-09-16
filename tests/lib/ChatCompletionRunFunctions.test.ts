@@ -254,7 +254,7 @@ class RunnerListener {
 
     const expectedContents = this.messages
       .filter(isAssistantMessage)
-      .map((m) => m.content as string)
+      .map((m) => m.content)
       .filter(Boolean);
     expect(this.contents).toEqual(expectedContents);
     expect(this.finalMessage).toEqual(findLastAssistantMessage(this.messages));

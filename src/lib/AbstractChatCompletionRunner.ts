@@ -142,6 +142,7 @@ export class AbstractChatCompletionRunner<
     this._emit('chatCompletion', chatCompletion);
     const message = chatCompletion.choices[0]?.message;
     if (message) {
+      // SAFETY: An API assistant message is also accepted as a subsequent conversation message; this preserves that existing input/output bridge.
       this._addMessage(message as ChatCompletionMessageParam);
     }
     return chatCompletion;
@@ -163,6 +164,7 @@ export class AbstractChatCompletionRunner<
       this._emit('message', message);
       if (isToolMessage(message) && message.content) {
         // Note, this assumes that {role: 'tool', content: …} is always the result of a call of tool of type=function.
+        // SAFETY: The legacy function-tool result event assumes textual tool output, as documented by the adjacent compatibility comment.
         this._emit('functionToolCallResult', message.content as string);
       } else if (isAssistantMessage(message) && message.tool_calls) {
         for (const tool_call of message.tool_calls) {
@@ -206,6 +208,7 @@ export class AbstractChatCompletionRunner<
       const message = this.messages[i];
       if (isAssistantMessage(message)) {
         // Audio is intentionally omitted from the final message snapshot.
+        // SAFETY: The assistant-message branch normalizes missing content and refusal to null when constructing the completed message.
         const ret: Omit<ChatCompletionMessage, 'audio'> = {
           ...message,
           content: (message as ChatCompletionMessage).content ?? null,
@@ -392,6 +395,7 @@ export class AbstractChatCompletionRunner<
   ) {
     const role = 'tool' as const;
     const { tool_choice = 'auto', stream, toolContext: inputToolContext, ...restParams } = params;
+    // SAFETY: The generic runner parameters tie toolContext to ToolContext; undefined remains valid when the caller omits it under that contract.
     const toolContext = inputToolContext as ToolContext;
     const singleFunctionToCall =
       // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Chat history and tool-choice inputs can contain runtime variants that select different runner behavior.
@@ -413,6 +417,7 @@ export class AbstractChatCompletionRunner<
           throw new OpenAIError('Tool given to `.runTools()` that does not have an associated function');
         }
 
+        // SAFETY: The auto-parseable tool supplies its own validated parameter schema and parser; this bridges the legacy runnable-tool parameter type.
         return {
           type: 'function',
           function: {
@@ -426,6 +431,7 @@ export class AbstractChatCompletionRunner<
         };
       }
 
+      // SAFETY: Unbranded tools follow the existing runnable-tool contract; the function-tool branch below performs its normal dispatch.
       return tool as RunnableToolFunction<any>;
     });
 
@@ -436,6 +442,9 @@ export class AbstractChatCompletionRunner<
       }
     }
 
+    // SAFETY: The runnable function's parameter schema is forwarded as JSON keyword properties without changing or inspecting its values.
+    // SAFETY: This is the intentional non-function tool pass-through; the runnable and wire types differ in index signatures, not the forwarded value.
+    // SAFETY: Omitting the tools list preserves the optional wire field; the existing conditional result type is broader than the runnable helper's declaration.
     const tools: ChatCompletionTool[] =
       'tools' in params
         ? inputTools.map((t) =>

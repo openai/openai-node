@@ -36,6 +36,7 @@ function strictSchemasForAllHelpers(jsonSchema: Record<string, unknown>) {
 
 // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
 function makePrototypeManipulationSchema(): Record<string, unknown> {
+  // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
   return JSON.parse(
     '{"type":"object","properties":{"safe":{"type":"string"}},"required":["safe"],' +
       '"__proto__":{"additionalProperties":false,"polluted":"YES"}}',
@@ -70,6 +71,7 @@ describe('Standard Schema prototype security', () => {
       };
 
       for (const schema of strictSchemasForAllHelpers(rootSchemas[keyword])) {
+        // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
         // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
         expectPrototypeSafeClosedSchema(schema as Record<string, unknown>);
         expect(schema).toMatchObject({
@@ -95,6 +97,7 @@ describe('Standard Schema prototype security', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
       const properties = (schema as Record<string, unknown>)['properties'] as Record<
         string,
@@ -115,6 +118,7 @@ describe('Standard Schema prototype security', () => {
   });
 
   it('preserves legitimate __proto__ property names across all helper surfaces', () => {
+    // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
     const jsonSchema = JSON.parse(
       '{"type":"object","properties":{"__proto__":{"type":"string"},"safe":{"type":"number"}},' +
         '"required":["__proto__","safe"]}',
@@ -122,6 +126,7 @@ describe('Standard Schema prototype security', () => {
     ) as Record<string, unknown>;
 
     for (const schema of strictSchemasForAllHelpers(jsonSchema)) {
+      // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
       const properties = (schema as Record<string, unknown>)['properties'] as Record<string, unknown>;
 
@@ -136,6 +141,7 @@ describe('Standard Schema prototype security', () => {
   it.each(['$defs', 'definitions'] as const)(
     'preserves own __proto__ entries in promoted root anyOf %s maps across all helper surfaces',
     (keyword) => {
+      // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
       const branchDefinitions = JSON.parse(
         '{"__proto__":{"type":"string"},"constructor":{"type":"number"},' +
           '"toString":{"type":"boolean"},"BranchOnly":{"type":"integer"}}',
@@ -161,11 +167,14 @@ describe('Standard Schema prototype security', () => {
       });
 
       for (const schema of schemas) {
+        // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
         // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
         const definitions = (schema as Record<string, unknown>)[keyword] as Record<string, unknown>;
         const serializedSchema = JSON.stringify(schema);
+        // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
         // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
         const serialized = JSON.parse(serializedSchema) as Record<string, unknown>;
+        // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
         // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
         const serializedDefinitions = serialized[keyword] as Record<string, unknown>;
 
@@ -194,6 +203,7 @@ describe('Standard Schema prototype security', () => {
   it.each(['$defs', 'definitions'] as const)(
     'keeps refs to promoted own __proto__ %s definitions across all helper surfaces',
     (keyword) => {
+      // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
       const branchDefinitions = JSON.parse('{"__proto__":{"type":"string"}}') as Record<string, unknown>;
       const schemas = strictSchemasForAllHelpers({
@@ -212,6 +222,7 @@ describe('Standard Schema prototype security', () => {
       });
 
       for (const schema of schemas) {
+        // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
         // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
         const definitions = (schema as Record<string, unknown>)[keyword] as Record<string, unknown>;
 

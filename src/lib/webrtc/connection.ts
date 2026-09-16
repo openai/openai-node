@@ -36,6 +36,7 @@ export class WebRTCConnection<ClientEvent, ServerEvent extends { type: string }>
 
   /** Creates native resources, but does not request media, contact a server, or begin negotiation. */
   constructor(configuration?: WebRTCConfiguration) {
+    // SAFETY: RTCPeerConnection is an optional runtime constructor checked before resource creation; the view keeps browser ambient types optional.
     const host = globalThis as typeof globalThis & {
       RTCPeerConnection?: new (configuration?: WebRTCConfiguration) => WebRTCPeerConnection;
     };
@@ -59,7 +60,7 @@ export class WebRTCConnection<ClientEvent, ServerEvent extends { type: string }>
       );
     }
     this.peer = peer;
-    this.peerConnection = peer as BrowserPeerConnection;
+    this.peerConnection = peer;
     this.dataChannel = this.adapter.dataChannel;
     peer.addEventListener('connectionstatechange', this.onPeerState);
     this.adapter.onConnectionEvent(this.onChannelEvent);

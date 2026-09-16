@@ -74,6 +74,7 @@ function makeStandardSchema(jsonSchema: Record<string, unknown> = weatherJSONSch
       '~standard': {
         version: 1 as const,
         vendor: 'test',
+        // SAFETY: Standard Schema types is phantom type metadata; this fixture intentionally leaves it undefined and never reads it at runtime.
         // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Standard Schema types is phantom input/output evidence, intentionally undefined at runtime.
         types: undefined as unknown as {
           input: WeatherInput;
@@ -116,6 +117,7 @@ function makeValidationOnlySchema() {
     '~standard': {
       version: 1 as const,
       vendor: 'test',
+      // SAFETY: Standard Schema types is phantom type metadata; this fixture intentionally leaves it undefined and never reads it at runtime.
       // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Standard Schema types is phantom input/output evidence, intentionally undefined at runtime.
       types: undefined as unknown as {
         input: WeatherInput;
@@ -455,8 +457,10 @@ describe('Standard Schema helpers', () => {
         },
       },
     });
+    // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Standard Schema fixtures include arbitrary JSON Schema keywords and malformed values checked by the helpers.
     const properties = (schema as Record<string, unknown>)['properties'] as Record<string, unknown>;
+    // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Standard Schema fixtures include arbitrary JSON Schema keywords and malformed values checked by the helpers.
     const choice = properties['choice'] as Record<string, unknown>;
     expect(choice).not.toHaveProperty('type');
@@ -487,6 +491,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       const choice = (schema as JSONSchema).properties?.['choice'] as JSONSchema;
       expect(choice).toEqual({
         anyOf: [
@@ -523,6 +528,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       expect((schema as JSONSchema).properties?.['choice']).toEqual({
         anyOf: [
           { type: 'array', items: { type: 'string' } },
@@ -560,6 +566,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       expect((schema as JSONSchema).properties?.['choice']).toEqual({
         anyOf: [
           {
@@ -595,6 +602,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       expect((schema as JSONSchema).properties?.['choice']).toEqual({
         anyOf: [
           { type: 'array', items: { type: 'string' } },
@@ -622,6 +630,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       expect((schema as JSONSchema).properties).toEqual({
         scalar: { type: 'string' },
         array: { type: 'array', items: { type: 'string' } },
@@ -641,6 +650,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       expect((schema as JSONSchema).properties?.['choice']).toEqual({
         anyOf: [{ type: 'string' }],
       });
@@ -671,6 +681,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       expect((schema as JSONSchema).properties?.['choice']).toEqual({
         anyOf: [{ type: 'string' }],
       });
@@ -790,6 +801,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       expect((schema as JSONSchema).properties?.['choice']).toEqual({
         anyOf: [{ const: 'foo' }, { type: 'number' }],
       });
@@ -870,6 +882,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       expect((schema as JSONSchema).properties?.['choice']).toEqual({
         anyOf: [
           {
@@ -1157,6 +1170,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       expect((schema as JSONSchema).properties?.['choice']).toEqual({
         anyOf: [{ $ref: '#/$defs/foo%20branch' }, { $ref: '#/$defs/bar%20branch' }],
       });
@@ -1201,6 +1215,7 @@ describe('Standard Schema helpers', () => {
 
     for (const consumerFirst of [true, false]) {
       for (const schema of strictSchemasForAllHelpers(makeSchema(consumerFirst))) {
+        // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
         expect((schema as JSONSchema).properties?.['consumer']).toEqual({
           type: 'object',
           properties: {
@@ -1241,6 +1256,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       expect((schema as JSONSchema).properties?.['value']).toEqual({
         type: 'object',
         properties: { x: { type: 'string' } },
@@ -1387,6 +1403,7 @@ describe('Standard Schema helpers', () => {
     });
 
     const schema = standardResponseFormat(standardSchema, 'choice').json_schema.schema;
+    // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
     expect((schema as JSONSchema).properties?.['choice']).toEqual({
       anyOf: [
         {
@@ -1419,6 +1436,7 @@ describe('Standard Schema helpers', () => {
     });
 
     const schema = standardResponseFormat(standardSchema, 'choice').json_schema.schema;
+    // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
     expect((schema as JSONSchema).properties?.['choice']).toEqual({
       anyOf: [{ type: 'string' }, { type: 'number' }],
     });
@@ -1761,6 +1779,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       expect((schema as JSONSchema).properties?.['choice']).toEqual({
         type: 'object',
         description: 'first description',
@@ -1795,6 +1814,7 @@ describe('Standard Schema helpers', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
       expect((schema as JSONSchema).properties?.['choice']).toEqual({ type: 'null' });
     }
   });

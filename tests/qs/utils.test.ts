@@ -393,7 +393,6 @@ describe('prototype-pollution safety', () => {
 
   test('snapshots two thousand aliases to a shared two-thousand-record graph only once', () => {
     let inspections = 0;
-    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The proxy target is populated incrementally with a two-thousand-record graph after allocation.
     const root: LinkedRecord = new Proxy(
       {},
       {
@@ -478,6 +477,7 @@ describe('prototype-pollution safety', () => {
   test.each(graphOperations)(
     '$name rejects unsupported unsafe keys even when a proxy changes their enumerability',
     ({ apply }) => {
+      // SAFETY: This local fixture intentionally controls its own keys and prototype; the dictionary view leaves values untrusted while testing prototype safety.
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       const unsupported = Object.create({ inherited: true }) as Record<string, unknown>;
       Object.defineProperty(unsupported, '__proto__', {
@@ -649,6 +649,7 @@ describe('prototype-pollution safety', () => {
   test.each(graphOperations)('$name preserves sealed, non-extensible, and frozen integrity', ({ apply }) => {
     const sealed = Object.seal({ value: true });
     const nonExtensible = Object.preventExtensions({ value: true });
+    // SAFETY: This local fixture intentionally controls its own keys and prototype; the dictionary view leaves values untrusted while testing prototype safety.
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
     const unsafe = JSON.parse('{"__proto__":{"polluted":true},"safe":true}') as Record<string, unknown>;
     const frozen = Object.freeze({ child: unsafe });
@@ -668,6 +669,7 @@ describe('prototype-pollution safety', () => {
   test.each(graphOperations)(
     '$name rejects retained inherited parents polluted by a later child Proxy trap',
     ({ apply }) => {
+      // SAFETY: This local fixture intentionally controls its own keys and prototype; the dictionary view leaves values untrusted while testing prototype safety.
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       const parent = Object.create({ inherited: true }) as Record<string, unknown>;
       let inspections = 0;

@@ -34,6 +34,7 @@ class FakeNodeSocket extends EventEmitter {
 describe('BrowserWebSocket', () => {
   test('normalizes platform socket properties and forwards outbound operations', () => {
     const socket = new FakeBrowserSocket();
+    // SAFETY: The fake socket implements the event/close/send operations used by this adapter; its recorded calls and emitted errors are checked below.
     const adapter = new BrowserWebSocket(socket as any);
 
     expect(socket.binaryType).toBe('arraybuffer');
@@ -49,6 +50,7 @@ describe('BrowserWebSocket', () => {
 
   test('normalizes text, binary, and close event arguments', () => {
     const socket = new FakeBrowserSocket();
+    // SAFETY: The fake socket implements the event/close/send operations used by this adapter; its recorded calls and emitted errors are checked below.
     const adapter = new BrowserWebSocket(socket as any);
     const onMessage = vi.fn();
     const onClose = vi.fn();
@@ -70,6 +72,7 @@ describe('BrowserWebSocket', () => {
     [{}, 'WebSocket error', undefined],
   ])('normalizes browser error events', (event, message, cause) => {
     const socket = new FakeBrowserSocket();
+    // SAFETY: The fake socket implements the event/close/send operations used by this adapter; its recorded calls and emitted errors are checked below.
     const adapter = new BrowserWebSocket(socket as any);
     const listener = vi.fn();
     adapter.on('error', listener);
@@ -77,6 +80,7 @@ describe('BrowserWebSocket', () => {
     socket.emit('error', event);
 
     expect(listener).toHaveBeenCalledTimes(1);
+    // SAFETY: The adapter wraps the explicitly emitted native error event in an Error; this assertion inspects its message and optional cause.
     const error = listener.mock.calls[0]![0] as Error & { cause?: Error };
     expect(error.message).toBe(message);
     expect(error.cause?.message).toBe(cause);
@@ -84,6 +88,7 @@ describe('BrowserWebSocket', () => {
 
   test('forwards open listeners and removes regular and one-time listeners', () => {
     const socket = new FakeBrowserSocket();
+    // SAFETY: The fake socket implements the event/close/send operations used by this adapter; its recorded calls and emitted errors are checked below.
     const adapter = new BrowserWebSocket(socket as any);
     const onOpen = vi.fn();
     const once = vi.fn();
@@ -108,6 +113,7 @@ describe('BrowserWebSocket', () => {
 describe('NodeWebSocket', () => {
   test('forwards platform socket properties and outbound operations', () => {
     const socket = new FakeNodeSocket();
+    // SAFETY: The fake socket implements the event/close/send operations used by this adapter; its recorded calls and emitted errors are checked below.
     const adapter = new NodeWebSocket(socket as any);
 
     expect(adapter.platformSocket).toBe(socket);
@@ -129,6 +135,7 @@ describe('NodeWebSocket', () => {
     [Uint8Array.from([1, 2]).buffer, true, Buffer.from([1, 2])],
   ] as const)('normalizes ws message payloads', (data, isBinary, expected) => {
     const socket = new FakeNodeSocket();
+    // SAFETY: The fake socket implements the event/close/send operations used by this adapter; its recorded calls and emitted errors are checked below.
     const adapter = new NodeWebSocket(socket as any);
     const listener = vi.fn();
     adapter.on('message', listener);
@@ -140,6 +147,7 @@ describe('NodeWebSocket', () => {
 
   test('normalizes close reasons, preserves pass-through events, and removes listeners', () => {
     const socket = new FakeNodeSocket();
+    // SAFETY: The fake socket implements the event/close/send operations used by this adapter; its recorded calls and emitted errors are checked below.
     const adapter = new NodeWebSocket(socket as any);
     const onClose = vi.fn();
     const onOpen = vi.fn();

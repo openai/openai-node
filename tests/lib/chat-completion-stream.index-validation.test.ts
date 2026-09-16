@@ -40,6 +40,7 @@ function createChunk(
           logprobs: null,
         };
 
+  // SAFETY: The fixture intentionally puts unvalidated indices into otherwise constructed chunks to exercise the stream index validator.
   return {
     id: 'chatcmpl-index-validation',
     object: 'chat.completion.chunk',
@@ -50,7 +51,7 @@ function createChunk(
 }
 
 function createStream(chunks: OpenAI.Chat.ChatCompletionChunk[], n?: number | null): ChatCompletionStream {
-  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The stream fixture implements only the completions.create transport used by this test.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The stream fixture implements only the completions.create transport used by this test.
   const client = {
     chat: {
       completions: {

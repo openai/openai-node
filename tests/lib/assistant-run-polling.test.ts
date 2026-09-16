@@ -73,7 +73,9 @@ describe('assistant run polling compatibility', () => {
       expect(call[1]).toBe(params);
       expect(call[2]?.headers).toMatchObject({ 'X-Test': 'kept' });
     }
+    // SAFETY: Two successful retrieve calls and their headers are asserted above; the SDK merge supplies the internal values/nulls containers whose sharing is tested.
     const firstHeaders = retrieve.mock.calls[0]?.[2]?.headers as NullableHeaders;
+    // SAFETY: Two successful retrieve calls and their headers are asserted above; the SDK merge supplies the internal values/nulls containers whose sharing is tested.
     const secondHeaders = retrieve.mock.calls[1]?.[2]?.headers as NullableHeaders;
     expect(firstHeaders).not.toBe(secondHeaders);
     expect(firstHeaders.values).toBe(secondHeaders.values);

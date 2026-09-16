@@ -27,6 +27,7 @@ function iterableEvents(events: Event[], controller = new AbortController()) {
     controller,
     async *[Symbol.asyncIterator]() {
       for (const event of events) {
+        // SAFETY: The synthetic events deliberately contain malformed indices and hostile fields outside the generated union so stream validation can reject them.
         yield event as AssistantStreamEvent;
       }
     },
@@ -36,6 +37,7 @@ function iterableEvents(events: Event[], controller = new AbortController()) {
 function unencodedAssistantStream(events: Event[]): AssistantStream {
   return AssistantStream.createAssistantStream(
     'thread_123',
+    // SAFETY: The partial Runs mock supplies create with this test event stream; no other resource method is used by the factory.
     { create: vi.fn().mockResolvedValue(iterableEvents(events)) } as any,
     { assistant_id: 'assistant_123' },
   );
@@ -83,7 +85,7 @@ describe('AssistantStream delta index security', () => {
 
     expect(lengthAfterDelta).toBe(1);
     expect(failure).toBeInstanceOf(OpenAIError);
-    expect((failure as Error).message).toContain('invalid array index');
+    expect(failure).toHaveProperty('message', expect.stringContaining('invalid array index'));
     expect(accumulator).toEqual({ status: 'original', entries: [{ index: 0, text: 'first' }] });
   });
 
@@ -385,7 +387,7 @@ describe('AssistantStream message index security', () => {
 
     expect(lengthAfterDelta).toBe(1);
     expect(failure).toBeInstanceOf(OpenAIError);
-    expect((failure as Error).message).toContain('invalid content index');
+    expect(failure).toHaveProperty('message', expect.stringContaining('invalid content index'));
     expect(content[0]?.text.value).toBe('original');
   });
 
@@ -423,7 +425,7 @@ describe('AssistantStream message index security', () => {
 
     expect(lengthAfterDelta).toBe(0);
     expect(failure).toBeInstanceOf(OpenAIError);
-    expect((failure as Error).message).toContain('invalid content index');
+    expect(failure).toHaveProperty('message', expect.stringContaining('invalid content index'));
   });
 
   test('preserves bounded out-of-order streamed content and fills missing slots', async () => {
@@ -756,7 +758,10 @@ describe('AssistantStream run-step index security', () => {
       const details = runner.currentRunStepSnapshot()?.step_details;
       if (details?.type === 'tool_calls') {
         lengthAfterDelta = details.tool_calls.length;
-        argumentsAfterDelta = (details.tool_calls[0] as any).function.arguments;
+        const [call] = details.tool_calls;
+        if (call?.type === 'function') {
+          argumentsAfterDelta = call.function.arguments;
+        }
       }
     } finally {
       const details = runner.currentRunStepSnapshot()?.step_details;
@@ -767,7 +772,7 @@ describe('AssistantStream run-step index security', () => {
 
     expect(lengthAfterDelta).toBe(1);
     expect(failure).toBeInstanceOf(OpenAIError);
-    expect((failure as Error).message).toContain('invalid array index');
+    expect(failure).toHaveProperty('message', expect.stringContaining('invalid array index'));
     expect(argumentsAfterDelta).toBe('original');
   });
 

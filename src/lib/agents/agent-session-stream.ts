@@ -241,6 +241,7 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
       if (!isObj(args)) {
         throw new OpenAIError('Function arguments must be a JSON object');
       }
+      // SAFETY: Arguments were parsed as JSON and checked to be a non-null non-array object before invoking the handler.
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Tool argument keys and value types are application-defined; handlers receive the public unvalidated argument dictionary.
       return toolResult(call, await this.#wait(() => handler(args as Record<string, unknown>)));
     } catch {

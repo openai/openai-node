@@ -28,6 +28,7 @@ const helpers = [
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The regression inspects serialized schema values recursively before trusting references or node types.
 function expectValidSchema(value: unknown): void {
+  // SAFETY: Traversal first establishes an object or an existing reference segment; this view reads schema fields without trusting their values before the following checks.
   // oxlint-disable-next-line unicorn/prefer-structured-clone -- verify the actual serialized request schema
   const schema = JSON.parse(JSON.stringify(value)) as JSONSchema;
   expect(JSON.stringify(schema)).not.toContain('"not":');
@@ -39,6 +40,7 @@ function expectValidSchema(value: unknown): void {
     if (child === null || typeof child !== 'object') {
       return;
     }
+    // SAFETY: Traversal first establishes an object or an existing reference segment; this view reads schema fields without trusting their values before the following checks.
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- JSON Pointer traversal reads heterogeneous schema fields and validates each resolved reference before use.
     const reference = (child as Record<string, unknown>)['$ref'];
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Traverse actual emitted schema objects and reference strings to verify shared optional definitions.
@@ -49,6 +51,7 @@ function expectValidSchema(value: unknown): void {
         // oxlint-disable-next-line unicorn/prefer-string-replace-all -- the test tsconfig uses the ES2020 library
         const key = token.replace(/~[01]/gu, (escape) => (escape === '~1' ? '/' : '~'));
         expect(target).toHaveProperty([key]);
+        // SAFETY: Traversal first establishes an object or an existing reference segment; this view reads schema fields without trusting their values before the following checks.
         // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- JSON Pointer traversal reads heterogeneous schema fields and validates each resolved reference before use.
         target = (target as Record<string, unknown>)[key];
       }

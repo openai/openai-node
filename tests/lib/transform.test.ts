@@ -216,7 +216,7 @@ describe('toStrictJsonSchema', () => {
     test.each(['$defs', 'definitions'] as const)(
       'preserves nested %s maps at their original pointer scope when inlining a root local ref',
       (keyword) => {
-        const schema = {
+        const schema: JSONSchema = {
           $ref: '#/' + keyword + '/Input',
           [keyword]: {
             Input: {
@@ -230,7 +230,7 @@ describe('toStrictJsonSchema', () => {
             },
             Nested: { type: 'number' },
           },
-        } as JSONSchema;
+        };
 
         expect(toStrictJsonSchema(schema)).toEqual({
           type: 'object',
@@ -359,7 +359,7 @@ describe('toStrictJsonSchema', () => {
     });
 
     test('reports the root path for invalid root ref values and boolean targets', () => {
-      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The numeric ref is deliberately invalid JSON Schema and must be rejected by runtime validation.
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The numeric ref is deliberately invalid JSON Schema and must be rejected by runtime validation.
       expect(() => toStrictJsonSchema({ $ref: 1 } as unknown as JSONSchema)).toThrow(
         'Received non-string $ref - 1; path=<root>',
       );
@@ -972,6 +972,7 @@ describe('toStrictJsonSchema', () => {
           required: ['value'],
         };
 
+        // SAFETY: This test builds an object schema at the value property; inspect that normalized object variant below.
         const strictValue = toStrictJsonSchema(schema).properties?.['value'] as JSONSchema;
 
         expect(strictValue.$ref).toBe(ref);
@@ -1314,7 +1315,7 @@ describe('toStrictJsonSchema', () => {
     ] as const;
 
     test.each(unsupportedKeywords)('omits undefined unsupported %s placeholders', (keyword) => {
-      const schema = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           value: {
@@ -1323,7 +1324,7 @@ describe('toStrictJsonSchema', () => {
           },
         },
         required: ['value'],
-      } as JSONSchema;
+      };
 
       const strict = toStrictJsonSchema(schema);
 
@@ -1332,7 +1333,7 @@ describe('toStrictJsonSchema', () => {
     });
 
     test.each(unsupportedKeywords)('still rejects defined unsupported %s placeholders', (keyword) => {
-      const schema = {
+      const schema: JSONSchema = {
         type: 'object',
         properties: {
           value: {
@@ -1341,7 +1342,7 @@ describe('toStrictJsonSchema', () => {
           },
         },
         required: ['value'],
-      } as JSONSchema;
+      };
 
       expect(() => toStrictJsonSchema(schema)).toThrow(`uses unsupported keyword \`${keyword}\``);
     });
@@ -1384,7 +1385,7 @@ describe('toStrictJsonSchema', () => {
     test.each(['minContains', 'maxContains'] as const)(
       'rejects unsupported %s without contains',
       (keyword) => {
-        const schema = {
+        const schema: JSONSchema = {
           type: 'object',
           properties: {
             values: {
@@ -1393,7 +1394,7 @@ describe('toStrictJsonSchema', () => {
             },
           },
           required: ['values'],
-        } as JSONSchema;
+        };
 
         expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword');
       },
@@ -1479,7 +1480,7 @@ describe('toStrictJsonSchema', () => {
       const schema: JSONSchema = {
         type: 'object',
         properties: {
-          value: propertySchema as JSONSchema,
+          value: propertySchema,
         },
         required: ['value'],
       };
@@ -1947,7 +1948,7 @@ describe('toStrictJsonSchema', () => {
     test.each(['$defs', 'definitions'] as const)(
       'inlines a singleton allOf while preserving scoped %s maps',
       (keyword) => {
-        const schema = {
+        const schema: JSONSchema = {
           type: 'object',
           properties: {
             value: {
@@ -1958,7 +1959,7 @@ describe('toStrictJsonSchema', () => {
             },
           },
           required: ['value'],
-        } as JSONSchema;
+        };
 
         expect(toStrictJsonSchema(schema).properties?.['value']).toEqual({
           $ref: `#/properties/value/${keyword}/Value`,
@@ -1972,7 +1973,7 @@ describe('toStrictJsonSchema', () => {
     test.each(['$defs', 'definitions'] as const)(
       'does not flatten a singleton allOf with malformed %s siblings',
       (keyword) => {
-        const schema = {
+        const schema: JSONSchema = {
           type: 'object',
           properties: {
             value: {
@@ -1981,7 +1982,7 @@ describe('toStrictJsonSchema', () => {
             },
           },
           required: ['value'],
-        } as JSONSchema;
+        };
 
         expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword `allOf`');
       },
@@ -2169,7 +2170,7 @@ describe('toStrictJsonSchema', () => {
     test.each(['$defs', 'definitions'] as const)(
       'discards neutral %s-only allOf branches after preserving their refs',
       (keyword) => {
-        const schema = {
+        const schema: JSONSchema = {
           type: 'object',
           properties: {
             value: {
@@ -2190,7 +2191,7 @@ describe('toStrictJsonSchema', () => {
             },
           },
           required: ['value'],
-        } as JSONSchema;
+        };
 
         const strict = toStrictJsonSchema(schema);
         expect(strict).toMatchObject({
@@ -2215,7 +2216,7 @@ describe('toStrictJsonSchema', () => {
     test.each(['$defs', 'definitions'] as const)(
       'keeps malformed %s-only allOf branches fail closed',
       (keyword) => {
-        const schema = {
+        const schema: JSONSchema = {
           type: 'object',
           properties: {
             value: {
@@ -2230,7 +2231,7 @@ describe('toStrictJsonSchema', () => {
             },
           },
           required: ['value'],
-        } as JSONSchema;
+        };
 
         expect(() => toStrictJsonSchema(schema)).toThrow(
           'cannot be merged without changing Draft 7 validation',
@@ -2372,7 +2373,7 @@ describe('toStrictJsonSchema', () => {
     test.each(['$defs', 'definitions'] as const)(
       'merges ref-backed object allOf variants with scoped %s maps',
       (keyword) => {
-        const schema = {
+        const schema: JSONSchema = {
           type: 'object',
           [keyword]: {
             Name: {
@@ -2398,7 +2399,7 @@ describe('toStrictJsonSchema', () => {
             },
           },
           required: ['value'],
-        } as JSONSchema;
+        };
 
         expect(toStrictJsonSchema(schema).properties?.['value']).toMatchObject({
           type: 'object',
@@ -2557,6 +2558,7 @@ describe('toStrictJsonSchema', () => {
       };
 
       const strict = toStrictJsonSchema(schema);
+      // SAFETY: This test builds an object schema at the value property; inspect that normalized object variant below.
       const valueSchema = strict.properties?.['value'] as JSONSchema | undefined;
       if (!valueSchema) {
         throw new Error('Expected value schema');
@@ -2571,6 +2573,7 @@ describe('toStrictJsonSchema', () => {
           ['other', { type: 'number' }],
         ]),
       );
+      // SAFETY: The preceding equality assertion verifies the merged properties object before inspecting its own __proto__ entry.
       expect(hasOwn(properties as object, '__proto__')).toBe(true);
     });
 

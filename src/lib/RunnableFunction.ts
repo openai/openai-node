@@ -131,7 +131,7 @@ export type RunnableToolFunctionWithContext<ToolContext> = {
 export function isRunnableFunctionWithParse<Args extends object, ToolContext = unknown>(
   fn: any,
 ): fn is RunnableFunctionWithParse<Args, ToolContext> {
-  return typeof (fn as any).parse === 'function';
+  return typeof fn.parse === 'function';
 }
 
 /** The ordered raw-string or parsed-object argument types accepted by runnable functions. */

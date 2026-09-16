@@ -111,6 +111,7 @@ async function runExample(
   });
   server.on('connection', (socket, upgradeRequest) => {
     socket.on('message', (data) => {
+      // SAFETY: The local server receives serialized ResponsesClientEvent messages from the example under test and records them before returning fixture events.
       const request = JSON.parse(data.toString()) as ResponsesClientEvent;
       requests.push(request);
       const response = reply(request, requests.length);

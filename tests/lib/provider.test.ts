@@ -55,7 +55,9 @@ describe('provider', () => {
     });
 
     const callApiKey = vi.spyOn(client, '_callApiKey');
+    // SAFETY: Spy on these existing protected SDK hooks to verify provider dispatch bypasses the default authentication path.
     const authHeaders = vi.spyOn(client as any, 'authHeaders');
+    // SAFETY: Spy on these existing protected SDK hooks to verify provider dispatch bypasses the default authentication path.
     const validateHeaders = vi.spyOn(client as any, 'validateHeaders');
 
     await client.request({ method: 'get', path: '/models' });
@@ -65,6 +67,7 @@ describe('provider', () => {
       'https://provider.example/v1/models',
     );
     expect(requestedURL).toBe('https://provider.example/v1/models');
+    // SAFETY: The SDK normalizes request headers to a Headers instance before this intercepted provider/fetch boundary.
     expect((requestedInit?.headers as Headers | undefined)?.get('authorization')).toBe('Provider token');
     expect(callApiKey).not.toHaveBeenCalled();
     expect(authHeaders).not.toHaveBeenCalled();
@@ -106,6 +109,7 @@ describe('provider', () => {
   test('allows null top-level options', () => {
     expect(
       () =>
+        // SAFETY: Deliberately pass explicit null options to verify provider initialization preserves its runtime null-handling contract.
         new OpenAI({
           provider: provider(),
           apiKey: null,
@@ -271,6 +275,7 @@ describe('provider', () => {
       // oxlint-disable-next-line class-methods-use-this -- This fixture exercises an overridable instance hook.
       protected override async prepareRequest(request: RequestInit): Promise<void> {
         order.push('subclass');
+        // SAFETY: The SDK normalizes request headers to a Headers instance before this intercepted provider/fetch boundary.
         (request.headers as Headers).set('x-prepared-by', 'subclass');
       }
     }
@@ -302,6 +307,7 @@ describe('provider', () => {
   });
 
   test('rejects provider objects that were not created by createProvider', () => {
+    // SAFETY: Deliberately pass an unregistered provider object so runtime provider validation must reject it.
     expect(() => new OpenAI({ provider: {} as any })).toThrow(
       'Invalid provider. Providers must be created with createProvider().',
     );
