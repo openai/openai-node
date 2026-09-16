@@ -157,6 +157,7 @@ beforeAll(async () => {
   const chatRequest = await requestClient.buildRequest(CHAT_REQUEST_OPTIONS);
   if (
     chatRequest.req.headers.get('content-type') !== 'application/json' ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate the prepared request body before accepting the benchmark result.
     typeof chatRequest.req.body !== 'string' ||
     JSON.parse(chatRequest.req.body).messages.length !== CHAT_REQUEST.messages.length
   ) {

@@ -91,14 +91,17 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
     let event: unknown;
     try {
       const { data } = message as { data?: unknown };
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted data-channel JSON and its own event discriminator before dispatch.
       if (typeof data !== 'string') {
         throw new TypeError('Invalid protocol message.');
       }
       event = JSON.parse(data);
       if (
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted data-channel JSON and its own event discriminator before dispatch.
         typeof event !== 'object' ||
         event === null ||
         Array.isArray(event) ||
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted data-channel JSON and its own event discriminator before dispatch.
         typeof Object.getOwnPropertyDescriptor(event, 'type')?.value !== 'string'
       ) {
         throw new TypeError('Invalid protocol message.');

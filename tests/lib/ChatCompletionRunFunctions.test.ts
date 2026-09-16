@@ -39,6 +39,7 @@ function mockChatCompletionFetch() {
   ): Promise<void> {
     return handleRawRequest(async (req, init) => {
       const rawBody = init?.body;
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate the emitted transport body before the fixture parses a completion request.
       if (typeof rawBody !== 'string') {
         // oxlint-disable-next-line unicorn/prefer-type-error -- Preserve the mock's historical Error identity.
         throw new Error(`expected init.body to be a string`);
@@ -64,6 +65,7 @@ function mockStreamingChatCompletionFetch() {
   ): Promise<void> {
     return handleRawRequest(async (req, init) => {
       const rawBody = init?.body;
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate the emitted transport body before the fixture parses a completion request.
       if (typeof rawBody !== 'string') {
         // oxlint-disable-next-line unicorn/prefer-type-error -- Preserve the mock's historical Error identity.
         throw new Error(`expected init.body to be a string`);

@@ -135,6 +135,7 @@ describe.each([
     expect(connection.peerConnection).toBe(peer);
     expect(connection.dataChannel).toBe(peer.channel);
     expect(connection.state).toBe('new');
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Assert the runtime adapter exposes the required event subscription method.
     expect(typeof connection.on).toBe('function');
     connection.close();
   });
@@ -415,6 +416,7 @@ describe.each([
   it('borrows a channel without taking ownership and releases subscriptions on disposal', () => {
     const channel = new FakeChannel();
     const adapter = new Adapter(channel);
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Assert the runtime adapter exposes the required event subscription method.
     expect(typeof adapter.on).toBe('function');
     adapter.dispose();
     adapter.dispose();

@@ -77,8 +77,10 @@ function validateStaticCredentials(options: BedrockProviderOptions): AwsCredenti
   }
 
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
     typeof options.accessKeyId !== 'string' ||
     !options.accessKeyId.trim() ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
     typeof options.secretAccessKey !== 'string' ||
     !options.secretAccessKey.trim()
   ) {
@@ -88,6 +90,7 @@ function validateStaticCredentials(options: BedrockProviderOptions): AwsCredenti
   }
   if (
     options.sessionToken !== undefined &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
     (typeof options.sessionToken !== 'string' || !options.sessionToken.trim())
   ) {
     throw new Errors.OpenAIError('A static AWS `sessionToken` must not be empty when provided.');
@@ -115,6 +118,7 @@ function requestTarget(parsedURL: URL) {
     const existing = query[name];
     if (existing === undefined) {
       query[name] = value;
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
     } else if (typeof existing === 'string') {
       query[name] = [existing, value];
     } else {
@@ -128,6 +132,7 @@ function signableBody(body: BodyInit | null | undefined): string | ArrayBuffer |
   if (body === undefined || body === null) {
     return undefined;
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
   if (typeof body === 'string' || body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
     return body;
   }
@@ -138,11 +143,14 @@ function signableBody(body: BodyInit | null | undefined): string | ArrayBuffer |
 
 function validateCredentialIdentity(identity: AwsCredentialIdentity): AwsCredentialIdentity {
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
     typeof identity?.accessKeyId !== 'string' ||
     !identity.accessKeyId.trim() ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
     typeof identity.secretAccessKey !== 'string' ||
     !identity.secretAccessKey.trim() ||
     (identity.sessionToken !== undefined &&
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
       (typeof identity.sessionToken !== 'string' || !identity.sessionToken.trim()))
   ) {
     throw new Errors.OpenAIError(

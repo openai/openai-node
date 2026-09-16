@@ -53,6 +53,7 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
         }
 
         source =
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Audio helpers distinguish supported stream interfaces and validate timeout behavior for JavaScript callers.
           'pipe' in body && typeof body.pipe === 'function'
             ? body
             : Readable.fromWeb(body as NodeReadableStream);
@@ -236,6 +237,7 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
     };
 
     try {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Audio helpers distinguish supported stream interfaces and validate timeout behavior for JavaScript callers.
       if (typeof timeout === 'number' && (timeout > 0 || Number.isNaN(timeout))) {
         internalSignal = AbortSignal.timeout(timeout);
       }

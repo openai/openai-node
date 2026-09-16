@@ -2,6 +2,7 @@
 function reportApplicationError(error: unknown): void {
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   const host = globalThis as typeof globalThis & { reportError?: (error: unknown) => void };
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The host error hook and user callback result may expose optional runtime capabilities.
   if (typeof host.reportError === 'function') {
     host.reportError(error);
   } else {
@@ -51,6 +52,7 @@ export class Subscriptions<Event extends { type: string }> {
       }
       try {
         const result = registration.listener(event);
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The host error hook and user callback result may expose optional runtime capabilities.
         if (result !== null && (typeof result === 'object' || typeof result === 'function')) {
           void observeResult(result);
         }

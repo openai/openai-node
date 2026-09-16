@@ -48,6 +48,7 @@ function createSerializedClient(chunks: AsyncIterable<Chunk>, observeBody: (body
     apiKey: 'sk-synthetic-serialized-tool',
     maxRetries: 0,
     fetch: async (_request, init) => {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (typeof init?.body !== 'string') {
         throw new TypeError('Expected a JSON-serialized chat request');
       }
@@ -1512,6 +1513,7 @@ it('tracks the actual serialized tool contract again when a request is retried',
     apiKey: 'sk-synthetic-retried-serialized-tool',
     maxRetries: 1,
     fetch: async (_request, init) => {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (typeof init?.body !== 'string') {
         throw new TypeError('Expected a JSON-serialized retry request');
       }
@@ -2383,6 +2385,7 @@ it.each(['content', 'tool'] as const)(
 
     stream.on('chunk', (current, snapshot) => {
       const delta = current.choices[0]?.delta;
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (kind === 'content' && typeof delta?.content === 'string') {
         publicSnapshot = snapshot;
         const message = snapshot.choices[0]?.message;
@@ -2433,6 +2436,7 @@ it.each(
         return;
       }
       const delta = current.choices[0]?.delta;
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (kind === 'content' && typeof delta?.content === 'string') {
         const message = snapshot.choices[0]?.message;
         if (message) {
@@ -2505,6 +2509,7 @@ it.each(['content', 'tool'] as const)(
 
     stream.on('chunk', (current, snapshot) => {
       const delta = current.choices[0]?.delta;
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (kind === 'content' && typeof delta?.content === 'string') {
         const message = snapshot.choices[0]?.message;
         if (message) {
@@ -2531,6 +2536,7 @@ it.each(['data', 'accessor'] as const)(
     const readContent = vi.fn(() => unsafe);
 
     stream.on('chunk', (current, snapshot) => {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (typeof current.choices[0]?.delta.content !== 'string') {
         return;
       }
@@ -2565,6 +2571,7 @@ it.each(['refusal', 'message'] as const)(
     let read: (() => void) | undefined;
 
     stream.on('chunk', (current, snapshot) => {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (typeof current.choices[0]?.delta.content !== 'string') {
         return;
       }
@@ -2605,6 +2612,7 @@ it('rejects an inherited structured refusal accessor without invoking it', async
   const read = vi.fn(() => 'Request refused');
 
   stream.on('chunk', (current, snapshot) => {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
     if (typeof current.choices[0]?.delta.content !== 'string') {
       return;
     }
@@ -2633,6 +2641,7 @@ it('rejects an inherited structured choice message without invoking its getter',
   const read = vi.fn(() => ({ content: '{}', role: 'assistant' }));
 
   stream.on('chunk', (current, snapshot) => {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
     if (typeof current.choices[0]?.delta.content !== 'string') {
       return;
     }
@@ -3015,6 +3024,7 @@ it('enforces an aggregate final budget across independently bounded public parse
     tools: [strictTool],
   });
   stream.on('chunk', (current, snapshot) => {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
     if (typeof current.choices[0]?.delta.content !== 'string') {
       return;
     }
@@ -3076,6 +3086,7 @@ it.each(['content', 'tool'] as const)(
         : { tools: [makeParseableTool(strictTool, { parser: parse, callback: undefined })] }),
     });
     stream.on('chunk', (current, snapshot) => {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (kind === 'content' && typeof current.choices[0]?.delta.content === 'string') {
         for (const choice of snapshot.choices) {
           choice.message.content = oversizedTogether;
@@ -3125,6 +3136,7 @@ it('bounds a new strict tool appended to the public snapshot before its final pa
   expect(failure).toBeInstanceOf(Error);
   expect((failure as Error).message).toMatch(/structured JSON byte limit/u);
   expect(
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
     parse.mock.calls.every(([value]) => typeof value !== 'string' || value.length < 16 * 1024 * 1024),
   ).toBe(true);
 });

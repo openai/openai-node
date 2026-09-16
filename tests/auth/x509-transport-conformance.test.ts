@@ -73,6 +73,7 @@ function createSDKClient(
       },
     },
     fetch: async (input, init) => {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The fetch boundary accepts Request, URL, or string inputs and must inspect the effective target.
       const target = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
       if (init?.redirect !== 'manual') {
         throw new Error('The SDK did not preserve its manual redirect policy');

@@ -207,7 +207,7 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
 }
 
 function stripUndefinedSchemaKeywords(schema: JSONSchemaDefinition, visited = new Set<JSONSchema>()): void {
-  if (typeof schema === 'boolean' || !isObject(schema) || visited.has(schema)) {
+  if (!isObject(schema) || visited.has(schema)) {
     return;
   }
   visited.add(schema);
@@ -234,6 +234,7 @@ function stripUndefinedSchemaKeywords(schema: JSONSchemaDefinition, visited = ne
 function normalizeRootRefAndAllOf(schema: JSONSchema): void {
   const seenRefs = new Set<string>();
   while (true) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof schema.$ref === 'string') {
       if (seenRefs.has(schema.$ref)) {
         throw new Error('Cyclic local $ref at `<root>` is not supported: ' + JSON.stringify(schema.$ref));
@@ -293,6 +294,7 @@ function inlineRootRefObject(schema: JSONSchema): void {
         'Local $ref at `<root>` does not resolve to an object or boolean schema: ' + JSON.stringify(ref),
       );
     }
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema permits boolean schemas and untrusted keyword values; validate them before normalization.
     if (typeof target === 'boolean') {
       throw new TypeError('Expected object schema but got boolean; path=<root>');
     }
@@ -382,7 +384,7 @@ function normalizeRootAllOf(schema: JSONSchema): void {
     }
 
     const branch = allOf[0];
-    if (typeof branch === 'boolean' || !isObject(branch)) {
+    if (!isObject(branch)) {
       return;
     }
 
@@ -422,7 +424,7 @@ function normalizeRootAnyOf(schema: JSONSchema): boolean {
   }
 
   const { branch, index: branchIndex } = realBranches[0]!;
-  if (typeof branch === 'boolean' || !isObject(branch) || !isObjectOnlySchema(branch, schema)) {
+  if (!isObject(branch) || !isObjectOnlySchema(branch, schema)) {
     return false;
   }
 
@@ -540,10 +542,11 @@ function rewriteLocalRefsIntoPromotedRootAnyOfBranch(
   };
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string') {
       value.$ref = rewriteRef(value.$ref);
     }
@@ -585,7 +588,7 @@ function hasOnlyRootRefAndDefinitions(schema: JSONSchema): boolean {
  * Multi-type arrays carry real union semantics and must remain unchanged.
  */
 function normalizeSingletonTypeArrays(schema: JSONSchemaDefinition): void {
-  if (typeof schema === 'boolean' || !isObject(schema)) {
+  if (!isObject(schema)) {
     return;
   }
 
@@ -599,6 +602,7 @@ function normalizeSingletonTypeArrays(schema: JSONSchemaDefinition): void {
 }
 
 function isNullable(schema: JSONSchemaDefinition, root: JSONSchema, seenRefs = new Set<string>()): boolean {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema permits boolean schemas and untrusted keyword values; validate them before normalization.
   if (typeof schema === 'boolean') {
     return schema;
   }
@@ -609,6 +613,7 @@ function isNullable(schema: JSONSchemaDefinition, root: JSONSchema, seenRefs = n
     // a local ref. Keep the proof conservative for every other sibling because
     // resolving those correctly would require intersecting the referenced
     // schema and its sibling constraints.
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(schema) || seenRefs.has(ref)) {
       return false;
     }
@@ -682,6 +687,7 @@ function ensureStrictJsonSchema(
   path: string[],
   root: JSONSchema,
 ): JSONSchema {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema permits boolean schemas and untrusted keyword values; validate them before normalization.
   if (typeof jsonSchema === 'boolean') {
     throw new TypeError(`Expected object schema but got boolean; path=${path.join('/')}`);
   }
@@ -729,6 +735,7 @@ function ensureStrictJsonSchema(
   }
 
   const required = jsonSchema.required ?? [];
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The required keyword must contain string property names before strict-schema normalization.
   if (!Array.isArray(required) || required.some((key) => typeof key !== 'string')) {
     throw new TypeError(
       `Expected \`required\` to be an array of strings; path=${path.join('/') || '<root>'}`,
@@ -838,6 +845,7 @@ function ensureStrictJsonSchema(
     // These boolean forms are already handled as parent-keyword semantics:
     // additionalProperties: false closes objects, while boolean
     // additionalItems does not contain a nested schema to strictify.
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema permits boolean schemas and untrusted keyword values; validate them before normalization.
     if (typeof child === 'boolean' && (keyword === 'additionalProperties' || keyword === 'additionalItems')) {
       return;
     }
@@ -986,11 +994,12 @@ function isObjectOnlySchema(
   root: JSONSchema,
   seenRefs = new Set<string>(),
 ): boolean {
-  if (typeof schema === 'boolean' || !isObject(schema)) {
+  if (!isObject(schema)) {
     return false;
   }
 
   if (schema.$ref !== undefined) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof schema.$ref !== 'string' || !hasOnlyRefAndAnnotations(schema) || seenRefs.has(schema.$ref)) {
       return false;
     }
@@ -1029,11 +1038,12 @@ function isArrayOnlySchema(
   root: JSONSchema,
   seenRefs = new Set<string>(),
 ): boolean {
-  if (typeof schema === 'boolean' || !isObject(schema)) {
+  if (!isObject(schema)) {
     return false;
   }
 
   if (schema.$ref !== undefined) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof schema.$ref !== 'string' || !hasOnlyRefAndAnnotations(schema) || seenRefs.has(schema.$ref)) {
       return false;
     }
@@ -1212,7 +1222,7 @@ function normalizeAnyOfFalseBranches(jsonSchema: JSONSchema): void {
  */
 export function assertNoNestedSchemaIds(schema: JSONSchema): void {
   const visit = (value: JSONSchemaDefinition, path: string[]): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
@@ -1306,10 +1316,11 @@ export function rewriteLocalRefsIntoMovedOneOfBranches(root: JSONSchema): void {
   };
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string') {
       value.$ref = rewriteRef(value.$ref);
     }
@@ -1339,11 +1350,8 @@ function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
     let changed = false;
 
     for (const [index, part] of originalParts.entries()) {
-      const resolvedRecord =
-        typeof resolved === 'object' && resolved !== null && !Array.isArray(resolved)
-          ? // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Resolved schema values may contain arbitrary annotation and literal fields beyond the declared schema interface.
-            (resolved as Record<string, unknown>)
-          : undefined;
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Resolved schema values may contain arbitrary annotation and literal fields beyond the declared schema interface.
+      const resolvedRecord = isObject(resolved) ? (resolved as Record<string, unknown>) : undefined;
       if (
         part === 'anyOf' &&
         index < originalParts.length - 1 &&
@@ -1389,10 +1397,11 @@ function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
   };
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string') {
       value.$ref = rewriteRef(value.$ref);
     }
@@ -1413,10 +1422,11 @@ function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
 function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
   const refsToPreserve = new Set<string>();
   const collectRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string' && refTargetsAllOfBranch(root, value.$ref)) {
       const pointerParts = parseLocalRef(value.$ref);
       if (!rootOnly || pointerParts?.[0] === 'allOf') {
@@ -1460,10 +1470,11 @@ function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
   }
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string') {
       value.$ref = rewrittenRefs.get(value.$ref) ?? value.$ref;
     }
@@ -1487,10 +1498,11 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
 
   const refsToPreserve = new Set<string>();
   const collectRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string') {
       const parts = parseLocalRef(value.$ref);
       if (
@@ -1538,10 +1550,11 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
   }
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string') {
       value.$ref = rewrittenRefs.get(value.$ref) ?? value.$ref;
     }
@@ -1554,12 +1567,13 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
 }
 
 function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: JSONSchema): void {
-  if (typeof schema === 'boolean' || !isObject(schema)) {
+  if (!isObject(schema)) {
     return;
   }
 
   const ref = schema.$ref;
   if (ref !== undefined) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof ref !== 'string') {
       throw new TypeError(`Received non-string $ref - ${ref}; path=${path.join('/')}`);
     }
@@ -1579,6 +1593,7 @@ function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: 
         }\` does not resolve to an object or boolean schema: ${JSON.stringify(ref)}`,
       );
     }
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema permits boolean schemas and untrusted keyword values; validate them before normalization.
     if (typeof resolved === 'boolean') {
       throw new TypeError(`Expected object schema but got boolean; path=${path.join('/')}`);
     }
@@ -1620,13 +1635,14 @@ function resolveObjectAllOfBranch(
   while (true) {
     while (resolved.$ref !== undefined) {
       const ref = resolved.$ref;
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
       if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(resolved) || seenRefs.has(ref)) {
         return undefined;
       }
       seenRefs.add(ref);
 
       const target = resolveLocalRef(root, ref);
-      if (typeof target === 'boolean' || !isObject(target)) {
+      if (!isObject(target)) {
         return undefined;
       }
       const targetPath = parseLocalRef(ref);
@@ -1663,7 +1679,7 @@ function normalizeObjectAllOfBranches(
   root: JSONSchema,
   normalizing = new Set<JSONSchema>(),
 ): void {
-  if (typeof schema === 'boolean' || !isObject(schema)) {
+  if (!isObject(schema)) {
     return;
   }
   if (normalizing.has(schema)) {
@@ -1720,7 +1736,7 @@ export function normalizeObjectAllOfForExclusivity(
       }
 
       const branch = allOf[0];
-      if (typeof branch === 'boolean' || !isObject(branch)) {
+      if (!isObject(branch)) {
         return undefined;
       }
 
@@ -1943,6 +1959,7 @@ function mergeObjectAllOf(
     }
 
     if (branch.required !== undefined) {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The required keyword must contain string property names before strict-schema normalization.
       if (!Array.isArray(branch.required) || branch.required.some((key) => typeof key !== 'string')) {
         fail();
       }
@@ -2074,6 +2091,7 @@ function schemasEqual(left: unknown, right: unknown): boolean {
     return left.every((value, index) => schemasEqual(value, right[index]));
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Structural schema equality distinguishes containers from primitive JSON values before recursion.
   if (typeof left !== 'object' || left === null || typeof right !== 'object' || right === null) {
     return false;
   }

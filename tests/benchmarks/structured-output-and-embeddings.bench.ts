@@ -255,6 +255,7 @@ function createFixtureClient(responseBody: string): OpenAI {
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The benchmark validates the parsed response rather than assuming its runtime schema.
 function assertStepCount(value: unknown): void {
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate the parser benchmark result before accepting the measured work as successful.
     typeof value !== 'object' ||
     value === null ||
     !('steps' in value) ||

@@ -16,7 +16,7 @@ import type { ResponseFormatTextJSONSchemaConfig } from '../resources/responses/
 import type { RealtimeFunctionTool } from '../resources/realtime/realtime';
 import { forEachJSONSchemaChild, toStrictJsonSchema } from '../lib/transform';
 import type { JSONSchema } from '../lib/jsonschema';
-import { hasOwn } from '../internal/utils/values';
+import { hasOwn, isObj } from '../internal/utils/values';
 import { assertJSONSerializableSchema, assertSupportedZodV3Schema } from './zod-v3-strict-schema';
 
 type ZodV4Schema = z4.ZodType | z4Mini.ZodMiniType;
@@ -99,7 +99,7 @@ function escapeSchemaDefinitionRefs<T extends object>(
   const visited = new Set<object>();
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Zod parsers and their recursive metadata accept untrusted values before schema validation.
   const visit = (value: unknown): void => {
-    if (!value || typeof value !== 'object' || Array.isArray(value) || visited.has(value)) {
+    if (!isObj(value) || visited.has(value)) {
       return;
     }
 
@@ -107,6 +107,7 @@ function escapeSchemaDefinitionRefs<T extends object>(
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Schema reference rewriting traverses arbitrary keyword and literal values without claiming they are valid schemas.
     const record = value as Record<string, unknown>;
     const ref = record['$ref'];
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Custom schema references and optional parser hooks require validation before traversal or invocation.
     if (typeof ref === 'string') {
       const replacement = refReplacements.get(ref);
       if (replacement !== undefined && replacement !== ref) {
@@ -247,6 +248,7 @@ function parseZodObject<ZodInput extends ZodTypeLike>(
   const parsed = parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, content);
   const parser = zodObject.parse;
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Custom schema references and optional parser hooks require validation before traversal or invocation.
   if (typeof parser === 'function') {
     const result = parser.call(zodObject, parsed) as InferZodType<ZodInput>;
     if (!isZodV4(zodObject as ZodSchema)) {

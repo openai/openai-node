@@ -417,6 +417,7 @@ describe('JSON response parsing', () => {
     const parsed = await client.get('/items');
 
     expect(parsed).toEqual(expected);
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The response fixture distinguishes structured JSON payloads from scalar response expectations.
     if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
       expect(parsed).toMatchObject({ _request_id: 'req_123' });
     }

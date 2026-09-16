@@ -20,6 +20,7 @@ export function parseLiteralDef(def: ZodLiteralDef, refs: Refs): JsonSchema7Lite
     return refs.target === 'openApi3' ? parseNullDef(refs) : { type: 'null', const: null };
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter emits the JSON Schema type corresponding to the literal value.
   const parsedType = typeof def.value;
   if (
     parsedType !== 'bigint' &&

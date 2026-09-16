@@ -13,11 +13,13 @@
  */
 export function ReadableStreamToAsyncIterable<T>(stream: any): AsyncIterableIterator<T> {
   if (stream[Symbol.asyncIterator]) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Adapt caller-owned iterators using their actual next, return, throw, and async-iterator capabilities.
     if (typeof stream.next === 'function') {
       return stream;
     }
 
     const iterator = stream[Symbol.asyncIterator]();
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Adapt caller-owned iterators using their actual next, return, throw, and async-iterator capabilities.
     if (typeof iterator[Symbol.asyncIterator] === 'function') {
       return iterator;
     }
@@ -28,9 +30,11 @@ export function ReadableStreamToAsyncIterable<T>(stream: any): AsyncIterableIter
         return this;
       },
     };
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Adapt caller-owned iterators using their actual next, return, throw, and async-iterator capabilities.
     if (typeof iterator.return === 'function') {
       iterableIterator.return = iterator.return.bind(iterator);
     }
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Adapt caller-owned iterators using their actual next, return, throw, and async-iterator capabilities.
     if (typeof iterator.throw === 'function') {
       iterableIterator.throw = iterator.throw.bind(iterator);
     }

@@ -98,6 +98,7 @@ function inner_stringify(
     }
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query serialization preserves JavaScript option validation and scalar-versus-container encoding semantics.
   if (typeof filter === 'function') {
     obj = filter(prefix, obj);
   } else if (obj instanceof Date) {
@@ -174,6 +175,7 @@ function inner_stringify(
   for (const key of obj_keys) {
     const value =
       // @ts-ignore
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query serialization preserves JavaScript option validation and scalar-versus-container encoding semantics.
       typeof key === 'object' && key.value !== undefined ? key.value : obj[key as any];
 
     if (skipNulls && value === null) {
@@ -185,6 +187,7 @@ function inner_stringify(
     let key_prefix: string;
     if (isArray(obj)) {
       key_prefix =
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query serialization preserves JavaScript option validation and scalar-versus-container encoding semantics.
         typeof generateArrayPrefix === 'function'
           ? generateArrayPrefix(adjusted_prefix, encoded_key)
           : adjusted_prefix;
@@ -226,14 +229,17 @@ function inner_stringify(
 function normalize_stringify_options(
   opts: StringifyOptions = defaults,
 ): NonNullableProperties<Omit<StringifyOptions, 'indices'>> & { indices?: boolean } {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `allowEmptyArrays` before accepting it or applying its compatibility default.
   if (opts.allowEmptyArrays !== undefined && typeof opts.allowEmptyArrays !== 'boolean') {
     throw new TypeError('`allowEmptyArrays` option can only be `true` or `false`, when provided');
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `encodeDotInKeys` before accepting it or applying its compatibility default.
   if (opts.encodeDotInKeys !== undefined && typeof opts.encodeDotInKeys !== 'boolean') {
     throw new TypeError('`encodeDotInKeys` option can only be `true` or `false`, when provided');
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `encoder` before accepting it or applying its compatibility default.
   if (opts.encoder !== null && opts.encoder !== undefined && typeof opts.encoder !== 'function') {
     throw new TypeError('Encoder has to be a function.');
   }
@@ -253,6 +259,7 @@ function normalize_stringify_options(
   const formatter = formatters[format];
 
   let filter = defaults.filter;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `filter` before accepting it or applying its compatibility default.
   if (typeof opts.filter === 'function' || isArray(opts.filter)) {
     filter = opts.filter;
   }
@@ -266,6 +273,7 @@ function normalize_stringify_options(
     arrayFormat = defaults.arrayFormat;
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `commaRoundTrip` before accepting it or applying its compatibility default.
   if ('commaRoundTrip' in opts && typeof opts.commaRoundTrip !== 'boolean') {
     throw new TypeError('`commaRoundTrip` must be a boolean, or absent');
   }
@@ -278,31 +286,42 @@ function normalize_stringify_options(
   }
 
   return {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `addQueryPrefix` before accepting it or applying its compatibility default.
     addQueryPrefix: typeof opts.addQueryPrefix === 'boolean' ? opts.addQueryPrefix : defaults.addQueryPrefix,
     // @ts-ignore
     allowDots,
     allowEmptyArrays:
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `allowEmptyArrays` before accepting it or applying its compatibility default.
       typeof opts.allowEmptyArrays === 'boolean' ? !!opts.allowEmptyArrays : defaults.allowEmptyArrays,
     arrayFormat,
     charset,
     charsetSentinel:
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `charsetSentinel` before accepting it or applying its compatibility default.
       typeof opts.charsetSentinel === 'boolean' ? opts.charsetSentinel : defaults.charsetSentinel,
     commaRoundTrip: !!opts.commaRoundTrip,
     delimiter: opts.delimiter === undefined ? defaults.delimiter : opts.delimiter,
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `encode` before accepting it or applying its compatibility default.
     encode: typeof opts.encode === 'boolean' ? opts.encode : defaults.encode,
     encodeDotInKeys:
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `encodeDotInKeys` before accepting it or applying its compatibility default.
       typeof opts.encodeDotInKeys === 'boolean' ? opts.encodeDotInKeys : defaults.encodeDotInKeys,
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `encoder` before accepting it or applying its compatibility default.
     encoder: typeof opts.encoder === 'function' ? opts.encoder : defaults.encoder,
     encodeValuesOnly:
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `encodeValuesOnly` before accepting it or applying its compatibility default.
       typeof opts.encodeValuesOnly === 'boolean' ? opts.encodeValuesOnly : defaults.encodeValuesOnly,
     filter,
     format,
     formatter,
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `serializeDate` before accepting it or applying its compatibility default.
     serializeDate: typeof opts.serializeDate === 'function' ? opts.serializeDate : defaults.serializeDate,
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `skipNulls` before accepting it or applying its compatibility default.
     skipNulls: typeof opts.skipNulls === 'boolean' ? opts.skipNulls : defaults.skipNulls,
     // @ts-ignore
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `sort` before accepting it or applying its compatibility default.
     sort: typeof opts.sort === 'function' ? opts.sort : null,
     strictNullHandling:
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate JavaScript query option `strictNullHandling` before accepting it or applying its compatibility default.
       typeof opts.strictNullHandling === 'boolean' ? opts.strictNullHandling : defaults.strictNullHandling,
   };
 }
@@ -314,6 +333,7 @@ export function stringify(object: any, opts: StringifyOptions = {}) {
   let obj_keys: PropertyKey[] | undefined;
   let filter;
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query serialization preserves JavaScript option validation and scalar-versus-container encoding semantics.
   if (typeof options.filter === 'function') {
     filter = options.filter;
     obj = filter('', obj);
@@ -324,6 +344,7 @@ export function stringify(object: any, opts: StringifyOptions = {}) {
 
   const keys: string[] = [];
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query serialization preserves JavaScript option validation and scalar-versus-container encoding semantics.
   if (typeof obj !== 'object' || obj === null) {
     return '';
   }

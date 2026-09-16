@@ -167,9 +167,11 @@ export function parseResponseFormatContent<ParsedT>(format: unknown, content: st
   }
 
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A caller-supplied response format may expose a callable parser; validate that hook before invoking it.
     typeof format === 'object' &&
     format !== null &&
     '$parseRaw' in format &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A caller-supplied response format may expose a callable parser; validate that hook before invoking it.
     typeof format.$parseRaw === 'function'
   ) {
     return format.$parseRaw(content) as ParsedT;

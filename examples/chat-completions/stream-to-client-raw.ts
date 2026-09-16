@@ -98,10 +98,15 @@ app.use(express.text());
 //
 function watchClientDisconnect(req: Request, res: Response) {
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host lifecycle methods and validates external transport failures before handling them.
     typeof AbortController !== 'function' ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host lifecycle methods and validates external transport failures before handling them.
     typeof req.on !== 'function' ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host lifecycle methods and validates external transport failures before handling them.
     typeof req.off !== 'function' ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host lifecycle methods and validates external transport failures before handling them.
     typeof res.on !== 'function' ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host lifecycle methods and validates external transport failures before handling them.
     typeof res.off !== 'function'
   ) {
     return;
@@ -150,6 +155,7 @@ async function writeResponseChunk(
     } catch (error) {
       if (
         !disconnect.signal.aborted ||
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host lifecycle methods and validates external transport failures before handling them.
         typeof error !== 'object' ||
         error === null ||
         !('name' in error) ||

@@ -50,12 +50,14 @@ function snapshotFor(item: Record<string, unknown>): Response {
 function applyEvent(snapshot: Response, event: Record<string, unknown>): Response {
   const { type, output_index: outputIndex } = event;
   const output =
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The adversarial event fixture must inspect runtime indexes and discriminators before adding defaults.
     typeof outputIndex === 'number' &&
     Number.isSafeInteger(outputIndex) &&
     hasOwn(snapshot.output, outputIndex)
       ? snapshot.output[outputIndex]
       : undefined;
   const requiresItemID =
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The adversarial event fixture must inspect runtime indexes and discriminators before adding defaults.
     typeof type === 'string' &&
     hasOwn(event, 'output_index') &&
     !type.startsWith('response.output_item.') &&

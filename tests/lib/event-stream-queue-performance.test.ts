@@ -182,6 +182,7 @@ describe('EventStream iterator queue performance', () => {
         values.length === 1 &&
         Array.isArray(tuple) &&
         tuple.length === 1 &&
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The retention regression inspects callback tuples before checking the adversarial payload marker.
         typeof tuple[0] === 'object' &&
         tuple[0] !== null &&
         'marker' in tuple[0] &&

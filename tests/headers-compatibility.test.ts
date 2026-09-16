@@ -53,6 +53,7 @@ test.each(cases)('sends $name from $location over HTTP', async ({ name, create, 
     server.listen(0, '127.0.0.1');
     await listening;
     const address = server.address();
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
     if (!address || typeof address === 'string') {
       throw new Error('Expected a loopback TCP server address');
     }

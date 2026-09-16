@@ -321,6 +321,7 @@ async function listen(server: ReturnType<typeof createServer>): Promise<string> 
   server.listen(0, '127.0.0.1');
   await listening;
   const address = server.address();
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
   if (address === null || typeof address === 'string') {
     throw new Error('The streaming example loopback server has no local port');
   }

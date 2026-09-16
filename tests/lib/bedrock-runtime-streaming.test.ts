@@ -33,6 +33,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 function sseResponse(events: readonly unknown[]): Response {
   const body = events
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The SSE fixture preserves raw sentinel strings and JSON-encodes structured wire events.
     .map((event) => `data: ${typeof event === 'string' ? event : JSON.stringify(event)}`)
     .join('\n\n');
   return new Response(`${body}\n\n`, {

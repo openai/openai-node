@@ -69,8 +69,7 @@ function commitAssistantStreamArrayProjection(projection: AssistantStreamDeltaPr
   }
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Delta validation and retention tracking must inspect arbitrary partial wire values before treating them as records.
-function isPrimitiveAssistantStreamValue(value: unknown): boolean {
+function isPrimitiveAssistantStreamValue(value: unknown): value is string | number {
   return typeof value === 'string' || typeof value === 'number';
 }
 
@@ -114,6 +113,7 @@ function getAssistantStreamDeltaIndex(
     throw new Error('Expected array delta entry to have an `index` property');
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Untrusted assistant deltas require index validation and type-matched scalar accumulation.
   if (kind === 'array' && typeof index !== 'number') {
     throw new TypeError(
       'Expected array delta entry `index` property to be a number but got an invalid value',
@@ -126,6 +126,7 @@ function getAssistantStreamDeltaIndex(
     (index as number) >= baselineLength + MAX_ASSISTANT_STREAM_ARRAY_GROWTH ||
     (index as number) >= MAX_EXTERNALLY_MUTABLE_ASSISTANT_STREAM_ARRAY_LENGTH
   ) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Untrusted assistant deltas require index validation and type-matched scalar accumulation.
     const safeIndex = typeof index === 'number' ? index : 'unknown';
     throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${safeIndex}`);
   }
@@ -292,6 +293,7 @@ function getRequiredAssistantStreamArrayIndex(deltaEntry: AssistantStreamRecord)
   if (index === null || index === undefined) {
     throw new Error('Expected array delta entry to have an `index` property');
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Untrusted assistant deltas require index validation and type-matched scalar accumulation.
   if (typeof index !== 'number') {
     throw new TypeError(
       'Expected array delta entry `index` property to be a number but got an invalid value',
@@ -374,8 +376,10 @@ function applyAssistantStreamDelta(
       continue;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Untrusted assistant deltas require index validation and type-matched scalar accumulation.
     if (typeof accumulatedValue === 'string' && typeof deltaValue === 'string') {
       accumulatedValue += deltaValue;
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Untrusted assistant deltas require index validation and type-matched scalar accumulation.
     } else if (typeof accumulatedValue === 'number' && typeof deltaValue === 'number') {
       accumulatedValue += deltaValue;
     } else if (isObj(accumulatedValue) && isObj(deltaValue)) {

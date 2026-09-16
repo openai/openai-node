@@ -29,6 +29,7 @@ const standardSchema = {
     vendor: 'synthetic-validator',
     // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Standard Schema validator contract receives untrusted parsed values before checking their fields.
     validate: (value: unknown) => {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The test schema must validate untrusted input before returning a successful parsed city.
       if (typeof value === 'object' && value !== null && 'city' in value && typeof value.city === 'string') {
         return { value: { city: value.city, normalized: true as const } };
       }

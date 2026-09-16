@@ -233,6 +233,7 @@ describe('Stream.tee queue performance', () => {
 
     expect(left.controller).toBe(controller);
     expect(right.controller).toBe(controller);
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression verifies that the returned runtime iterator exposes its required cancellation method.
     expect(typeof left[Symbol.asyncIterator]().return).toBe('function');
 
     for await (const value of left) {

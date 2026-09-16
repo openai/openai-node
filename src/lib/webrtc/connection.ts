@@ -190,6 +190,7 @@ export class WebRTCConnection<ClientEvent, ServerEvent extends { type: string }>
       if (this.attempt !== attempt) {
         return;
       }
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate the server-provided SDP answer before passing it to the host WebRTC implementation.
       if (typeof answer !== 'string' || answer.length === 0) {
         throw new TypeError('The SDP callback must return a nonempty string.');
       }

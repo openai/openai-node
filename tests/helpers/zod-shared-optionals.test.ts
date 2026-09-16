@@ -35,11 +35,13 @@ function expectValidSchema(value: unknown): void {
 
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The regression inspects serialized schema values recursively before trusting references or node types.
   const visit = (child: unknown): void => {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Traverse actual emitted schema objects and reference strings to verify shared optional definitions.
     if (child === null || typeof child !== 'object') {
       return;
     }
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- JSON Pointer traversal reads heterogeneous schema fields and validates each resolved reference before use.
     const reference = (child as Record<string, unknown>)['$ref'];
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Traverse actual emitted schema objects and reference strings to verify shared optional definitions.
     if (typeof reference === 'string') {
       expect(reference.startsWith('#/')).toBe(true);
       let target: unknown = schema;

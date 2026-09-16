@@ -21,6 +21,7 @@ const MAX_REFRESH_BUFFER_FRACTION = 0.5;
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The token exchange response supplies an untrusted lifetime that must pass numeric and expiry validation.
 function calculateExpiresAt(expiresIn: unknown, exchangeStartedAt: number): number {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- OAuth responses and cross-runtime response implementations require validation before token handling.
   if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
     throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
   }
@@ -59,6 +60,7 @@ function isResponsePrototype(response: Response, prototype: object): boolean {
   const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
   if (
     prototype === response ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate native Response descriptors before reading token JSON without trusting overridden body methods.
     typeof constructor !== 'function' ||
     Object.getOwnPropertyDescriptor(constructor, 'name')?.value !== 'Response' ||
     Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value !== prototype
@@ -68,9 +70,13 @@ function isResponsePrototype(response: Response, prototype: object): boolean {
 
   const tag = Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag);
   return (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate native Response descriptors before reading token JSON without trusting overridden body methods.
     (tag?.value === 'Response' || typeof tag?.get === 'function') &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate native Response descriptors before reading token JSON without trusting overridden body methods.
     typeof Object.getOwnPropertyDescriptor(prototype, 'headers')?.get === 'function' &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate native Response descriptors before reading token JSON without trusting overridden body methods.
     typeof Object.getOwnPropertyDescriptor(prototype, 'ok')?.get === 'function' &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate native Response descriptors before reading token JSON without trusting overridden body methods.
     typeof Object.getOwnPropertyDescriptor(prototype, 'status')?.get === 'function'
   );
 }
@@ -85,6 +91,7 @@ function isResponseBodyPrototype(prototype: object, responsePrototype: object | 
   return (
     responsePrototype !== null &&
     Object.getPrototypeOf(responsePrototype) === prototype &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate native Response descriptors before reading token JSON without trusting overridden body methods.
     typeof constructor === 'function' &&
     Object.getOwnPropertyDescriptor(constructor, 'name')?.value === 'Body' &&
     Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value === prototype
@@ -93,6 +100,7 @@ function isResponseBodyPrototype(prototype: object, responsePrototype: object | 
 
 function decodeNativeResponseBody(body: ArrayBuffer): string {
   const scope = globalThis as typeof globalThis & { Bun?: { version?: unknown } };
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bun needs its specific response-decoding behavior; probe the actual host runtime marker.
   return new TextDecoder('utf-8', { ignoreBOM: typeof scope.Bun?.version === 'string' }).decode(body);
 }
 
@@ -118,11 +126,13 @@ async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
       continue;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate native Response descriptors before reading token JSON without trusting overridden body methods.
     if (typeof parser.value !== 'function') {
       break;
     }
 
     const bodyReader = Object.getOwnPropertyDescriptor(prototype, 'text')?.value;
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate native Response descriptors before reading token JSON without trusting overridden body methods.
     if (typeof bodyReader === 'function' && isResponseBodyPrototype(prototype, responsePrototype)) {
       readText = bodyReader;
       break;
@@ -145,6 +155,7 @@ async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
 
 function isUnsafeAccessToken(accessToken: string): boolean {
   const scope = globalThis as typeof globalThis & { Bun?: { version?: unknown } };
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bun needs its specific response-decoding behavior; probe the actual host runtime marker.
   if (typeof scope.Bun?.version === 'string') {
     return /[^\t\u0020-\u007E]|^[\t ]|[\t ]$/u.test(accessToken);
   }
@@ -281,10 +292,12 @@ export class WorkloadIdentityAuth {
 
     const tokenResponse: unknown = await parseOAuthTokenResponse(response);
     const accessToken =
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- OAuth responses and cross-runtime response implementations require validation before token handling.
       typeof tokenResponse === 'object' && tokenResponse !== null && 'access_token' in tokenResponse
         ? tokenResponse.access_token
         : undefined;
     if (
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- OAuth responses and cross-runtime response implementations require validation before token handling.
       typeof accessToken !== 'string' ||
       accessToken.trim().length === 0 ||
       isUnsafeAccessToken(accessToken)

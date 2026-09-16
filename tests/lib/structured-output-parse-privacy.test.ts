@@ -193,6 +193,7 @@ function createClient(body: OpenAI.Chat.ChatCompletion | OpenAI.Responses.Respon
 }
 
 function createStreamingToolClient(content: string | readonly string[], tool: ChatCompletionFunctionTool) {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The fixture accepts either a single text fragment or an iterable of fragments.
   const fragments = typeof content === 'string' ? [content] : content;
   const chunk: OpenAI.Chat.ChatCompletionChunk = {
     id: 'chatcmpl_stream_privacy',

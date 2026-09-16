@@ -32,6 +32,7 @@ class GrandchildClient extends DerivedClient {}
 
 void (async () => {
   try {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify that the installed package exports a callable constructor in this module-loading environment.
     assert.equal(typeof OpenAI, 'function');
     assert.equal(OpenAI.OpenAI, OpenAI.default);
     assert.equal(OpenAI.APIError, OpenAI.default.APIError);

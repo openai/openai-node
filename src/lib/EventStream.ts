@@ -43,6 +43,7 @@ const symbolDescriptionGetter = Object.getOwnPropertyDescriptor(Symbol.prototype
 const dateTimestampGetter = Date.prototype.getTime;
 const arrayBufferByteLengthGetter = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get;
 const sharedArrayBufferByteLengthGetter =
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect retained event data and native descriptors without invoking attacker-controlled accessors or coercion.
   typeof SharedArrayBuffer === 'function'
     ? Object.getOwnPropertyDescriptor(SharedArrayBuffer.prototype, 'byteLength')?.get
     : undefined;
@@ -52,6 +53,7 @@ const functionToString = Function.prototype.toString;
 const objectToString = Object.prototype.toString;
 const errorBrandDescriptor = Object.getOwnPropertyDescriptor(Error, 'isError');
 const nativeErrorBrand =
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
   errorBrandDescriptor && 'value' in errorBrandDescriptor && typeof errorBrandDescriptor.value === 'function'
     ? // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The native Error.isError predicate brands arbitrary values before an Error contract can be assumed.
       (errorBrandDescriptor.value as (value: unknown) => boolean)
@@ -94,19 +96,23 @@ function captureNativeProxyDetector(): ((value: object) => boolean) | undefined 
 
   try {
     const loader = Object.getOwnPropertyDescriptor(process, 'getBuiltinModule');
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect retained event data and native descriptors without invoking attacker-controlled accessors or coercion.
     if (!loader || !('value' in loader) || typeof loader.value !== 'function') {
       return undefined;
     }
     // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the descriptor value without reading a potentially overridden call property.
     const util: unknown = Reflect.apply(loader.value, process, ['node:util']);
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect retained event data and native descriptors without invoking attacker-controlled accessors or coercion.
     if (typeof util !== 'object' || util === null) {
       return undefined;
     }
     const types = Object.getOwnPropertyDescriptor(util, 'types');
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect retained event data and native descriptors without invoking attacker-controlled accessors or coercion.
     if (!types || !('value' in types) || typeof types.value !== 'object' || types.value === null) {
       return undefined;
     }
     const detector = Object.getOwnPropertyDescriptor(types.value, 'isProxy');
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect retained event data and native descriptors without invoking attacker-controlled accessors or coercion.
     if (!detector || !('value' in detector) || typeof detector.value !== 'function') {
       return undefined;
     }
@@ -123,6 +129,7 @@ const nativeProxyDetector = captureNativeProxyDetector();
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Intrinsic constructors are verified at runtime before callable or prototype metadata is trusted.
 function rememberTrustedIntrinsic(constructor: unknown): void {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
   if (typeof constructor !== 'function') {
     return;
   }
@@ -131,6 +138,7 @@ function rememberTrustedIntrinsic(constructor: unknown): void {
   if (
     !prototypeDescriptor ||
     !('value' in prototypeDescriptor) ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
     (typeof prototypeDescriptor.value !== 'object' && typeof prototypeDescriptor.value !== 'function')
   ) {
     return;
@@ -208,11 +216,13 @@ if (typedArrayConstructorDescriptor && 'value' in typedArrayConstructorDescripto
   rememberTrustedIntrinsic(typedArrayConstructorDescriptor.value);
 }
 
+// oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect retained event data and native descriptors without invoking attacker-controlled accessors or coercion.
 if (typeof Buffer === 'function') {
   rememberTrustedIntrinsic(Buffer);
 }
 
 const blobInternalHandlePrototype = (() => {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect retained event data and native descriptors without invoking attacker-controlled accessors or coercion.
   if (typeof Blob !== 'function') {
     return undefined;
   }
@@ -221,6 +231,7 @@ const blobInternalHandlePrototype = (() => {
     const blob = new Blob([]);
     for (const key of Object.getOwnPropertySymbols(blob)) {
       const descriptor = Object.getOwnPropertyDescriptor(blob, key);
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
       if (descriptor && 'value' in descriptor && typeof descriptor.value === 'object' && descriptor.value) {
         return Object.getPrototypeOf(descriptor.value) as object;
       }
@@ -234,10 +245,12 @@ const blobInternalHandlePrototype = (() => {
 const mapEntries = Map.prototype.entries;
 const setValues = Set.prototype.values;
 const headersEntriesDescriptor =
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect retained event data and native descriptors without invoking attacker-controlled accessors or coercion.
   typeof Headers === 'function' ? Object.getOwnPropertyDescriptor(Headers.prototype, 'entries') : undefined;
 const headersEntries =
   headersEntriesDescriptor &&
   'value' in headersEntriesDescriptor &&
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
   typeof headersEntriesDescriptor.value === 'function'
     ? (headersEntriesDescriptor.value as typeof Headers.prototype.entries)
     : undefined;
@@ -261,6 +274,7 @@ interface TrustedForeignIntrinsic {
 // oxlint-disable-next-line anti-slop/no-object-parameters -- Foreign prototypes are untrusted objects until their constructor descriptors are verified.
 function getTrustedForeignIntrinsic(prototype: object): TrustedForeignIntrinsic | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
   if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') {
     return undefined;
   }
@@ -303,6 +317,7 @@ function isCanonicalIntrinsicFunction(
     return value === undefined;
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
   if (typeof value !== 'function' || typeof canonical !== 'function') {
     return false;
   }
@@ -346,9 +361,11 @@ function isCanonicalIntrinsicDescriptor(
     if (descriptor.writable !== canonical.writable) {
       return false;
     }
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
     if (typeof canonical.value === 'function') {
       return isCanonicalIntrinsicFunction(descriptor.value, canonical.value, functionPrototype);
     }
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
     if (canonical.value !== null && typeof canonical.value === 'object') {
       return false;
     }
@@ -383,6 +400,7 @@ function getVerifiedForeignErrorConstructor(
   current: object,
   stackDescriptor: PropertyDescriptor,
 ): { constructor: NativeErrorConstructor; prototype: object } | undefined {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
   if (typeof stackDescriptor.get !== 'function' || typeof stackDescriptor.set !== 'function') {
     return undefined;
   }
@@ -390,6 +408,7 @@ function getVerifiedForeignErrorConstructor(
   let prototype = Object.getPrototypeOf(current) as object | null;
   for (let depth = 0; prototype !== null && depth < MAX_BUFFERED_EVENT_DEPTH; depth += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
     if (descriptor && 'value' in descriptor && typeof descriptor.value === 'function') {
       const constructor = descriptor.value as NativeErrorConstructor;
       if (
@@ -421,6 +440,7 @@ function isTrustedNativeErrorStack(current: object, descriptor: PropertyDescript
   if (
     errorStackDescriptor &&
     !('value' in errorStackDescriptor) &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
     typeof errorStackDescriptor.get === 'function' &&
     Object.prototype.isPrototypeOf.call(Error.prototype, current) &&
     descriptor.get === errorStackDescriptor.get &&
@@ -438,6 +458,7 @@ function isTrustedNativeErrorStack(current: object, descriptor: PropertyDescript
   if (!canonicalDescriptor) {
     const canonical = Reflect.construct(verified.constructor, []) as unknown;
     if (
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
       typeof canonical !== 'object' ||
       canonical === null ||
       !hasNativeErrorBrand(canonical) ||
@@ -450,7 +471,9 @@ function isTrustedNativeErrorStack(current: object, descriptor: PropertyDescript
     if (
       !canonicalDescriptor ||
       'value' in canonicalDescriptor ||
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
       typeof canonicalDescriptor.get !== 'function' ||
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
       typeof canonicalDescriptor.set !== 'function'
     ) {
       return false;
@@ -523,6 +546,7 @@ function getRetainedStorageBrand(current: object): string | undefined {
       if (
         constructor &&
         'value' in constructor &&
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
         typeof constructor.value === 'function' &&
         functionToString.call(constructor.value) === nativeDateConstructorSource &&
         getTrustedForeignIntrinsic(prototype)
@@ -535,6 +559,7 @@ function getRetainedStorageBrand(current: object): string | undefined {
     if (
       descriptor &&
       'value' in descriptor &&
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Verify native descriptor kinds without invoking user-defined getters or accepting spoofed intrinsics.
       typeof descriptor.value === 'string' &&
       retainedStorageBrands.has(descriptor.value)
     ) {
@@ -564,6 +589,7 @@ function estimateRetainedBufferBytes(
       buffer = dataViewBufferGetter?.call(current) as unknown;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect retained event data and native descriptors without invoking attacker-controlled accessors or coercion.
     if (typeof buffer !== 'object' || buffer === null) {
       return { bytes: Number.POSITIVE_INFINITY, kind };
     }
@@ -618,6 +644,7 @@ function estimateRetainedBufferBytes(
   const bytes = getter?.call(current);
   return {
     bytes:
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Untrusted descriptor lengths must be safe nonnegative numbers before memory accounting.
       typeof bytes === 'number' && Number.isSafeInteger(bytes) && bytes >= 0
         ? bytes
         : Number.POSITIVE_INFINITY,
@@ -672,6 +699,7 @@ function getInspectableEventKeys(
     const descriptor = Object.getOwnPropertyDescriptor(current, 'length');
     const length: unknown = descriptor && 'value' in descriptor ? descriptor.value : undefined;
     if (
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Untrusted descriptor lengths must be safe nonnegative numbers before memory accounting.
       typeof length !== 'number' ||
       !Number.isSafeInteger(length) ||
       length < 0 ||
@@ -687,6 +715,7 @@ function getInspectableEventKeys(
 
   const length: unknown = typedArrayLengthGetter?.call(current);
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Untrusted descriptor lengths must be safe nonnegative numbers before memory accounting.
     typeof length !== 'number' ||
     !Number.isSafeInteger(length) ||
     length < 0 ||
@@ -696,6 +725,7 @@ function getInspectableEventKeys(
   }
 
   return Reflect.ownKeys(current).filter((key) => {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Retained-size accounting handles string and symbol property keys without coercing them.
     if (typeof key !== 'string') {
       return true;
     }
@@ -721,9 +751,11 @@ function visitInspectableEventProperties(
   }
 
   for (const key of keys) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Retained-size accounting handles string and symbol property keys without coercing them.
     if (!charge(typeof key === 'string' ? key.length * 2 + 8 : 8)) {
       return false;
     }
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Retained-size accounting handles string and symbol property keys without coercing them.
     if (typeof key === 'symbol') {
       visit(key, depth + 1);
     }
@@ -807,9 +839,11 @@ function visitRetainedEventPrototypes(
         ) {
           continue;
         }
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Retained-size accounting handles string and symbol property keys without coercing them.
         if (!charge(typeof key === 'string' ? key.length * 2 + 8 : 8) || !('value' in descriptor)) {
           return false;
         }
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Retained-size accounting handles string and symbol property keys without coercing them.
         if (typeof key === 'symbol') {
           visit(key, prototypeDepth + 1);
         }
@@ -938,21 +972,25 @@ function inspectBufferedEventGraph(
       return;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Retained-size accounting distinguishes strings, symbols, callables, and containers without coercion.
     if (typeof current === 'string') {
       charge(current.length * 2);
       return;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Retained-size accounting distinguishes strings, symbols, callables, and containers without coercion.
     if (typeof current === 'symbol') {
       visitSymbol(current);
       return;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Retained-size accounting distinguishes strings, symbols, callables, and containers without coercion.
     if (typeof current === 'function') {
       bytes = remainingBytes + 1;
       return;
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Retained-size accounting distinguishes strings, symbols, callables, and containers without coercion.
     if (current === null || typeof current !== 'object') {
       charge(8);
       return;
@@ -1817,10 +1855,12 @@ export class EventStream<EventTypes extends BaseEvents> {
           return;
         }
 
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect retained event data and native descriptors without invoking attacker-controlled accessors or coercion.
         if (typeof value === 'object' && value !== null && sdkOwnedBufferedEventArguments.has(value)) {
           const argumentsTuple = value as unknown[];
           for (let index = 0; index < argumentsTuple.length; index += 1) {
             const argument = argumentsTuple[index];
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Retained-size accounting distinguishes strings, symbols, callables, and containers without coercion.
             if (typeof argument === 'string') {
               argumentsTuple[index] = bufferedJSONParse(bufferedJSONStringify(argument)) as string;
             }

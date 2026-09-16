@@ -47,7 +47,9 @@ class MalformedJSON extends Error {}
  * @throws {MalformedJSON} If the JSON is malformed
  */
 function parseJSON(jsonString: string, allowPartial: number = Allow.ALL): any {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The partial JSON parser validates JavaScript input and reports its actual runtime kind.
   if (typeof jsonString !== 'string') {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The partial JSON parser validates JavaScript input and reports its actual runtime kind.
     throw new TypeError(`expecting str, got ${typeof jsonString}`);
   }
   if (!jsonString.trim()) {

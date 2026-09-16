@@ -78,6 +78,7 @@ function safeOptionRecord(
   label: string,
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Credential option snapshots contain unvalidated descriptor values; each option is validated before use.
 ): Record<string, unknown> {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
   if (!value || typeof value !== 'object' || types.isProxy(value)) {
     throw new Error(`X.509 ${label} options must be a non-proxy object.`);
   }
@@ -88,6 +89,7 @@ function safeOptionRecord(
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Credential option snapshots contain unvalidated descriptor values; each option is validated before use.
   const snapshot = Object.create(null) as Record<string, unknown>;
   for (const name of Reflect.ownKeys(value)) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
     if (typeof name !== 'string' || !allowed.has(name)) {
       throw new Error(`Unsupported X.509 ${label} option: \`${String(name)}\`.`);
     }
@@ -103,6 +105,7 @@ function safeOptionRecord(
 // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Credential option snapshots contain unvalidated descriptor values; each option is validated before use.
 function requiredCredentialValue(options: Record<string, unknown>, name: string): string {
   const value = options[name];
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new Error(`X.509 credential requires a nonempty own \`${name}\` value.`);
   }
@@ -114,6 +117,7 @@ function snapshotCertificateAuthorities(value: unknown): string | string[] | und
   if (value === undefined) {
     return undefined;
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
   if (typeof value === 'string') {
     if (value.trim().length === 0) {
       throw new Error('X.509 certificate authorities must contain nonempty PEM values.');
@@ -126,6 +130,7 @@ function snapshotCertificateAuthorities(value: unknown): string | string[] | und
   const authorities: string[] = [];
   for (let index = 0; index < value.length; index += 1) {
     const entry = Object.getOwnPropertyDescriptor(value, String(index));
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
     if (!entry || !('value' in entry) || typeof entry.value !== 'string' || entry.value.trim().length === 0) {
       throw new Error('X.509 certificate authorities require own plain nonempty PEM strings.');
     }
@@ -168,11 +173,13 @@ function validatedCredentialOptions(options: X509CredentialOptions): ValidatedX5
   const identityProviderId = requiredCredentialValue(configured, 'identityProviderId');
   const serviceAccountId = requiredCredentialValue(configured, 'serviceAccountId');
   const { refreshBufferSeconds, passphrase } = configured;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
   if (passphrase !== undefined && typeof passphrase !== 'string') {
     throw new Error('X.509 credential requires a string private-key passphrase.');
   }
   if (
     refreshBufferSeconds !== undefined &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
     (typeof refreshBufferSeconds !== 'number' ||
       !Number.isSafeInteger(refreshBufferSeconds) ||
       refreshBufferSeconds < 0 ||
@@ -232,10 +239,12 @@ function proxyAuthentication(url: URL): string | undefined {
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Credential and proxy options are untrusted runtime inputs and must pass validation before transport construction.
 function normalizeProxyURL(value: unknown): URL {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
   if (typeof value !== 'string' && (typeof value !== 'object' || value === null || types.isProxy(value))) {
     throw new Error('X.509 CONNECT proxy requires an own URL string or URL value.');
   }
   try {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
     return new URL(typeof value === 'string' ? value : URL.prototype.toString.call(value));
   } catch {
     throw new Error('X.509 CONNECT proxy requires a valid proxy URL.');

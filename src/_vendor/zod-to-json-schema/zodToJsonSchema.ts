@@ -11,6 +11,7 @@ function ownStrictRootSchema(
   name: string | undefined,
   nameStrategy: string,
 ): JsonSchema7Type {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter inspects schema values and serialization hooks before producing JSON Schema.
   if (schema === null || typeof schema !== 'object') {
     throw new TypeError('Root schema must be a plain JSON-schema record');
   }
@@ -31,9 +32,11 @@ function ownStrictRootSchema(
     }
 
     const value: unknown = descriptor.value;
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter inspects schema values and serialization hooks before producing JSON Schema.
     if (key === 'toJSON' && typeof value === 'function') {
       throw new TypeError("Root schema cannot contain a callable 'toJSON' property");
     }
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter inspects schema values and serialization hooks before producing JSON Schema.
     if (['undefined', 'function', 'symbol'].includes(typeof value)) {
       continue;
     }
@@ -47,11 +50,13 @@ function ownStrictRootSchema(
   }
 
   const { type, nullable, $ref: reference } = owned;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter inspects schema values and serialization hooks before producing JSON Schema.
   if (!['undefined', 'boolean'].includes(typeof nullable)) {
     throw new TypeError("Root schema 'nullable' must be a boolean");
   }
   if (type !== 'object' || nullable === true) {
     let actualType: string | undefined;
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter inspects schema values and serialization hooks before producing JSON Schema.
     if (typeof type === 'string') {
       actualType = nullable === true ? `${type},null` : type;
     } else if (Array.isArray(type)) {
@@ -92,6 +97,7 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
   }
 
   let name: string | undefined;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter inspects schema values and serialization hooks before producing JSON Schema.
   if (typeof options === 'string') {
     name = options;
   } else if (options?.nameStrategy !== 'title') {

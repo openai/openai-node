@@ -16,11 +16,13 @@ import { z as zv4Mini } from 'zod/v4-mini';
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema traversal inspects arbitrary JSON keyword values before following references or counting enums.
 function collectRefs(value: unknown, refs: string[] = []): string[] {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect emitted JSON Schema containers and references to verify the converter output.
   if (!value || typeof value !== 'object') {
     return refs;
   }
 
   const maybeRef = (value as { $ref?: unknown }).$ref;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect emitted JSON Schema containers and references to verify the converter output.
   if (typeof maybeRef === 'string') {
     refs.push(maybeRef);
   }
@@ -34,6 +36,7 @@ function collectRefs(value: unknown, refs: string[] = []): string[] {
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema traversal inspects arbitrary JSON keyword values before following references or counting enums.
 function countEnumValues(value: unknown): number {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect emitted JSON Schema containers and references to verify the converter output.
   if (!value || typeof value !== 'object') {
     return 0;
   }
@@ -66,6 +69,7 @@ function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unk
   let value: unknown = root;
   for (const token of tokens) {
     expect(value).not.toBeNull();
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect emitted JSON Schema containers and references to verify the converter output.
     expect(typeof value).toBe('object');
     expect(hasOwn(value as object, token)).toBe(true);
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
@@ -78,12 +82,14 @@ function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unk
 function expectDefinitionRefsToResolve(schema: Record<string, unknown>) {
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema traversal inspects arbitrary JSON keyword values before following references or counting enums.
   const visit = (value: unknown, resolving: Set<string>) => {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect emitted JSON Schema containers and references to verify the converter output.
     if (!value || typeof value !== 'object') {
       return;
     }
 
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     const ref = (value as Record<string, unknown>)['$ref'];
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect emitted JSON Schema containers and references to verify the converter output.
     if (typeof ref === 'string') {
       const definition = resolveJsonPointer(schema, ref);
       expect(definition).toBeDefined();

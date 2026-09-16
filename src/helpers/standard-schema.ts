@@ -1,3 +1,4 @@
+import { isObj } from '../internal/utils/values';
 import { OpenAIError } from '../error';
 import type { AutoParseableResponseFormat, AutoParseableTextFormat, AutoParseableTool } from '../lib/parser';
 import {
@@ -191,6 +192,7 @@ function formatStandardSchemaIssues(issues: readonly StandardSchemaIssue[]): str
     .map((issue) => {
       const path = issue.path
         ?.map((segment) =>
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Standard Schema issue paths accept raw property keys or key-bearing objects; preserve both forms.
           typeof segment === 'object' && segment !== null && 'key' in segment ? segment.key : segment,
         )
         .map(String)
@@ -206,7 +208,7 @@ type JSONPrimitive = string | number | boolean | null;
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
 function getSchemaTypes(schema: unknown): Set<string> | undefined {
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+  if (!isObj(schema)) {
     return undefined;
   }
 
@@ -218,6 +220,7 @@ function getSchemaTypes(schema: unknown): Set<string> | undefined {
   const types = Array.isArray(type) ? type : [type];
   if (
     types.length === 0 ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate externally produced JSON Schema keywords before using them to prove schema compatibility.
     !types.every((value) => typeof value === 'string' && JSON_SCHEMA_TYPES.has(value))
   ) {
     return undefined;
@@ -237,7 +240,7 @@ function isJSONPrimitive(value: unknown): value is JSONPrimitive {
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
 function getLiteralValues(schema: unknown): JSONPrimitive[] | undefined {
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+  if (!isObj(schema)) {
     return undefined;
   }
 
@@ -267,6 +270,7 @@ function getLiteralSchemaTypes(schema: unknown): Set<string> | undefined {
       if (value === null) {
         return 'null';
       }
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Emit the JSON Schema primitive type name for the already validated literal value.
       return typeof value;
     }),
   );
@@ -310,12 +314,8 @@ function haveDisjointObjectDiscriminator(left: unknown, right: unknown, root: JS
   const leftRequired = leftRecord['required'];
   const rightRequired = rightRecord['required'];
   if (
-    !leftProperties ||
-    typeof leftProperties !== 'object' ||
-    Array.isArray(leftProperties) ||
-    !rightProperties ||
-    typeof rightProperties !== 'object' ||
-    Array.isArray(rightProperties) ||
+    !isObj(leftProperties) ||
+    !isObj(rightProperties) ||
     !Array.isArray(leftRequired) ||
     !Array.isArray(rightRequired)
   ) {
@@ -324,6 +324,7 @@ function haveDisjointObjectDiscriminator(left: unknown, right: unknown, root: JS
 
   for (const property of leftRequired) {
     if (
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate externally produced JSON Schema keywords before using them to prove schema compatibility.
       typeof property === 'string' &&
       rightRequired.includes(property) &&
       haveDisjointLiteralValues(
@@ -354,10 +355,9 @@ function getClosedObjectPropertySet(
   const required = record['required'];
   if (
     record['additionalProperties'] !== false ||
-    !properties ||
-    typeof properties !== 'object' ||
-    Array.isArray(properties) ||
+    !isObj(properties) ||
     !Array.isArray(required) ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate externally produced JSON Schema keywords before using them to prove schema compatibility.
     required.some((property) => typeof property !== 'string')
   ) {
     return undefined;
@@ -421,7 +421,7 @@ function resolveLocalRefForExclusivity(
   seenRefs = new Set<string>(),
   // oxlint-disable-next-line anti-slop/no-unknown-returns -- Resolving untrusted schema references may produce any value; callers perform the schema checks.
 ): unknown | undefined {
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+  if (!isObj(schema)) {
     return schema;
   }
 
@@ -432,6 +432,7 @@ function resolveLocalRefForExclusivity(
     // Annotation keywords do not affect Draft 7 validation, so they are safe
     // to retain while proving the referenced branches are mutually exclusive.
     // Keep the proof conservative for every other sibling constraint.
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate externally produced JSON Schema keywords before using them to prove schema compatibility.
     if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(record as JSONSchema)) {
       return undefined;
     }
@@ -489,7 +490,7 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
 
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
   const visitSchema = (value: unknown): void => {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    if (!isObj(value)) {
       return;
     }
     // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The traversal preserves arbitrary schema fields and validates only the keywords it normalizes.

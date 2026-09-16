@@ -886,6 +886,7 @@ describe('OpenAI X.509 workload-identity client integration', () => {
       provider: { tokenType: 'jwt', getToken: subjectToken },
     };
     const fetch = vi.fn(async (input: string | URL | Request) => {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The fetch fixture accepts string and URL inputs and must inspect the actual requested URL.
       const url = typeof input === 'string' ? input : input.toString();
       return url === 'https://auth.openai.com/oauth/token'
         ? Response.json({ access_token: 'synthetic-legacy-bearer' })

@@ -55,6 +55,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     super();
     client ??= new OpenAI();
     const apiKey = props.__apiKey === undefined ? client.apiKey : props.__apiKey;
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The public Node WebSocket boundary accepts refreshable credentials and untrusted JSON frames.
     const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
     if (hasProvider && !props.__resolvedApiKey) {
       throw new Error(
@@ -88,10 +89,12 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
           const parsedEvent = parseRealtimeEvent(wsEvent.toString());
 
           if (
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The public Node WebSocket boundary accepts refreshable credentials and untrusted JSON frames.
             typeof parsedEvent !== 'object' ||
             parsedEvent === null ||
             Array.isArray(parsedEvent) ||
             !Object.getOwnPropertyDescriptor(parsedEvent, 'type') ||
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The public Node WebSocket boundary accepts refreshable credentials and untrusted JSON frames.
             typeof parsedEvent.type !== 'string'
           ) {
             throw new TypeError('Realtime WebSocket event must be an object with a string type.');

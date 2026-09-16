@@ -223,6 +223,7 @@ describe('embedding request compatibility', () => {
         if (customization === 'replacement') {
           options.body = floatBody;
         } else if (customization === 'mutation') {
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The request hook validates its runtime body before exercising in-place serialization changes.
           if (typeof options.body !== 'object' || options.body === null) {
             throw new Error('Expected an object request body');
           }

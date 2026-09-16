@@ -7,8 +7,10 @@ const main = () => {
   if (!version) {
     throw new Error('The version property is not set in the package.json file');
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate the actual package.json version value before comparing release metadata.
   if (typeof version !== 'string') {
     throw new TypeError(
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate the actual package.json version value before comparing release metadata.
       `Unexpected type for the package.json version field; got ${typeof version}, expected string`,
     );
   }

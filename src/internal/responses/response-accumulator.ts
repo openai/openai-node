@@ -199,6 +199,7 @@ function hasRoutedOutputCallIdentity(
 }
 
 function getOutputItemIdentityKeys(output: Response['output'][number], eventType: string): string[] {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
   if (!hasOwn(output, 'type') || typeof output.type !== 'string') {
     throw new OpenAIError(`expected an own output item type for ${eventType}`);
   }
@@ -207,6 +208,7 @@ function getOutputItemIdentityKeys(output: Response['output'][number], eventType
   const identities: string[] = [];
 
   if (hasOwn(output, 'id')) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
     if (typeof output.id !== 'string' || output.id.length === 0) {
       throw new OpenAIError(`expected a non-empty output item id for ${eventType}`);
     }
@@ -216,6 +218,7 @@ function getOutputItemIdentityKeys(output: Response['output'][number], eventType
   }
 
   if (hasRoutedOutputCallIdentity(output)) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
     if (!hasOwn(output, 'call_id') || typeof output.call_id !== 'string' || output.call_id.length === 0) {
       throw new OpenAIError(`expected a non-empty output item call_id for ${eventType}`);
     }
@@ -403,6 +406,7 @@ function validateOutputItemIdentity(
   }
 
   const itemEvent = event as ResponseItemScopedEvent;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
   if (!hasOwn(event, 'item_id') || typeof itemEvent.item_id !== 'string' || itemEvent.item_id.length === 0) {
     throw new OpenAIError(`expected a non-empty item_id for ${event.type}`);
   }
@@ -562,6 +566,7 @@ function sanitizeResponseEvent(
 
   const type: unknown = descriptor?.value;
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
     typeof type !== 'string' ||
     !supportedResponseEventTypes.has(type as ResponseAccumulatorEvent['type'])
   ) {

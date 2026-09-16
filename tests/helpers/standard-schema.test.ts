@@ -39,9 +39,11 @@ const strictWeatherJSONSchema: JSONSchema = {
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Standard Schema validation begins with unknown model output and narrows it through the validator.
 function validateWeather(value: unknown) {
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The Standard Schema fixture must reject inputs that do not satisfy its city contract.
     typeof value === 'object' &&
     value !== null &&
     'city' in value &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The Standard Schema fixture must reject inputs that do not satisfy its city contract.
     typeof value.city === 'string' &&
     'unit' in value &&
     (value.unit === 'c' || value.unit === 'f')

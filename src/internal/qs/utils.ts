@@ -48,6 +48,7 @@ function isIntrinsicFunctionPrototype(
   descriptor: PropertyDescriptor,
 ): boolean {
   return (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
     typeof value === 'function' && key === 'prototype' && !descriptor.enumerable && !descriptor.configurable
   );
 }
@@ -108,6 +109,7 @@ function sanitizeAdoptions(state: MergeState): void {
     const array = isArray(value);
     const extensible = Object.isExtensible(value);
     const ordinary =
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
       typeof value !== 'function' &&
       (array ? prototype === Array.prototype : prototype === Object.prototype || prototype === null);
     const record: AdoptedRecord = {
@@ -264,6 +266,7 @@ function previewTarget(state: MergeState, target: object, key: PropertyKey): any
 }
 
 function prepareMergeSource(target: any, source: any, state: MergeState, assign = false): any {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
   if (!source || typeof source !== 'object' || !target || typeof target !== 'object') {
     return source;
   }
@@ -303,6 +306,7 @@ function prepareMergeSource(target: any, source: any, state: MergeState, assign 
       if (has(target, index)) {
         const targetValue = previewTarget(state, target, index);
         prepared[index] =
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
           targetValue && typeof targetValue === 'object' && value && typeof value === 'object'
             ? prepareMergeSource(targetValue, value, state)
             : value;
@@ -315,6 +319,7 @@ function prepareMergeSource(target: any, source: any, state: MergeState, assign 
 
   const enumerableKeys: string[] = [];
   for (const key of sourceKeys) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
     if (typeof key === 'string' && Object.getOwnPropertyDescriptor(source, key)?.enumerable) {
       enumerableKeys.push(key);
     }
@@ -325,6 +330,7 @@ function prepareMergeSource(target: any, source: any, state: MergeState, assign 
     }
     const value = source[key];
     prepared[key] =
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
       !assign && has(target, key) && value && typeof value === 'object'
         ? prepareMergeSource(previewTarget(state, target, key), value, state)
         : value;
@@ -393,11 +399,14 @@ function mergeWithState(
     return target;
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
   if (typeof source !== 'object') {
     if (isArray(target)) {
       target.push(source);
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
     } else if (target && typeof target === 'object') {
       const propertyKey =
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
         typeof source === 'string' || typeof source === 'symbol'
           ? source
           : Reflect.ownKeys({ [source]: true })[0]!;
@@ -415,6 +424,7 @@ function mergeWithState(
     return target;
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
   if (!target || typeof target !== 'object') {
     // oxlint-disable-next-line unicorn/prefer-spread -- concat intentionally preserves one-level flattening and sparse-array behavior.
     return [target].concat(source);
@@ -433,6 +443,7 @@ function mergeWithState(
         const item = source[i];
         if (has(target, i)) {
           const targetItem = readPreparedTarget(state, target, i);
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
           if (targetItem && typeof targetItem === 'object' && item && typeof item === 'object') {
             const merged = mergeWithState(targetItem, item, options, state);
             target[i] = merged;
@@ -525,8 +536,10 @@ export const encode: (
   }
 
   let string = str;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
   if (typeof str === 'symbol') {
     string = Symbol.prototype.toString.call(str);
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
   } else if (typeof str !== 'string') {
     string = String(str);
   }
@@ -611,6 +624,7 @@ export function compact(value: any) {
     const keys = Object.keys(obj);
     for (const key of keys) {
       const val = obj[key];
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
       if (typeof val === 'object' && val !== null && !refs.includes(val)) {
         queue.push({ obj, prop: key });
         refs.push(val);
@@ -628,6 +642,7 @@ export function is_regexp(obj: any) {
 }
 
 export function is_buffer(obj: any) {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Query utilities inspect runtime property and value kinds to preserve encoding and safe merge behavior.
   if (!obj || typeof obj !== 'object') {
     return false;
   }

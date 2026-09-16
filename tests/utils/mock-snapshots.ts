@@ -39,6 +39,7 @@ export async function makeSnapshotRequest<T>(
   if (!data) {
     throw new Error(`could not resolve snapshot with name ${qualifiedSnapshotName}`);
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Snapshot files are external fixture data; reject non-string payloads before replaying an SSE response.
   if (typeof data !== 'string') {
     console.error(data);
     throw new Error('Expected snapshot data to be a string');
@@ -102,6 +103,7 @@ export async function makeStreamSnapshotRequest<T extends AsyncIterable<any>>(
   if (!data) {
     throw new Error(`could not resolve snapshot with name ${qualifiedSnapshotName}`);
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Snapshot files are external fixture data; reject non-string payloads before replaying an SSE response.
   if (typeof data !== 'string') {
     console.error(data);
     throw new Error('Expected snapshot data to be a string');

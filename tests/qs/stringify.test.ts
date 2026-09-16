@@ -39,6 +39,7 @@ describe('stringify()', () => {
     // @ts-expect-error
     const encodeWithN = function encodeWithN(value, defaultEncoder, charset) {
       const result = defaultEncoder(value, defaultEncoder, charset);
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The query compatibility regression distinguishes primitive and binary fixture values at runtime.
       return typeof value === 'bigint' ? result + 'n' : result;
     };
 
@@ -1549,6 +1550,7 @@ describe('stringify()', () => {
       {
         encoder(str) {
           // st.match(typeof str, /^(?:string|number|boolean)$/);
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The query compatibility regression distinguishes primitive and binary fixture values at runtime.
           assert.match(typeof str, /^(?:string|number|boolean)$/);
           return '';
         },
@@ -1608,6 +1610,7 @@ describe('stringify()', () => {
         { a: Buffer.from([1]) },
         {
           encoder(buffer) {
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The query compatibility regression distinguishes primitive and binary fixture values at runtime.
             if (typeof buffer === 'string') {
               return buffer;
             }

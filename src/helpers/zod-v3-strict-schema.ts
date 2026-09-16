@@ -96,12 +96,15 @@ function literalDomain(value: unknown): JSONDomain | undefined {
   if (value === null) {
     return { type: 'null', values: new Set([null]) };
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
   if (typeof value === 'string') {
     return { type: 'string', values: new Set([value]) };
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
   if (typeof value === 'boolean') {
     return { type: 'boolean', values: new Set([value]) };
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
   if (typeof value === 'number' && Number.isFinite(value)) {
     return { type: 'number', values: new Set([value]) };
   }
@@ -119,6 +122,7 @@ function nativeEnumDomains(def: SchemaDefinition): JSONDomain[] {
     .filter((key) => {
       const value = object[key];
       return (
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
         (typeof value === 'string' || typeof value === 'number') && typeof object[String(value)] !== 'number'
       );
     })
@@ -130,6 +134,7 @@ function nativeEnumDomains(def: SchemaDefinition): JSONDomain[] {
   return (['string', 'number'] as const)
     .map((type) => ({
       type,
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
       values: new Set(values.filter((value) => typeof value === type)),
     }))
     .filter((domain) => domain.values.size > 0);
@@ -295,7 +300,9 @@ function hasFiniteNumberOutput(def: SchemaDefinition): boolean {
     return true;
   }
   return (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
     checks.some(({ kind, value }) => kind === 'min' && typeof value === 'number' && Number.isFinite(value)) &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
     checks.some(({ kind, value }) => kind === 'max' && typeof value === 'number' && Number.isFinite(value))
   );
 }
@@ -447,6 +454,7 @@ function assertNoJSONSerializationHook(value: object, path: string): void {
     if (!descriptor) {
       continue;
     }
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
     if (!('value' in descriptor) || typeof descriptor.value === 'function') {
       throw new Error(
         `Strict Structured Outputs schema field \`${path}\` contains an unsupported \`toJSON\` serialization hook`,
@@ -470,15 +478,19 @@ export function assertJSONSerializableSchema(
   path = '$',
   ancestors = new Set<object>(),
 ): void {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
   if (value === null || typeof value === 'string' || typeof value === 'boolean') {
     return;
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
   if (typeof value === 'number' && Number.isFinite(value)) {
     assertJSONSerializableNumber(value, path);
     return;
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
   if (typeof value !== 'object') {
     throw new TypeError(
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
       `Strict Structured Outputs schema field \`${path}\` contains a non-JSON ${typeof value} value`,
     );
   }

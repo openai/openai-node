@@ -182,8 +182,10 @@ function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChu
             delete arr.index;
           }
         }
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Accumulate streamed deltas using type-matched string, numeric, and object behavior.
       } else if (typeof acc[key] === 'string' && typeof value === 'string') {
         acc[key] += value;
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Accumulate streamed deltas using type-matched string, numeric, and object behavior.
       } else if (typeof acc[key] === 'number' && typeof value === 'number') {
         acc[key] = value;
       } else if (Array.isArray(acc[key]) && Array.isArray(value)) {
@@ -196,6 +198,7 @@ function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChu
           }
           accArray[index] = reduce(accArray[index], chunkTool);
         }
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Accumulate streamed deltas using type-matched string, numeric, and object behavior.
       } else if (typeof acc[key] === 'object' && typeof value === 'object') {
         acc[key] = reduce(acc[key], value);
       }

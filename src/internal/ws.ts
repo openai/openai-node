@@ -123,12 +123,14 @@ export function snapshotWebSocketCredentials(options: {
     const values = Array.isArray(snapshot) ? snapshot : [snapshot];
     credentials.set(
       name.toLowerCase(),
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- WebSocket transport data and credential headers require runtime validation before parsing or forwarding.
       values.some((item) => typeof item === 'string' && item.trim().length > 0),
     );
   }
   // Node applies header names case-insensitively, and Authorization overrides Basic auth.
   return (
     [...credentials.values()].some(Boolean) ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- WebSocket transport data and credential headers require runtime validation before parsing or forwarding.
     (!credentials.has('authorization') && typeof options.auth === 'string' && options.auth.trim().length > 0)
   );
 }
@@ -186,6 +188,7 @@ export function flattenRawData(data: RawWebSocketData): Exclude<RawWebSocketData
 }
 
 function snapshotRawData(data: RawWebSocketData): Exclude<RawWebSocketData, ArrayBufferView[]> {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- WebSocket transport data and credential headers require runtime validation before parsing or forwarding.
   if (typeof data === 'string') {
     return data;
   }
@@ -202,6 +205,7 @@ function snapshotRawData(data: RawWebSocketData): Exclude<RawWebSocketData, Arra
 }
 
 function rawByteLength(data: RawWebSocketData): number {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- WebSocket transport data and credential headers require runtime validation before parsing or forwarding.
   if (typeof data === 'string') {
     return encodeUTF8(data).byteLength;
   }

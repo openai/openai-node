@@ -189,6 +189,7 @@ function throwingStructuralSignal(controller: AbortController) {
 
       const guarded = (event: Event) => {
         try {
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The signal fixture preserves both listener-function and handleEvent-object callback forms.
           if (typeof listener === 'function') {
             listener.call(controller.signal, event);
           } else {
@@ -500,6 +501,7 @@ describe('caller-signal reentrancy and polling compatibility', () => {
         removeEventListener.mockClear();
         failNextRemovals(2);
         controller.abort(reason);
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The signal fixture preserves both listener-function and handleEvent-object callback forms.
         if (typeof listener === 'function') {
           listener.call(signal, new Event('abort'));
           listener.call(signal, new Event('abort'));
@@ -573,6 +575,7 @@ describe('caller-signal reentrancy and polling compatibility', () => {
         options?: AbortListenerOptions,
       ) => {
         controller.abort(reason);
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The signal fixture preserves both listener-function and handleEvent-object callback forms.
         if (deliver && typeof listener === 'function') {
           listener.call(controller.signal, new Event('abort'));
         }

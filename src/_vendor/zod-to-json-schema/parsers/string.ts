@@ -101,6 +101,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
           setResponseValueAndErrors(
             res,
             'minLength',
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter distinguishes numeric schema bounds and callable pattern factories at runtime.
             typeof res.minLength === 'number' ? Math.max(res.minLength, check.value) : check.value,
             check.message,
             refs,
@@ -111,6 +112,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
           setResponseValueAndErrors(
             res,
             'maxLength',
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter distinguishes numeric schema bounds and callable pattern factories at runtime.
             typeof res.maxLength === 'number' ? Math.min(res.maxLength, check.value) : check.value,
             check.message,
             refs,
@@ -185,6 +187,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
           setResponseValueAndErrors(
             res,
             'minLength',
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter distinguishes numeric schema bounds and callable pattern factories at runtime.
             typeof res.minLength === 'number' ? Math.max(res.minLength, check.value) : check.value,
             check.message,
             refs,
@@ -192,6 +195,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
           setResponseValueAndErrors(
             res,
             'maxLength',
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter distinguishes numeric schema bounds and callable pattern factories at runtime.
             typeof res.maxLength === 'number' ? Math.min(res.maxLength, check.value) : check.value,
             check.message,
             refs,
@@ -336,6 +340,7 @@ const addPattern = (
 
 // Mutate z.string.regex() in a best attempt to accommodate for regex flags when applyRegexFlags is true
 const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): string => {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter distinguishes numeric schema bounds and callable pattern factories at runtime.
   const regex = typeof regexOrFunction === 'function' ? regexOrFunction() : regexOrFunction;
   if (!refs.applyRegexFlags || !regex.flags) {
     return regex.source;

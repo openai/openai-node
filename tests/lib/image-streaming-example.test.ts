@@ -107,6 +107,7 @@ describe('image-streaming executable example', () => {
         server.listen(0, '127.0.0.1');
         await once(server, 'listening');
         const address = server.address();
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
         if (!address || typeof address === 'string') {
           throw new Error('Expected a loopback HTTP address');
         }
@@ -116,6 +117,7 @@ describe('image-streaming executable example', () => {
         expect(JSON.parse(requestBody).partial_images).toBe(3);
         expect(await readFile(victim)).toEqual(sentinel);
         expect(await readdir(path.join(work, 'partial_images'))).toEqual([]);
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The adversarial image-event fixture distinguishes valid numeric indexes from malformed inputs.
         if (valid && typeof index === 'number') {
           const filename = `partial_${index + 1}.png`;
           expect(result.code).toBe(0);
@@ -214,6 +216,7 @@ describe('image-streaming executable example', () => {
         server.listen(0, '127.0.0.1');
         await once(server, 'listening');
         const address = server.address();
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
         if (!address || typeof address === 'string') {
           throw new Error('Expected a loopback HTTP address');
         }

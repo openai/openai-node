@@ -162,6 +162,7 @@ const parseArgs = (argv: string[]): CLIArgs => {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Tool arguments come from model output and must be validated before use as string identifiers.
     if (typeof arg !== 'string') {
       throw new TypeError('Unexpected missing CLI argument');
     }
@@ -220,6 +221,7 @@ const parseSKUArguments = (rawArguments: string): SKUArguments => {
   }
 
   const skuValue = parsed['sku'];
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Tool arguments come from model output and must be validated before use as string identifiers.
   if (typeof skuValue !== 'string') {
     throw new TypeError(`Tool arguments must include a string \`sku\`: ${rawArguments}`);
   }

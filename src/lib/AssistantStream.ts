@@ -518,6 +518,7 @@ export class AssistantStream
     const descriptor = Object.getOwnPropertyDescriptor(event.data, 'id');
     const runStepID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject malformed wire identifiers before indexing assistant-stream snapshots.
     if (typeof runStepID !== 'string' || runStepID.length === 0) {
       throw new OpenAIError('Received assistant run-step event with an invalid run-step ID');
     }
@@ -579,6 +580,7 @@ export class AssistantStream
   #reserveRunStepAlias(data: RunStepStreamEvent['data'], canonicalID: string): void {
     const descriptor = Object.getOwnPropertyDescriptor(data, 'id');
     const runStepID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject malformed wire identifiers before indexing assistant-stream snapshots.
     if (typeof runStepID !== 'string' || runStepID.length === 0) {
       throw new OpenAIError('Received assistant run-step event with an invalid run-step ID');
     }
@@ -595,6 +597,7 @@ export class AssistantStream
     const descriptor = Object.getOwnPropertyDescriptor(event.data, 'id');
     const messageID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject malformed wire identifiers before indexing assistant-stream snapshots.
     if (typeof messageID !== 'string' || messageID.length === 0) {
       throw new OpenAIError('Received assistant message event with an invalid message ID');
     }
@@ -638,6 +641,7 @@ export class AssistantStream
   #reserveMessageAlias(data: MessageStreamEvent['data'], canonicalID: string): void {
     const descriptor = Object.getOwnPropertyDescriptor(data, 'id');
     const messageID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject malformed wire identifiers before indexing assistant-stream snapshots.
     if (typeof messageID !== 'string' || messageID.length === 0) {
       throw new OpenAIError('Received assistant message event with an invalid message ID');
     }

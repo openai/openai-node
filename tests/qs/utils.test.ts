@@ -50,6 +50,7 @@ describe('merge()', () => {
   // t.deepEqual(noOptionsNonObjectSource, { foo: 'baz', bar: true });
   expect(noOptionsNonObjectSource).toEqual({ foo: 'baz', bar: true });
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Assert the runtime merge contract or probe the descriptor API required by the compatibility fixture.
   (typeof Object.defineProperty === 'function' ? test : test.skip)(
     'avoids invoking array setters unnecessarily',
     () => {
@@ -325,6 +326,7 @@ describe('prototype-pollution safety', () => {
 
     const result = merge({}, { nested: root });
     expect(result.nested === root).toBe(false);
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Assert the runtime merge contract or probe the descriptor API required by the compatibility fixture.
     expect(typeof result.nested.next).toBe('object');
   });
 

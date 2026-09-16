@@ -122,6 +122,7 @@ function measureWork(kind: 'text' | 'output') {
     });
   vi.spyOn(globalThis, 'structuredClone').mockImplementation((value, options) => {
     const cloned = clone(value, options);
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The proxy fixture distinguishes string index keys from symbols while auditing snapshot access.
     if (typeof cloned !== 'object' || cloned === null) {
       return cloned;
     }
@@ -132,6 +133,7 @@ function measureWork(kind: 'text' | 'output') {
       const snapshot = cloned as Response;
       snapshot.output = instrument(
         snapshot.output,
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The proxy fixture distinguishes string index keys from symbols while auditing snapshot access.
         (property) => typeof property === 'string' && /^[1-9][0-9]*$/u.test(property),
       );
     }

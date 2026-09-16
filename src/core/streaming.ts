@@ -399,6 +399,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
 }
 
 function createAbortableSSESource(body: NonNullable<Response['body']>, signal: AbortSignal) {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Streaming accepts host streams and text or binary chunks; the runtime representation selects the supported decoder.
   const reader = typeof body.getReader === 'function' ? body.getReader() : undefined;
   const source = reader
     ? {
@@ -619,6 +620,7 @@ async function* iterSSEChunks(iterator: AsyncIterableIterator<Bytes>): AsyncGene
     let binaryChunk: Uint8Array;
     if (chunk instanceof ArrayBuffer) {
       binaryChunk = new Uint8Array(chunk);
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Streaming accepts host streams and text or binary chunks; the runtime representation selects the supported decoder.
     } else if (typeof chunk === 'string') {
       binaryChunk = encodeUTF8(chunk);
     } else {

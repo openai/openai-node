@@ -27,6 +27,7 @@ describe.each(['OpenAI', 'Azure AD', 'legacy Bedrock'] as const)('%s HTTP creden
         ...options,
         baseURL: 'https://azure.example/openai',
         apiVersion: '2024-10-01-preview',
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Exercise static keys and callable credential providers through their respective public options.
         ...(typeof apiKey === 'function' ? { azureADTokenProvider: apiKey } : { apiKey }),
       });
     }
@@ -34,6 +35,7 @@ describe.each(['OpenAI', 'Azure AD', 'legacy Bedrock'] as const)('%s HTTP creden
       return new BedrockOpenAI({
         ...options,
         baseURL: 'https://bedrock.example/openai/v1',
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Exercise static keys and callable credential providers through their respective public options.
         ...(typeof apiKey === 'function' ? { bedrockTokenProvider: apiKey } : { apiKey }),
       });
     }

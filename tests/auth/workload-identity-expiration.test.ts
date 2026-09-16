@@ -25,6 +25,7 @@ function tokenExchangeResponse(expiresIn: unknown, accessToken: string): Respons
     Object.assign(body, { expires_in: expiresIn });
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Construct non-finite numeric issuer responses that JSON serialization would otherwise turn into null.
   if (typeof expiresIn === 'number' && !Number.isFinite(expiresIn)) {
     const response = Response.json({ access_token: accessToken });
     vi.spyOn(response, 'json').mockResolvedValue(body);

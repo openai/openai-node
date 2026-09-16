@@ -129,6 +129,7 @@ describe('environment and request utilities', () => {
 
       controller.abort();
       expect(() => {
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The signal fixture preserves both listener-function and handleEvent-object callback forms.
         if (typeof listener === 'function') {
           listener.call(signal, new Event('abort'));
         } else {

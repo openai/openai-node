@@ -51,9 +51,11 @@ function exchangeDeadline(timeout: number | undefined, callerSignal: AbortSignal
       : setTimeout(() => deadline.abort(new APIConnectionTimeoutError()), timeout);
   const timerHandle: unknown = timer;
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
     typeof timerHandle === 'object' &&
     timerHandle !== null &&
     'unref' in timerHandle &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
     typeof timerHandle.unref === 'function'
   ) {
     timerHandle.unref();
@@ -159,6 +161,7 @@ export function isX509WorkloadIdentity(
 /** Rejects unsupported WebSocket authentication before any connection or credential side effect. */
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Custom request hooks can replace bodies and clients; this boundary validates or tracks their actual runtime values.
 export function assertX509WebSocketSupported(client: unknown): void {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
   if (!client || typeof client !== 'object') {
     return;
   }
@@ -443,9 +446,11 @@ export class X509WorkloadIdentityAuth {
   static isStreamingRequestBody(body: unknown): boolean {
     return (
       (globalThis.ReadableStream !== undefined && body instanceof globalThis.ReadableStream) ||
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
       (typeof body === 'object' &&
         body !== null &&
         (Symbol.asyncIterator in body ||
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
           (Symbol.iterator in body && 'next' in body && typeof body.next === 'function')))
     );
   }
@@ -626,6 +631,7 @@ export class X509WorkloadIdentityAuth {
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   static isRetryableFailure(error: unknown): boolean {
     return (
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
       typeof error === 'object' &&
       error !== null &&
       (isTransientX509ConnectionError(error) || isRetryableX509IssuerError(error))
@@ -635,6 +641,7 @@ export class X509WorkloadIdentityAuth {
   /** Reads safe retry hints only from a privately branded, sanitized issuer response. */
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   static retryHeaders(error: unknown): Headers | undefined {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
     if (!error || typeof error !== 'object' || !isRetryableX509IssuerError(error)) {
       return undefined;
     }
@@ -714,6 +721,7 @@ export class X509WorkloadIdentityAuth {
     if (fallback !== undefined) {
       return fallback;
     }
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
     if (error && typeof error === 'object' && !(error instanceof OAuthError)) {
       const oauth:
         | { status: 400 | 401 | 403; error: { error: string } | undefined; headers: Headers }
@@ -961,6 +969,7 @@ export class X509WorkloadIdentityAuth {
   fetch(): Fetch {
     return async (input, init = {}) => {
       const target = assertX509APIOrigin(
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
         typeof input === 'string' || input instanceof URL ? input : input.url,
       );
       assertX509FetchOptions(init);

@@ -39,10 +39,13 @@ function isRunningInBrowserOrBrowserWorker(): boolean {
 
   const scope = globalThis as RuntimeScope;
   return (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Probe browser-worker and server-runtime capabilities before choosing WebSocket credential transport.
     typeof scope.WorkerGlobalScope === 'function' &&
     scope instanceof scope.WorkerGlobalScope &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Probe browser-worker and server-runtime capabilities before choosing WebSocket credential transport.
     typeof scope.WorkerNavigator === 'function' &&
     scope.navigator instanceof scope.WorkerNavigator &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Probe browser-worker and server-runtime capabilities before choosing WebSocket credential transport.
     typeof scope.navigator?.userAgent === 'string' &&
     scope.navigator.userAgent !== 'Cloudflare-Workers' &&
     scope.process?.versions?.node === undefined &&
@@ -70,12 +73,14 @@ function supportsWebSocketRequestHeaders(): boolean {
     return major !== undefined && minor !== undefined && (major > 2 || (major === 2 && minor >= 5));
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Probe browser-worker and server-runtime capabilities before choosing WebSocket credential transport.
   if (typeof scope.Bun?.version === 'string') {
     return true;
   }
 
   return (
     Object.prototype.toString.call(scope.process) === '[object process]' &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Probe browser-worker and server-runtime capabilities before choosing WebSocket credential transport.
     typeof scope.process?.versions?.node === 'string'
   );
 }
@@ -189,6 +194,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
   ) {
     super();
     let apiKey = getRealtimeAPIKey(client, props.__apiKey);
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The beta native WebSocket boundary must validate runtime capabilities, credentials, and incoming JSON frames.
     const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
     const dangerouslyAllowBrowser =
       props.dangerouslyAllowBrowser ??
@@ -236,10 +242,12 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
           const parsedEvent = parseRealtimeEvent(websocketEvent.data.toString());
 
           if (
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The beta native WebSocket boundary must validate runtime capabilities, credentials, and incoming JSON frames.
             typeof parsedEvent !== 'object' ||
             parsedEvent === null ||
             Array.isArray(parsedEvent) ||
             !Object.getOwnPropertyDescriptor(parsedEvent, 'type') ||
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The beta native WebSocket boundary must validate runtime capabilities, credentials, and incoming JSON frames.
             typeof parsedEvent.type !== 'string'
           ) {
             throw new TypeError('Realtime WebSocket event must be an object with a string type.');
@@ -268,6 +276,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       // Native ErrorEvents can carry an empty message while `error` still holds the failure.
       const cause = event.error ?? null;
       const message = [event.message, cause?.message].find(
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The beta native WebSocket boundary must validate runtime capabilities, credentials, and incoming JSON frames.
         (value) => typeof value === 'string' && value !== '',
       );
       this._onError(null, message ?? 'unknown error', cause);

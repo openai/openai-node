@@ -96,10 +96,15 @@ app.use(express.text());
 // See examples/chat-completions/stream-to-client-browser.ts for a more complete example.
 function watchClientDisconnect(req: Request, res: Response) {
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host cancellation and HTTP lifecycle methods before registering cleanup.
     typeof AbortController !== 'function' ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host cancellation and HTTP lifecycle methods before registering cleanup.
     typeof req.on !== 'function' ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host cancellation and HTTP lifecycle methods before registering cleanup.
     typeof req.off !== 'function' ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host cancellation and HTTP lifecycle methods before registering cleanup.
     typeof res.on !== 'function' ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host cancellation and HTTP lifecycle methods before registering cleanup.
     typeof res.off !== 'function'
   ) {
     return;

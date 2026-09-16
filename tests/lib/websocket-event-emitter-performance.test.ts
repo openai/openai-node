@@ -304,6 +304,7 @@ describe.each(websocketVariants)('$name event waiters', ({ event, create, dispat
       if (mode === 'success') {
         expect(
           settled.every(
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Select the actual event payload from recorded callback arguments before asserting its delivery.
             (value) => typeof value === 'object' && value !== null && 'type' in value && value.type === event,
           ),
         ).toBe(true);

@@ -179,6 +179,7 @@ function observeRequest(request: IncomingMessage): ObservedRequest {
     cookie: request.headers.cookie,
     path: request.url,
     proxyAuthorization: request.headers['proxy-authorization'],
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Capture the actual TLS server-name value without coercing absent or non-string host state.
     serverName: typeof socket.servername === 'string' ? socket.servername : undefined,
   };
 }
@@ -263,6 +264,7 @@ export async function listenLoopback(
   await listening;
 
   const address = observed.server.address();
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
   if (!address || typeof address === 'string') {
     throw new Error('Expected a loopback TCP server address');
   }

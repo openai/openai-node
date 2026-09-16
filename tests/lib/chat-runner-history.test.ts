@@ -35,6 +35,7 @@ describe.each(['runTools', 'streaming runTools', 'stream'] as const)('%s initial
 
         const requests: unknown[] = [];
         const fetch = vi.fn<Fetch>(async (_url, init) => {
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate the emitted transport body before checking serialized runner history.
           if (typeof init?.body !== 'string') {
             throw new TypeError('Expected a serialized chat completion request');
           }

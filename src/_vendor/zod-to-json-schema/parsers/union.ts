@@ -60,6 +60,7 @@ export function parseUnionDef(
 
     const types: JsonSchema7Primitive[] = [];
     for (const x of options as readonly { _def: ZodLiteralDef }[]) {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter emits JSON Schema type names from the actual kinds of literal union members.
       const type = typeof x._def.value;
       switch (type) {
         case 'string':

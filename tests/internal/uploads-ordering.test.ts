@@ -10,6 +10,7 @@ function imageResponse(name: string, contents = name): Response {
 }
 
 function formValues(form: FormData, name: string): string[] {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- FormData entries are text or files; preserve text and inspect file names when asserting upload order.
   return form.getAll(name).map((value) => (typeof value === 'string' ? value : value.name));
 }
 

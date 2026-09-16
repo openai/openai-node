@@ -56,6 +56,7 @@ function normalizedOutput(value: unknown): AgentFunctionCallOutputParam | null {
   if (value === null) {
     return null;
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Agent input and tool-output APIs accept text and structured values; choose the matching serialization path.
   if (typeof value === 'string' || (Array.isArray(value) && value.every(isInputContent))) {
     return value;
   }
@@ -64,8 +65,7 @@ function normalizedOutput(value: unknown): AgentFunctionCallOutputParam | null {
 
 // oxlint-disable-next-line anti-slop/no-object-parameters -- The public AgentToolOutput contract accepts arbitrary JSON-serializable object results.
 function toolResult(call: AgentFunctionCallItem, value: AgentToolOutput): ToolResult {
-  const output =
-    value !== null && typeof value === 'object' && !Array.isArray(value) ? JSON.stringify(value) : value;
+  const output = isObj(value) ? JSON.stringify(value) : value;
   // Detect unserializable callback results inside the redacted failure boundary.
   const serialized = JSON.stringify(output);
   if (serialized === undefined) {
@@ -76,6 +76,7 @@ function toolResult(call: AgentFunctionCallItem, value: AgentToolOutput): ToolRe
     turn_id: call.turn_id,
     call_id: call.call_id,
     success: true,
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Agent input and tool-output APIs accept text and structured values; choose the matching serialization path.
     output: normalizedOutput(typeof output === 'string' ? output : JSON.parse(serialized)),
   };
 }
@@ -123,6 +124,7 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
     options?: RequestOptions,
   ) {
     const input: AgentSessionInputMessageParam[] =
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Agent input and tool-output APIs accept text and structured values; choose the matching serialization path.
       typeof params.input === 'string'
         ? [{ role: 'user', content: [{ type: 'input_text', text: params.input }] }]
         : params.input;
@@ -234,8 +236,9 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
 
   async #result(call: AgentFunctionCallItem, handler: AgentToolHandler): Promise<ToolResult> {
     try {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Agent input and tool-output APIs accept text and structured values; choose the matching serialization path.
       const args: unknown = typeof call.arguments === 'string' ? JSON.parse(call.arguments) : call.arguments;
-      if (args === null || typeof args !== 'object' || Array.isArray(args)) {
+      if (!isObj(args)) {
         throw new OpenAIError('Function arguments must be a JSON object');
       }
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Tool argument keys and value types are application-defined; handlers receive the public unvalidated argument dictionary.
