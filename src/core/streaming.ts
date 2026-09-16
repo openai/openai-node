@@ -575,6 +575,15 @@ export async function* _iterSSEMessages(
         yield sse;
       }
     }
+    // Servers sometimes omit the trailing blank line that normally
+    // terminates the last event. Flush any in-progress event exactly once.
+    if (signal.aborted) {
+      return;
+    }
+    const pending = sseDecoder.flush();
+    if (pending) {
+      yield pending;
+    }
   } catch (error) {
     failed = true;
     if (!signal.aborted || (!isAbortError(error) && error !== signal.reason)) {
@@ -704,6 +713,15 @@ class SSEDecoder {
     }
 
     return null;
+  }
+
+  /**
+   * Emits a pending event at EOF when the stream omitted the trailing blank
+   * line. Returns `null` when no event is in progress so a record that already
+   * ended with a blank line is not delivered twice.
+   */
+  flush(): ServerSentEvent | null {
+    return this.decode('');
   }
 }
 
