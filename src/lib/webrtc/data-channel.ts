@@ -14,7 +14,8 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
   /** Attaches listeners without negotiating, opening, or taking ownership of the channel. */
   constructor(channel: WebRTCDataChannel) {
     this.channel = channel;
-    this.dataChannel = channel;
+    // SAFETY: Expose the supplied channel unchanged through the public alias, which uses native browser typings when DOM globals are present.
+    this.dataChannel = channel as BrowserDataChannel;
     channel.addEventListener('message', this.onMessage);
     channel.addEventListener('error', this.onError);
     channel.addEventListener('open', this.onOpen);
