@@ -88,6 +88,36 @@ jobs:
       - name: Check published package
         run: pnpm exec publint dist
 
+  build_windows:
+    timeout-minutes: 15
+    name: build (Windows)
+    runs-on: windows-latest
+    if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Bootstrap
+        run: ./scripts/bootstrap
+
+      - name: Check build
+        run: pnpm build
+
   node_matrix:
     name: Read Node.js test matrix
     runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
@@ -214,7 +244,7 @@ jobs:
   test_matrix:
     name: ${{ (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && 'test matrix' || 'test matrix (not run)' }}
     if: ${{ always() && (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') }}
-    needs: [test, benchmarks, ecosystem_tests]
+    needs: [test, benchmarks, ecosystem_tests, build_windows]
     runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     permissions: {}
     steps:
@@ -223,6 +253,7 @@ jobs:
           TEST_RESULT: ${{ needs.test.result }}
           BENCHMARKS_RESULT: ${{ needs.benchmarks.result }}
           ECOSYSTEM_RESULT: ${{ needs.ecosystem_tests.result }}
+          WINDOWS_BUILD_RESULT: ${{ needs.build_windows.result }}
         run: |
           if [ "$TEST_RESULT" != "success" ]; then
             echo "::error::Node.js test matrix result: $TEST_RESULT"
@@ -234,6 +265,10 @@ jobs:
           fi
           if [ "$ECOSYSTEM_RESULT" != "success" ]; then
             echo "::error::Ecosystem tests result: $ECOSYSTEM_RESULT"
+            exit 1
+          fi
+          if [ "$WINDOWS_BUILD_RESULT" != "success" ]; then
+            echo "::error::Windows build result: $WINDOWS_BUILD_RESULT"
             exit 1
           fi
 

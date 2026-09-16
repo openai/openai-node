@@ -17,6 +17,11 @@ const workflow = readFileSync(path.join(root, '.github/workflows/create-releases
   .join('\n');
 const publishJob = workflow.split('\n  publish:\n')[1] ?? '';
 const releaseCIJob = workflow.split('\n  release-ci:\n')[1]?.split(/\n {2}[\w-]+:\n/u)[0] ?? '';
+const ciWorkflow = readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf-8')
+  .split('\r\n')
+  .join('\n');
+const windowsBuildJob = ciWorkflow.split('\n  build_windows:\n')[1]?.split(/\n {2}[\w-]+:\n/u)[0] ?? '';
+const testMatrixJob = ciWorkflow.split('\n  test_matrix:\n')[1]?.split(/\n {2}[\w-]+:\n/u)[0] ?? '';
 
 function workflowRunStep(name: string, job = publishJob): string {
   const [, step] = job.split(`      - name: ${name}\n`);
@@ -35,6 +40,42 @@ function workflowRunStep(name: string, job = publishJob): string {
 function writeExecutable(filename: string, source: string) {
   writeFileSync(filename, `#!/usr/bin/env node\n${source}\n`, { mode: 0o755 });
 }
+
+describe('Windows build CI gate', () => {
+  test('requires the contributor build on Windows in the aggregate CI check', () => {
+    expect(windowsBuildJob).toContain('\n    runs-on: windows-latest\n');
+    expect(windowsBuildJob).toContain('\n    defaults:\n      run:\n        shell: bash\n');
+    expect(windowsBuildJob).toContain('      - name: Bootstrap\n        run: ./scripts/bootstrap\n');
+    expect(windowsBuildJob).toContain('      - name: Check build\n        run: pnpm build\n');
+    expect(windowsBuildJob).not.toContain('continue-on-error:');
+    expect(testMatrixJob).toMatch(/needs: \[[^\n]*\bbuild_windows\b[^\n]*\]/u);
+    expect(testMatrixJob).toContain('always()');
+    expect(testMatrixJob).toMatch(/WINDOWS_BUILD_RESULT: \$\{\{ needs\.build_windows\.result \}\}/u);
+  });
+
+  test.each(['success', 'failure', 'cancelled', 'skipped'])(
+    'handles a %s Windows build when the other required checks pass',
+    (windowsBuildResult) => {
+      const result = spawnSync(
+        'bash',
+        ['-e', '-o', 'pipefail', '-c', workflowRunStep('Tests (all)', testMatrixJob)],
+        {
+          encoding: 'utf-8',
+          env: {
+            ...process.env,
+            TEST_RESULT: 'success',
+            BENCHMARKS_RESULT: 'success',
+            ECOSYSTEM_RESULT: 'success',
+            WINDOWS_BUILD_RESULT: windowsBuildResult,
+          },
+        },
+      );
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(windowsBuildResult === 'success' ? 0 : 1);
+    },
+  );
+});
 
 describe('release commit CI gate', () => {
   test('requires successful release CI before publication', () => {
