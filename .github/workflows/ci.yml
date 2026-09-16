@@ -154,10 +154,15 @@ jobs:
           node scripts/steady/cache.test.cjs
 
       - name: Run tests
+        # Reuse V8 compilation within this job only; never restore it across runs.
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
         run: ./scripts/test
 
       - name: Test packed npm package
         if: matrix.experimental == false
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
         run: |
           ./scripts/build
           node --experimental-strip-types scripts/test-packed-package.ts

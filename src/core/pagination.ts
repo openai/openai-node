@@ -152,7 +152,7 @@ export interface CursorPageParams {
   limit?: number;
 }
 
-export class CursorPage<Item extends { id: string }>
+export class CursorPage<Item extends { id?: string | null }>
   extends AbstractPage<Item>
   implements CursorPageResponse<Item>
 {
@@ -323,6 +323,68 @@ export class NextCursorPage<Item> extends AbstractPage<Item> implements NextCurs
       query: {
         ...maybeObj(this.options.query),
         after: cursor,
+      },
+    };
+  }
+}
+
+export interface TokenPageResponse<Item> {
+  data: Array<Item>;
+
+  has_more: boolean;
+
+  next: string | null;
+}
+
+export interface TokenPageParams {
+  page?: string;
+
+  limit?: number;
+}
+
+export class TokenPage<Item> extends AbstractPage<Item> implements TokenPageResponse<Item> {
+  data: Array<Item>;
+
+  has_more: boolean;
+
+  next: string | null;
+
+  constructor(
+    client: OpenAI,
+    response: Response,
+    body: TokenPageResponse<Item>,
+    options: FinalRequestOptions,
+  ) {
+    super(client, response, body, options);
+
+    this.data = body.data || [];
+    this.has_more = body.has_more || false;
+    this.next = body.next || null;
+  }
+
+  getPaginatedItems(): Item[] {
+    return this.data ?? [];
+  }
+
+  override hasNextPage(): boolean {
+    if (this.has_more === false) {
+      return false;
+    }
+
+    return this.nextPageRequestOptions() != null;
+  }
+
+  nextPageRequestOptions(): PageRequestOptions | null {
+    const cursor = this.next;
+    if (!cursor) {
+      return null;
+    }
+
+    return {
+      ...this.options,
+      query: {
+        ...maybeObj(this.options.query),
+        page: cursor,
       },
     };
   }

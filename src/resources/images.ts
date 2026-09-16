@@ -68,7 +68,7 @@ export class Images extends APIResource {
 
   /**
    * Creates an image given a prompt.
-   * [Learn more](https://platform.openai.com/docs/guides/images).
+   * [Learn more](https://developers.openai.com/api/docs/guides/images-vision).
    *
    * @example
    * ```ts
@@ -559,7 +559,7 @@ export interface ImageCreateVariationParams {
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
    * and detect abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 }
@@ -690,7 +690,7 @@ export interface ImageEditParamsBase {
 
   /**
    * Edit the image in streaming mode. Defaults to `false`. See the
-   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
    * for more information.
    */
   stream?: boolean | null;
@@ -698,7 +698,7 @@ export interface ImageEditParamsBase {
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
    * and detect abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 }
@@ -711,7 +711,7 @@ export namespace ImageEditParams {
 export interface ImageEditParamsNonStreaming extends ImageEditParamsBase {
   /**
    * Edit the image in streaming mode. Defaults to `false`. See the
-   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
    * for more information.
    */
   stream?: false | null;
@@ -720,7 +720,7 @@ export interface ImageEditParamsNonStreaming extends ImageEditParamsBase {
 export interface ImageEditParamsStreaming extends ImageEditParamsBase {
   /**
    * Edit the image in streaming mode. Defaults to `false`. See the
-   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
    * for more information.
    */
   stream: true;
@@ -844,7 +844,7 @@ export interface ImageGenerateParamsBase {
 
   /**
    * Generate the image in streaming mode. Defaults to `false`. See the
-   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
    * for more information. This parameter is only supported for the GPT image models.
    */
   stream?: boolean | null;
@@ -860,7 +860,7 @@ export interface ImageGenerateParamsBase {
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
    * and detect abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 }
@@ -873,7 +873,7 @@ export namespace ImageGenerateParams {
 export interface ImageGenerateParamsNonStreaming extends ImageGenerateParamsBase {
   /**
    * Generate the image in streaming mode. Defaults to `false`. See the
-   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
    * for more information. This parameter is only supported for the GPT image models.
    */
   stream?: false | null;
@@ -882,7 +882,7 @@ export interface ImageGenerateParamsNonStreaming extends ImageGenerateParamsBase
 export interface ImageGenerateParamsStreaming extends ImageGenerateParamsBase {
   /**
    * Generate the image in streaming mode. Defaults to `false`. See the
-   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
    * for more information. This parameter is only supported for the GPT image models.
    */
   stream: true;

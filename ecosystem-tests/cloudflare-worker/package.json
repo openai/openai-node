@@ -24,7 +24,7 @@
 	"overrides": {
 		"@speed-highlight/core": "1.2.17",
 		"miniflare": {
-			"sharp": "0.35.3",
+			"sharp": "0.35.4",
 			"undici": "7.29.0",
 			"ws": "8.21.0"
 		}

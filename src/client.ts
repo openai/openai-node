@@ -5,6 +5,7 @@ import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestIni
 import { uuid4 } from './internal/utils/uuid';
 import { validatePositiveInteger, isAbsoluteURL, safeJSON, hasOwn } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
+import { addRequestAbortListener, retainRequestAbortCallback } from './internal/utils/abort';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
 import { addRequestID, defaultParseResponse, type APIResponseProps } from './internal/parse';
@@ -41,10 +42,13 @@ import {
   type NextCursorPageParams,
   NextCursorPageResponse,
   PageResponse,
+  type TokenPageParams,
+  TokenPageResponse,
 } from './core/pagination';
 import * as Uploads from './core/uploads';
 import * as API from './resources/index';
 import { APIPromise } from './core/api-promise';
+import { resolveRealtimeAPIKey } from './internal/realtime-credentials';
 import {
   Batch,
   BatchCreateParams,
@@ -166,6 +170,7 @@ import {
 } from './resources/evals/evals';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
 import { Graders } from './resources/graders/graders';
+import { Live } from './resources/live/live';
 import { Realtime } from './resources/realtime/realtime';
 import { Responses } from './resources/responses/responses';
 import { Safety } from './resources/safety/safety';
@@ -297,8 +302,9 @@ export interface ClientOptions {
    *
    * - Accepts either a static string or an async function that resolves to a string.
    * - Defaults to process.env['OPENAI_API_KEY'].
-   * - When a function is provided, it is invoked before each request so you can rotate
-   *   or refresh credentials at runtime.
+   * - When a function is provided, it is invoked when building bearer authentication
+   *   headers for each attempt, including retries and direct `buildRequest()` calls.
+   *   Each invocation's result is used for its own request.
    * - The function must return a non-empty string; otherwise an OpenAIError is thrown.
    * - If the function throws, the error is wrapped in an OpenAIError with the original
    *   error available as `cause`.
@@ -813,10 +819,11 @@ export class OpenAI {
           : await authentication.getToken();
       return buildHeaders([{ Authorization: `Bearer ${token}` }]);
     }
-    if (this.apiKey == null) {
+    const { apiKey } = await resolveRealtimeAPIKey(this);
+    if (apiKey == null) {
       return undefined;
     }
-    return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+    return buildHeaders([{ Authorization: `Bearer ${apiKey}` }]);
   }
 
   protected async adminAPIKeyAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
@@ -849,12 +856,16 @@ export class OpenAI {
     return Errors.APIError.generate(status, normalizedError, message, headers);
   }
 
+  _hasApiKeyProvider(): boolean {
+    return typeof this._options.apiKey === 'function';
+  }
+
   /**
    * Resolves a function-based API key and retains the resolved value on this client.
    * Returns whether a provider was invoked. Internal callers can capture this
    * invocation's key before another request updates the shared `apiKey` property.
    * Overrides should forward `capture` or invoke it with their own resolved key
-   * to preserve connection-local credentials in concurrent Realtime factories.
+   * to preserve invocation-local credentials in concurrent requests and Realtime factories.
    * @internal
    */
   async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
@@ -916,15 +927,11 @@ export class OpenAI {
 
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
+   * Function-based credentials are resolved later, when building authentication
+   * headers, including for direct `buildRequest()` calls. Overriding this hook
+   * does not bypass that resolution.
    */
-  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
-    if (this._provider) return;
-
-    const security = options.__security ?? { bearerAuth: true };
-    if (security.bearerAuth) {
-      await this._callApiKey();
-    }
-  }
+  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {}
 
   /**
    * Used as a callback for mutating the given `RequestInit` object.
@@ -1105,6 +1112,8 @@ export class OpenAI {
           props.options,
           retriesRemaining,
           props.retryOfRequestLogID ?? props.requestLogID,
+          undefined,
+          props.requestSignal,
         );
         Object.assign(props, next);
       } finally {
@@ -1315,7 +1324,13 @@ export class OpenAI {
             message: x509Authentication ? 'X.509 workload identity API connection failed.' : response.message,
           }),
         );
-        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+        return this.retryRequest(
+          options,
+          retriesRemaining,
+          retryOfRequestLogID ?? requestLogID,
+          undefined,
+          req.signal,
+        );
       }
       const terminalMessage = hasStreamingBody
         ? 'error; streaming body cannot be retried'
@@ -1439,6 +1454,7 @@ export class OpenAI {
           retriesRemaining,
           retryOfRequestLogID ?? requestLogID,
           response.headers,
+          req.signal,
         );
       }
 
@@ -1494,7 +1510,15 @@ export class OpenAI {
       helperMethod: options.__metadata?.['helperMethod'],
       ...(continueRequest ? { continueRequest } : {}),
     });
-    return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
+    return {
+      response,
+      options,
+      controller,
+      requestSignal: req.signal,
+      requestLogID,
+      retryOfRequestLogID,
+      startTime,
+    };
   }
 
   getAPIList<Item, PageClass extends Pagination.AbstractPage<Item> = Pagination.AbstractPage<Item>>(
@@ -1571,7 +1595,8 @@ export class OpenAI {
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
     const composed = !!signal && composedCallerSignals.get(controller) === signal;
-    if (signal && !composed) signal.addEventListener('abort', abort, { once: true });
+    const cleanup =
+      signal && !composed ? addRequestAbortListener(signal, abort, controller.signal) : undefined;
 
     const timeout = setTimeout(abort, ms);
 
@@ -1593,9 +1618,13 @@ export class OpenAI {
 
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await (this.#x509Fetch ?? this.fetch).call(undefined, url, fetchOptions);
+      const response = await (this.#x509Fetch ?? this.fetch).call(undefined, url, fetchOptions);
+      if (cleanup) {
+        retainRequestAbortCallback(response.body ?? response, abort, controller.signal);
+      }
+      return response;
     } catch (err) {
-      if (signal && !composed) signal.removeEventListener('abort', abort);
+      cleanup?.();
       throw err;
     } finally {
       clearTimeout(timeout);
@@ -1630,6 +1659,7 @@ export class OpenAI {
     retriesRemaining: number,
     requestLogID: string,
     responseHeaders?: Headers | undefined,
+    requestSignal: AbortSignal | null | undefined = options.signal,
   ): Promise<APIResponseProps> {
     let timeoutMillis: number | undefined;
 
@@ -1677,7 +1707,17 @@ export class OpenAI {
     if (x509Authentication) {
       await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.effectiveSignal());
     } else {
-      await sleep(timeoutMillis);
+      const retrySignals =
+        requestSignal === options.signal ? [requestSignal] : [requestSignal, options.signal];
+      try {
+        await sleep(timeoutMillis, ...retrySignals);
+      } catch (error) {
+        const abortedSignal = retrySignals.find((signal) => signal?.aborted);
+        if (abortedSignal) {
+          throw this._makeUserAbortError(abortedSignal);
+        }
+        throw error;
+      }
     }
 
     return this.makeRequest(options, retriesRemaining - 1, requestLogID);
@@ -1698,6 +1738,12 @@ export class OpenAI {
     return sleepSeconds * jitter * 1000;
   }
 
+  /**
+   * Builds a request, resolving callback credentials when constructing authentication
+   * headers, after any subclass request-option rewrites. Calling this method directly
+   * also resolves credentials. Complete replacement builders own authentication and
+   * can call `this.authHeaders()` to resolve headers with request-local credentials.
+   */
   async buildRequest(
     inputOptions: FinalRequestOptions,
     { retryCount = 0 }: { retryCount?: number } = {},
@@ -1742,6 +1788,10 @@ export class OpenAI {
         options.signal = snapshot.signal;
       }
     }
+    const authenticationHeaders =
+      this._provider || x509Authentication
+        ? undefined
+        : await this.authHeaders(inputOptions, inputOptions.__security ?? { bearerAuth: true });
     const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
 
     if (isStreamingBody) {
@@ -1756,6 +1806,7 @@ export class OpenAI {
       options: inputOptions,
       method,
       bodyHeaders,
+      authenticationHeaders,
       retryCount,
       x509Headers,
       x509Timeout: explicitTimeout ? options.timeout : undefined,
@@ -1780,6 +1831,7 @@ export class OpenAI {
     options,
     method,
     bodyHeaders,
+    authenticationHeaders,
     retryCount,
     x509Headers,
     x509Timeout,
@@ -1788,6 +1840,7 @@ export class OpenAI {
     options: FinalRequestOptions;
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
+    authenticationHeaders: NullableHeaders | undefined;
     retryCount: number;
     x509Headers?: { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } | undefined;
     x509Timeout: number | undefined;
@@ -1813,9 +1866,10 @@ export class OpenAI {
         'OpenAI-Organization': x509Tenant ? x509Tenant.organization : this.organization,
         'OpenAI-Project': x509Tenant ? x509Tenant.project : this.project,
       },
-      this._provider || this.#x509Authentication?.isPlanningRequest()
-        ? undefined
-        : await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
+      // X.509 owns streaming uploads before authentication so it can retire them on failure.
+      this.#x509Authentication && !this.#x509Authentication.isPlanningRequest()
+        ? await this.authHeaders(options, options.__security ?? { bearerAuth: true })
+        : authenticationHeaders,
       x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
       bodyHeaders,
       x509Headers?.requestHeaders ?? options.headers,
@@ -1977,6 +2031,7 @@ export class OpenAI {
   uploads: API.Uploads = new API.Uploads(this);
   admin: API.Admin = new API.Admin(this);
   responses: API.Responses = new API.Responses(this);
+  live: API.Live = new API.Live(this);
   realtime: API.Realtime = new API.Realtime(this);
   /**
    * Manage conversations and conversation items.
@@ -2013,12 +2068,18 @@ OpenAI.Batches = Batches;
 OpenAI.Uploads = UploadsAPIUploads;
 OpenAI.Admin = Admin;
 OpenAI.Responses = Responses;
+OpenAI.Live = Live;
 OpenAI.Realtime = Realtime;
 OpenAI.Conversations = Conversations;
 OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
 OpenAI.Skills = Skills;
 OpenAI.Videos = Videos;
+OpenAI.ConversationCursorPage = Pagination.ConversationCursorPage;
+OpenAI.CursorPage = Pagination.CursorPage;
+OpenAI.NextCursorPage = Pagination.NextCursorPage;
+OpenAI.Page = Pagination.Page;
+OpenAI.TokenPage = Pagination.TokenPage;
 
 const composedCallerSignals = new WeakMap<AbortController, AbortSignal>();
 
@@ -2105,6 +2166,9 @@ export declare namespace OpenAI {
     type NextCursorPageParams as NextCursorPageParams,
     type NextCursorPageResponse as NextCursorPageResponse,
   };
+
+  export import TokenPage = Pagination.TokenPage;
+  export { type TokenPageParams as TokenPageParams, type TokenPageResponse as TokenPageResponse };
 
   export {
     Completions as Completions,
@@ -2279,6 +2343,8 @@ export declare namespace OpenAI {
   export { Admin as Admin };
 
   export { Responses as Responses };
+
+  export { Live as Live };
 
   export { Realtime as Realtime };
 
