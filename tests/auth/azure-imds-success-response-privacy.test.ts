@@ -944,6 +944,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
       apiFetch,
     );
 
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const failure = await client.models.list().catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(SubjectTokenProviderError);

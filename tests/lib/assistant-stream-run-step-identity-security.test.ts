@@ -325,6 +325,7 @@ describe('AssistantStream run-step identity security', () => {
       runner.on('toolCallDone', toolDone);
       runner.on('run', runDone);
 
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       const failure = await runner.done().catch((error: unknown) => error);
 
       expect(failure).toBeInstanceOf(OpenAIError);

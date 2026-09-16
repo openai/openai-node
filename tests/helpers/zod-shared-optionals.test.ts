@@ -26,12 +26,14 @@ const helpers = [
   },
 ];
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The regression inspects serialized schema values recursively before trusting references or node types.
 function expectValidSchema(value: unknown): void {
   // oxlint-disable-next-line unicorn/prefer-structured-clone -- verify the actual serialized request schema
   const schema = JSON.parse(JSON.stringify(value)) as JSONSchema;
   expect(JSON.stringify(schema)).not.toContain('"not":');
   expect(() => toStrictJsonSchema(schema)).not.toThrow();
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The regression inspects serialized schema values recursively before trusting references or node types.
   const visit = (child: unknown): void => {
     if (child === null || typeof child !== 'object') {
       return;

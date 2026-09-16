@@ -19,6 +19,7 @@ class IdempotentOpenAI extends OpenAI {
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The response fixture serializes heterogeneous valid and malformed API payloads.
 function jsonResponse(value: unknown = {}, init: ResponseInit = {}): Response {
   return Response.json(value, {
     ...init,

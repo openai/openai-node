@@ -217,6 +217,7 @@ describe('Bedrock bearer redirect security', () => {
           )
           .then(
             () => null,
+            // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
             (error: unknown) => error,
           );
 

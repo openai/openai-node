@@ -7,6 +7,7 @@ import { Stream } from 'openai/streaming';
 type StreamIndexKind = 'choice' | 'tool call';
 
 function createChunk(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Malformed index fixtures must reach the runtime validator without a trusted numeric type.
   index: unknown,
   kind: StreamIndexKind,
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Index fixtures combine arbitrary extension fields with invalid wire indices before stream validation.

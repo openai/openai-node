@@ -12,6 +12,7 @@ type UploadPromise = ReturnType<OpenAI['files']['create']>;
 
 function deferred<T>() {
   let resolveValue!: (value: T) => void;
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   let rejectValue!: (reason: unknown) => void;
   // oxlint-disable-next-line promise/avoid-new -- Tests control the order in which concurrent uploads settle.
   const promise = new Promise<T>((resolve, reject) => {

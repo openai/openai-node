@@ -107,7 +107,10 @@ function mockResponse(endpoint: 'chat' | 'responses', stream: boolean, code: str
     );
   }
 
-  const chunk = (delta: unknown, finish_reason: string | null = null) => ({
+  const chunk = (
+    delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta,
+    finish_reason: string | null = null,
+  ) => ({
     ...chat,
     object: 'chat.completion.chunk',
     choices: [{ index: 0, delta, finish_reason, logprobs: null }],
@@ -228,6 +231,7 @@ describe.each(variants)('$name tool schema binding', ({ schema }) => {
       });
       const outcome = await parsedArguments(client, tool, stream).then(
         (parsed) => ({ parsed }),
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         (error: unknown) => ({ error }),
       );
       const length = fresh ? 4 : 6;

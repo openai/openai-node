@@ -626,6 +626,7 @@ function parseArgs() {
         type: 'string',
         default: '0',
         description: 'number of times to retry failing jobs',
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- CLI option coercion validates values received from the external argument parser.
         coerce: (value: unknown) => {
           const retry = Number(value);
           const decimal = /^[+-]?(?<whole>\d*)(?:\.(?<fraction>\d*))?(?:e(?<exponent>[+-]?\d+))?$/iu.exec(
@@ -986,6 +987,7 @@ async function withRetry(
   identifier: string,
   retryAmount: number,
   retryDelayMs: number,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   shouldRetry: (err: unknown) => boolean = () => true,
 ): Promise<void> {
   let retriesLeft = retryAmount;
@@ -1011,6 +1013,7 @@ async function withRetry(
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function errorMessage(err: unknown): string {
   if (
     err &&
@@ -1023,6 +1026,7 @@ function errorMessage(err: unknown): string {
   return String(err);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function isLikelyNodeCrash(err: unknown): boolean {
   const signal = err && typeof err === 'object' ? (err as any).signal : undefined;
   if (signal === 'SIGABRT' || signal === 'SIGSEGV' || signal === 'SIGBUS' || signal === 'SIGILL') {

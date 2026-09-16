@@ -91,6 +91,7 @@ function unsupported(path: string, kind: string, explanation: string): never {
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema literals and parsed results are untrusted until their JSON domains and serialization behavior are validated.
 function literalDomain(value: unknown): JSONDomain | undefined {
   if (value === null) {
     return { type: 'null', values: new Set([null]) };
@@ -464,6 +465,7 @@ function assertJSONSerializableNumber(value: number, path: string): void {
 }
 
 export function assertJSONSerializableSchema(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema literals and parsed results are untrusted until their JSON domains and serialization behavior are validated.
   value: unknown,
   path = '$',
   ancestors = new Set<object>(),

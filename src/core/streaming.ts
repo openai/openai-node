@@ -9,6 +9,7 @@ import type { OpenAI } from '../client';
 
 type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function isTransportAbortError(error: unknown): boolean {
   return !(error instanceof APIError) && isAbortError(error);
 }

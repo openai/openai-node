@@ -57,6 +57,7 @@ class FakeBrowserSocket {
 const originalWebSocket = globalThis.WebSocket;
 const nodeSocketConstructor = vi.mocked(WS.WebSocket);
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function expectPrivateBedrockCredentialFailure(failure: unknown, credential: string): void {
   expect(failure).toBeInstanceOf(TypeError);
   expect((failure as Error).message).toBe('Bedrock bearer credential contains an invalid HTTP header value.');

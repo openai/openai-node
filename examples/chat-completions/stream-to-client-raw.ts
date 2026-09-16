@@ -128,6 +128,7 @@ function watchClientDisconnect(req: Request, res: Response) {
 }
 
 function rethrowUnlessClientAbort(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   error: unknown,
   disconnect: ReturnType<typeof watchClientDisconnect>,
 ): void {
@@ -214,7 +215,7 @@ const handleRequest = async (req: Request, res: Response) => {
 };
 
 app.post('/', (req: Request, res: Response) =>
-  // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Express 4 does not await async handlers; consume rejections in this synchronous route.
+  // oxlint-disable-next-line promise/prefer-await-to-callbacks, anti-slop/no-unknown-parameters -- Express 4 does not await async handlers; consume their arbitrary rejection values in this synchronous route.
   handleRequest(req, res).catch((error: unknown) => {
     console.error(error);
     if (res.destroyed || res.writableEnded) {

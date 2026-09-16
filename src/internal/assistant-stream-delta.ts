@@ -69,6 +69,7 @@ function commitAssistantStreamArrayProjection(projection: AssistantStreamDeltaPr
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Delta validation and retention tracking must inspect arbitrary partial wire values before treating them as records.
 function isPrimitiveAssistantStreamValue(value: unknown): boolean {
   return typeof value === 'string' || typeof value === 'number';
 }
@@ -249,10 +250,12 @@ function assertValidAssistantStreamDeltaIndices(
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Delta validation and retention tracking must inspect arbitrary partial wire values before treating them as records.
 export function isAssistantStreamValueExternallyMutable(value: unknown): boolean {
   return (isObj(value) || Array.isArray(value)) && externallyMutableAssistantStreamValues.has(value);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Delta validation and retention tracking must inspect arbitrary partial wire values before treating them as records.
 export function markAssistantStreamValueExternallyMutable(value: unknown): void {
   if ((!isObj(value) && !Array.isArray(value)) || externallyMutableAssistantStreamValues.has(value)) {
     return;
@@ -271,6 +274,7 @@ export function markAssistantStreamValueExternallyMutable(value: unknown): void 
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Delta validation and retention tracking must inspect arbitrary partial wire values before treating them as records.
 export function defineAssistantStreamArrayEntry(accumulator: unknown[], index: number, value: unknown): void {
   if (externallyMutableAssistantStreamValues.has(accumulator)) {
     markAssistantStreamValueExternallyMutable(value);
@@ -388,6 +392,7 @@ function applyAssistantStreamDelta(
   return accumulator;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Delta validation and retention tracking must inspect arbitrary partial wire values before treating them as records.
 export function assertSafeAssistantStreamDelta(value: unknown): void {
   if (!isObj(value) && !Array.isArray(value)) {
     return;

@@ -252,6 +252,7 @@ function createFixtureClient(responseBody: string): OpenAI {
   });
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The benchmark validates the parsed response rather than assuming its runtime schema.
 function assertStepCount(value: unknown): void {
   if (
     typeof value !== 'object' ||

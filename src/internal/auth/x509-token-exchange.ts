@@ -27,6 +27,7 @@ const SAFE_OAUTH_ERRORS = new Set(['invalid_grant', 'invalid_subject_token', 'to
 const SAFE_RESPONSE_HEADERS = ['retry-after', 'retry-after-ms', 'x-should-retry', 'x-request-id'];
 const MAX_TOKEN_EXCHANGE_DURATION_MS = 5000;
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function transientConnectionError(message: string, failure: unknown): APIConnectionError {
   const error = new APIConnectionError({ message });
   if (isRetryableX509TransportFailure(failure)) {
@@ -52,6 +53,7 @@ export interface X509TokenExchangeOptions {
 
 async function cancelReader(
   reader: ReadableStreamDefaultReader<Uint8Array>,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   reason?: unknown,
 ): Promise<void> {
   try {
@@ -132,6 +134,7 @@ interface UnvalidatedTokenResponse {
   expires_in?: unknown;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Token-exchange JSON fields are untrusted until response or OAuth-error validation succeeds.
 function validateTokenResponse(value: unknown): X509ExchangedToken {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new OpenAIError('X.509 workload identity token exchange returned an invalid token response.');
@@ -183,6 +186,7 @@ function safeResponseHeaders(response: Response, includeRetryHints = false): Hea
   return headers;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Token-exchange JSON fields are untrusted until response or OAuth-error validation succeeds.
 function readOAuthErrorCode(value: unknown): string | undefined {
   if (typeof value === 'string') {
     return value;

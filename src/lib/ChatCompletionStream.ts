@@ -745,6 +745,7 @@ type CanonicalSerializedParserValue =
   | typeof UNSAFE_SERIALIZED_PARSER_VALUE;
 
 function canonicalSerializedParserSchema(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Parser metadata is inspected through descriptors and may contain arbitrary caller values before validation.
   value: unknown,
   budget: SerializedParserSchemaBudget,
 ): string | undefined {
@@ -762,6 +763,7 @@ function canonicalSerializedParserSchema(
     return true;
   };
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Parser metadata is inspected through descriptors and may contain arbitrary caller values before validation.
   const visit = (current: unknown, depth: number): CanonicalSerializedParserValue => {
     if (depth > MAX_SERIALIZED_PARSER_SCHEMA_DEPTH || budget.nodes >= MAX_SERIALIZED_PARSER_SCHEMA_NODES) {
       return UNSAFE_SERIALIZED_PARSER_VALUE;
@@ -953,6 +955,7 @@ function hasMatchingSerializedParserSchema(
   // oxlint-disable-next-line anti-slop/no-object-parameters -- The schema holder is inspected through own descriptors before its contents are trusted.
   holder: object,
   key: string,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Parser metadata is inspected through descriptors and may contain arbitrary caller values before validation.
   value: unknown,
 ): boolean {
   const expected = source && signatures.get(source);
@@ -967,6 +970,7 @@ function hasMatchingSerializedParserSchema(
 
 function serializedParserDescriptor(
   descriptor: PropertyDescriptor | undefined,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Parser metadata is inspected through descriptors and may contain arbitrary caller values before validation.
   value: unknown,
 ): PropertyDescriptor {
   return descriptor && 'value' in descriptor

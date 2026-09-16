@@ -37,6 +37,7 @@ describe('transport error causes', () => {
       const client = new OpenAI({ apiKey: 'test-key', maxRetries: 0, fetch });
 
       expect(failure).not.toBeInstanceOf(Error);
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       const requestError = await client.models.list().catch((error: unknown) => error);
       expect(requestError).toBeInstanceOf(APIConnectionError);
       const normalized = (requestError as APIConnectionError & { cause: Error }).cause;
@@ -64,6 +65,7 @@ describe('transport error causes', () => {
       throw failure;
     });
     const client = new OpenAI({ apiKey: 'test-key', maxRetries: 0, fetch });
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const requestError = await client.models.list().catch((error: unknown) => error);
 
     expect(requestError).toBeInstanceOf(APIConnectionError);

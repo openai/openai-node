@@ -602,6 +602,7 @@ export class AbstractChatCompletionRunner<
     }
   }
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Public tool callbacks can return any JavaScript value; this boundary normalizes their results for the API.
   static #stringifyFunctionCallResult(rawContent: unknown): string {
     if (typeof rawContent === 'string') {
       return rawContent;

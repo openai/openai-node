@@ -31,8 +31,11 @@ interface StreamingScenario {
 }
 
 function messageEvents(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The delta fixture deliberately accepts invalid indices and heterogeneous values to exercise diagnostic privacy.
   value: unknown = true,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The delta fixture deliberately accepts invalid indices and heterogeneous values to exercise diagnostic privacy.
   index: unknown = 0,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The delta fixture deliberately accepts invalid indices and heterogeneous values to exercise diagnostic privacy.
   initialValue: unknown = sensitiveText,
 ): AssistantEventFixture[] {
   return [
@@ -58,7 +61,9 @@ function messageEvents(
 }
 
 function runStepEvents(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The delta fixture deliberately accepts invalid indices and heterogeneous values to exercise diagnostic privacy.
   value: unknown = true,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The delta fixture deliberately accepts invalid indices and heterogeneous values to exercise diagnostic privacy.
   index: unknown = 0,
   primitiveEntry = false,
 ): AssistantEventFixture[] {

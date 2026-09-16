@@ -157,6 +157,7 @@ export function isX509WorkloadIdentity(
 }
 
 /** Rejects unsupported WebSocket authentication before any connection or credential side effect. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Custom request hooks can replace bodies and clients; this boundary validates or tracks their actual runtime values.
 export function assertX509WebSocketSupported(client: unknown): void {
   if (!client || typeof client !== 'object') {
     return;
@@ -430,6 +431,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Owns only SDK-created iterator adapters until authenticated dispatch takes responsibility. */
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Custom request hooks can replace bodies and clients; this boundary validates or tracks their actual runtime values.
   ownRequestBody(body: unknown, source: unknown): void {
     if (body instanceof ReadableStream && body !== source) {
       this.#scope().materializedBody = body;
@@ -437,6 +439,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Recognizes every one-shot upload before issuer authentication or request replay. */
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Custom request hooks can replace bodies and clients; this boundary validates or tracks their actual runtime values.
   static isStreamingRequestBody(body: unknown): boolean {
     return (
       (globalThis.ReadableStream !== undefined && body instanceof globalThis.ReadableStream) ||
@@ -466,6 +469,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Transfers the dispatched upload while retiring any SDK-owned body replaced by a hook. */
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Custom request hooks can replace bodies and clients; this boundary validates or tracks their actual runtime values.
   releaseRequestBody(body: unknown): void {
     const scope = this.#scope();
     if (scope.materializedBody === body) {
@@ -619,6 +623,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Trusts only issuer or connection failures privately branded by the approved transport. */
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   static isRetryableFailure(error: unknown): boolean {
     return (
       typeof error === 'object' &&
@@ -628,6 +633,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Reads safe retry hints only from a privately branded, sanitized issuer response. */
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   static retryHeaders(error: unknown): Headers | undefined {
     if (!error || typeof error !== 'object' || !isRetryableX509IssuerError(error)) {
       return undefined;
@@ -689,6 +695,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   async #recoverRefreshFailure(
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     error: unknown,
     attempt: X509RefreshAttempt,
     cached: CachedX509Token | undefined,
@@ -719,6 +726,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   #fallbackToken(
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     error: unknown,
     cached: CachedX509Token | undefined,
     scope: X509RequestScope | undefined,

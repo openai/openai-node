@@ -19,6 +19,7 @@ class FakeBrowserSocket {
   });
   readonly listeners = new Map<string, (...args: any[]) => void>();
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The native socket adapter fixture forwards arbitrary platform event payloads.
   emit(event: string, payload?: unknown) {
     this.listeners.get(event)?.(payload);
   }

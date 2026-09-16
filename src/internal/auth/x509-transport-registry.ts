@@ -21,6 +21,7 @@ const transientX509TransportCodes = new Set([
 ]);
 
 /** Retries only known temporary failures when neither error layer reports a permanent code. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 export function isRetryableX509TransportFailure(failure: unknown): boolean {
   const cause =
     typeof failure === 'object' && failure !== null
@@ -114,6 +115,7 @@ export interface RegisteredX509Transport {
 }
 
 /** Resolves a previously registered opaque capability without importing an optional transport peer. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Transport capabilities are untrusted until runtime identity and registration checks succeed.
 export function resolveX509Transport(value: unknown): RegisteredX509Transport {
   if (!value || typeof value !== 'object') {
     throw new OpenAIError('X.509 workload identity requires an approved X.509 transport capability.');

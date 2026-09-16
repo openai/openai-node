@@ -5,6 +5,7 @@ import { buildHeaders, isEmptyHeaders } from 'openai/internal/headers';
 import { compact, decode, is_regexp, maybe_map } from 'openai/internal/qs/utils';
 import { toFloat32Array } from 'openai/internal/utils/base64';
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The JSON response fixture accepts heterogeneous synthetic SDK payloads.
 function jsonResponse(body: unknown): Response {
   return Response.json(body, {
     headers: { 'content-type': 'application/json' },

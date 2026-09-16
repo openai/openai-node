@@ -18,6 +18,7 @@ const workloadIdentity: WorkloadIdentity = {
   },
 };
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The fixture supplies malformed lifetime values to test the token response validator.
 function tokenExchangeResponse(expiresIn: unknown, accessToken: string): Response {
   const body = { access_token: accessToken };
   if (expiresIn !== undefined) {

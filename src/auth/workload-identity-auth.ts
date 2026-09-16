@@ -19,6 +19,7 @@ const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchan
 // workload-identity path, so short-lived tokens keep a usable cache window.
 const MAX_REFRESH_BUFFER_FRACTION = 0.5;
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The token exchange response supplies an untrusted lifetime that must pass numeric and expiry validation.
 function calculateExpiresAt(expiresIn: unknown, exchangeStartedAt: number): number {
   if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
     throw new OpenAIError("Token exchange response has invalid 'expires_in' field");

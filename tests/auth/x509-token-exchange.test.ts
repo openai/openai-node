@@ -46,6 +46,7 @@ function exchange(signal?: AbortSignal) {
   return exchangeX509Token(options);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Token response fixtures include malformed JSON values to exercise the exchange validator.
 function mockResponse(body: unknown, init?: ResponseInit) {
   return vi.spyOn(transportCapability, 'sendX509Request').mockResolvedValue(Response.json(body, init));
 }
@@ -290,6 +291,7 @@ describe('isolated X.509 workload-identity token exchange', () => {
         },
       );
 
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       const caught = await exchange().catch((error: unknown) => error);
       expect(caught).toBeInstanceOf(OAuthError);
       expect(caught).toMatchObject({ status: 403, error_code: code });
@@ -305,6 +307,7 @@ describe('isolated X.509 workload-identity token exchange', () => {
     const secret = 'synthetic-unrecognized-oauth-secret';
     mockResponse({ error: secret, error_description: secret }, { status: 401 });
 
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const caught = await exchange().catch((error: unknown) => error);
     expect(caught).toBeInstanceOf(OAuthError);
     expect((caught as OAuthError).error_code).toBeUndefined();
@@ -315,6 +318,7 @@ describe('isolated X.509 workload-identity token exchange', () => {
     const secret = 'synthetic-nested-oauth-secret';
     mockResponse({ error: { code: 'invalid_grant', message: secret } }, { status: 400 });
 
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const caught = await exchange().catch((error: unknown) => error);
     expect(caught).toMatchObject({ status: 400, error_code: 'invalid_grant' });
     expect(String(caught)).not.toContain(secret);
@@ -333,6 +337,7 @@ describe('isolated X.509 workload-identity token exchange', () => {
       },
     );
 
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const caught = await exchange().catch((error: unknown) => error);
     expect(caught).toBeInstanceOf(APIError);
     expect((caught as APIError).status).toBe(status);
@@ -360,6 +365,7 @@ describe('isolated X.509 workload-identity token exchange', () => {
         },
       );
 
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       const caught = await exchange().catch((error: unknown) => error);
       expect(caught).toBeInstanceOf(APIError);
       const error = caught as APIError;
@@ -378,6 +384,7 @@ describe('isolated X.509 workload-identity token exchange', () => {
     const secret = 'synthetic-transport-private-key-secret';
     vi.spyOn(transportCapability, 'sendX509Request').mockRejectedValue(new Error(secret));
 
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const caught = await exchange().catch((error: unknown) => error);
     expect(caught).toBeInstanceOf(APIConnectionError);
     expect(String(caught)).not.toContain(secret);

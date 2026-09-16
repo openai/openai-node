@@ -1,4 +1,6 @@
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function reportApplicationError(error: unknown): void {
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   const host = globalThis as typeof globalThis & { reportError?: (error: unknown) => void };
   if (typeof host.reportError === 'function') {
     host.reportError(error);
@@ -9,6 +11,7 @@ function reportApplicationError(error: unknown): void {
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Application listeners may return any value; only promise-like results require asynchronous observation.
 async function observeResult(result: unknown): Promise<void> {
   try {
     await result;

@@ -150,6 +150,7 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
     let settled = false;
     let callerAbortObserved = false;
     let timeoutAbortObserved = false;
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     let rejectRecording: (error: unknown) => void = reject;
 
     const collectData = (chunk: Buffer) => {
@@ -189,6 +190,7 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       }
       return true;
     };
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     rejectRecording = (error: unknown) => {
       if (cleanup()) {
         reject(error);

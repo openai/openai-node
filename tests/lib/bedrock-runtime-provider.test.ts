@@ -59,6 +59,7 @@ function providerCases(options: EndpointOptions) {
   ] as const;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The response fixture accepts heterogeneous synthetic Runtime API bodies for serialization.
 function createClient(provider: Provider, body: unknown = {}, responseInit?: ResponseInit) {
   const requests: { url: string; headers: Headers; body: string }[] = [];
   const client = new OpenAI({
@@ -294,6 +295,7 @@ describe('bedrock Runtime provider', () => {
       .create({ model: RUNTIME_MODEL, messages: [{ role: 'user', content: 'Say hello' }] })
       .then(
         () => null,
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         (error: unknown) => error,
       );
 

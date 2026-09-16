@@ -54,7 +54,11 @@ function lastNodeSocket(): FakeNodeSocket {
   return socket;
 }
 
-function onRealtimeEvent(realtime: unknown, event: string, listener: Listener): void {
+function onRealtimeEvent(
+  realtime: StableResponsesWS | BetaResponsesWS | StableNodeRealtime | BetaNodeRealtime,
+  event: string,
+  listener: Listener,
+): void {
   (realtime as { on: (event: string, listener: Listener) => void }).on(event, listener);
 }
 

@@ -34,6 +34,7 @@ const standardSchema = {
   '~standard': {
     version: 1 as const,
     vendor: 'synthetic-validator',
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The fixture validates or serializes caller-controlled schema metadata before treating the result as trusted.
     validate: (value: unknown) => {
       if (typeof value === 'object' && value !== null && 'city' in value && typeof value.city === 'string') {
         return { value: { city: value.city, normalized: true as const } };
@@ -120,6 +121,7 @@ function makeCompletionPayload() {
   };
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The fixture validates or serializes caller-controlled schema metadata before treating the result as trusted.
 function parseSerializedJSON<T>(value: unknown): T {
   const serialized = JSON.stringify(value);
   return JSON.parse(serialized) as T;
@@ -179,7 +181,7 @@ describe.each(formatFactories)(
 
         // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary response-format metadata until assertions inspect the actual wire values.
         let body: { response_format?: { type: string; json_schema: Record<string, unknown> } } | undefined;
-        const fetch = vi.fn(async (_request: unknown, init?: RequestInit) => {
+        const fetch = vi.fn(async (_request: string | URL | Request, init?: RequestInit) => {
           body = JSON.parse(init?.body as string) as typeof body;
           return Response.json(makeCompletionPayload(), { status: 200 });
         });

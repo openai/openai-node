@@ -484,6 +484,7 @@ const main = async (): Promise<void> => {
   }
 };
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 main().catch((error: unknown) => {
   console.error(error);
   process.exitCode = 1;

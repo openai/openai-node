@@ -63,6 +63,7 @@ function createRedactingLogger() {
   return {
     redactedMessages,
     logger: {
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The console spy receives arbitrary diagnostic arguments and checks them without trusting their type.
       error: vi.fn((message: unknown) => {
         redactedMessages.push(
           String(message)

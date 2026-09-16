@@ -53,7 +53,8 @@ const objectToString = Object.prototype.toString;
 const errorBrandDescriptor = Object.getOwnPropertyDescriptor(Error, 'isError');
 const nativeErrorBrand =
   errorBrandDescriptor && 'value' in errorBrandDescriptor && typeof errorBrandDescriptor.value === 'function'
-    ? (errorBrandDescriptor.value as (value: unknown) => boolean)
+    ? // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The native Error.isError predicate brands arbitrary values before an Error contract can be assumed.
+      (errorBrandDescriptor.value as (value: unknown) => boolean)
     : undefined;
 const nativeErrorConstructorSource = functionToString.call(Error);
 const nativeDateConstructorSource = functionToString.call(Date);
@@ -120,6 +121,7 @@ function captureNativeProxyDetector(): ((value: object) => boolean) | undefined 
 // expose one without adding a Node-only import to browser-compatible bundles.
 const nativeProxyDetector = captureNativeProxyDetector();
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Intrinsic constructors are verified at runtime before callable or prototype metadata is trusted.
 function rememberTrustedIntrinsic(constructor: unknown): void {
   if (typeof constructor !== 'function') {
     return;
@@ -290,7 +292,9 @@ function isTrustedIntrinsicPrototype(prototype: object): boolean {
 }
 
 function isCanonicalIntrinsicFunction(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Descriptor functions are untrusted until the native callable identity is verified.
   value: unknown,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Canonical descriptor slots may be absent or noncallable and are checked before invocation.
   canonical: unknown,
   // oxlint-disable-next-line anti-slop/no-object-parameters -- Cross-realm function prototypes are compared by identity without trusting a callable signature.
   functionPrototype: object,
@@ -545,6 +549,7 @@ function getRetainedStorageBrand(current: object): string | undefined {
 function estimateRetainedBufferBytes(
   // oxlint-disable-next-line anti-slop/no-object-parameters -- Memory accounting inspects arbitrary retained objects and detects native backing storage at runtime.
   current: object,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Retention inspection traverses arbitrary event values and establishes their brands and descriptors before use.
   visit: (value: unknown, depth: number) => void,
   depth: number,
 ): RetainedStorage | undefined {
@@ -624,6 +629,7 @@ function visitHiddenEventValues(
   // oxlint-disable-next-line anti-slop/no-object-parameters -- Native collection contents are inspected only after storage branding, without trusting structural fields.
   current: object,
   kind: RetainedStorage['kind'] | undefined,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Retention inspection traverses arbitrary event values and establishes their brands and descriptors before use.
   visit: (value: unknown, overhead: number) => boolean,
 ): boolean {
   if (kind === 'map') {
@@ -706,6 +712,7 @@ function visitInspectableEventProperties(
   depth: number,
   availableBytes: () => number,
   charge: (bytes: number) => boolean,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Retention inspection traverses arbitrary event values and establishes their brands and descriptors before use.
   visit: (value: unknown, depth: number, isBlobInternalHandle?: boolean) => void,
 ): boolean {
   const keys = getInspectableEventKeys(current, kind, availableBytes());
@@ -745,6 +752,7 @@ function visitRetainedEventPrototypes(
   visited: WeakSet<object>,
   availableBytes: () => number,
   charge: (bytes: number) => boolean,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Retention inspection traverses arbitrary event values and establishes their brands and descriptors before use.
   visit: (value: unknown, depth: number, isBlobInternalHandle?: boolean) => void,
   // oxlint-disable-next-line anti-slop/no-object-parameters -- The retention callback records prototype identity before inspecting its descriptors.
   retainPrototype: (prototype: object, inspect: () => boolean) => boolean,
@@ -855,6 +863,7 @@ const BUFFERED_LEDGER_OWNER_BYTES = 16;
 const MAX_BUFFERED_LEDGER_RECONCILIATION_WORK = 128 * 1024;
 
 function inspectBufferedEventGraph(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Retention inspection traverses arbitrary event values and establishes their brands and descriptors before use.
   value: unknown,
   remainingBytes: number,
 ): BufferedInspectedGraph | undefined {
@@ -923,6 +932,7 @@ function inspectBufferedEventGraph(
     }
   };
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The retained graph can contain any JavaScript value; the visitor validates each node before traversal.
   const visit = (current: unknown, depth: number, isBlobInternalHandle = false): void => {
     if (bytes > remainingBytes) {
       return;
@@ -1936,6 +1946,7 @@ export class EventStream<EventTypes extends BaseEvents> {
     await this.#endPromise;
   }
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   #handleError(this: EventStream<EventTypes>, error: unknown) {
     this.#errored = true;
     if (error instanceof Error && error.name === 'AbortError') {

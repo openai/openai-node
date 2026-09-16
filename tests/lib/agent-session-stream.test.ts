@@ -7,6 +7,7 @@ import type { AgentToolHandler } from 'openai/lib/agents/agent-session-stream';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   let reject!: (reason: unknown) => void;
   // oxlint-disable-next-line promise/avoid-new -- Tests explicitly control completion of pending transport and handler work.
   const promise = new Promise<T>((_resolve, _reject) => {
@@ -27,6 +28,7 @@ function turn(type = 'created', id = 'turn_main', subagentID: string | null = nu
     turn: { id, subagent_id: subagentID },
   });
 }
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Tool-call argument fixtures include malformed values that must be rejected at the public stream boundary.
 function call(id = 'call_test', arguments_: unknown = '{"value":1}', turnID = 'turn_main', name = 'lookup') {
   return event('agent.session.turn.item.added', `event_${turnID}_${id}`, {
     turn_id: turnID,

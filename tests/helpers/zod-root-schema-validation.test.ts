@@ -144,6 +144,7 @@ it('rejects registered non-object roots without changing definitions', () => {
   expect(schemaDefinitions.Root).toBe(root);
 });
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The root-schema regression deliberately supplies malformed values for runtime rejection.
 const convertStrictRoot = (root: unknown) =>
   zodToJsonSchema(z3.object({ value: z3.string() }), {
     target: 'openApi3',

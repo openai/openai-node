@@ -11,6 +11,7 @@ import { OpenAIRealtimeWS as BetaNodeRealtime } from 'openai/beta/realtime/ws';
 type Listener = (event: any) => void;
 
 interface FakeSocket {
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The transport fixture deliberately dispatches invalid native and wire payloads to the runtime validator.
   dispatch: (event: string, value: unknown) => void;
   send: ReturnType<typeof vi.fn>;
   close: ReturnType<typeof vi.fn>;
@@ -33,6 +34,7 @@ vi.mock('ws', () => {
       on: (event: string, listener: Listener) => listeners.set(event, listener),
       send: vi.fn(),
       close: vi.fn(),
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The transport fixture deliberately dispatches invalid native and wire payloads to the runtime validator.
       dispatch: (event: string, value: unknown) => listeners.get(event)?.(value),
     };
   }
@@ -50,6 +52,7 @@ class FakeNativeSocket implements FakeSocket {
     this.listeners.set(event, listener);
   }
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The transport fixture deliberately dispatches invalid native and wire payloads to the runtime validator.
   dispatch(event: string, value: unknown): void {
     this.listeners.get(event)?.(value);
   }
@@ -63,10 +66,15 @@ const sensitiveFrames = [
 ] as const;
 const privateSyntaxMessage = 'Could not parse Realtime WebSocket event data as JSON.';
 
-function onRealtimeEvent(realtime: unknown, event: string, listener: Listener): void {
+function onRealtimeEvent(
+  realtime: StableNativeRealtime | StableNodeRealtime | BetaNativeRealtime | BetaNodeRealtime,
+  event: string,
+  listener: Listener,
+): void {
   (realtime as { on: (event: string, listener: Listener) => void }).on(event, listener);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The transport fixture deliberately dispatches invalid native and wire payloads to the runtime validator.
 function dispatchFrame(socket: FakeSocket, transport: 'native' | 'node', data: unknown): void {
   socket.dispatch('message', transport === 'native' ? { data } : data);
 }

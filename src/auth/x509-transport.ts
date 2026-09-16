@@ -72,6 +72,7 @@ const credentialOptionNames = new Set([
 const proxyOptionNames = new Set(['url', 'mode', 'ca']);
 
 function safeOptionRecord(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Credential and proxy options are untrusted runtime inputs and must pass validation before transport construction.
   value: unknown,
   allowed: ReadonlySet<string>,
   label: string,
@@ -108,6 +109,7 @@ function requiredCredentialValue(options: Record<string, unknown>, name: string)
   return value;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Credential and proxy options are untrusted runtime inputs and must pass validation before transport construction.
 function snapshotCertificateAuthorities(value: unknown): string | string[] | undefined {
   if (value === undefined) {
     return undefined;
@@ -228,6 +230,7 @@ function proxyAuthentication(url: URL): string | undefined {
   return Buffer.from(`${username}:${password}`, 'utf-8').toString('base64');
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Credential and proxy options are untrusted runtime inputs and must pass validation before transport construction.
 function normalizeProxyURL(value: unknown): URL {
   if (typeof value !== 'string' && (typeof value !== 'object' || value === null || types.isProxy(value))) {
     throw new Error('X.509 CONNECT proxy requires an own URL string or URL value.');
@@ -240,6 +243,7 @@ function normalizeProxyURL(value: unknown): URL {
 }
 
 function credentialDispatcher(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Credential and proxy options are untrusted runtime inputs and must pass validation before transport construction.
   proxyOptionsInput: unknown,
   requestTls: VerifiedX509TLSOptions,
 ): { dispatcher: Agent | ProxyAgent; proxy: X509ProxyMode } {

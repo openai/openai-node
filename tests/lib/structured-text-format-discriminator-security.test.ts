@@ -27,6 +27,7 @@ const standardSchema = {
   '~standard': {
     version: 1 as const,
     vendor: 'synthetic-validator',
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Standard Schema validator contract receives untrusted parsed values before checking their fields.
     validate: (value: unknown) => {
       if (typeof value === 'object' && value !== null && 'city' in value && typeof value.city === 'string') {
         return { value: { city: value.city, normalized: true as const } };
@@ -298,7 +299,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
 
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary text-format metadata until assertions inspect the actual wire values.
       let requestBody: { text?: { format?: Record<string, unknown> } } | undefined;
-      const fetch = vi.fn(async (_request: unknown, init?: RequestInit) => {
+      const fetch = vi.fn(async (_request: string | URL | Request, init?: RequestInit) => {
         requestBody = JSON.parse(init?.body as string) as typeof requestBody;
         return Response.json(makeResponsePayload(), { status: 200 });
       });
@@ -366,7 +367,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
     async (override) => {
       // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary text-format metadata until assertions inspect the actual wire values.
       let requestBody: { text?: { format?: Record<string, unknown> } } | undefined;
-      const fetch = vi.fn(async (_request: unknown, init?: RequestInit) => {
+      const fetch = vi.fn(async (_request: string | URL | Request, init?: RequestInit) => {
         requestBody = JSON.parse(init?.body as string) as typeof requestBody;
         return Response.json(makeResponsePayload(), { status: 200 });
       });

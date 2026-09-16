@@ -36,6 +36,7 @@ const strictWeatherJSONSchema: JSONSchema = {
   additionalProperties: false,
 };
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Standard Schema validation begins with unknown model output and narrows it through the validator.
 function validateWeather(value: unknown) {
   if (
     typeof value === 'object' &&
@@ -149,6 +150,7 @@ describe('Standard Schema helpers', () => {
     ],
   ] as const;
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Standard Schema validation begins with unknown model output and narrows it through the validator.
   const permissiveValidation = (_value: unknown): ReturnType<typeof validateWeather> => ({
     value: { city: 'unvalidated', unit: 'c', normalized: true },
   });
@@ -231,6 +233,7 @@ describe('Standard Schema helpers', () => {
     const originalInput = metadata.jsonSchema.input;
     let metadataReads = 0;
 
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Standard Schema validation begins with unknown model output and narrows it through the validator.
     const strictValidator = function strictValidator(this: typeof metadata, value: unknown) {
       expect(this).toBe(metadata);
       return validateWeather(value);
@@ -2148,6 +2151,7 @@ describe('Standard Schema helpers', () => {
       ...standardSchema,
       '~standard': {
         ...standardSchema['~standard'],
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Standard Schema validation begins with unknown model output and narrows it through the validator.
         validate: async (value: unknown) => validateWeather(value),
       },
     };

@@ -97,7 +97,10 @@ async function closeServers(...servers: Server[]): Promise<void> {
   );
 }
 
-function onConnectionError(connection: unknown, listener: (error: Error) => void): void {
+function onConnectionError(
+  connection: StableResponsesWS | BetaResponsesWS,
+  listener: (error: Error) => void,
+): void {
   (connection as { on: (event: 'error', callback: (error: Error) => void) => void }).on('error', listener);
 }
 

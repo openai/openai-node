@@ -149,6 +149,7 @@ export function isAutoParsableResponseFormat<ParsedT>(
  * predicate so the runtime, the streaming events and
  * {@link ExtractParsedContentFromParams} cannot drift apart.
  */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This public parser boundary accepts caller-supplied formats and validates their parser metadata at runtime.
 export function isParseableResponseFormat(format: unknown): boolean {
   return isAutoParsableResponseFormat(format) || (format as { type?: string } | null)?.type === 'json_schema';
 }
@@ -159,6 +160,7 @@ export function isParseableResponseFormat(format: unknown): boolean {
  *
  * Returns `null` for formats that are not auto-parseable.
  */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This public parser boundary accepts caller-supplied formats and validates their parser metadata at runtime.
 export function parseResponseFormatContent<ParsedT>(format: unknown, content: string): ParsedT | null {
   if (!isParseableResponseFormat(format)) {
     return null;

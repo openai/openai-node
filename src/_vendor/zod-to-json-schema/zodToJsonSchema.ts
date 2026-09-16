@@ -6,6 +6,7 @@ import { getRefs } from './Refs';
 import { zodDef, isEmptyObj } from './util';
 
 function ownStrictRootSchema(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Preserve the vendored converter boundary, which validates schema-library objects received from callers.
   schema: unknown,
   name: string | undefined,
   nameStrategy: string,

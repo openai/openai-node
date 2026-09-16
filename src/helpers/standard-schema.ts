@@ -88,6 +88,7 @@ type StandardSchemaLike<Input = unknown, Output = Input> = {
      * Promise-returning validators are rejected when a response is parsed.
      */
     readonly validate: (
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The public Standard Schema contract requires unknown input so the validator owns runtime type checking.
       value: unknown,
     ) => StandardSchemaResult<Output> | Promise<StandardSchemaResult<Output>>;
 
@@ -203,6 +204,7 @@ const JSON_SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'ob
 
 type JSONPrimitive = string | number | boolean | null;
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
 function getSchemaTypes(schema: unknown): Set<string> | undefined {
   if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
     return undefined;
@@ -233,6 +235,7 @@ function isJSONPrimitive(value: unknown): value is JSONPrimitive {
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
 function getLiteralValues(schema: unknown): JSONPrimitive[] | undefined {
   if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
     return undefined;
@@ -252,6 +255,7 @@ function getLiteralValues(schema: unknown): JSONPrimitive[] | undefined {
   return undefined;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
 function getLiteralSchemaTypes(schema: unknown): Set<string> | undefined {
   const literalValues = getLiteralValues(schema);
   if (!literalValues) {
@@ -268,6 +272,7 @@ function getLiteralSchemaTypes(schema: unknown): Set<string> | undefined {
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
 function haveDisjointLiteralValues(left: unknown, right: unknown): boolean {
   const leftValues = getLiteralValues(left);
   const rightValues = getLiteralValues(right);
@@ -284,11 +289,13 @@ function schemaTypesOverlap(left: string, right: string): boolean {
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
 function isObjectOnlySchema(schema: unknown): boolean {
   const types = getSchemaTypes(schema);
   return types?.size === 1 && types.has('object');
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
 function haveDisjointObjectDiscriminator(left: unknown, right: unknown, root: JSONSchema): boolean {
   if (!isObjectOnlySchema(left) || !isObjectOnlySchema(right)) {
     return false;
@@ -334,6 +341,7 @@ function haveDisjointObjectDiscriminator(left: unknown, right: unknown, root: JS
 }
 
 function getClosedObjectPropertySet(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
   schema: unknown,
 ): { properties: Set<string>; required: string[] } | undefined {
   if (!isObjectOnlySchema(schema)) {
@@ -367,6 +375,7 @@ function getClosedObjectPropertySet(
   return { properties: propertySet, required: requiredProperties };
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
 function haveDisjointClosedObjectPropertySets(left: unknown, right: unknown): boolean {
   const leftPropertySet = getClosedObjectPropertySet(left);
   const rightPropertySet = getClosedObjectPropertySet(right);
@@ -384,6 +393,7 @@ function haveDisjointClosedObjectPropertySets(left: unknown, right: unknown): bo
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
 function areMutuallyExclusive(left: unknown, right: unknown, root: JSONSchema): boolean {
   const leftTypes = getSchemaTypes(left);
   const rightTypes = getSchemaTypes(right);
@@ -405,6 +415,7 @@ function areMutuallyExclusive(left: unknown, right: unknown, root: JSONSchema): 
 }
 
 function resolveLocalRefForExclusivity(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
   schema: unknown,
   root: JSONSchema,
   seenRefs = new Set<string>(),
@@ -476,6 +487,7 @@ function normalizeStructuredOutputSchema(schema: JSONSchema): JSONSchema {
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Cycle detection tracks the same unvalidated schema records traversed during oneOf normalization.
   const visitedSchemas = new Set<Record<string, unknown>>();
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema keywords and reference targets remain untrusted until their types and required properties are checked.
   const visitSchema = (value: unknown): void => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return;

@@ -89,6 +89,7 @@ const MERGEABLE_OBJECT_ALL_OF_KEYWORDS = new Set([
 ]);
 
 /** Visits a nested schema together with its root-relative path and containing schema keyword. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- JSON Schema traversal accepts arbitrary keyword values and validates each node before interpreting it.
 type JSONSchemaChildVisitor = (schema: unknown, path: string[], keyword: string) => void;
 
 /** Assigns schema keywords without invoking the inherited `__proto__` setter. */
@@ -887,7 +888,7 @@ function parseLocalRef(ref: string): string[] | undefined {
   return parts;
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-returns -- Resolving untrusted schema references may produce any value; callers perform the schema checks.
+// oxlint-disable-next-line anti-slop/no-unknown-returns, anti-slop/no-unknown-parameters -- Resolving untrusted schema references may produce any value; callers perform the schema checks. JSON Schema traversal accepts arbitrary keyword values and validates each node before interpreting it.
 function resolvePointerPart(resolved: unknown, part: string): unknown | undefined {
   if (Array.isArray(resolved)) {
     if (!/^(?:0|[1-9]\d*)$/.test(part)) {
@@ -2059,6 +2060,7 @@ function isMergeableObjectType(type: JSONSchema['type']): boolean {
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- JSON Schema traversal accepts arbitrary keyword values and validates each node before interpreting it.
 function schemasEqual(left: unknown, right: unknown): boolean {
   if (left === right) {
     return true;

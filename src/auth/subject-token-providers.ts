@@ -101,6 +101,7 @@ function classifyCrossRealmAzureError(error: object): AzureJSONErrorKind {
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function inspectAzureJSONErrorCause(error: unknown): boolean {
   const visited = new Set<object>();
   let current = error;
@@ -145,6 +146,7 @@ function inspectAzureJSONErrorCause(error: unknown): boolean {
   return true;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function isMalformedAzureJSONError(error: unknown): boolean {
   try {
     return inspectAzureJSONErrorCause(error);
@@ -153,6 +155,7 @@ function isMalformedAzureJSONError(error: unknown): boolean {
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Metadata-service JSON is untrusted until the token field passes runtime validation.
 function readAzureAccessToken(data: unknown): string {
   const token = isObj(data) && hasOwn(data, 'access_token') ? data['access_token'] : undefined;
   if (typeof token !== 'string' || token.trim().length === 0) {

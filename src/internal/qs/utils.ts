@@ -14,7 +14,7 @@ export const has = (obj: object, key: PropertyKey): boolean => {
   return resolvedHas(obj, key);
 };
 
-function isUnsafePropertyKey(key: unknown): boolean {
+function isUnsafePropertyKey(key: PropertyKey): boolean {
   return key === '__proto__' || key === 'constructor' || key === 'prototype';
 }
 

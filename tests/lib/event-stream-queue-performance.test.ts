@@ -8,11 +8,13 @@ import type { BaseEvents } from 'openai/lib/EventStream';
 const QUEUE_SIZE = 4096;
 
 interface QueueEvents extends BaseEvents {
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The queue fixture exercises arbitrary payload identities without assigning one event schema.
   value: (value: unknown) => void;
   empty: () => void;
 }
 
 class QueueTestStream extends EventStream<QueueEvents> {
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The queue fixture exercises arbitrary payload identities without assigning one event schema.
   emitValue(value: unknown): void {
     this._emit('value', value);
   }

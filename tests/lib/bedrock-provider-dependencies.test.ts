@@ -33,6 +33,7 @@ afterEach(() => {
   process.env = originalEnv;
 });
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The response fixture serializes arbitrary synthetic API bodies without prevalidating the code under test.
 function jsonResponse(body: unknown = {}): Response {
   return Response.json(body, {
     headers: { 'Content-Type': 'application/json' },

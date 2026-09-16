@@ -196,6 +196,7 @@ describe.each(websocketVariants.filter(({ name }) => name.endsWith('Responses'))
       const websocket = create(new OpenAI({ apiKey: 'test-key' }));
       const cause = new Error('synthetic transport failure');
       const listenerError = new Error('application listener failed');
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       const errors = vi.fn<(error: unknown) => void>(() => {
         throw listenerError;
       });

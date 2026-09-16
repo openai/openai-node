@@ -128,6 +128,7 @@ describe('file processing compatibility', () => {
     const promise = client.files.waitForProcessing('file_123', options);
 
     if (fails) {
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       const failure: unknown = await promise.catch((error: unknown) => error);
       expect(failure).toBeInstanceOf(APIConnectionTimeoutError);
       expect(failure).toMatchObject({

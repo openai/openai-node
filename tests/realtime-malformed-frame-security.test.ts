@@ -11,6 +11,7 @@ import { OpenAIRealtimeWS as BetaNodeRealtime } from 'openai/beta/realtime/ws';
 type Listener = (event: any) => void;
 
 interface FakeSocket {
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture intentionally dispatches arbitrary malformed native and JSON payloads.
   dispatch: (event: string, value: unknown) => void;
 }
 
@@ -23,6 +24,7 @@ vi.mock('ws', () => {
       on: (event: string, listener: Listener) => listeners.set(event, listener),
       send: vi.fn(),
       close: vi.fn(),
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture intentionally dispatches arbitrary malformed native and JSON payloads.
       dispatch: (event: string, value: unknown) => listeners.get(event)?.(value),
     };
   }
@@ -40,6 +42,7 @@ class FakeNativeSocket implements FakeSocket {
     this.listeners.set(event, listener);
   }
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture intentionally dispatches arbitrary malformed native and JSON payloads.
   dispatch(event: string, value: unknown): void {
     this.listeners.get(event)?.(value);
   }
@@ -112,11 +115,16 @@ function dispatchRawFrame(socket: FakeSocket, transport: 'native' | 'node', fram
   socket.dispatch('message', transport === 'native' ? { data: frame } : frame);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture intentionally dispatches arbitrary malformed native and JSON payloads.
 function dispatchFrame(socket: FakeSocket, transport: 'native' | 'node', frame: unknown): void {
   dispatchRawFrame(socket, transport, JSON.stringify(frame));
 }
 
-function onRealtimeEvent(realtime: unknown, event: string, listener: Listener): void {
+function onRealtimeEvent(
+  realtime: StableNativeRealtime | StableNodeRealtime | BetaNativeRealtime | BetaNodeRealtime,
+  event: string,
+  listener: Listener,
+): void {
   (realtime as { on: (event: string, listener: Listener) => void }).on(event, listener);
 }
 

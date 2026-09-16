@@ -35,6 +35,7 @@ afterAll(() => {
   }
 });
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This request fixture intentionally serializes valid and invalid message payloads to test the HTTP boundary.
 function requestWithMessages(messages: unknown): NextRequest {
   return new NextRequest('https://example.com/api/vercel-ai-streaming', {
     method: 'POST',

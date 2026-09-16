@@ -1462,6 +1462,7 @@ describe('AssistantStream factories and async iteration', () => {
     const runner = AssistantStream.fromReadableStream(readable);
     const failure = await runner.done().then(
       () => null,
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -1483,6 +1484,7 @@ describe('AssistantStream factories and async iteration', () => {
     const runner = AssistantStream.fromReadableStream(readable);
     const failure = await runner.done().then(
       () => null,
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 

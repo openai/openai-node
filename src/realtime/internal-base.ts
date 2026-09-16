@@ -23,6 +23,7 @@ export function parseRealtimeEvent(data: string): RealtimeServerEvent {
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Error fields arrive from untrusted realtime frames and may be noncoercible JSON values.
 function safeErrorValue(value: unknown): string {
   try {
     return String(value);

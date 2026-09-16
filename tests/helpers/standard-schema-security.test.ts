@@ -14,6 +14,7 @@ function strictSchemasForAllHelpers(jsonSchema: Record<string, unknown>) {
     '~standard': {
       version: 1 as const,
       vendor: 'test',
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Standard Schema validator must accept unknown input according to its public validation contract.
       validate: (value: unknown) => ({ value }),
       jsonSchema: { input: () => jsonSchema },
     },

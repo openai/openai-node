@@ -14,6 +14,7 @@ import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 import { z as zv4Mini } from 'zod/v4-mini';
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema traversal inspects arbitrary JSON keyword values before following references or counting enums.
 function collectRefs(value: unknown, refs: string[] = []): string[] {
   if (!value || typeof value !== 'object') {
     return refs;
@@ -31,6 +32,7 @@ function collectRefs(value: unknown, refs: string[] = []): string[] {
   return refs;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema traversal inspects arbitrary JSON keyword values before following references or counting enums.
 function countEnumValues(value: unknown): number {
   if (!value || typeof value !== 'object') {
     return 0;
@@ -74,6 +76,7 @@ function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unk
 
 // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
 function expectDefinitionRefsToResolve(schema: Record<string, unknown>) {
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema traversal inspects arbitrary JSON keyword values before following references or counting enums.
   const visit = (value: unknown, resolving: Set<string>) => {
     if (!value || typeof value !== 'object') {
       return;

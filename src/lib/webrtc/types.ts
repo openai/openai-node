@@ -3,8 +3,10 @@ import type { WebRTCError } from './errors';
 /** A native event source, without requiring DOM declarations in server projects. */
 export interface WebRTCEventTarget {
   /** Registers a native event listener. */
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The public native-event adapter accepts platform events without imposing DOM declarations on server consumers.
   addEventListener: (type: string, listener: (event: unknown) => void) => void;
   /** Removes a previously registered native event listener. */
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The public native-event adapter accepts platform events without imposing DOM declarations on server consumers.
   removeEventListener: (type: string, listener: (event: unknown) => void) => void;
 }
 

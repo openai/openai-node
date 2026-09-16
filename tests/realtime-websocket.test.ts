@@ -17,6 +17,7 @@ type FakeNodeSocket = {
   on: Mock;
   send: Mock;
   close: Mock;
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture forwards arbitrary native event and server message values to the adapter boundary.
   dispatch: (event: string, value: unknown) => void;
 };
 
@@ -31,6 +32,7 @@ vi.mock('ws', () => ({
       on: vi.fn((event: string, listener: Listener) => listeners.set(event, listener)),
       send: vi.fn(),
       close: vi.fn(),
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture forwards arbitrary native event and server message values to the adapter boundary.
       dispatch: (event: string, value: unknown) => listeners.get(event)?.(value),
     } satisfies FakeNodeSocket;
   }),
@@ -57,6 +59,7 @@ class FakeBrowserSocket {
     this.listeners.set(event, listener);
   }
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture forwards arbitrary native event and server message values to the adapter boundary.
   dispatch(event: string, value: unknown): void {
     this.listeners.get(event)?.(value);
   }
@@ -88,7 +91,11 @@ function lastNodeSocket(): FakeNodeSocket {
     .value as FakeNodeSocket;
 }
 
-function onRealtimeEvent(realtime: unknown, event: string, listener: Listener): void {
+function onRealtimeEvent(
+  realtime: StableBrowserRealtime | StableNodeRealtime | BetaBrowserRealtime | BetaNodeRealtime,
+  event: string,
+  listener: Listener,
+): void {
   (realtime as { on: (event: string, listener: Listener) => void }).on(event, listener);
 }
 

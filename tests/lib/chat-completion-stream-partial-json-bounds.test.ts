@@ -988,6 +988,7 @@ it('ignores global stringify replacement inside a tool serializer when comparing
   const parseStaleSchema = vi.fn((value: string) => ({ stale: JSON.parse(value) as unknown }));
   const tool = makeParseableTool(strictTool, { parser: parseStaleSchema, callback: vi.fn() });
   const originalStringify = JSON.stringify;
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The JSON serializer spy receives arbitrary serializable values and preserves the original stringify boundary.
   const forgePrimitive = vi.fn((value: unknown) => originalStringify(value === 'wire' ? 'value' : value));
   const serialize = vi.fn(() => {
     JSON.stringify = forgePrimitive as typeof JSON.stringify;
@@ -2114,6 +2115,7 @@ it.each(['byte', 'depth'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => 'unexpected success',
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => (error instanceof Error ? error.message : String(error)),
     );
 
@@ -2182,6 +2184,7 @@ it.each(['byte', 'depth', 'fragment'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => 'unexpected success',
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => (error instanceof Error ? error.message : String(error)),
     );
 
@@ -2447,6 +2450,7 @@ it.each(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
     expect(failure).toBeInstanceOf(Error);
@@ -2485,6 +2489,7 @@ it.each(['content', 'tool'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
     expect(failure).toBeInstanceOf(Error);
@@ -2541,6 +2546,7 @@ it.each(['data', 'accessor'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -2582,6 +2588,7 @@ it.each(['refusal', 'message'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -2612,6 +2619,7 @@ it('rejects an inherited structured refusal accessor without invoking it', async
 
   const failure = await stream.finalChatCompletion().then(
     () => null,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     (error: unknown) => error,
   );
 
@@ -2638,6 +2646,7 @@ it('rejects an inherited structured choice message without invoking its getter',
 
   const failure = await stream.finalChatCompletion().then(
     () => null,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     (error: unknown) => error,
   );
 
@@ -2970,6 +2979,7 @@ it.each(['choices', 'tool_calls'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -3018,6 +3028,7 @@ it('enforces an aggregate final budget across independently bounded public parse
 
   const failure = await stream.finalChatCompletion().then(
     () => null,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     (error: unknown) => error,
   );
 
@@ -3080,6 +3091,7 @@ it.each(['content', 'tool'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -3107,6 +3119,7 @@ it('bounds a new strict tool appended to the public snapshot before its final pa
 
   const failure = await stream.finalChatCompletion().then(
     () => null,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     (error: unknown) => error,
   );
   expect(failure).toBeInstanceOf(Error);
@@ -3169,6 +3182,7 @@ it.each(['content', 'tool'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -3264,6 +3278,7 @@ it('charges repeated whole-snapshot strict-tool scans to the cumulative parse-wo
 
   const failure = await stream.finalChatCompletion().then(
     () => null,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     (error: unknown) => error,
   );
 

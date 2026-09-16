@@ -53,6 +53,7 @@ interface AuditedEvents {
   other: (value: string) => void;
   pair: (value: string, index: number) => void;
   empty: () => void;
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   error: (error: unknown) => void;
   __proto__: (value: number) => void;
 }
@@ -208,8 +209,9 @@ function measureListenerMovement(operation: () => void) {
 
   function trackedFilter(
     this: unknown[],
-    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Array.filter accepts any truthy callback result; instrumentation must preserve that native signature.
+    // oxlint-disable-next-line anti-slop/no-unknown-returns, anti-slop/no-unknown-parameters -- Array.filter accepts any truthy callback result; instrumentation must preserve that native signature. The Array.filter instrumentation preserves the native callback contract for arbitrary elements and receivers.
     predicate: (value: unknown, index: number, values: unknown[]) => unknown,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Array.filter instrumentation preserves the native callback contract for arbitrary elements and receivers.
     thisArg?: unknown,
   ) {
     const result = originalFilter.call(this, predicate, thisArg);

@@ -13,7 +13,9 @@ import type {
 } from '../../src/lib/webrtc/types';
 
 class NativeEvents {
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Native event and message fixtures exercise arbitrary platform values before adapter validation.
   readonly listeners = new Map<string, Set<(event: unknown) => void>>();
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Native event and message fixtures exercise arbitrary platform values before adapter validation.
   addEventListener(type: string, listener: (event: unknown) => void): void {
     let listeners = this.listeners.get(type);
     if (!listeners) {
@@ -22,9 +24,11 @@ class NativeEvents {
     }
     listeners.add(listener);
   }
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Native event and message fixtures exercise arbitrary platform values before adapter validation.
   removeEventListener(type: string, listener: (event: unknown) => void): void {
     this.listeners.get(type)?.delete(listener);
   }
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Native event and message fixtures exercise arbitrary platform values before adapter validation.
   emit(type: string, event: unknown = {}): void {
     const snapshot = [...(this.listeners.get(type) ?? [])];
     for (const listener of snapshot) {
@@ -47,6 +51,7 @@ class FakeChannel extends NativeEvents implements WebRTCDataChannel {
     this.readyState = 'open';
     this.emit('open');
   }
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Native event and message fixtures exercise arbitrary platform values before adapter validation.
   message(value: unknown): void {
     this.emit('message', { data: JSON.stringify(value) });
   }
@@ -85,6 +90,7 @@ class FakePeer extends NativeEvents implements WebRTCPeerConnection {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   let reject!: (reason: unknown) => void;
   // oxlint-disable-next-line promise/avoid-new, promise/param-names -- Tests deliberately control settlement of native operations.
   const promise = new Promise<T>((resolvePromise, rejectPromise) => {

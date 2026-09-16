@@ -84,9 +84,11 @@ function withBrowserWorker<T>(
 ): T {
   const navigator = { userAgent: options.userAgent ?? 'Mozilla/5.0' };
   const browserWorkerGlobalScope = Object.defineProperty(() => null, Symbol.hasInstance, {
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Symbol.hasInstance probe must accept any JavaScript value before comparing the simulated host identity.
     value: (value: unknown) => value === globalThis,
   });
   const browserWorkerNavigator = Object.defineProperty(() => null, Symbol.hasInstance, {
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Symbol.hasInstance probe must accept any JavaScript value before comparing the simulated host identity.
     value: (value: unknown) => value === navigator,
   });
 

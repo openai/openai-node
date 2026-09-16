@@ -131,6 +131,7 @@ describe('malformed SSE diagnostic privacy', () => {
         () => {
           throw new Error('Expected the malformed SSE payload to be rejected.');
         },
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         (error: unknown) => error,
       );
 

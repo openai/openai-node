@@ -634,6 +634,7 @@ describe('X.509 review regressions', () => {
         : new Response(secret, { headers: { 'content-type': 'application/json' } }),
     );
 
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const failure: unknown = await new OpenAI(options()).models.list().catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(SyntaxError);

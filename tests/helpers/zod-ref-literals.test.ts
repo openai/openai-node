@@ -12,6 +12,7 @@ import { z as zv4Mini } from 'zod/v4-mini';
 // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Reference tests traverse schema keywords and arbitrary literal/default objects with different value shapes.
 type JSONSchemaRecord = Record<string, unknown>;
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Serialized schema properties are inspected only after their runtime object structure is checked.
 function schemaProperties(schema: unknown): Record<string, JSONSchemaRecord> {
   return (schema as { properties: Record<string, JSONSchemaRecord> }).properties;
 }

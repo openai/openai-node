@@ -83,6 +83,7 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
     }
   }
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Native channel events enter an untrusted boundary before their message data is parsed and validated.
   private readonly onMessage = (message: unknown): void => {
     if (this.disposed) {
       return;

@@ -39,7 +39,7 @@ type ZodTypeLike = (
     }
 ) & {
   /** Synchronous schema parser when the validator exposes an instance-level parse method. */
-  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The public schema adapter accepts arbitrary validated outputs and derives their concrete type separately.
+  // oxlint-disable-next-line anti-slop/no-unknown-returns, anti-slop/no-unknown-parameters -- The public schema adapter accepts arbitrary validated outputs and derives their concrete type separately. Zod parsers and their recursive metadata accept untrusted values before schema validation.
   parse?: (data: unknown) => unknown;
 };
 
@@ -97,6 +97,7 @@ function escapeSchemaDefinitionRefs<T extends object>(
   }
 
   const visited = new Set<object>();
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Zod parsers and their recursive metadata accept untrusted values before schema validation.
   const visit = (value: unknown): void => {
     if (!value || typeof value !== 'object' || Array.isArray(value) || visited.has(value)) {
       return;

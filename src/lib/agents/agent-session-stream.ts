@@ -51,6 +51,7 @@ function isInputContent(value: unknown): value is InputContentParam {
   return hasOwn(content, 'type') && hasOwn(content, field) && typeof content[field] === 'string';
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Tool handlers can return arbitrary runtime values; normalization validates the serialized output contract.
 function normalizedOutput(value: unknown): AgentFunctionCallOutputParam | null {
   if (value === null) {
     return null;
@@ -146,6 +147,7 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
   }
 
   /** Closes local requests without cancelling the turn; an optional reason becomes the abort error's cause. */
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   abort(reason?: unknown): void {
     this.controller.abort(reason);
     this.#stream?.controller.abort(this.controller.signal.reason);

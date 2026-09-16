@@ -63,7 +63,7 @@ describeOnUnix('monthly Node review proposal boundary', () => {
     return result;
   }
 
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Policy fixtures mutate unrelated package and proposal fields, including values of invalid types, before validation.
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type, anti-slop/no-unknown-parameters -- Policy fixtures mutate unrelated package and proposal fields, including values of invalid types, before validation.
   function proposal(changes: Record<string, unknown> = {}, body: unknown = 'Review summary') {
     return { base_sha: base, files: changes, body };
   }

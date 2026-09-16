@@ -341,6 +341,7 @@ describe('ChatCompletionStream prototype safety', () => {
 
     const completionError = await runner.done().then(
       () => null,
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 

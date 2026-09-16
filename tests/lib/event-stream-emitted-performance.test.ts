@@ -66,8 +66,9 @@ function measureListenerMovement<T>(operation: () => T) {
 
   function trackedFilter(
     this: unknown[],
-    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Array.filter accepts any truthy callback result; instrumentation must preserve that native signature.
+    // oxlint-disable-next-line anti-slop/no-unknown-returns, anti-slop/no-unknown-parameters -- Array.filter accepts any truthy callback result; instrumentation must preserve that native signature. The Array.filter spy must preserve callbacks and receivers for arbitrary listener arrays.
     predicate: (value: unknown, index: number, values: unknown[]) => unknown,
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Array.filter spy must preserve callbacks and receivers for arbitrary listener arrays.
     thisArg?: unknown,
   ) {
     const result = originalFilter.call(this, predicate, thisArg);

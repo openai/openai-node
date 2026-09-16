@@ -34,6 +34,7 @@ afterEach(() => {
   process.env = originalEnv;
 });
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The response fixture serializes heterogeneous synthetic API bodies without assuming their schema.
 function jsonResponse(body: unknown = {}): Response {
   return Response.json(body, {
     headers: { 'Content-Type': 'application/json' },
@@ -245,6 +246,7 @@ describe('bedrock provider', () => {
         })
         .then(
           () => null,
+          // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
           (error: unknown) => error,
         );
 

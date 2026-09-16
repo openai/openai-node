@@ -41,6 +41,7 @@ function createdEvent(): ResponseStreamEvent {
   } as ResponseStreamEvent;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The regression intentionally feeds unsupported or malformed event values through the public parsing boundary.
 function unsupportedEvent(type: unknown = futureEventType) {
   return {
     type,
@@ -81,7 +82,7 @@ function expectPrivateFailure(error: unknown, expectedType: string): asserts err
   expect((error as OpenAIError).stack).not.toContain(syntheticPassword);
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
+// oxlint-disable-next-line anti-slop/no-unknown-returns, anti-slop/no-unknown-parameters -- JavaScript rejection values can have any type; the calling test must validate the captured failure. The regression intentionally feeds unsupported or malformed event values through the public parsing boundary.
 function applyUnsupported(event: unknown, snapshot?: APIResponse): unknown {
   try {
     accumulateResponse(event as ResponseStreamEvent, snapshot);
@@ -461,6 +462,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
         () => {
           throw new Error('Expected the first response event to be rejected.');
         },
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         (error: unknown) => error,
       );
 
@@ -491,6 +493,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
         () => {
           throw new Error('Expected the restored stream to reject.');
         },
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         (error: unknown) => error,
       );
 
@@ -548,6 +551,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
         () => {
           throw new Error('Expected the public response stream to reject.');
         },
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         (error: unknown) => error,
       );
 
@@ -585,6 +589,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
       () => {
         throw new Error('Expected the provider API error to reject.');
       },
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 

@@ -106,6 +106,7 @@ function createHandlerHarness(runtime: Runtime, failedClientIDs: number[] = []):
   });
 
   const handlerExports: {
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The dynamically evaluated handler is invoked with both web and Node request fixtures.
     default?: (request: unknown, response?: MockNodeResponse) => Promise<HandlerResult | undefined>;
     // oxlint-disable-next-line anti-slop/no-known-value-widening -- Executing the CommonJS module populates this initially empty exports object.
   } = {};

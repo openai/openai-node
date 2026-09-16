@@ -16,6 +16,7 @@ type Example = (typeof examples)[number];
 interface Completion {
   choices: [{ delta: { content: string } }];
 }
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The VM harness also exercises incomplete legacy request and response objects without lifecycle APIs.
 type RouteHandler = (request: unknown, response: unknown) => Promise<void>;
 
 interface ExampleRuntime {
@@ -65,7 +66,7 @@ export function createResponse() {
       return response;
     }),
 
-    write: vi.fn((chunk: unknown) => {
+    write: vi.fn((chunk: string | Uint8Array) => {
       if (response.destroyed) {
         throw new Error('Attempted to write to a destroyed socket');
       }
@@ -175,6 +176,7 @@ export function loadExample(
   };
 
   const express = Object.assign(() => app, {
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The VM harness also exercises incomplete legacy request and response objects without lifecycle APIs.
     text: () => (_request: unknown, _response: unknown, next: () => void) => next(),
   });
 
@@ -198,7 +200,10 @@ export function loadExample(
 
     readonly chat = {
       completions: {
-        stream: (_body: unknown, providerOptions?: { signal?: AbortSignal }) => {
+        stream: (
+          _body: OpenAI.Chat.ChatCompletionCreateParams,
+          providerOptions?: { signal?: AbortSignal },
+        ) => {
           configureProvider(providerOptions);
           runtime.onProvider?.();
           return {
@@ -206,7 +211,10 @@ export function loadExample(
           };
         },
 
-        create: (_body: unknown, providerOptions?: { signal?: AbortSignal }) => {
+        create: (
+          _body: OpenAI.Chat.ChatCompletionCreateParams,
+          providerOptions?: { signal?: AbortSignal },
+        ) => {
           configureProvider(providerOptions);
           const chunks = completionChunks(runtime, false) as AsyncIterable<Completion>;
 
@@ -290,6 +298,7 @@ export function loadExample(
   return runtime;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The VM harness also exercises incomplete legacy request and response objects without lifecycle APIs.
 export function invoke(runtime: ExampleRuntime, request: unknown, response: unknown): Promise<void> {
   if (!runtime.handler) {
     throw new Error('The streaming example did not register its Express route');

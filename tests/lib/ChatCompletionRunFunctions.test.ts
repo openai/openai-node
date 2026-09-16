@@ -1358,7 +1358,10 @@ describe('resource completions', () => {
         const controller = new AbortController();
         const definition = {
           name: 'abortable',
-          function: (_args: unknown, activeRunner: Pick<ChatCompletionRunner<unknown>, 'controller'>) => {
+          function: (
+            _args: string | { args: string },
+            activeRunner: Pick<ChatCompletionRunner<unknown>, 'controller'>,
+          ) => {
             controller.abort(abortReason);
             activeRunner.controller.signal.throwIfAborted();
             return 'unreachable';

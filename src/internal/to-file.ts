@@ -200,6 +200,7 @@ async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Prom
   return parts;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Invalid upload diagnostics must accept arbitrary rejected values without assuming their object type.
 function propsForError(value: unknown): string {
   if (typeof value !== 'object' || value === null) {
     return '';

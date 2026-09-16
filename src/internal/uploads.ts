@@ -351,6 +351,7 @@ const isUploadable = (value: unknown): value is Uploadable =>
     isStreamingFile(value) ||
     isBlob(value));
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
 const hasStreamingUploadableValue = (value: unknown): boolean => {
   if (isStreamingFile(value) || isAsyncIterable(value) || isReadableStream(value)) {
     return true;
@@ -370,6 +371,7 @@ const hasStreamingUploadableValue = (value: unknown): boolean => {
   return false;
 };
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
 const hasUploadableValue = (value: unknown): boolean => {
   if (isUploadable(value)) {
     return true;
@@ -454,6 +456,7 @@ async function* iterateMultipartBody(
   yield encodeUTF8(`--${boundary}--\r\n`);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
 function* iterateFormEntries(body: unknown): Generator<FormEntry> {
   if (!body || typeof body !== 'object') {
     return;
@@ -464,6 +467,7 @@ function* iterateFormEntries(body: unknown): Generator<FormEntry> {
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
 function* iterateFormValue(key: string, value: unknown): Generator<FormEntry> {
   if (value === undefined) {
     return;
@@ -548,6 +552,7 @@ function getStreamingFileData(value: Uploadable): Exclude<Uploadable, StreamingF
   return value;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
 async function* iterateBytes(value: unknown): AsyncGenerator<Uint8Array> {
   if (typeof value === 'string') {
     yield encodeUTF8(value);
@@ -588,6 +593,7 @@ function escapeHeaderValue(value: string): string {
 const addFormValue = async (
   form: FormData,
   key: string,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
   value: unknown,
   options: CreateFormOptions,
 ): Promise<void> => {
