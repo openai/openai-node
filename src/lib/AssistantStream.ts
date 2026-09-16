@@ -102,7 +102,10 @@ export type RunSubmitToolOutputsParamsStream = Omit<RunSubmitToolOutputsParamsBa
 function stabilizeAssistantStreamEvent(event: AssistantStreamEvent) {
   const eventDescriptor = Object.getOwnPropertyDescriptor(event, 'event');
   const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
-  const { event: eventType, data } = event;
+  // oxlint-disable-next-line anti-slop/no-reflect-get -- Reflective wire reads reject primitive frames and preserve the original event receiver.
+  const eventType: AssistantStreamEvent['event'] = Reflect.get(event, 'event', event);
+  // oxlint-disable-next-line anti-slop/no-reflect-get -- Keep the paired wire-data read on the original receiver after reading the event discriminator.
+  const data: AssistantStreamEvent['data'] = Reflect.get(event, 'data', event);
   let stableData = data;
   if (
     eventType === 'thread.message.created' ||
@@ -119,7 +122,12 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent) {
     eventType === 'thread.run.step.expired'
   ) {
     const messageID = Object.getOwnPropertyDescriptor(data, 'id');
-    if (messageID && 'value' in messageID && data.id !== messageID.value) {
+    if (
+      messageID &&
+      'value' in messageID &&
+      // SAFETY: The own id descriptor was found above; keep its live read unknown while comparing it with the captured descriptor value.
+      (data as { id: unknown }).id !== messageID.value
+    ) {
       // SAFETY: Descriptor values are untyped; retaining this value as unknown avoids trusting a mutable message identifier.
       const canonicalID = messageID.value as unknown;
       // SAFETY: The proxy retains the event data and substitutes only its captured own id; all other properties forward to the original receiver.
