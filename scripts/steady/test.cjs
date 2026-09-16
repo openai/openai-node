@@ -41,6 +41,10 @@ async function health(port) {
 }
 
 async function main() {
+  const download = spawnSync(process.execPath, [path.join(__dirname, 'download.test.cjs')], {
+    stdio: 'inherit',
+  });
+  assert.equal(download.status, 0, 'Download retries must succeed');
   const lifetime = spawnSync(process.execPath, [path.join(__dirname, 'cache.test.cjs')], {
     stdio: 'inherit',
   });
