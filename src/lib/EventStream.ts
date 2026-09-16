@@ -1452,6 +1452,9 @@ export class EventStream<EventTypes extends BaseEvents> {
       this.controller.abort();
       return;
     }
+    if (this.#abortListeners.some((registration) => registration.signal === signal)) {
+      return;
+    }
 
     const listener = () => this.controller.abort();
     signal.addEventListener('abort', listener, { once: true });
@@ -1990,7 +1993,8 @@ export class EventStream<EventTypes extends BaseEvents> {
         try {
           for (const registration of listeners as any) {
             if (!registration.removed) {
-              registration.listener(...(args as any));
+              const { listener } = registration;
+              listener(...(args as any));
             }
           }
         } finally {

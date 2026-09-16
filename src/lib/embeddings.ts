@@ -34,7 +34,6 @@ export function createEmbedding(
     ...options,
     __security: { bearerAuth: true },
   };
-  const hasBodyOverride = requestOptions.body !== optimizedBody;
   const response: APIPromise<CreateEmbeddingResponse> = client.post('/embeddings', requestOptions);
 
   // Explicit encodings return the original response promise unchanged.
@@ -47,16 +46,19 @@ export function createEmbedding(
   loggerFor(client).debug('embeddings/decoding base64 embeddings from base64');
 
   return response._thenUnwrap((data) => {
-    if (data && data.data) {
-      const embeddings = data.data;
+    const embeddings = data?.data;
+    if (embeddings !== undefined) {
+      if (!Array.isArray(embeddings)) {
+        throw new TypeError('Expected embeddings response data to be an array');
+      }
       const { length } = embeddings;
       // Preserve the original iteration length and skip sparse-array holes.
       for (let index = 0; index < length; index += 1) {
         if (index in embeddings) {
           const embeddingBase64Obj = embeddings[index] as Embedding;
           const { embedding } = embeddingBase64Obj;
-          // A body override can request float embeddings or omit the format.
-          if (hasBodyOverride && Array.isArray(embedding)) {
+          // Request hooks and serialization can also select float embeddings.
+          if (Array.isArray(embedding)) {
             continue;
           }
           embeddingBase64Obj.embedding = toFloat32Array(embedding as unknown as string);

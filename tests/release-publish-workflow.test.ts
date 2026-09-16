@@ -114,6 +114,27 @@ describe('trusted npm release publication', () => {
             'process.exit(91);',
           ].join('\n'),
         );
+        if (spawnSync('jq', ['--version']).status !== 0) {
+          writeExecutable(
+            path.join(executableDirectory, 'jq'),
+            [
+              "const fs = require('node:fs');",
+              'const args = process.argv.slice(2);',
+              "const expression = args.find((arg) => !arg.startsWith('-'));",
+              'const filename = expression && args[args.indexOf(expression) + 1];',
+              "const input = fs.readFileSync(filename || 0, 'utf-8');",
+              'const value = JSON.parse(input);',
+              'let output;',
+              "if (expression === '.') output = value;",
+              "else if (expression === '.name') output = value.name;",
+              "else if (expression === '.version') output = value.version;",
+              "else if (expression === '.error.code == \"E404\"') output = value?.error?.code === 'E404';",
+              "else throw new Error('Unsupported jq expression: ' + expression);",
+              "if (args.includes('-e') && (output === false || output == null)) process.exit(1);",
+              "process.stdout.write(typeof output === 'string' && args.includes('-r') ? output : JSON.stringify(output));",
+            ].join('\n'),
+          );
+        }
 
         const env = {
           ...process.env,

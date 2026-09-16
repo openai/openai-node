@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 import OpenAI, { BadRequestError } from 'openai';
 import { APIPromise } from 'openai/api-promise';
 import type { Fetch } from 'openai/internal/builtin-types';
-import type { RequestOptions } from 'openai/internal/request-options';
+import type { FinalRequestOptions, RequestOptions } from 'openai/internal/request-options';
 import type { PromiseOrValue } from 'openai/internal/types';
 import { compareType } from '../utils/typing';
 
@@ -11,11 +11,17 @@ const encodedVector = Buffer.from(new Float32Array(vector).buffer).toString('bas
 const request = { input: 'hello', model: 'text-embedding-3-small' };
 
 class RecordingClient extends OpenAI {
+  prepareRequestOptions?: (options: FinalRequestOptions) => void;
   readonly requests: {
     path: string;
     options: PromiseOrValue<RequestOptions> | undefined;
     response: APIPromise<unknown>;
   }[] = [];
+
+  protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {
+    await super.prepareOptions(options);
+    this.prepareRequestOptions?.(options);
+  }
 
   override post<Rsp>(path: string, options?: PromiseOrValue<RequestOptions>): APIPromise<Rsp> {
     const response = super.post<Rsp>(path, options);
@@ -197,6 +203,46 @@ describe('embedding request compatibility', () => {
     },
   );
 
+  test.each(['mutation', 'replacement', 'serialization'] as const)(
+    'preserves numeric output after request-body %s',
+    async (customization) => {
+      const floatVector = [1.25, -2.5, 3.75, 4.5];
+      const floatBody = { ...request, encoding_format: 'float' };
+      const body = Object.freeze({
+        ...request,
+        ...(customization === 'serialization' ? { toJSON: () => floatBody } : {}),
+      });
+      const originalBody = { ...body };
+      const fetch = vi.fn<Fetch>(async (_url, init) => {
+        expect(JSON.parse(String(init?.body))).toEqual(floatBody);
+        return embeddingResponse(floatVector);
+      });
+      const client = new RecordingClient({ apiKey: 'test-key', fetch });
+      client.prepareRequestOptions = (options) => {
+        if (customization === 'replacement') {
+          options.body = floatBody;
+        } else if (customization === 'mutation') {
+          if (typeof options.body !== 'object' || options.body === null) {
+            throw new Error('Expected an object request body');
+          }
+          Object.assign(options.body, { encoding_format: 'float' });
+        }
+      };
+      const promise = client.embeddings.create(body);
+      const rawResponse = await promise.asResponse();
+      expect(await rawResponse.clone().json()).toMatchObject({ data: [{ embedding: floatVector }] });
+
+      const response = await promise;
+      expect(response.data[0]?.embedding).toEqual(floatVector);
+      const dataAndResponse = await promise.withResponse();
+      expect(dataAndResponse.data).toBe(response);
+      expect(dataAndResponse.response).toBe(rawResponse);
+      expect(dataAndResponse.request_id).toBe('req_embeddings');
+      expect(body).toEqual(originalBody);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
   test('preserves response identity and sparse entries from custom parsers', async () => {
     const client = new OpenAI({ apiKey: 'test-key' });
     const entries: OpenAI.Embedding[] = [];
@@ -207,6 +253,12 @@ describe('embedding request compatibility', () => {
       embedding: encodedVector as unknown as number[],
     };
     entries[1] = entry;
+    const numericEntry = Object.freeze({
+      object: 'embedding' as const,
+      index: 2,
+      embedding: vector,
+    });
+    entries[2] = numericEntry;
     const data: OpenAI.CreateEmbeddingResponse = {
       object: 'list',
       data: entries,
@@ -221,6 +273,8 @@ describe('embedding request compatibility', () => {
     expect(result.data[1]).toBe(entry);
     expect(0 in result.data).toBe(false);
     expect(entry.embedding).toEqual(vector);
+    expect(result.data[2]).toBe(numericEntry);
+    expect(numericEntry.embedding).toBe(vector);
   });
 
   test('keeps the original iteration length when a custom parser mutates the array', async () => {

@@ -1518,6 +1518,9 @@ export class ChatCompletionStream<ParsedT = null>
         );
       }
 
+      if (choiceSnapshot.finish_reason) {
+        state.done_tool_calls.add(toolCallIndex);
+      }
       this._emit('tool_calls.function.arguments.done', {
         name: toolCallSnapshot.function.name,
         index: toolCallIndex,

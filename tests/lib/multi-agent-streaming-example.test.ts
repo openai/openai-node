@@ -1,3 +1,4 @@
+import { compiledFixture, compiledFixtureConfig } from '../utils/compiled-fixtures';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -40,7 +41,7 @@ const textEvent: BetaResponseStreamEvent = {
   sequence_number: 0,
 };
 
-async function runExample(events: BetaResponseStreamEvent[]) {
+async function runExample(events: readonly BetaResponseStreamEvent[], ending: 'done' | 'eof' = 'done') {
   const requests: { url: string | undefined; body: unknown }[] = [];
   const server = createServer((request, response) => {
     let body = '';
@@ -53,7 +54,7 @@ async function runExample(events: BetaResponseStreamEvent[]) {
       for (const [sequence_number, event] of events.entries()) {
         response.write(`event: ${event.type}\ndata: ${JSON.stringify({ ...event, sequence_number })}\n\n`);
       }
-      response.end('data: [DONE]\n\n');
+      response.end(ending === 'done' ? 'data: [DONE]\n\n' : '');
     });
   });
   server.listen(0, '127.0.0.1');
@@ -67,19 +68,18 @@ async function runExample(events: BetaResponseStreamEvent[]) {
   const child = spawn(
     process.execPath,
     [
-      path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '-T',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
-      path.join(root, 'examples/responses/multi-agent-streaming.ts'),
+      compiledFixture('examples/responses/multi-agent-streaming.ts'),
     ],
     {
       cwd: root,
       env: {
         OPENAI_API_KEY: 'synthetic-example-key',
         OPENAI_BASE_URL: `http://127.0.0.1:${address.port}/v1`,
-        TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+        TS_NODE_PROJECT: compiledFixtureConfig(),
         DISABLE_V8_COMPILE_CACHE: '1',
+        NODE_COMPILE_CACHE: process.env['NODE_COMPILE_CACHE'],
         SystemRoot: process.env['SystemRoot'],
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -131,6 +131,46 @@ test.each([
   expect(result.stdout).toBe(partialOutput ? '━━━ Coordinator: /root ━━━\n\nSynthetic answer' : '');
 });
 
+test.each(
+  (['done', 'eof'] as const).flatMap((ending) => [
+    { name: 'no events', events: [], ending },
+    { name: 'partial coordinator text', events: [textEvent], ending },
+    ...(['completed', 'failed', 'incomplete'] as const).map((status) => ({
+      name: `only a child with ${status} status`,
+      events: [{ ...terminalEvent(status), agent: { agent_name: '/root/alpha' } }],
+      ending,
+    })),
+  ]),
+)('rejects $ending after $name without coordinator completion', async ({ name, events, ending }) => {
+  const result = await runExample(events, ending);
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr).toContain('Stream ended before the coordinator response completed.');
+  expect(result.stderr).not.toContain('Synthetic private detail');
+  expect(result.stdout).toBe(
+    name === 'partial coordinator text' ? '━━━ Coordinator: /root ━━━\n\nSynthetic answer' : '',
+  );
+});
+
+test.each(
+  (['done', 'eof'] as const).flatMap((ending) =>
+    [
+      { ownership: 'omitted', agent: undefined },
+      { ownership: 'null', agent: null },
+      { ownership: 'explicit root', agent: { agent_name: '/root' } },
+    ].map((owner) => ({ ...owner, ending })),
+  ),
+)('accepts $ending after coordinator completion with $ownership ownership', async ({ agent, ending }) => {
+  const result = await runExample(
+    [textEvent, { ...terminalEvent('completed'), ...(agent === undefined ? {} : { agent }) }],
+    ending,
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stderr).toBe('');
+  expect(result.stdout).toBe('━━━ Coordinator: /root ━━━\n\nSynthetic answer\n');
+});
+
 test.each(['completed', 'failed', 'incomplete'] as const)(
   'continues to a successful root response after a child response is %s',
   async (status) => {
@@ -162,18 +202,22 @@ test.each(['completed', 'failed', 'incomplete'] as const)(
   },
 );
 
-test('preserves SDK error handling for a named SSE error frame', async () => {
-  const result = await runExample([
-    {
-      type: 'error',
-      code: 'server_error',
-      message: 'Synthetic SSE error',
-      param: null,
-      sequence_number: 0,
-    },
-  ]);
+test.each([false, true])(
+  'preserves a named SSE error after coordinator completion: %s',
+  async (completed) => {
+    const result = await runExample([
+      ...(completed ? [terminalEvent('completed')] : []),
+      {
+        type: 'error',
+        code: 'server_error',
+        message: 'Synthetic SSE error',
+        param: null,
+        sequence_number: 0,
+      },
+    ]);
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stderr).toContain('APIError: Synthetic SSE error');
-  expect(result.stdout).toBe('');
-});
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('APIError: Synthetic SSE error');
+    expect(result.stdout).toBe('');
+  },
+);

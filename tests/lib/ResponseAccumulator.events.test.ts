@@ -69,6 +69,26 @@ function applyEvent(snapshot: Response, event: Record<string, unknown>): Respons
 }
 
 describe('ResponseAccumulator output and content events', () => {
+  test('compaction progress preserves the current response and output item', () => {
+    const snapshot = snapshotFor({ type: 'compaction', encrypted_content: '' });
+    const before = structuredClone(snapshot);
+    const { output } = snapshot;
+    const [item] = output;
+
+    for (const sequenceNumber of [2, 3]) {
+      const result = applyEvent(snapshot, {
+        type: 'response.compaction.compacting',
+        sequence_number: sequenceNumber,
+        output_index: 0,
+        item_id: 'item_123',
+      });
+      expect(result).toBe(snapshot);
+      expect(result.output).toBe(output);
+      expect(result.output[0]).toBe(item);
+      expect(result).toEqual(before);
+    }
+  });
+
   test('replaces completed output items with detached authoritative copies', () => {
     const snapshot = snapshotFor({
       type: 'message',

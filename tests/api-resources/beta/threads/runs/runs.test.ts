@@ -21,7 +21,7 @@ describe('resource runs', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.beta.threads.runs.create('thread_id', {
+    await client.beta.threads.runs.create('thread_id', {
       assistant_id: 'assistant_id',
       include: ['step_details.tool_calls[*].file_search.results[*].content'],
       additional_instructions: 'additional_instructions',
@@ -62,7 +62,7 @@ describe('resource runs', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    const response = await client.beta.threads.runs.retrieve('run_id', { thread_id: 'thread_id' });
+    await client.beta.threads.runs.retrieve('run_id', { thread_id: 'thread_id' });
   });
 
   test('update: only required params', async () => {
@@ -77,7 +77,7 @@ describe('resource runs', () => {
   });
 
   test('update: required and optional params', async () => {
-    const response = await client.beta.threads.runs.update('run_id', {
+    await client.beta.threads.runs.update('run_id', {
       thread_id: 'thread_id',
       metadata: { foo: 'string' },
     });
@@ -122,7 +122,7 @@ describe('resource runs', () => {
   });
 
   test('cancel: required and optional params', async () => {
-    const response = await client.beta.threads.runs.cancel('run_id', { thread_id: 'thread_id' });
+    await client.beta.threads.runs.cancel('run_id', { thread_id: 'thread_id' });
   });
 
   test('submitToolOutputs: only required params', async () => {
@@ -140,7 +140,7 @@ describe('resource runs', () => {
   });
 
   test('submitToolOutputs: required and optional params', async () => {
-    const response = await client.beta.threads.runs.submitToolOutputs('run_id', {
+    await client.beta.threads.runs.submitToolOutputs('run_id', {
       thread_id: 'thread_id',
       tool_outputs: [{ output: 'output', tool_call_id: 'tool_call_id' }],
       stream: false,

@@ -6,12 +6,10 @@ const indexJs = process.env['DIST_PATH']
   : path.resolve(__dirname, '..', '..', 'dist', 'index.js');
 
 const before = fs.readFileSync(indexJs, 'utf-8');
+// Keep the wrapper on the unmapped header line to preserve source-map positions.
 const after = before.replace(
   /^(\s*Object\.defineProperty\s*\(exports,\s*["']__esModule["'].+)$/m,
-  `exports = module.exports = function (...args) {
-    return Reflect.construct(exports.default, args, new.target || exports.default)
-  }
-  $1`.replaceAll(/^ {2}/gm, ''),
+  `exports = module.exports = function (...args) { return Reflect.construct(exports.default, args, new.target || exports.default); }; $1`,
 );
 // Retain the callable CommonJS export while sharing the SDK class's inheritance.
 fs.writeFileSync(

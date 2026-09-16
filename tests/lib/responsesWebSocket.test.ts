@@ -118,6 +118,34 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
     expect(websocket.connectionHeaders).toEqual([{ Authorization: 'Bearer test-key' }]);
   });
 
+  test('forwards repeated compaction progress to listeners and the stream', async () => {
+    const websocket = createWebSocket();
+    websocket.socket.open();
+    const iterator = websocket.stream();
+    const named = vi.fn();
+    const messages = vi.fn();
+    websocket.on('response.compaction.compacting', named);
+    websocket.on('event', messages);
+    await expect(iterator.next()).resolves.toMatchObject({ value: { type: 'open' } });
+
+    for (const sequenceNumber of [2, 3]) {
+      const event = {
+        type: 'response.compaction.compacting',
+        sequence_number: sequenceNumber,
+        output_index: 0,
+        item_id: 'cmp_123',
+        stream_id: 'stream_123',
+      } satisfies StableResponsesServerEvent & BetaResponsesServerEvent;
+      websocket.socket.emit('message', JSON.stringify(event), false);
+      await expect(iterator.next()).resolves.toMatchObject({ value: { type: 'message', message: event } });
+      expect(named).toHaveBeenLastCalledWith(event);
+      expect(messages).toHaveBeenLastCalledWith(event);
+    }
+    expect(named).toHaveBeenCalledTimes(2);
+    await iterator.return?.();
+    websocket.close();
+  });
+
   test('rejects operations before its socket has been initialized', () => {
     const websocket = createWebSocket();
     (websocket as any).socket = undefined;

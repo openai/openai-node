@@ -1,3 +1,4 @@
+import { compiledFixture } from './utils/compiled-fixtures';
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -67,7 +68,8 @@ const credentialStates: CredentialState[] = [
 ];
 
 function withFixture(run: (fixture: Fixture) => void) {
-  const directory = mkdtempSync(path.join(tmpdir(), 'openai-node-cloudflare-lifecycle-'));
+  // Exercise preload paths containing spaces regardless of the system temporary directory.
+  const directory = mkdtempSync(path.join(tmpdir(), 'openai-node-cloudflare lifecycle-'));
   const worker = path.join(directory, 'ecosystem-tests', 'cloudflare-worker');
   const bin = path.join(directory, 'bin');
   const fixture: Fixture = {
@@ -209,6 +211,10 @@ function expectNoCloudflareCredentialArtifacts(fixture: Fixture) {
   expect(readdirSync(fixture.worker).filter((name) => name.startsWith('.dev.vars.openai-'))).toEqual([]);
 }
 
+function preloadNodeOptions(preload: string) {
+  return `--require "${preload.split('\\').join('\\\\').split('"').join('\\"')}"`;
+}
+
 function runCloudflare(
   fixture: Fixture,
   flags: string[],
@@ -219,10 +225,7 @@ function runCloudflare(
   const result = spawnSync(
     process.execPath,
     [
-      path.join(repositoryRoot, 'node_modules/ts-node/dist/bin.js'),
-      '-r',
-      path.join(repositoryRoot, 'node_modules/tsconfig-paths/register.js'),
-      path.join(repositoryRoot, 'ecosystem-tests/cli.ts'),
+      compiledFixture('ecosystem-tests/cli.ts'),
       'cloudflare-worker',
       '--fromNpm=openai',
       '--skipPack',
@@ -365,7 +368,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       const result = runCloudflare(fixture, ['--live'], {
         CLOUDFLARE_FAILURE: 'capture-original',
         CLOUDFLARE_HELD_CAPTURE: capture,
-        NODE_OPTIONS: `--require ${preload}`,
+        NODE_OPTIONS: preloadNodeOptions(preload),
       });
 
       expect(result.error).toBeUndefined();
@@ -385,7 +388,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
       const result = runCloudflare(fixture, ['--live'], {
         CLOUDFLARE_FAILURE: 'edit-original',
-        NODE_OPTIONS: `--require ${preload}`,
+        NODE_OPTIONS: preloadNodeOptions(preload),
       });
 
       expect(result.error).toBeUndefined();
@@ -477,7 +480,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         const result = runCloudflare(fixture, ['--live', '--retry=3', '--retryDelay=0'], {
           CLOUDFLARE_FAILURE: 'deny-path-validation',
           CLOUDFLARE_DENIAL_READY: marker,
-          NODE_OPTIONS: `--require ${preload}`,
+          NODE_OPTIONS: preloadNodeOptions(preload),
         });
 
         expect(result.error).toBeUndefined();
@@ -601,7 +604,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
           CLOUDFLARE_FAILURE: interruption.failure,
           CLOUDFLARE_INTERRUPT_COMMAND: interruption.command,
           CLOUDFLARE_INTERRUPT_SIGNAL: interruption.signal,
-          NODE_OPTIONS: `--require ${preload}`,
+          NODE_OPTIONS: preloadNodeOptions(preload),
         },
         false,
       );
@@ -677,7 +680,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         const result = runCloudflare(fixture, ['--live', '--retry=3', '--retryDelay=0'], {
           CLOUDFLARE_FAILURE: 'replace-file',
           CLOUDFLARE_IDENTITY_FIELD: field,
-          NODE_OPTIONS: `--require ${preload}`,
+          NODE_OPTIONS: preloadNodeOptions(preload),
         });
 
         expect(result.error).toBeUndefined();
@@ -790,7 +793,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         const result = runCloudflare(fixture, ['--live'], {
           CLOUDFLARE_FAILURE: 'replace-during-truncate',
           CLOUDFLARE_REPLACE_READY: marker,
-          NODE_OPTIONS: `--require ${preload}`,
+          NODE_OPTIONS: preloadNodeOptions(preload),
         });
 
         expect(result.error).toBeUndefined();
@@ -860,7 +863,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
           {
             CLOUDFLARE_ACQUISITION_PHASE: phase,
             CLOUDFLARE_ACQUISITION_SIGNAL: signal,
-            NODE_OPTIONS: `--require ${preload}`,
+            NODE_OPTIONS: preloadNodeOptions(preload),
           },
           noCleanup,
         );
@@ -919,7 +922,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         const result = runCloudflare(
           fixture,
           flags,
-          { CLOUDFLARE_STAGING_SIGNAL: signal, NODE_OPTIONS: `--require ${preload}` },
+          { CLOUDFLARE_STAGING_SIGNAL: signal, NODE_OPTIONS: preloadNodeOptions(preload) },
           noCleanup,
         );
 
@@ -988,7 +991,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         ].join('\n'),
       );
 
-      const result = runCloudflare(fixture, ['--live'], { NODE_OPTIONS: `--require ${preload}` });
+      const result = runCloudflare(fixture, ['--live'], { NODE_OPTIONS: preloadNodeOptions(preload) });
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
