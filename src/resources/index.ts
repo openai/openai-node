@@ -91,6 +91,7 @@ export {
   type ImageGenerateParamsNonStreaming,
   type ImageGenerateParamsStreaming,
 } from './images';
+export { Live } from './live/live';
 export { Models, type Model, type ModelDeleted, type ModelsPage } from './models';
 export {
   Moderations,

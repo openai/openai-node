@@ -1,3 +1,4 @@
+import { compiledFixture } from './utils/compiled-fixtures';
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -224,10 +225,7 @@ function runCloudflare(
   const result = spawnSync(
     process.execPath,
     [
-      path.join(repositoryRoot, 'node_modules/ts-node/dist/bin.js'),
-      '-r',
-      path.join(repositoryRoot, 'node_modules/tsconfig-paths/register.js'),
-      path.join(repositoryRoot, 'ecosystem-tests/cli.ts'),
+      compiledFixture('ecosystem-tests/cli.ts'),
       'cloudflare-worker',
       '--fromNpm=openai',
       '--skipPack',

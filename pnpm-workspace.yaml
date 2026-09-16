@@ -36,6 +36,8 @@ overrides:
   'qs@<6.16.0': 6.16.0
 
 allowBuilds:
+  # Jest's watcher uses optional platform binaries; source builds are unnecessary.
+  '@parcel/watcher': false
   '@swc/core': true
   sharp: false
   unrs-resolver: false

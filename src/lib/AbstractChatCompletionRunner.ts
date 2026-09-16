@@ -1,4 +1,4 @@
-import { APIUserAbortError, OpenAIError } from '../error';
+import { OpenAIError } from '../error';
 import type OpenAI from '../index';
 import type { RequestOptions } from '../internal/request-options';
 import { uuid4 } from '../internal/utils/uuid';
@@ -340,13 +340,7 @@ export class AbstractChatCompletionRunner<
 
   #throwIfAborted() {
     if (this.controller.signal.aborted) {
-      const error = new APIUserAbortError();
-      Object.defineProperty(error, 'cause', {
-        value: this.controller.signal.reason,
-        writable: true,
-        configurable: true,
-      });
-      throw error;
+      throw this._userAbortError();
     }
   }
 
@@ -504,20 +498,34 @@ export class AbstractChatCompletionRunner<
           parsed = await fn.parse(args);
         } catch (error) {
           if (this.controller.signal.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
           }
           const content = error instanceof Error ? error.message : String(error);
           return { message: { role, tool_call_id, content }, functionCalled: false };
         }
         if (this.controller.signal.aborted) {
-          throw new APIUserAbortError();
+          throw this._userAbortError();
         }
-        rawContent = await fn.function(parsed, runner, toolContext);
+        try {
+          rawContent = await fn.function(parsed, runner, toolContext);
+        } catch (error) {
+          if (this.controller.signal.aborted && Object.is(error, this.controller.signal.reason)) {
+            throw this._userAbortError();
+          }
+          throw error;
+        }
       } else {
         if (this.controller.signal.aborted && !bufferedToolCall) {
-          throw new APIUserAbortError();
+          throw this._userAbortError();
         }
-        rawContent = await fn.function(args, runner, toolContext);
+        try {
+          rawContent = await fn.function(args, runner, toolContext);
+        } catch (error) {
+          if (this.controller.signal.aborted && Object.is(error, this.controller.signal.reason)) {
+            throw this._userAbortError();
+          }
+          throw error;
+        }
       }
 
       const content = AbstractChatCompletionRunner.#stringifyFunctionCallResult(rawContent);
@@ -555,7 +563,7 @@ export class AbstractChatCompletionRunner<
             this._addMessage(result.message);
           }
           if (this.controller.signal.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
           }
 
           if (singleFunctionToCall && result.functionCalled) {
@@ -584,7 +592,7 @@ export class AbstractChatCompletionRunner<
           }
         }
         if (this.controller.signal.aborted) {
-          throw new APIUserAbortError();
+          throw this._userAbortError();
         }
       }
 

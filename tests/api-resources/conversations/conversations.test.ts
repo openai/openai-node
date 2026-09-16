@@ -63,7 +63,7 @@ describe('resource conversations', () => {
   });
 
   test('update: required and optional params', async () => {
-    const response = await client.conversations.update('conv_123', { metadata: { foo: 'string' } });
+    await client.conversations.update('conv_123', { metadata: { foo: 'string' } });
   });
 
   test('delete', async () => {

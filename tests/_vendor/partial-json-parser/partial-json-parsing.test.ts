@@ -61,16 +61,14 @@ describe('partial parsing', () => {
   test('should only throw errors parsing numbers', () =>
     assert(
       property(json({ depthSize: 'large', noUnicodeString: false }), (jsonString) => {
+        const isNumber = typeof JSON.parse(jsonString) === 'number';
         for (let i = 1; i < jsonString.length; i++) {
           // speedup
           i += Math.floor(Math.random() * 3);
           const substring = jsonString.slice(0, i);
 
           // since we don't allow partial parsing for numbers
-          if (
-            typeof JSON.parse(jsonString) === 'number' &&
-            'e-+.'.includes(substring[substring.length - 1]!)
-          ) {
+          if (isNumber && 'e-+.'.includes(substring[substring.length - 1]!)) {
             expect(() => partialParse(substring)).toThrow(MalformedJSON);
           } else {
             partialParse(substring);
