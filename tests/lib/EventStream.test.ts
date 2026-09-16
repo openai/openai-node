@@ -74,6 +74,7 @@ function settledWithin(promise: Promise<unknown>, ticks = 50): Promise<'settled'
   return chain.then(() => (settled ? 'settled' : 'pending'));
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function captureFailure(promise: Promise<unknown>): Promise<unknown> {
   try {
     await promise;

@@ -597,7 +597,7 @@ it.each([
     const serialize = vi.fn(function serializeConfiguredTool(
       this: OpenAI.Chat.ChatCompletionFunctionTool | typeof serializedFunction,
       key: string,
-    ): unknown {
+    ) {
       expect(this).toBe(location === 'tool' ? tool : serializedFunction);
       expect(key).toBe(location === 'tool' ? '0' : 'function');
       return location === 'tool'
@@ -2550,7 +2550,7 @@ it.each(['refusal', 'message'] as const)(
     const unsafe = `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`;
     const stream = createStructuredStream('content', ['{}']);
     const parse = vi.spyOn(partialJSONParser, 'partialParse');
-    let read: (() => unknown) | undefined;
+    let read: (() => void) | undefined;
 
     stream.on('chunk', (current, snapshot) => {
       if (typeof current.choices[0]?.delta.content !== 'string') {

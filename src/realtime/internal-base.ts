@@ -87,6 +87,7 @@ type RealtimeEvents = Simplify<
           type: EventType;
         }
       >,
+      // oxlint-disable-next-line anti-slop/no-unknown-returns -- Preserve the published event-callback contract, which accepts and ignores arbitrary return values.
     ) => unknown;
   }
 >;

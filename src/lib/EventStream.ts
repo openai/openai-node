@@ -82,6 +82,7 @@ const trustedNativeConstructorSources = new Set<string>();
 const canonicalIntrinsicDescriptors = new Map<string, ReadonlyMap<PropertyKey, PropertyDescriptor>>();
 const foreignErrorStackDescriptors = new WeakMap<object, PropertyDescriptor>();
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Native and cross-realm constructor identities are inspected without assuming an unvalidated result type.
 type NativeErrorConstructor = (...args: never[]) => unknown;
 
 // oxlint-disable-next-line anti-slop/no-object-parameters -- The native proxy predicate accepts arbitrary object identities without invoking their handlers.
@@ -572,6 +573,7 @@ function estimateRetainedBufferBytes(
     return undefined;
   }
 
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Captured native accessors are checked for a finite numeric result before retained-size accounting.
   let getter: (() => unknown) | undefined;
   const kind: RetainedStorage['kind'] = 'buffer';
   switch (brand) {

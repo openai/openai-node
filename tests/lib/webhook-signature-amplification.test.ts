@@ -33,7 +33,7 @@ function makeHeaders(signatures: string[], timestamp = String(now)): Headers {
   });
 }
 
-function runPublicSurface(surface: Surface, headers: Headers, signedPayload = payload): Promise<unknown> {
+function runPublicSurface(surface: Surface, headers: Headers, signedPayload = payload) {
   const client = new OpenAI({ apiKey: 'test-key', webhookSecret: secret });
   return surface === 'verifySignature'
     ? client.webhooks.verifySignature(signedPayload, headers)

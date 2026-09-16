@@ -31,6 +31,7 @@ import { Stream } from '../streaming';
 import { AbstractChatCompletionRunner } from './AbstractChatCompletionRunner';
 import type { AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Partial JSON may have any shape; callers validate or parse it against their response schema.
 function parseStructuredStreamingJSON(content: string): unknown {
   try {
     return partialParse(content);

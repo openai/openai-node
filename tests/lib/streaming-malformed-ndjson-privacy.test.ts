@@ -69,7 +69,11 @@ function assertSafeSyntaxError(value: unknown): asserts value is SyntaxError & {
 interface WrapperHandle {
   controller: AbortController;
   done: () => Promise<void>;
-  final: () => Promise<unknown>;
+  final: () => ReturnType<
+    | ChatCompletionStream['finalChatCompletion']
+    | AssistantStream['finalRun']
+    | ResponseStream['finalResponse']
+  >;
   onError: (listener: (error: OpenAIError) => void) => void;
 }
 

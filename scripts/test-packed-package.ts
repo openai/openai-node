@@ -3,7 +3,7 @@ import type { promisify } from 'node:util';
 import type pAll from 'p-all';
 
 const packedPackageAcorn: {
-  parse: (source: string, options: { ecmaVersion: 2020; sourceType: 'module' }) => unknown;
+  parse: (source: string, options: { ecmaVersion: 2020; sourceType: 'module' }) => void;
 } = require(require.resolve('acorn', { paths: [require.resolve('ts-node/package.json')] }));
 const packedPackageAssert = require('node:assert/strict');
 const packedPackageChildProcess = require('node:child_process');

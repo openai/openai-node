@@ -125,7 +125,7 @@ describe.each([
       nested: Object.freeze({ $ref: '#/definitions/account/admin' }),
     });
     const Root = z.object({ payload: nestedReferenceLiteral().default(payload) });
-    const helpers: (() => unknown)[] = [
+    const helpers = [
       () => zodResponseFormat(Root, 'account').json_schema.schema,
       () => zodTextFormat(Root, 'account').schema,
       () => zodFunction({ name: 'account', parameters: Root }).function.parameters,

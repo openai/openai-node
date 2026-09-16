@@ -95,6 +95,7 @@ function decodeNativeResponseBody(body: ArrayBuffer): string {
   return new TextDecoder('utf-8', { ignoreBOM: typeof scope.Bun?.version === 'string' }).decode(body);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Decoded token JSON remains untrusted until the caller validates its fields.
 async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
   let readText: ((this: Response) => Promise<string>) | undefined;
   let responsePrototype: object | null = null;

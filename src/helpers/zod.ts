@@ -39,6 +39,7 @@ type ZodTypeLike = (
     }
 ) & {
   /** Synchronous schema parser when the validator exposes an instance-level parse method. */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The public schema adapter accepts arbitrary validated outputs and derives their concrete type separately.
   parse?: (data: unknown) => unknown;
 };
 
@@ -236,7 +237,7 @@ function parseZodObject<ZodInput extends ZodTypeLike>(
   content: string,
 ): InferZodType<ZodInput> {
   const parsed = parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, content);
-  const parser = (zodObject as { parse?: (data: unknown) => unknown }).parse;
+  const parser = zodObject.parse;
 
   if (typeof parser === 'function') {
     const result = parser.call(zodObject, parsed) as InferZodType<ZodInput>;
@@ -366,6 +367,7 @@ interface ZodFunctionOptions<Parameters extends ZodTypeLike> {
   parameters: Parameters;
 
   /** Optional callback invoked with validated arguments by chat `runTools()`. */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Public tool callbacks may return arbitrary application values; preserve the published callback contract.
   function?: ((args: InferZodType<Parameters>) => unknown | Promise<unknown>) | undefined;
 
   /** Optional model-visible explanation of when and how the function should be used. */
@@ -455,6 +457,7 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
   parameters: Parameters;
 
   /** Optional callback retained on the tool; `responses.parse()` does not execute it. */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Public tool callbacks may return arbitrary application values; preserve the published callback contract.
   function?: ((args: InferZodType<Parameters>) => unknown | Promise<unknown>) | undefined;
 
   /** Optional model-visible explanation of when and how the function should be used. */
@@ -467,6 +470,7 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
   name: string;
 
   /** Callback signature associated with validated function-call arguments. */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Public tool callbacks may return arbitrary application values; preserve the published callback contract.
   function: (args: InferZodType<Parameters>) => unknown;
 }> {
   const parameters = options.parameters;

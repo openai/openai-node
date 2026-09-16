@@ -31,6 +31,7 @@ function createCauseFreeJSONFailure(privateValue: string): Error {
   });
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Cross-realm thrown values must stay unknown so privacy assertions validate their actual shape.
 function createCrossRealmJSONFailure(privateValue: string, wrapped = false): unknown {
   return runInNewContext(
     [
@@ -62,6 +63,7 @@ function createWorkloadClient(provider: AzureProvider, apiFetch: typeof fetch): 
 }
 
 async function expectPrivateParseFailure(
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- This failure-only harness accepts different SDK result types and validates their rejection instead.
   operation: () => Promise<unknown>,
   privateValue: string,
 ): Promise<void> {
@@ -887,7 +889,10 @@ describe('Azure IMDS successful-response JSON privacy', () => {
   );
 
   it('reads an own custom parsed token only once', async () => {
-    const readToken = vi.fn<() => unknown>().mockReturnValueOnce(VALID_SUBJECT_TOKEN).mockReturnValue(42);
+    const readToken = vi
+      .fn<() => string | number>()
+      .mockReturnValueOnce(VALID_SUBJECT_TOKEN)
+      .mockReturnValue(42);
     const data = Object.defineProperty({}, 'access_token', { get: readToken });
     const response = new Response(null);
     vi.spyOn(response, 'json').mockResolvedValue(data);

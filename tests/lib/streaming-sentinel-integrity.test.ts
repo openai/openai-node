@@ -81,6 +81,7 @@ async function collect(source: AsyncIterable<unknown>): Promise<unknown[]> {
   return items;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function rejection(source: AsyncIterable<unknown>): Promise<unknown> {
   return await collect(source).then(
     () => {},

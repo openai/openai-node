@@ -878,6 +878,7 @@ function parseLocalRef(ref: string): string[] | undefined {
   return parts;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Resolving untrusted schema references may produce any value; callers perform the schema checks.
 function resolvePointerPart(resolved: unknown, part: string): unknown | undefined {
   if (Array.isArray(resolved)) {
     if (!/^(?:0|[1-9]\d*)$/.test(part)) {

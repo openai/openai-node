@@ -19,6 +19,7 @@ interface JsonSchema {
 
 interface HelperResult {
   schema: JsonSchema;
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The shared adapter covers arbitrary Zod schema outputs, which each fixture compares with its expected value.
   parseRaw?: (content: string) => unknown;
 }
 

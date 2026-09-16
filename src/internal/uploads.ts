@@ -537,7 +537,7 @@ function validateStreamingFileType(type: string): string {
   return type;
 }
 
-function getStreamingFileData(value: Uploadable): unknown {
+function getStreamingFileData(value: Uploadable): Exclude<Uploadable, StreamingFile> {
   if (isStreamingFile(value)) {
     return value.data;
   }

@@ -74,6 +74,7 @@ function oauthResponse(accessToken: string, expiresIn = 3600): Response {
   });
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- The adversarial token accessor can return malformed values that the SDK must validate.
 function accessorResponse(readAccessToken: () => unknown, useProxy = false): Response {
   const payload: { access_token: unknown; expires_in: number } = {
     access_token: undefined,
@@ -130,7 +131,7 @@ function createLogger() {
   return { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 }
 
-function operationFor(surface: Surface, harness: Harness): () => Promise<unknown> {
+function operationFor(surface: Surface, harness: Harness) {
   if (surface === 'direct-auth') {
     const auth = new WorkloadIdentityAuth(harness.config, harness.fetch);
     return () => auth.getToken();
@@ -141,7 +142,7 @@ function operationFor(surface: Surface, harness: Harness): () => Promise<unknown
 }
 
 async function expectPrivateFailure(
-  run: () => Promise<unknown>,
+  run: ReturnType<typeof operationFor>,
   accessToken: string,
   surface: Surface,
 ): Promise<Error> {

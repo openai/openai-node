@@ -138,6 +138,7 @@ type StandardTextFormatProps = Omit<
 /** Function callback invoked with arguments validated by a Standard Schema implementation. */
 type StandardToolFunction<Parameters extends StandardSchemaLike> = (
   args: InferStandardOutput<Parameters>,
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Public tool callbacks may return arbitrary application values; preserve the published callback contract.
 ) => unknown | Promise<unknown>;
 
 /** Model-facing function-tool settings and optional Standard Schema validation callback. */
@@ -395,6 +396,7 @@ function resolveLocalRefForExclusivity(
   schema: unknown,
   root: JSONSchema,
   seenRefs = new Set<string>(),
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Resolving untrusted schema references may produce any value; callers perform the schema checks.
 ): unknown | undefined {
   if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
     return schema;

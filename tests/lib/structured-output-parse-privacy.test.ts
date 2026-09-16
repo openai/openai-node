@@ -310,7 +310,9 @@ function createStreamingContentClient(
 
 interface Scenario {
   title: string;
-  parse: (content: string) => Promise<unknown>;
+  parse: (
+    content: string,
+  ) => Promise<ReturnType<typeof parseChatCompletion> | ReturnType<typeof parseResponse>>;
   expected: Record<string, unknown>;
 }
 

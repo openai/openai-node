@@ -74,6 +74,7 @@ function cancelResponseBody(response: Response): void {
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Decoded token JSON remains untrusted until the caller validates its fields.
 async function readResponseBody(response: Response, signal?: AbortSignal): Promise<unknown> {
   if (!response.body) {
     throw new OpenAIError('X.509 workload identity token exchange returned invalid JSON.');

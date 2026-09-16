@@ -8,6 +8,7 @@ import { pollWithResponse } from 'openai/lib/polling';
 
 type Options = RequestOptions & { pollIntervalMs?: number };
 type FetchMock = ReturnType<typeof vi.fn<Fetch>>;
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- This failure-only harness accepts different SDK result types and validates their rejection instead.
 type Method = [string, number, (client: OpenAI, options: Options) => Promise<unknown>];
 type AbortListener = Parameters<AbortSignal['addEventListener']>[1];
 type AbortListenerOptions = Parameters<AbortSignal['addEventListener']>[2];
@@ -87,6 +88,7 @@ async function waitForDelay(fetch: FetchMock, requests: number): Promise<void> {
   expect(vi.getTimerCount()).toBe(1);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function observe(promise: Promise<unknown>): Promise<unknown> {
   try {
     return { completed: await promise };

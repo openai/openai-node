@@ -20,8 +20,10 @@ type Surface = 'direct-auth' | 'public-client';
 const surfaces: readonly Surface[] = ['direct-auth', 'public-client'];
 
 class CustomResponse extends Response {
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Custom and node-fetch parser fixtures intentionally produce unvalidated JSON values or arbitrary failures.
   readonly readJSON: () => Promise<unknown>;
 
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Custom and node-fetch parser fixtures intentionally produce unvalidated JSON values or arbitrary failures.
   constructor(readJSON: () => Promise<unknown>) {
     super(null, { status: 200 });
     this.readJSON = readJSON;
@@ -29,6 +31,7 @@ class CustomResponse extends Response {
 }
 Object.defineProperty(CustomResponse.prototype, 'json', {
   configurable: true,
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Custom and node-fetch parser fixtures intentionally produce unvalidated JSON values or arbitrary failures.
   value(this: CustomResponse): Promise<unknown> {
     return this.readJSON();
   },
@@ -63,6 +66,7 @@ const NodeFetchBody = class Body {
     return await this.nativeResponse.blob();
   }
 
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Custom and node-fetch parser fixtures intentionally produce unvalidated JSON values or arbitrary failures.
   async json(): Promise<unknown> {
     const body = await this.text();
     if (this.nodeFetchVersion === 'v2') {
@@ -175,7 +179,7 @@ function createHarness(
 
 type Harness = ReturnType<typeof createHarness>;
 
-function operationFor(surface: Surface, harness: Harness): () => Promise<unknown> {
+function operationFor(surface: Surface, harness: Harness) {
   if (surface === 'direct-auth') {
     const auth = new WorkloadIdentityAuth(harness.config, harness.fetch);
     return () => auth.getToken();
@@ -193,7 +197,7 @@ function operationFor(surface: Surface, harness: Harness): () => Promise<unknown
 }
 
 async function expectPrivateFailure(
-  run: () => Promise<unknown>,
+  run: ReturnType<typeof operationFor>,
   harness: Harness,
   privateValue = PRIVATE_TOKEN,
 ): Promise<void> {

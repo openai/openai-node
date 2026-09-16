@@ -54,7 +54,7 @@ function lastNodeSocket(): FakeNodeSocket {
 }
 
 function onRealtimeEvent(realtime: unknown, event: string, listener: Listener): void {
-  (realtime as { on: (event: string, listener: Listener) => unknown }).on(event, listener);
+  (realtime as { on: (event: string, listener: Listener) => void }).on(event, listener);
 }
 
 function createClient(apiKey = 'test-key', baseURL = 'https://example.com/v1/'): OpenAI {

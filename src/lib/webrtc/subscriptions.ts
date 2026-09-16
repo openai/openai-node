@@ -20,11 +20,13 @@ async function observeResult(result: unknown): Promise<void> {
 /** Internal callback subscriptions with optional discriminator filters; no buffering or replay. */
 export class Subscriptions<Event extends { type: string }> {
   private readonly listeners = new Set<{
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- The existing public listener contract accepts any callback result; subscriptions discard it.
     listener: (event: Event) => unknown;
     type: Event['type'] | undefined;
   }>();
 
   /** Registers independently, including when the same function is supplied twice. */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The existing public listener contract accepts any callback result; subscriptions discard it.
   add(listener: (event: Event) => unknown, type?: Event['type']): () => void {
     const registration = { listener, type };
     this.listeners.add(registration);

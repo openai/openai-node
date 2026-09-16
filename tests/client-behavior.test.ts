@@ -26,6 +26,7 @@ function jsonResponse(value: unknown = {}, init: ResponseInit = {}): Response {
   });
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function observe(promise: Promise<unknown>): Promise<unknown> {
   try {
     return await promise;

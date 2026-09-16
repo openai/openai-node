@@ -26,7 +26,7 @@ async function inspectHandshake(
       throw new Error('Expected a local HTTP server');
     }
     const connection = new Responses(makeClient(`http://127.0.0.1:${address.port}/v1`), options);
-    const errorEmitter: { on: (event: 'error', listener: (error: Error) => void) => unknown } = connection;
+    const errorEmitter: { on: (event: 'error', listener: (error: Error) => void) => void } = connection;
     errorEmitter.on('error', () => {});
     await once(connection.socket.platformSocket, 'error');
     if (!received) {

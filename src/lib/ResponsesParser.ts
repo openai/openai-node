@@ -203,6 +203,7 @@ type ToolOptions = {
 /** A Responses API function tool with an argument parser and optional executable callback. */
 export type AutoParseableResponseTool<
   OptionsT extends ToolOptions,
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- This public conditional type detects any callable callback without constraining its return type.
   HasFunction = OptionsT['function'] extends (...args: never[]) => unknown ? true : false,
 > = FunctionTool & {
   /** Type-only marker for parsed tool arguments; this property does not exist at runtime. */

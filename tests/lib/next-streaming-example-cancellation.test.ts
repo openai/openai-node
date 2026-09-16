@@ -34,6 +34,7 @@ function completeResponse(): Response {
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function readOutcome(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<unknown> {
   try {
     return await reader.read();

@@ -34,6 +34,7 @@ const metadataFailures = [
   },
 ] as const;
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- This failure-only harness accepts different SDK result types and validates their rejection instead.
 async function expectPrivateAzureFailure(operation: () => Promise<unknown>, status: number): Promise<void> {
   let failure: unknown;
 

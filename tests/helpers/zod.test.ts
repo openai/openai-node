@@ -52,6 +52,7 @@ function countEnumValues(value: unknown): number {
   return enumValues + nestedEnumValues;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JSON Pointer traversal may resolve any schema or literal value, which each fixture checks afterward.
 function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unknown {
   expect(pointer.startsWith('#/')).toBe(true);
 
@@ -828,6 +829,7 @@ describe.each([
   }
 });
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- This compile-time regression preserves the public optional callback contract for arbitrary results.
 function _typeTests(client: OpenAI, maybeCallback?: (args: { hello: 'world' }) => unknown) {
   const MiniSchema = zv4Mini.object({ hello: zv4Mini.literal('world') });
   type ParsedArguments = { hello: 'world' };

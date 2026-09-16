@@ -24,6 +24,7 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
   /** Subscribes to one server event type with its generated payload; returns an independent unsubscribe function. */
   on<Type extends ServerEvent['type']>(
     type: Type,
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- The existing public listener contract accepts any callback result; subscriptions discard it.
     handler: (event: Extract<ServerEvent, { type: Type }>) => unknown,
   ): () => void {
     this.assertActive();
@@ -32,12 +33,14 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
   }
 
   /** Subscribes to future server events, including raw API errors; returns an unsubscribe function. */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The existing public listener contract accepts any callback result; subscriptions discard it.
   onEvent(handler: (event: ServerEvent) => unknown): () => void {
     this.assertActive();
     return this.events.add(handler);
   }
 
   /** Observes only this channel's local errors and lifecycle, not its owning peer connection. */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The existing public listener contract accepts any callback result; subscriptions discard it.
   onConnectionEvent(handler: (event: WebRTCConnectionEvent) => unknown): () => void {
     this.assertActive();
     return this.connectionEvents.add(handler);

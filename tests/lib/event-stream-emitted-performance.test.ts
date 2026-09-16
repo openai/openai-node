@@ -70,6 +70,7 @@ function measureListenerMovement<T>(operation: () => T): {
 
   function trackedFilter(
     this: unknown[],
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Array.filter accepts any truthy callback result; instrumentation must preserve that native signature.
     predicate: (value: unknown, index: number, values: unknown[]) => unknown,
     thisArg?: unknown,
   ) {
@@ -88,6 +89,7 @@ function measureListenerMovement<T>(operation: () => T): {
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function captureRejection(promise: Promise<unknown>): Promise<unknown> {
   try {
     await promise;

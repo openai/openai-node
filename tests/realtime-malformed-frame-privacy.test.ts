@@ -64,7 +64,7 @@ const sensitiveFrames = [
 const privateSyntaxMessage = 'Could not parse Realtime WebSocket event data as JSON.';
 
 function onRealtimeEvent(realtime: unknown, event: string, listener: Listener): void {
-  (realtime as { on: (event: string, listener: Listener) => unknown }).on(event, listener);
+  (realtime as { on: (event: string, listener: Listener) => void }).on(event, listener);
 }
 
 function dispatchFrame(socket: FakeSocket, transport: 'native' | 'node', data: unknown): void {

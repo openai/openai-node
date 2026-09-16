@@ -16,6 +16,7 @@ async function collect<T>(stream: AsyncIterable<T>): Promise<T[]> {
   return values;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- The default response parser handles arbitrary bodies; these regressions inspect its rejection behavior.
 function parseResponse(response: Response, controller: AbortController): Promise<unknown> {
   return defaultParseResponse(new OpenAI({ apiKey: 'test-key' }), {
     response,

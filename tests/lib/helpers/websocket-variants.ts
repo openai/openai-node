@@ -89,7 +89,7 @@ type CommonWebSocketEvent = 'event' | 'raw' | 'error' | 'close' | 'reconnecting'
 
 export function onWebSocketEvent(
   connection: {
-    on: (event: CommonWebSocketEvent, listener: (...args: unknown[]) => void) => unknown;
+    on: (event: CommonWebSocketEvent, listener: (...args: unknown[]) => void) => void;
   },
   event: CommonWebSocketEvent,
   listener: (...args: unknown[]) => void,

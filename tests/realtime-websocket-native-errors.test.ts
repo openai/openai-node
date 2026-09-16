@@ -33,7 +33,7 @@ describe.each([
       expect(socket).toBeInstanceOf(globalThis.WebSocket);
 
       const errors: (Error & { cause?: unknown })[] = [];
-      const errorEmitter: { on: (event: 'error', listener: (error: Error) => void) => unknown } = realtime;
+      const errorEmitter: { on: (event: 'error', listener: (error: Error) => void) => void } = realtime;
       errorEmitter.on('error', (error) => errors.push(error));
 
       const [nativeEvent] = await once(socket, 'error', { signal: AbortSignal.timeout(5000) });

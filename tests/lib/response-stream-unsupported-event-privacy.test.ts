@@ -81,6 +81,7 @@ function expectPrivateFailure(error: unknown, expectedType: string): asserts err
   expect((error as OpenAIError).stack).not.toContain(syntheticPassword);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 function applyUnsupported(event: unknown, snapshot?: APIResponse): unknown {
   try {
     accumulateResponse(event as ResponseStreamEvent, snapshot);

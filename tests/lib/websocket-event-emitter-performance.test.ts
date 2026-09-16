@@ -32,8 +32,9 @@ interface FakeBrowserSocket {
 }
 
 interface PublicWebSocket {
-  on: (event: string, listener: Listener) => unknown;
-  once: (event: string, listener: Listener) => unknown;
+  on: (event: string, listener: Listener) => void;
+  once: (event: string, listener: Listener) => void;
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- This shared emitter fixture includes arbitrary error payloads and validates each emitted result in its test.
   emitted: (event: string) => Promise<unknown>;
   socket: unknown;
 }
@@ -60,6 +61,7 @@ interface AuditedEmitter {
   on: (event: keyof AuditedEvents, listener: Listener) => AuditedEmitter;
   once: (event: keyof AuditedEvents, listener: Listener) => AuditedEmitter;
   off: (event: keyof AuditedEvents, listener: Listener) => AuditedEmitter;
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- This shared emitter fixture includes arbitrary error payloads and validates each emitted result in its test.
   emitted: (event: keyof AuditedEvents) => Promise<unknown>;
 }
 
@@ -205,6 +207,7 @@ function measureListenerMovement(operation: () => void): {
 
   function trackedFilter(
     this: unknown[],
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Array.filter accepts any truthy callback result; instrumentation must preserve that native signature.
     predicate: (value: unknown, index: number, values: unknown[]) => unknown,
     thisArg?: unknown,
   ) {
@@ -233,6 +236,7 @@ function hasListener(emitter: AuditedEmitter, event: keyof AuditedEvents): boole
   return (emitter as unknown as { _hasListener: (name: string) => boolean | undefined })._hasListener(event);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function captureOutcome(promise: Promise<unknown>): Promise<unknown> {
   try {
     return await promise;
@@ -343,8 +347,8 @@ test.each([
 ] as const)('%s Responses close settles after a listener throws', async (_version, WebSocket) => {
   const client = new OpenAI({ apiKey: 'synthetic-api-key', baseURL: 'https://example.test/v1' });
   const connection: {
-    on: (event: 'close', listener: () => void) => unknown;
-    emitted: (event: 'close') => Promise<unknown>;
+    on: (event: 'close', listener: () => void) => void;
+    emitted: (event: 'close') => Promise<[code: number, reason: string, unsent: unknown[]]>;
     socket: StableResponsesWS['socket'];
   } = new WebSocket(client);
   const failure = new Error('synthetic close listener failure');

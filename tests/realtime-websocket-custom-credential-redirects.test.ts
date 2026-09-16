@@ -98,7 +98,7 @@ async function closeServers(...servers: Server[]): Promise<void> {
 }
 
 function onConnectionError(connection: unknown, listener: (error: Error) => void): void {
-  (connection as { on: (event: 'error', callback: (error: Error) => void) => unknown }).on('error', listener);
+  (connection as { on: (event: 'error', callback: (error: Error) => void) => void }).on('error', listener);
 }
 
 async function inspectRedirect({

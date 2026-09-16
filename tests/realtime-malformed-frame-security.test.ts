@@ -117,7 +117,7 @@ function dispatchFrame(socket: FakeSocket, transport: 'native' | 'node', frame: 
 }
 
 function onRealtimeEvent(realtime: unknown, event: string, listener: Listener): void {
-  (realtime as { on: (event: string, listener: Listener) => unknown }).on(event, listener);
+  (realtime as { on: (event: string, listener: Listener) => void }).on(event, listener);
 }
 
 beforeEach(() => {

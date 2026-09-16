@@ -248,7 +248,7 @@ export function loadExample(
     fileName: filename,
   }).outputText;
 
-  function requireExampleModule(specifier: string): unknown {
+  function requireExampleModule(specifier: string) {
     if (specifier === 'openai') {
       return { __esModule: true, default: options.client ?? MockOpenAI };
     }

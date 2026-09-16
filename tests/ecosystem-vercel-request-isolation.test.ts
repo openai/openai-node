@@ -105,7 +105,7 @@ function createHandlerHarness(runtime: Runtime, failedClientIDs: number[] = []):
   });
 
   const handlerExports: {
-    default?: (request: unknown, response?: MockNodeResponse) => Promise<unknown>;
+    default?: (request: unknown, response?: MockNodeResponse) => Promise<HandlerResult | undefined>;
   } = {};
 
   runInNewContext(
