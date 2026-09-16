@@ -4,6 +4,7 @@ import { hasOwn, isObj } from './utils';
 const MAX_ASSISTANT_STREAM_ARRAY_GROWTH = 1024;
 const MAX_EXTERNALLY_MUTABLE_ASSISTANT_STREAM_ARRAY_LENGTH = 65_536;
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Assistant deltas contain heterogeneous extension fields; merge validation establishes each field type before use.
 type AssistantStreamRecord = Record<string, unknown>;
 
 function getAssistantStreamDiagnosticProperty(property: string): string {
@@ -132,7 +133,9 @@ function getAssistantStreamDeltaIndex(
 }
 
 type ValidateAssistantStreamRecord = (
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Assistant deltas contain heterogeneous extension fields; merge validation establishes each field type before use.
   accumulator: AssistantStreamRecord,
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Assistant deltas contain heterogeneous extension fields; merge validation establishes each field type before use.
   delta: AssistantStreamRecord,
   projection: AssistantStreamDeltaProjection,
 ) => void;
@@ -294,8 +297,11 @@ function getRequiredAssistantStreamArrayIndex(deltaEntry: AssistantStreamRecord)
 }
 
 type ApplyAssistantStreamRecord = (
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Assistant deltas contain heterogeneous extension fields; merge validation establishes each field type before use.
   accumulator: AssistantStreamRecord,
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Assistant deltas contain heterogeneous extension fields; merge validation establishes each field type before use.
   delta: AssistantStreamRecord,
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Assistant deltas contain heterogeneous extension fields; merge validation establishes each field type before use.
 ) => AssistantStreamRecord;
 
 function applyAssistantStreamArrayDelta(

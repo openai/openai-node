@@ -19,6 +19,7 @@ function ownStrictRootSchema(
     throw new TypeError('Root schema must be a plain JSON-schema record');
   }
 
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Copying own properties must preserve arbitrary schema keywords and literal values without assuming their types.
   const owned: Record<string, unknown> = {};
   for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(schema))) {
     if (!descriptor.enumerable) {
@@ -120,7 +121,7 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
       return undefined;
     }
 
-    const definitions: Record<string, any> = {};
+    const definitions: Record<string, JsonSchema7Type> = {};
     const processedDefinitions = new Set();
 
     // the call to `parseDef()` here might itself add more entries to `.definitions`

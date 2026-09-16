@@ -59,6 +59,7 @@ function validateWeather(value: unknown) {
   };
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Standard Schema fixtures include arbitrary JSON Schema keywords and malformed values checked by the helpers.
 function makeStandardSchema(jsonSchema: Record<string, unknown> = weatherJSONSchema) {
   const input = vi.fn(() => jsonSchema);
   const output = vi.fn(() => ({ type: 'string' }));
@@ -82,6 +83,7 @@ function makeStandardSchema(jsonSchema: Record<string, unknown> = weatherJSONSch
   };
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Standard Schema fixtures include arbitrary JSON Schema keywords and malformed values checked by the helpers.
 function makeStrictSchemaFactories(jsonSchema: Record<string, unknown>) {
   const { standardSchema } = makeStandardSchema(jsonSchema);
 
@@ -101,6 +103,7 @@ function makeStrictSchemaFactories(jsonSchema: Record<string, unknown>) {
   ];
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Standard Schema fixtures include arbitrary JSON Schema keywords and malformed values checked by the helpers.
 function strictSchemasForAllHelpers(jsonSchema: Record<string, unknown>) {
   return makeStrictSchemaFactories(jsonSchema).map((makeSchema) => makeSchema());
 }
@@ -447,7 +450,9 @@ describe('Standard Schema helpers', () => {
         },
       },
     });
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Standard Schema fixtures include arbitrary JSON Schema keywords and malformed values checked by the helpers.
     const properties = (schema as Record<string, unknown>)['properties'] as Record<string, unknown>;
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Standard Schema fixtures include arbitrary JSON Schema keywords and malformed values checked by the helpers.
     const choice = properties['choice'] as Record<string, unknown>;
     expect(choice).not.toHaveProperty('type');
     expect(choice).not.toHaveProperty('additionalProperties');

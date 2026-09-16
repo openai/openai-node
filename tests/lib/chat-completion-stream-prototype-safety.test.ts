@@ -21,6 +21,7 @@ describe('ChatCompletionStream prototype safety', () => {
     name: string;
     inject: (
       chunk: OpenAI.Chat.ChatCompletionChunk,
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The test injects extension metadata and own __proto__ fields into several different wire object kinds.
       properties: Record<string, unknown>,
     ) => OpenAI.Chat.ChatCompletionChunk;
     target: (snapshot: PrototypeSnapshot) => object | undefined;
@@ -103,6 +104,7 @@ describe('ChatCompletionStream prototype safety', () => {
       };
       const properties = JSON.parse(
         '{"__proto__":{"forged_metadata":"inherited"},"provider_metadata":"preserved"}',
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The test injects extension metadata and own __proto__ fields into several different wire object kinds.
       ) as Record<string, unknown>;
       expect(hasOwn(properties, '__proto__')).toBe(true);
 

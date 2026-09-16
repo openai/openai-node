@@ -730,6 +730,7 @@ it.each(['removed', 'accessor', 'serializer', 'oversized', 'cyclic source'] as c
       throw new Error('unsafe tool parser must not run');
     });
     const callback = vi.fn();
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The malformed tool argument fixture must contain a self-referential value that is not JSON serializable.
     const circular: Record<string, unknown> = {};
     circular['self'] = circular;
     const source =
@@ -738,7 +739,7 @@ it.each(['removed', 'accessor', 'serializer', 'oversized', 'cyclic source'] as c
         : strictTool;
     const tool = makeParseableTool(source, { parser, callback });
     const inspectSchema = vi.fn(() => ({ type: 'string' }));
-    const nested: Record<string, unknown> = {};
+    const nested = {};
     if (kind === 'accessor') {
       Object.defineProperty(nested, 'value', { enumerable: true, get: inspectSchema });
     } else if (kind === 'serializer') {
@@ -3123,7 +3124,7 @@ it.each(['type', 'function', 'name', 'arguments'] as const)(
     const injectedFunction = { name: strictTool.function.name, arguments: unsafe };
     const injectedTool = { id: 'call_injected', type: 'function' as const, function: injectedFunction };
     const target = property === 'type' || property === 'function' ? injectedTool : injectedFunction;
-    const values: Record<typeof property, unknown> = {
+    const values = {
       type: 'function',
       function: injectedFunction,
       name: strictTool.function.name,

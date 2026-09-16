@@ -8,6 +8,7 @@ import { hasOwn } from 'openai/internal/utils/values';
 
 const prototypePropertyName = '__proto__';
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
 function strictSchemasForAllHelpers(jsonSchema: Record<string, unknown>) {
   const standardSchema = {
     '~standard': {
@@ -32,13 +33,16 @@ function strictSchemasForAllHelpers(jsonSchema: Record<string, unknown>) {
   ];
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
 function makePrototypeManipulationSchema(): Record<string, unknown> {
   return JSON.parse(
     '{"type":"object","properties":{"safe":{"type":"string"}},"required":["safe"],' +
       '"__proto__":{"additionalProperties":false,"polluted":"YES"}}',
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
   ) as Record<string, unknown>;
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
 function expectPrototypeSafeClosedSchema(schema: Record<string, unknown>) {
   const serializedSchema = JSON.stringify(schema);
 
@@ -48,7 +52,7 @@ function expectPrototypeSafeClosedSchema(schema: Record<string, unknown>) {
   expect(hasOwn(schema, prototypePropertyName)).toBe(true);
   expect(schema[prototypePropertyName]).toEqual({ additionalProperties: false, polluted: 'YES' });
   expect(schema['polluted']).toBeUndefined();
-  expect((Object.prototype as Record<string, unknown>)['polluted']).toBeUndefined();
+  expect(Object.prototype).not.toHaveProperty('polluted');
   expect(JSON.parse(serializedSchema)).toMatchObject({ additionalProperties: false });
 }
 
@@ -65,6 +69,7 @@ describe('Standard Schema prototype security', () => {
       };
 
       for (const schema of strictSchemasForAllHelpers(rootSchemas[keyword])) {
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
         expectPrototypeSafeClosedSchema(schema as Record<string, unknown>);
         expect(schema).toMatchObject({
           ...metadata,
@@ -89,8 +94,10 @@ describe('Standard Schema prototype security', () => {
     });
 
     for (const schema of schemas) {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
       const properties = (schema as Record<string, unknown>)['properties'] as Record<
         string,
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
         Record<string, unknown>
       >;
       const nested = properties['nested'] ?? {};
@@ -98,7 +105,7 @@ describe('Standard Schema prototype security', () => {
 
       expectPrototypeSafeClosedSchema(nested);
       expect(nested['description']).toBe('Ordinary nested annotation');
-      expect(hasOwn(schema as Record<string, unknown>, 'additionalProperties')).toBe(true);
+      expect(Object.getOwnPropertyDescriptor(schema, 'additionalProperties')).toBeDefined();
       expect(JSON.parse(serializedSchema)).toMatchObject({
         additionalProperties: false,
         properties: { nested: { additionalProperties: false } },
@@ -110,16 +117,18 @@ describe('Standard Schema prototype security', () => {
     const jsonSchema = JSON.parse(
       '{"type":"object","properties":{"__proto__":{"type":"string"},"safe":{"type":"number"}},' +
         '"required":["__proto__","safe"]}',
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
     ) as Record<string, unknown>;
 
     for (const schema of strictSchemasForAllHelpers(jsonSchema)) {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
       const properties = (schema as Record<string, unknown>)['properties'] as Record<string, unknown>;
 
       expect(Object.getPrototypeOf(properties)).toBe(Object.prototype);
       expect(hasOwn(properties, prototypePropertyName)).toBe(true);
       expect(properties[prototypePropertyName]).toEqual({ type: 'string' });
       expect(properties['safe']).toEqual({ type: 'number' });
-      expect(hasOwn(schema as Record<string, unknown>, 'additionalProperties')).toBe(true);
+      expect(Object.getOwnPropertyDescriptor(schema, 'additionalProperties')).toBeDefined();
     }
   });
 
@@ -129,6 +138,7 @@ describe('Standard Schema prototype security', () => {
       const branchDefinitions = JSON.parse(
         '{"__proto__":{"type":"string"},"constructor":{"type":"number"},' +
           '"toString":{"type":"boolean"},"BranchOnly":{"type":"integer"}}',
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
       ) as Record<string, unknown>;
       const schemas = strictSchemasForAllHelpers({
         type: 'object',
@@ -150,9 +160,12 @@ describe('Standard Schema prototype security', () => {
       });
 
       for (const schema of schemas) {
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
         const definitions = (schema as Record<string, unknown>)[keyword] as Record<string, unknown>;
         const serializedSchema = JSON.stringify(schema);
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
         const serialized = JSON.parse(serializedSchema) as Record<string, unknown>;
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
         const serializedDefinitions = serialized[keyword] as Record<string, unknown>;
 
         expect(Object.getPrototypeOf(definitions)).toBe(Object.prototype);
@@ -180,6 +193,7 @@ describe('Standard Schema prototype security', () => {
   it.each(['$defs', 'definitions'] as const)(
     'keeps refs to promoted own __proto__ %s definitions across all helper surfaces',
     (keyword) => {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
       const branchDefinitions = JSON.parse('{"__proto__":{"type":"string"}}') as Record<string, unknown>;
       const schemas = strictSchemasForAllHelpers({
         type: 'object',
@@ -197,6 +211,7 @@ describe('Standard Schema prototype security', () => {
       });
 
       for (const schema of schemas) {
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These schema fixtures preserve hostile prototype keys and arbitrary JSON values until the assertions inspect them.
         const definitions = (schema as Record<string, unknown>)[keyword] as Record<string, unknown>;
 
         expect(Object.getPrototypeOf(definitions)).toBe(Object.prototype);

@@ -10,6 +10,7 @@ import * as transportCapability from 'openai/internal/auth/x509-transport-capabi
 let dispatcher: Agent;
 let transport: X509Transport;
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Credential configuration fixtures deliberately provide malformed option values to exercise boundary validation.
 function configuredIdentity(configuration: Record<string, unknown> = {}) {
   return {
     type: 'x509' as const,
@@ -19,6 +20,7 @@ function configuredIdentity(configuration: Record<string, unknown> = {}) {
   };
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Credential configuration fixtures deliberately provide malformed option values to exercise boundary validation.
 function configuredClient(configuration: Record<string, unknown> = {}): OpenAI {
   return new OpenAI({
     apiKey: null,

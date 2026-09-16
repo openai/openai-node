@@ -17,6 +17,7 @@ function deferred<T>() {
 }
 
 const session = { id: 'session_test', status: 'idle' };
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Agent event fixtures include application-defined payload fields and deliberately malformed tool arguments.
 function event(type: string, id = type, fields: Record<string, unknown> = {}) {
   return { type, event_id: id, session, ...fields };
 }
@@ -46,6 +47,7 @@ type WireEvent = ReturnType<typeof event>;
 
 interface RecordedRequest {
   request: Request;
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Agent event fixtures include application-defined payload fields and deliberately malformed tool arguments.
   body: { events?: Record<string, unknown>[] };
 }
 function transport(
@@ -187,6 +189,7 @@ describe('agents sessions.stream public transport', () => {
       order.push('handler');
       await Promise.resolve();
       if (args['nested']) {
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Agent event fixtures include application-defined payload fields and deliberately malformed tool arguments.
         (args['nested'] as Record<string, unknown>)['value'] = 2;
       }
       return { answer: 'ok' };

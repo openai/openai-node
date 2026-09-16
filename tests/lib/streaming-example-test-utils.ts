@@ -272,7 +272,7 @@ export function loadExample(
   }
 
   const commonJS = { exports: {} };
-  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The VM global dictionary conditionally gains AbortController to exercise runtimes with and without it.
+  // oxlint-disable-next-line anti-slop/no-known-value-widening, anti-slop/no-unsafe-dictionary-type -- The VM installs heterogeneous globals and conditionally adds AbortController to simulate runtimes with and without it.
   const globals: Record<string, unknown> = {
     Buffer,
     console: { error: runtime.consoleError, log: vi.fn() },

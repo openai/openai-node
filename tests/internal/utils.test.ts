@@ -209,6 +209,7 @@ describe('value utilities', () => {
   });
 
   test('checks own properties without trusting an overwritten hasOwnProperty method', () => {
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The fixture adds arbitrary own keys to an inherited object to verify own-property detection.
     const object = Object.create({ inherited: true }) as Record<string, unknown>;
     object['own'] = true;
     object['hasOwnProperty'] = undefined;

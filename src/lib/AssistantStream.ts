@@ -948,6 +948,7 @@ export class AssistantStream
     currentContent: MessageContent | undefined,
     cacheArrays: boolean,
   ): TextContentBlock | ImageFileContentBlock {
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public accumulateDelta helper retains its legacy open dictionary contract for heterogeneous delta fields.
     return accumulateAssistantStreamDelta(currentContent as Record<any, any>, contentElement, cacheArrays) as
       | TextContentBlock
       | ImageFileContentBlock;
@@ -957,6 +958,7 @@ export class AssistantStream
    * Applies an assistant delta to its mutable snapshot, concatenating text and
    * merging nested objects and indexed array entries.
    */
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public accumulateDelta helper retains its legacy open dictionary contract for heterogeneous delta fields.
   static accumulateDelta(acc: Record<string, any>, delta: Record<string, any>): Record<string, any> {
     return accumulateAssistantStreamDelta(acc, delta);
   }

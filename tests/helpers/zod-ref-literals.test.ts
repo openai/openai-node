@@ -9,6 +9,7 @@ import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 import { z as zv4Mini } from 'zod/v4-mini';
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Reference tests traverse schema keywords and arbitrary literal/default objects with different value shapes.
 type JSONSchemaRecord = Record<string, unknown>;
 
 function schemaProperties(schema: unknown): Record<string, JSONSchemaRecord> {

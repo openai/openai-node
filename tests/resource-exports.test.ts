@@ -32,6 +32,7 @@ const resourceIndexes = [...findResourceIndexes(resourcesDirectory), ...realtime
 
 describe.each(resourceIndexes)('SDK exports: $path', ({ modulePath }) => {
   test('exposes every declared runtime export', async () => {
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Dynamic module loading returns heterogeneous runtime exports; the test validates their names and presence.
     const exports = (await import(modulePath)) as Record<string, unknown>;
     const names = Object.keys(exports);
 

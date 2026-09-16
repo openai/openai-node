@@ -31,6 +31,7 @@ describeOnUnix('monthly Node review proposal boundary', () => {
   let bodyPath: string;
   let outputPath: string;
   let base: string;
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Policy fixtures mutate unrelated package and proposal fields, including values of invalid types, before validation.
   let metadata: Record<string, any>;
 
   function git(...args: string[]) {
@@ -62,6 +63,7 @@ describeOnUnix('monthly Node review proposal boundary', () => {
     return result;
   }
 
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Policy fixtures mutate unrelated package and proposal fields, including values of invalid types, before validation.
   function proposal(changes: Record<string, unknown> = {}, body: unknown = 'Review summary') {
     return { base_sha: base, files: changes, body };
   }

@@ -82,7 +82,7 @@ function createHandlerHarness(runtime: Runtime, failedClientIDs: number[] = []):
     }
   }
 
-  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The test module loader indexes this dependency registry using runtime import specifiers.
+  // oxlint-disable-next-line anti-slop/no-known-value-widening, anti-slop/no-unsafe-dictionary-type -- The test module loader indexes this dependency registry using runtime import specifiers. The VM loader resolves heterogeneous mock module exports from runtime import specifiers.
   const dependencies: Record<string, unknown> = {
     '../../uploadWebApiTestCases': { uploadWebApiTestCases },
     'fastest-levenshtein': { distance: () => 0 },

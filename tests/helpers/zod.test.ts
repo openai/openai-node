@@ -43,6 +43,7 @@ function countEnumValues(value: unknown): number {
     return total;
   }
 
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
   const record = value as Record<string, unknown>;
   const enumValues = Array.isArray(record['enum']) ? record['enum'].length : 0;
   let nestedEnumValues = 0;
@@ -52,7 +53,7 @@ function countEnumValues(value: unknown): number {
   return enumValues + nestedEnumValues;
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-returns -- JSON Pointer traversal may resolve any schema or literal value, which each fixture checks afterward.
+// oxlint-disable-next-line anti-slop/no-unknown-returns, anti-slop/no-unsafe-dictionary-type -- JSON Pointer traversal may resolve any schema or literal value, which each fixture checks afterward. These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
 function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unknown {
   expect(pointer.startsWith('#/')).toBe(true);
 
@@ -65,17 +66,20 @@ function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unk
     expect(value).not.toBeNull();
     expect(typeof value).toBe('object');
     expect(hasOwn(value as object, token)).toBe(true);
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     value = (value as Record<string, unknown>)[token];
   }
   return value;
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
 function expectDefinitionRefsToResolve(schema: Record<string, unknown>) {
   const visit = (value: unknown, resolving: Set<string>) => {
     if (!value || typeof value !== 'object') {
       return;
     }
 
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     const ref = (value as Record<string, unknown>)['$ref'];
     if (typeof ref === 'string') {
       const definition = resolveJsonPointer(schema, ref);
@@ -336,7 +340,9 @@ describe.each([
       }),
     });
 
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     const schema = zodResponseFormat(Root, 'example-scope').json_schema.schema as Record<string, unknown>;
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     const definitions = (schema['definitions'] ?? schema['$defs'] ?? {}) as Record<string, unknown>;
     const refs = collectRefs(schema);
     const definitionNames = Object.keys(definitions);
@@ -344,6 +350,7 @@ describe.each([
     expect(refs).not.toContainEqual(expect.stringMatching(/\s/));
     expect(definitionNames).not.toContainEqual(expect.stringMatching(/\s/));
     if (version === 'v3') {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       const rootProperties = schema['properties'] as Record<string, Record<string, unknown>>;
       const groupProperties = rootProperties['group']?.['properties'] as Record<string, { $ref?: string }>;
       const spacedRef = groupProperties['anotherSpacedUsage']?.$ref;
@@ -377,6 +384,7 @@ describe.each([
       }),
       'shared',
       { schemaDefinitions: { foo: Foo, bar: Bar } },
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     ).json_schema.schema as Record<string, unknown>;
 
     expect(countEnumValues(schema)).toBe(fooValues.length + barValues.length);
@@ -388,6 +396,7 @@ describe.each([
     const Shared = z.object({ value: z.string() });
     const schema = zodResponseFormat(z.object({ first: Shared, second: Shared }), 'root', {
       schemaDefinitions: { root: Shared },
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     }).json_schema.schema as Record<string, unknown>;
 
     expect(collectRefs(schema)).toContain('#/definitions/root');
@@ -398,6 +407,7 @@ describe.each([
     const Shared = z.object({ value: z.string() });
     const schema = zodResponseFormat(z.object({ first: Shared, second: Shared }), 'response', {
       schemaDefinitions: { 'foo/bar~baz': Shared },
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     }).json_schema.schema as Record<string, unknown>;
 
     expect(collectRefs(schema)).toContain('#/definitions/foo~1bar~0baz');
@@ -408,6 +418,7 @@ describe.each([
     const Shared = z.object({ value: z.string() });
     const schema = zodResponseFormat(z.object({ first: Shared, second: Shared }), 'response', {
       schemaDefinitions: { 'foo%2Fbar': Shared },
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     }).json_schema.schema as Record<string, unknown>;
 
     expect(collectRefs(schema)).toContain('#/definitions/foo%252Fbar');
@@ -759,6 +770,7 @@ describe.each([
           nullableSecond: nullable,
         }),
         'wrappers',
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       ).schema as Record<string, unknown>;
 
       expectDefinitionRefsToResolve(schema);
@@ -767,6 +779,7 @@ describe.each([
       const brandedRef = properties['brandedSecond']?.$ref;
       expect(brandedRef).toBeDefined();
 
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       const definitions = schema['definitions'] as Record<string, unknown>;
       expect(definitions[brandedRef!.replace('#/definitions/', '')]).toMatchObject({ type: 'string' });
     });
@@ -787,7 +800,9 @@ describe.each([
           lateSecond: late,
         }),
         'wrapperState',
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       ).schema as Record<string, any>;
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       const definitions = schema['definitions'] as Record<string, any>;
 
       const lateRef = schema['properties']['lateSecond']['$ref'] as string;
@@ -812,7 +827,9 @@ describe.each([
           second: recursive,
         }),
         'recursive',
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       ).schema as Record<string, any>;
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       const definitions = schema['definitions'] as Record<string, any>;
 
       const recursiveRef = schema['properties']['second']['$ref'] as string;

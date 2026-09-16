@@ -7,6 +7,7 @@ import type { Run } from 'openai/resources/beta/threads/runs/runs';
 import { Stream } from 'openai/streaming';
 import { assistantStream, completedRun } from './assistant-stream-test-utils';
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Raw event fixtures deliberately include malformed and incomplete payloads outside the generated event union.
 type Event = Record<string, any>;
 
 function iterableEvents(events: Event[], controller = new AbortController()) {
@@ -118,7 +119,7 @@ describe('AssistantStream delta accumulation', () => {
 
   test('creates own fields without changing ordinary inherited values', () => {
     const inherited = { label: 'inherited' };
-    const accumulator: Record<string, unknown> = Object.create(inherited);
+    const accumulator: Record<string, string> = Object.create(inherited);
 
     const result = AssistantStream.accumulateDelta(accumulator, { label: 'updated', status: 'ready' });
 
@@ -134,7 +135,7 @@ describe('AssistantStream delta accumulation', () => {
     const nested: Record<string, string> = Object.create(null);
     nested['text'] = 'hello';
 
-    const accumulator: Record<string, unknown> = Object.create(null);
+    const accumulator: Record<string, string | typeof nested> = Object.create(null);
     accumulator['details'] = nested;
 
     const result = AssistantStream.accumulateDelta(accumulator, {
@@ -1359,9 +1360,8 @@ describe('AssistantStream run-step lifecycle', () => {
 
       await expect(runner.done()).rejects.toThrow('Received a RunStepDelta before creation of a snapshot');
       expect(Object.getOwnPropertyDescriptor(Object.prototype, pollutionKey)).toBeUndefined();
-      expect(({} as Record<string, unknown>)[pollutionKey]).toBeUndefined();
-      // oxlint-disable-next-line anti-slop/no-known-value-widening, anti-slop/no-chained-type-assertions -- The pollution regression probes an arbitrary inherited string key on an otherwise empty array.
-      expect(([] as unknown as Record<string, unknown>)[pollutionKey]).toBeUndefined();
+      expect({}).not.toHaveProperty(pollutionKey);
+      expect([]).not.toHaveProperty(pollutionKey);
     } finally {
       Reflect.deleteProperty(Object.prototype, pollutionKey);
     }

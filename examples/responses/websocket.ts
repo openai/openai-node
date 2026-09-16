@@ -202,6 +202,7 @@ const parseArgs = (argv: string[]): CLIArgs => {
   return { model, useBetaHeader, showEvents, showToolIO };
 };
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Incoming WebSocket JSON fields remain unknown until the example validates the event fields it uses.
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 

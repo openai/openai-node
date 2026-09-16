@@ -26,6 +26,7 @@ interface FakeNodeSocket {
 
 interface FakeBrowserSocket {
   addEventListener: (event: string, listener: Listener) => void;
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
   dispatch: (event: Record<string, unknown>) => void;
   send: () => void;
   close: () => void;
@@ -43,6 +44,7 @@ interface WebSocketVariant {
   name: string;
   event: string;
   create: (client: OpenAI) => PublicWebSocket;
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
   dispatch: (connection: PublicWebSocket, event: Record<string, unknown>) => void;
 }
 
@@ -106,6 +108,7 @@ function createBrowserSocket(): FakeBrowserSocket {
       registrations.push(listener);
       listeners.set(event, registrations);
     },
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
     dispatch(event: Record<string, unknown>) {
       for (const listener of listeners.get('message') ?? []) {
         listener({ data: JSON.stringify(event) });
@@ -120,14 +123,18 @@ function installBrowserSocket(): void {
   vi.stubGlobal('WebSocket', vi.fn().mockImplementation(createBrowserSocket));
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
 function dispatchBrowser(connection: PublicWebSocket, event: Record<string, unknown>): void {
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
   (connection.socket as { dispatch: (value: Record<string, unknown>) => void }).dispatch(event);
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
 function dispatchNodeRealtime(connection: PublicWebSocket, event: Record<string, unknown>): void {
   (connection.socket as FakeNodeSocket).emit('message', Buffer.from(JSON.stringify(event)));
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
 function dispatchResponses(connection: PublicWebSocket, event: Record<string, unknown>): void {
   (connection.socket as { platformSocket: FakeNodeSocket }).platformSocket.emit(
     'message',

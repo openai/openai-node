@@ -19,6 +19,7 @@ interface SchemaDefinition {
   options: readonly SchemaNode[] | Map<unknown, SchemaNode>;
   getter: () => SchemaNode;
   value?: unknown;
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Native enum definition entries are unvalidated until the string/number checks establish their domains.
   values?: readonly unknown[] | Record<string, unknown>;
 }
 
@@ -111,6 +112,7 @@ function nativeEnumDomains(def: SchemaDefinition): JSONDomain[] {
   if (!definitionValues || Array.isArray(definitionValues)) {
     return [];
   }
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Native enum definition entries are unvalidated until the string/number checks establish their domains.
   const object = definitionValues as Record<string, unknown>;
   const values = Object.keys(object)
     .filter((key) => {

@@ -261,11 +261,13 @@ export const empty_test_cases = [
   },
 ] satisfies {
   input: string;
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Parsed query fixtures contain heterogeneous nested arrays, objects, and scalar values under runtime keys.
   with_empty_keys: Record<string, unknown>;
   stringify_output: {
     brackets: string;
     indices: string;
     repeat: string;
   };
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Parsed query fixtures contain heterogeneous nested arrays, objects, and scalar values under runtime keys.
   no_empty_keys: Record<string, unknown>;
 }[];

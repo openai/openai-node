@@ -23,6 +23,7 @@ export function getMaxBufferedEvents(options?: WebSocketStreamOptions): number |
 }
 
 /** Reconnection event passed to the `onReconnecting` handler and event listeners. */
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public reconnect event retains its default dictionary type for application-defined connection parameters.
 export interface ReconnectingEvent<Parameters = Record<string, unknown>> {
   /** Which retry attempt this is (1-based). */
   readonly attempt: number;
@@ -33,6 +34,7 @@ export interface ReconnectingEvent<Parameters = Record<string, unknown>> {
   /** The WebSocket close code that triggered reconnection. */
   readonly closeCode: number;
   /** The current query parameters. */
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public reconnect contract permits extra parameter keys whose values belong to the application.
   readonly parameters: (Parameters & Record<string, unknown>) | undefined;
 }
 
@@ -40,12 +42,14 @@ export interface ReconnectingEvent<Parameters = Record<string, unknown>> {
  * Optional overrides returned from the `onReconnecting` handler
  * to customize the next reconnection attempt.
  */
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public reconnect override retains its default dictionary type for application-defined connection parameters.
 export type ReconnectingOverrides<Parameters = Record<string, unknown>> =
   | {
       /**
        * If provided, assigns the query parameters for the next connection.
        * Set to `undefined` to clear all query parameters.
        */
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public reconnect contract permits extra parameter keys whose values belong to the application.
       parameters?: (Parameters & Record<string, unknown>) | undefined;
     }
   | {
@@ -97,6 +101,7 @@ function isWebSocketCredentialHeader(name: string): boolean {
  */
 export function snapshotWebSocketCredentials(options: {
   auth?: unknown;
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Header overrides are unvalidated values until the transport checks and normalizes them.
   headers?: Record<string, unknown> | undefined;
 }): boolean {
   if (options.auth !== null && options.auth !== undefined) {

@@ -27,6 +27,7 @@ function makeResponse(output: OutputItem[] = []): Response {
   } as Response;
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Accumulator fixtures intentionally construct incomplete or malformed wire objects before invoking validation.
 function outputItem(value: Record<string, unknown>): OutputItem {
   const { type } = value;
   const defaults = { id: 'item_123' };
@@ -36,6 +37,7 @@ function outputItem(value: Record<string, unknown>): OutputItem {
   return { ...defaults, ...value } as OutputItem;
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Accumulator fixtures intentionally construct incomplete or malformed wire objects before invoking validation.
 function snapshotFor(item: Record<string, unknown>): Response {
   return accumulateResponse({
     type: 'response.created',
@@ -44,6 +46,7 @@ function snapshotFor(item: Record<string, unknown>): Response {
   });
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Accumulator fixtures intentionally construct incomplete or malformed wire objects before invoking validation.
 function applyEvent(snapshot: Response, event: Record<string, unknown>): Response {
   const { type, output_index: outputIndex } = event;
   const output =
@@ -1113,7 +1116,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
 
   test('rejects inherited values in sparse output, content, summary, and annotation arrays', () => {
     const inheritedOutput = { type: 'message', content: [] };
-    const outputPrototype = Object.create(Array.prototype) as Record<number, unknown>;
+    const outputPrototype = Object.create(Array.prototype) as Record<number, typeof inheritedOutput>;
     outputPrototype[0] = inheritedOutput;
     const sparseOutput: OutputItem[] = [];
     sparseOutput.length = 1;
@@ -1139,7 +1142,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       content: [{ type: string; text: string; annotations: unknown[] }];
     };
     const [inheritedContent] = contentOutput.content;
-    const contentPrototype = Object.create(Array.prototype) as Record<number, unknown>;
+    const contentPrototype = Object.create(Array.prototype) as Record<number, typeof inheritedContent>;
     contentPrototype[0] = inheritedContent;
     Reflect.deleteProperty(contentOutput.content, 0);
     Object.setPrototypeOf(contentOutput.content, contentPrototype);
@@ -1164,7 +1167,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       summary: [{ type: string; text: string }];
     };
     const [inheritedSummary] = summaryOutput.summary;
-    const summaryPrototype = Object.create(Array.prototype) as Record<number, unknown>;
+    const summaryPrototype = Object.create(Array.prototype) as Record<number, typeof inheritedSummary>;
     summaryPrototype[0] = inheritedSummary;
     Reflect.deleteProperty(summaryOutput.summary, 0);
     Object.setPrototypeOf(summaryOutput.summary, summaryPrototype);
@@ -1189,6 +1192,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       content: [{ annotations: unknown[] }];
     };
     const [{ annotations }] = annotationOutput.content;
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The sparse array fixture supplies an inherited arbitrary annotation to verify own-index filtering.
     const annotationPrototype = Object.create(Array.prototype) as Record<number, unknown>;
     [annotationPrototype[0]] = annotations;
     delete annotations[0];

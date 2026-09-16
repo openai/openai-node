@@ -92,6 +92,7 @@ function applyUnsupported(event: unknown, snapshot?: APIResponse): unknown {
   throw new Error('Expected an unsupported response event to be rejected.');
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Future and malformed event fixtures intentionally accept fields outside the currently generated event union.
 function readableStream(events: Record<string, unknown>[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
 
@@ -320,12 +321,14 @@ describe('unsupported Responses event diagnostic privacy', () => {
   test.each([
     [
       'a circular event payload',
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Future and malformed event fixtures intentionally accept fields outside the currently generated event union.
       (event: Record<string, unknown>) => {
         event['self'] = event;
       },
     ],
     [
       'a BigInt event payload',
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Future and malformed event fixtures intentionally accept fields outside the currently generated event union.
       (event: Record<string, unknown>) => {
         event['count'] = 42n;
       },
@@ -398,6 +401,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
 
   test('does not trust an inherited discriminator for diagnostic output', () => {
     const snapshot = createSnapshot();
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Future and malformed event fixtures intentionally accept fields outside the currently generated event union.
     const event = Object.create({ type: futureEventType }) as Record<string, unknown>;
     event['sequence_number'] = 1;
     event['private_data'] = syntheticCredential;
@@ -473,7 +477,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
       const created = createdEvent();
       const event = unsupportedEvent();
       const stream = ResponseStream.fromReadableStream(
-        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The mixed wire-event fixture serializes protocol events and unsupported records through one test stream.
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type, anti-slop/no-chained-type-assertions -- Future and malformed event fixtures intentionally accept fields outside the currently generated event union.
         readableStream([created as unknown as Record<string, unknown>, event]),
       );
       const events = vi.fn();
@@ -571,7 +575,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
     };
     const stream = ResponseStream.fromReadableStream(
       readableStream([
-        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The mixed wire-event fixture serializes protocol events and unsupported records through one test stream.
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type, anti-slop/no-chained-type-assertions -- Future and malformed event fixtures intentionally accept fields outside the currently generated event union.
         createdEvent() as unknown as Record<string, unknown>,
         { type: 'error', sequence_number: 1, error: payload },
       ]),

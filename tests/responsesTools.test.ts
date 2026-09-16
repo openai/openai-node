@@ -69,6 +69,7 @@ type _StableFunctionToolMayOmitOutputSchema = Assert<
   IsAssignable<
     {
       name: string;
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The compile-time assertion must preserve the exact published function-tool parameter dictionary type.
       parameters: Record<string, unknown> | null;
       strict: boolean | null;
       type: 'function';
@@ -87,6 +88,7 @@ type _BetaFunctionToolMayOmitOutputSchema = Assert<
   IsAssignable<
     {
       name: string;
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The compile-time assertion must preserve the exact published function-tool parameter dictionary type.
       parameters: Record<string, unknown> | null;
       strict: boolean | null;
       type: 'function';

@@ -184,7 +184,7 @@ describe('canonical strict vendor-converter roots', () => {
   });
 
   it.each(['plain', 'null prototype'] as const)('owns and returns a stable %s root snapshot', (kind) => {
-    const source: Record<string, unknown> =
+    const source =
       kind === 'plain'
         ? { type: 'object' }
         : Object.assign(Object.create(null) as object, { type: 'object' });

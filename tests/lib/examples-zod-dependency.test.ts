@@ -19,7 +19,7 @@ describe('standalone structured-output examples', () => {
 
   test.each(['zod/v3', 'zod/v4'])('resolve %s from the examples package', (subpath) => {
     const zod = createRequire(examplesPackagePath)(subpath) as {
-      // oxlint-disable-next-line anti-slop/no-unknown-returns -- Dynamically loaded Zod versions return schema-dependent values checked by this resolution smoke test.
+      // oxlint-disable-next-line anti-slop/no-unknown-returns, anti-slop/no-unsafe-dictionary-type -- Dynamically loaded Zod versions return schema-dependent values checked by this resolution smoke test. The stub accepts schema fields from independently loaded examples without claiming their runtime parser types.
       z: { object: (properties: Record<string, unknown>) => { parse: (input: unknown) => unknown } };
     };
 

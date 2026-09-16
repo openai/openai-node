@@ -307,6 +307,7 @@ interface Scenario {
   parse: (
     content: string,
   ) => Promise<ReturnType<typeof parseChatCompletion> | ReturnType<typeof parseResponse>>;
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Privacy assertions accept different parsed object shapes produced by independent schema fixtures.
   expected: Record<string, unknown>;
 }
 

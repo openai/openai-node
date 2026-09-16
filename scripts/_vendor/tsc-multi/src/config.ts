@@ -14,6 +14,7 @@ const targetSchema = type({
   transpileOnly: optional(boolean()),
 });
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The vendored target contract permits additional compiler options whose values are interpreted by TypeScript.
 export type Target = Infer<typeof targetSchema> & Record<string, unknown>;
 
 const configSchema = object({

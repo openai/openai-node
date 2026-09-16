@@ -197,8 +197,8 @@ describe('object intersection normalization for exclusivity', () => {
       value: { polluted: 'YES' },
       writable: true,
     });
-    expect((normalized as Record<string, unknown>)['polluted']).toBeUndefined();
-    expect((Object.prototype as Record<string, unknown>)['polluted']).toBeUndefined();
+    expect(normalized).not.toHaveProperty('polluted');
+    expect(Object.prototype).not.toHaveProperty('polluted');
     expect(normalized?.title).toBe('preserved annotation');
     expect(schema.allOf).toEqual([branch]);
   });

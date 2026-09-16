@@ -103,6 +103,7 @@ function escapeSchemaDefinitionRefs<T extends object>(
     }
 
     visited.add(value);
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Schema reference rewriting traverses arbitrary keyword and literal values without claiming they are valid schemas.
     const record = value as Record<string, unknown>;
     const ref = record['$ref'];
     if (typeof ref === 'string') {
@@ -134,6 +135,7 @@ function getZodV3RootName(name: string, schemaDefinitions: ZodSchemaDefinitions 
 function zodV3ToJsonSchema(
   schema: z3.ZodType,
   options: { name: string; schemaDefinitions?: ZodSchemaDefinitions | undefined },
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The converter returns extensible JSON Schema objects with arbitrary literal/default and annotation values.
 ): Record<string, unknown> {
   assertSupportedZodV3Schema(schema, options.schemaDefinitions as Record<string, z3.ZodType> | undefined);
   const rootName = getZodV3RootName(options.name, options.schemaDefinitions);
@@ -159,8 +161,9 @@ function zodV3ToJsonSchema(
 function zodV4ToJsonSchema(
   schema: ZodV4Schema,
   options: { schemaDefinitions?: ZodSchemaDefinitions | undefined } = {},
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The converter returns extensible JSON Schema objects with arbitrary literal/default and annotation values.
 ): Record<string, unknown> {
-  const metadata = options.schemaDefinitions ? z4.registry<Record<string, unknown>>() : undefined;
+  const metadata = options.schemaDefinitions ? z4.registry<{ id: string }>() : undefined;
   const definitionNames = new Map<string, string>();
   for (const [name, definition] of Object.entries(options.schemaDefinitions ?? {})) {
     // Avoid `/` and `~` so Zod versions that escape JSON Pointer tokens emit the same IDs.
@@ -209,9 +212,11 @@ function zodV4ToJsonSchema(
     );
   }
 
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The helper preserves the public JSON Schema dictionary contract after strict-schema validation.
   return toStrictJsonSchema(escapedSchema) as Record<string, unknown>;
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Non-strict conversion retains arbitrary Zod literal/default values and schema extension keywords.
 function zodV3ToNonStrictJsonSchema(schema: z3.ZodType, options: { name: string }): Record<string, unknown> {
   return _zodToJsonSchema(schema, {
     name: options.name,
@@ -221,10 +226,12 @@ function zodV3ToNonStrictJsonSchema(schema: z3.ZodType, options: { name: string 
   });
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Non-strict conversion retains arbitrary Zod literal/default values and schema extension keywords.
 function zodV4ToNonStrictJsonSchema(schema: ZodV4Schema): Record<string, unknown> {
   return z4.toJSONSchema(schema, {
     target: 'draft-7',
     io: 'input',
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Non-strict conversion retains arbitrary Zod literal/default values and schema extension keywords.
   }) as Record<string, unknown>;
 }
 

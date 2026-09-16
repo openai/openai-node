@@ -125,12 +125,20 @@ async function readResponseBody(response: Response, signal?: AbortSignal): Promi
   }
 }
 
+interface UnvalidatedTokenResponse {
+  access_token?: unknown;
+  token_type?: unknown;
+  issued_token_type?: unknown;
+  expires_in?: unknown;
+}
+
 function validateTokenResponse(value: unknown): X509ExchangedToken {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new OpenAIError('X.509 workload identity token exchange returned an invalid token response.');
   }
 
-  const response = value as Record<string, unknown>;
+  // SAFETY: The object check above establishes a container; optional unknown fields make no claim about its values.
+  const response = value as UnvalidatedTokenResponse;
   if (
     !hasOwn(response, 'access_token') ||
     typeof response['access_token'] !== 'string' ||

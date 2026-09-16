@@ -67,6 +67,7 @@ function response(output: Output[] = [], outputText?: string): Response {
   } as Response;
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The frame builder serializes heterogeneous wire fields for the different response event kinds.
 function frame(type: ResponseStreamEvent['type'], fields: Record<string, unknown> = {}): ResponseStreamEvent {
   return { type, sequence_number: 0, ...fields } as ResponseStreamEvent;
 }

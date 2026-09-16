@@ -19,6 +19,7 @@ import type { Sessions } from '../../resources/beta/agents/sessions/sessions';
 export type AgentToolOutput = AgentFunctionCallOutputParam | object | null;
 /** Receives a detached JSON object and may return a result asynchronously. */
 export type AgentToolHandler = (
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Tool argument keys and value types are application-defined; handlers receive the public unvalidated argument dictionary.
   arguments_: Record<string, unknown>,
 ) => AgentToolOutput | PromiseLike<AgentToolOutput>;
 
@@ -235,6 +236,7 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
       if (args === null || typeof args !== 'object' || Array.isArray(args)) {
         throw new OpenAIError('Function arguments must be a JSON object');
       }
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Tool argument keys and value types are application-defined; handlers receive the public unvalidated argument dictionary.
       return toolResult(call, await this.#wait(() => handler(args as Record<string, unknown>)));
     } catch {
       this.#checkAbort();

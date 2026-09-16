@@ -75,6 +75,7 @@ function safeOptionRecord(
   value: unknown,
   allowed: ReadonlySet<string>,
   label: string,
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Credential option snapshots contain unvalidated descriptor values; each option is validated before use.
 ): Record<string, unknown> {
   if (!value || typeof value !== 'object' || types.isProxy(value)) {
     throw new Error(`X.509 ${label} options must be a non-proxy object.`);
@@ -83,6 +84,7 @@ function safeOptionRecord(
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`X.509 ${label} options must have only own plain data properties.`);
   }
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Credential option snapshots contain unvalidated descriptor values; each option is validated before use.
   const snapshot = Object.create(null) as Record<string, unknown>;
   for (const name of Reflect.ownKeys(value)) {
     if (typeof name !== 'string' || !allowed.has(name)) {
@@ -97,6 +99,7 @@ function safeOptionRecord(
   return snapshot;
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Credential option snapshots contain unvalidated descriptor values; each option is validated before use.
 function requiredCredentialValue(options: Record<string, unknown>, name: string): string {
   const value = options[name];
   if (typeof value !== 'string' || value.trim().length === 0) {

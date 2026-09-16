@@ -158,6 +158,7 @@ const _parseJSON = (jsonString: string, allow: number) => {
   const parseObj = () => {
     index++; // skip initial brace
     skipBlank();
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The vendored partial JSON parser accumulates heterogeneous JSON values and preserves its existing return contract.
     const obj: Record<string, any> = {};
     try {
       while (jsonString[index] !== '}') {

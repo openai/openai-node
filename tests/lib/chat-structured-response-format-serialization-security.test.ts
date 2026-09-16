@@ -12,6 +12,7 @@ import { z as zodV3 } from 'zod/v3';
 import { z as zodV4 } from 'zod/v4';
 import { z as zodV4Mini } from 'zod/v4-mini';
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Adversarial metadata fixtures include symbols, accessors, serialization hooks, and non-JSON values.
 type UnsafeMetadata = Record<PropertyKey, unknown>;
 
 interface ParsedWeather {
@@ -176,6 +177,7 @@ describe.each(formatFactories)(
         }
         Object.freeze(metadata);
 
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary response-format metadata until assertions inspect the actual wire values.
         let body: { response_format?: { type: string; json_schema: Record<string, unknown> } } | undefined;
         const fetch = vi.fn(async (_request: unknown, init?: RequestInit) => {
           body = JSON.parse(init?.body as string) as typeof body;
@@ -226,7 +228,7 @@ describe.each(formatFactories)(
 
       for (const metadata of [inherited, hidden]) {
         const format = create(metadata);
-        const serialized = parseSerializedJSON<Record<string, unknown>>(format);
+        const serialized = parseSerializedJSON(format);
 
         expectTrustedFormat(format);
         expect(serialized).toMatchObject({
@@ -309,6 +311,7 @@ describe('shared chat structured response-format factory', () => {
 
     const format = makeParseableResponseFormat(original, parser);
     const wire = parseSerializedJSON<{
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary response-format metadata until assertions inspect the actual wire values.
       response_format: { type: string; json_schema: Record<string, unknown> };
     }>({ response_format: format });
 

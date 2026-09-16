@@ -12,6 +12,7 @@ import { z as zodV3 } from 'zod/v3';
 import { z as zodV4 } from 'zod/v4';
 import { z as zodV4Mini } from 'zod/v4-mini';
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Adversarial metadata fixtures include symbols, accessors, serialization hooks, and non-JSON values.
 type UnsafeFormatMetadata = Record<PropertyKey, unknown>;
 interface ParsedWeather {
   city: string;
@@ -217,7 +218,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
     expect(record[metadataSymbol]).toBe('preserved');
     expect(Object.getPrototypeOf(format)).toBe(Object.prototype);
     expect(Object.getOwnPropertyDescriptor(format, '__proto__')?.value).toEqual({ polluted: 'no' });
-    expect((Object.prototype as Record<string, unknown>)['polluted']).toBeUndefined();
+    expect(Object.prototype).not.toHaveProperty('polluted');
   });
 
   test('keeps parsing metadata non-enumerable and replaces caller-supplied parser markers', () => {
@@ -295,6 +296,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
       }
       Object.freeze(metadata);
 
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary text-format metadata until assertions inspect the actual wire values.
       let requestBody: { text?: { format?: Record<string, unknown> } } | undefined;
       const fetch = vi.fn(async (_request: unknown, init?: RequestInit) => {
         requestBody = JSON.parse(init?.body as string) as typeof requestBody;
@@ -348,7 +350,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
     for (const metadata of [inherited, hidden]) {
       const format = create(metadata);
       const wire = JSON.stringify(format);
-      const serialized = JSON.parse(wire) as Record<string, unknown>;
+      const serialized: unknown = JSON.parse(wire);
 
       expectTrustedFormat(format);
       expect(serialized).toMatchObject({ type: 'json_schema', name: trustedName, strict: true });
@@ -362,6 +364,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
   test.each(['text', 'json_object'])(
     'sends a strict schema and validates the public Responses parse result despite %s metadata',
     async (override) => {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary text-format metadata until assertions inspect the actual wire values.
       let requestBody: { text?: { format?: Record<string, unknown> } } | undefined;
       const fetch = vi.fn(async (_request: unknown, init?: RequestInit) => {
         requestBody = JSON.parse(init?.body as string) as typeof requestBody;
@@ -481,6 +484,7 @@ describe('shared structured text-format factory', () => {
     const format = makeParseableTextFormat(original, parser);
     const wire = JSON.stringify({ text: { format } });
     const serialized = JSON.parse(wire) as {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary text-format metadata until assertions inspect the actual wire values.
       text: { format: Record<string, unknown> };
     };
 

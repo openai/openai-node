@@ -49,6 +49,7 @@ const originalWebSocket = Object.getOwnPropertyDescriptor(globalThis, 'WebSocket
 
 const errorFields = ['message', 'code', 'param', 'type', 'event_id'] as const;
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Error fixtures override fields with malformed and sensitive values before the public error parser validates them.
 function serverError(overrides: Record<string, unknown> = {}) {
   return {
     type: 'error',

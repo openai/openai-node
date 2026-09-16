@@ -21,6 +21,7 @@ async function withGlobals<T>(overrides: PlatformGlobals, run: (detection: Platf
     for (const [name, value] of Object.entries(overrides)) {
       descriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
       if (value === undefined) {
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Platform fixtures temporarily remove runtime-selected globals whose values depend on the simulated environment.
         delete (globalThis as Record<string, unknown>)[name];
       } else {
         Object.defineProperty(globalThis, name, { configurable: true, value });
@@ -33,6 +34,7 @@ async function withGlobals<T>(overrides: PlatformGlobals, run: (detection: Platf
       if (descriptor) {
         Object.defineProperty(globalThis, name, descriptor);
       } else {
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Platform fixtures temporarily remove runtime-selected globals whose values depend on the simulated environment.
         delete (globalThis as Record<string, unknown>)[name];
       }
     }
@@ -123,6 +125,7 @@ describe('platform detection', () => {
 
     try {
       Object.defineProperty(globalThis, 'EdgeRuntime', { configurable: true, value: 'edge-runtime' });
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Platform fixtures temporarily remove runtime-selected globals whose values depend on the simulated environment.
       delete (globalThis as Record<string, unknown>)['process'];
       result = await client.models.list();
     } catch (error) {
@@ -132,6 +135,7 @@ describe('platform detection', () => {
         if (descriptor) {
           Object.defineProperty(globalThis, name, descriptor);
         } else {
+          // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Platform fixtures temporarily remove runtime-selected globals whose values depend on the simulated environment.
           delete (globalThis as Record<string, unknown>)[name];
         }
       }

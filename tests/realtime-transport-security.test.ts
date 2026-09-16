@@ -79,6 +79,7 @@ function lastNativeSocket(): CapturingNativeSocket {
 function withBrowserWorker<T>(
   workerType: 'DedicatedWorkerGlobalScope' | 'SharedWorkerGlobalScope' | 'ServiceWorkerGlobalScope',
   run: () => T,
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The fixture replaces heterogeneous runtime globals to test browser and server transport selection.
   options: { runtime?: Record<string, unknown>; userAgent?: string } = {},
 ): T {
   const navigator = { userAgent: options.userAgent ?? 'Mozilla/5.0' };

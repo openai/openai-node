@@ -9,6 +9,7 @@ type StreamIndexKind = 'choice' | 'tool call';
 function createChunk(
   index: unknown,
   kind: StreamIndexKind,
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Index fixtures combine arbitrary extension fields with invalid wire indices before stream validation.
   additionalFields: Record<string, unknown> = {},
 ): OpenAI.Chat.ChatCompletionChunk {
   const choice =
@@ -108,14 +109,12 @@ describe('ChatCompletionStream index validation', () => {
   describe.each<StreamIndexKind>(['choice', 'tool call'])('%s indices', (kind) => {
     it('rejects an index that would pollute the global Array prototype', async () => {
       const pollutionKey = `sdk${kind.replace(' ', '')}PrototypePolluted`;
-      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect an arbitrary prototype property after a malicious index to prove no array pollution occurred.
-      const prototype = Array.prototype as unknown as Record<string, unknown>;
+      const { prototype } = Array;
       const stream = createStream([createChunk('__proto__', kind, { [pollutionKey]: 'owned' })]);
 
       try {
         await expect(stream.done()).rejects.toThrow(`invalid ${kind} index: __proto__`);
-        // oxlint-disable-next-line anti-slop/no-known-value-widening, anti-slop/no-chained-type-assertions -- The pollution regression deliberately checks an arbitrary inherited string property on an array.
-        expect(([] as unknown as Record<string, unknown>)[pollutionKey]).toBeUndefined();
+        expect([]).not.toHaveProperty(pollutionKey);
         expect(getSnapshotArray(stream, kind)).toEqual([]);
       } finally {
         Reflect.deleteProperty(prototype, pollutionKey);

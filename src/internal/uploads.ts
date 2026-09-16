@@ -312,6 +312,7 @@ export type CreateFormOptions = {
  * @throws {TypeError} If the fetch implementation cannot encode global
  * `FormData`, a field is `null`, or a field has an unsupported value.
  */
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The exported form builder retains its default dictionary type for application-defined multipart fields.
 export const createForm = async <T = Record<string, unknown>>(
   body: T | undefined,
   fetch: OpenAI | Fetch,
@@ -360,6 +361,7 @@ const hasStreamingUploadableValue = (value: unknown): boolean => {
   if (value && typeof value === 'object' && !isBlob(value) && !(value instanceof Response)) {
     // Own properties only, matching what form encoding serializes; inherited values are never encoded.
     for (const k of Object.keys(value)) {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Recursive upload detection inspects arbitrary body fields and validates each value before using it as an upload.
       if (hasStreamingUploadableValue((value as Record<string, unknown>)[k])) {
         return true;
       }

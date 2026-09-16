@@ -1,5 +1,9 @@
 import { combine, merge, is_buffer, assign_single_source, has } from 'openai/internal/qs/utils';
 
+interface LinkedRecord {
+  next?: LinkedRecord;
+}
+
 describe('merge()', () => {
   // t.deepEqual(merge(null, true), [null, true], 'merges true into null');
   expect(merge(null, true)).toEqual([null, true]);
@@ -89,10 +93,12 @@ describe('prototype-pollution safety', () => {
   const graphOperations = [
     {
       name: 'merge',
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (target: Record<string, any>, source: Record<string, any>) => merge(target, source),
     },
     {
       name: 'assign_single_source',
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (target: Record<string, any>, source: Record<string, any>) =>
         assign_single_source(target, source),
     },
@@ -101,10 +107,12 @@ describe('prototype-pollution safety', () => {
   test.each([
     {
       name: 'merge',
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (target: Record<string, unknown>, source: Record<string, unknown>) => merge(target, source),
     },
     {
       name: 'assign_single_source',
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (target: Record<string, unknown>, source: Record<string, unknown>) =>
         assign_single_source(target, source),
     },
@@ -156,22 +164,27 @@ describe('prototype-pollution safety', () => {
   test.each([
     {
       name: 'nested array entries',
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (unsafe: Record<string, unknown>) => merge({}, { nested: [unsafe] }).nested[0],
     },
     {
       name: 'newly assigned array entries',
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (unsafe: Record<string, unknown>) => merge([], [unsafe])[0],
     },
     {
       name: 'array entries appended after a scalar collision',
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (unsafe: Record<string, unknown>) => merge(['existing'], [unsafe])[1],
     },
     {
       name: 'objects adopted after a scalar target',
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (unsafe: Record<string, unknown>) => merge('existing', unsafe)[1],
     },
     {
       name: 'flattened array entries after a scalar target',
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (unsafe: Record<string, unknown>) => merge('existing', [unsafe])[1],
     },
   ])('sanitizes $name', ({ apply }) => {
@@ -201,6 +214,7 @@ describe('prototype-pollution safety', () => {
   });
 
   test('preserves cycles and shared references when sanitizing adopted records', () => {
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
     const unsafe: Record<string, any> = JSON.parse('{"__proto__":{"polluted":true},"safe":true}');
     unsafe['self'] = unsafe;
     const result = merge({}, { left: unsafe, right: unsafe });
@@ -302,7 +316,7 @@ describe('prototype-pollution safety', () => {
   );
 
   test('iteratively snapshots adopted records deeper than the JavaScript call stack', () => {
-    const root: Record<string, any> = {};
+    const root: LinkedRecord = {};
     let current = root;
     for (let index = 0; index < 6000; index += 1) {
       current['next'] = {};
@@ -315,7 +329,7 @@ describe('prototype-pollution safety', () => {
   });
 
   test('fails closed when adopted records exceed the bounded traversal budget', () => {
-    const root: Record<string, any> = {};
+    const root: LinkedRecord = {};
     let current = root;
     for (let index = 0; index < 10_001; index += 1) {
       current['next'] = {};
@@ -378,7 +392,7 @@ describe('prototype-pollution safety', () => {
   test('snapshots two thousand aliases to a shared two-thousand-record graph only once', () => {
     let inspections = 0;
     // oxlint-disable-next-line anti-slop/no-known-value-widening -- The proxy target is populated incrementally with a two-thousand-record graph after allocation.
-    const root: Record<string, any> = new Proxy(
+    const root: LinkedRecord = new Proxy(
       {},
       {
         ownKeys(value) {
@@ -395,7 +409,7 @@ describe('prototype-pollution safety', () => {
       current['next'] = {};
       current = current['next'];
     }
-    const source: Record<string, unknown> = {};
+    const source: Record<string, LinkedRecord> = {};
     for (let index = 0; index < 2000; index += 1) {
       source[`alias-${index}`] = root;
     }
@@ -462,6 +476,7 @@ describe('prototype-pollution safety', () => {
   test.each(graphOperations)(
     '$name rejects unsupported unsafe keys even when a proxy changes their enumerability',
     ({ apply }) => {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       const unsupported = Object.create({ inherited: true }) as Record<string, unknown>;
       Object.defineProperty(unsupported, '__proto__', {
         configurable: true,
@@ -578,7 +593,7 @@ describe('prototype-pollution safety', () => {
   test.each(graphOperations)(
     '$name leaves the caller target untouched when the traversal budget is exceeded',
     ({ apply }) => {
-      const oversized: Record<string, unknown> = {};
+      const oversized: Record<string, number> = {};
       for (let index = 0; index <= 10_000; index += 1) {
         oversized[`value-${index}`] = index;
       }
@@ -632,6 +647,7 @@ describe('prototype-pollution safety', () => {
   test.each(graphOperations)('$name preserves sealed, non-extensible, and frozen integrity', ({ apply }) => {
     const sealed = Object.seal({ value: true });
     const nonExtensible = Object.preventExtensions({ value: true });
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
     const unsafe = JSON.parse('{"__proto__":{"polluted":true},"safe":true}') as Record<string, unknown>;
     const frozen = Object.freeze({ child: unsafe });
     const result = apply({}, { sealed, nonExtensible, frozen });
@@ -650,6 +666,7 @@ describe('prototype-pollution safety', () => {
   test.each(graphOperations)(
     '$name rejects retained inherited parents polluted by a later child Proxy trap',
     ({ apply }) => {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       const parent = Object.create({ inherited: true }) as Record<string, unknown>;
       let inspections = 0;
       parent['child'] = new Proxy(
@@ -680,7 +697,7 @@ describe('prototype-pollution safety', () => {
     '$name rejects an oversized root or adopted record before inspecting any descriptors',
     ({ apply }) => {
       for (const position of ['root', 'adopted']) {
-        const wide: Record<string, unknown> = {};
+        const wide: Record<string, number> = {};
         for (let index = 0; index <= 10_000; index += 1) {
           wide[`value-${index}`] = index;
         }
@@ -716,7 +733,7 @@ describe('prototype-pollution safety', () => {
         return coercions === 1 ? 'safe' : 'constructor';
       },
     });
-    const target: Record<string, unknown> = {};
+    const target: Record<string, boolean> = {};
 
     expect(merge(target, callable)).toBe(target);
     expect(coercions).toBe(1);
@@ -736,7 +753,7 @@ describe('prototype-pollution safety', () => {
           return unsafeKey;
         },
       });
-      const target: Record<string, unknown> = {};
+      const target: Record<string, boolean> = {};
 
       expect(merge(target, callable, { allowPrototypes: true })).toBe(target);
       expect(coercions).toBe(1);
@@ -755,7 +772,7 @@ describe('prototype-pollution safety', () => {
         return safe;
       },
     });
-    const target: Record<PropertyKey, unknown> = {};
+    const target: Record<PropertyKey, boolean> = {};
 
     expect(merge(target, callable, { allowPrototypes: true })).toBe(target);
     expect(coercions).toBe(1);

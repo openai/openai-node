@@ -36,6 +36,7 @@ function expectValidSchema(value: unknown): void {
     if (child === null || typeof child !== 'object') {
       return;
     }
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- JSON Pointer traversal reads heterogeneous schema fields and validates each resolved reference before use.
     const reference = (child as Record<string, unknown>)['$ref'];
     if (typeof reference === 'string') {
       expect(reference.startsWith('#/')).toBe(true);
@@ -44,6 +45,7 @@ function expectValidSchema(value: unknown): void {
         // oxlint-disable-next-line unicorn/prefer-string-replace-all -- the test tsconfig uses the ES2020 library
         const key = token.replace(/~[01]/gu, (escape) => (escape === '~1' ? '/' : '~'));
         expect(target).toHaveProperty([key]);
+        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- JSON Pointer traversal reads heterogeneous schema fields and validates each resolved reference before use.
         target = (target as Record<string, unknown>)[key];
       }
     }

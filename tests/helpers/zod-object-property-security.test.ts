@@ -104,6 +104,7 @@ describe.each(schemaHelpers)('$name object property security', ({ getSchema }) =
     const fieldNames = ['safe', 'constructor', 'toString', 'prototype', 'hasOwnProperty'];
     const properties = Object.fromEntries(fieldNames.map((name) => [name, zv3.string()]));
     const jsonSchema = getSchema(zv3.object(properties)) as {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The test inspects schema properties with hostile names without treating their unvalidated values as trusted schemas.
       properties: Record<string, unknown>;
       required: string[];
     };

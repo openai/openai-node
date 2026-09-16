@@ -5,6 +5,7 @@ import { ReadableStreamFrom } from 'openai/internal/shims';
 import { AssistantStream } from 'openai/lib/AssistantStream';
 import type { AssistantStreamEvent } from 'openai/resources/beta/assistants';
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Raw event fixtures omit or corrupt identity fields to exercise validation beyond the generated event contract.
 type Event = Record<string, any>;
 
 function readableEvents(events: Event[]) {

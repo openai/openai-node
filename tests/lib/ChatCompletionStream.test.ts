@@ -1187,6 +1187,7 @@ describe('.stream()', () => {
       const stream = ChatCompletionStream.fromReadableStream(readable);
       await expect(stream.finalContent()).resolves.toBe('ok');
     } finally {
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Cleanup removes the synthetic error property installed on Object.prototype by the pollution regression.
       delete (Object.prototype as Record<string, unknown>)['error'];
     }
   });
