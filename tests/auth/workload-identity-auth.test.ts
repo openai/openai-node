@@ -41,10 +41,7 @@ function tokenExchangeResponse(accessToken: string, expiresIn: number): Response
   });
 }
 
-function pendingTokenExchange(): {
-  response: Promise<Response>;
-  resolve: (response: Response) => void;
-} {
+function pendingTokenExchange() {
   let resolveResponse!: (response: Response) => void;
   const response = new Promise<Response>((resolve) => {
     resolveResponse = resolve;

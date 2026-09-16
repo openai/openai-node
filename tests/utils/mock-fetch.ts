@@ -9,7 +9,7 @@ import type { Fetch, RequestInfo, RequestInit, Response } from 'openai/internal/
  * - calls the callback with the `fetch` arguments
  * - resolves `fetch` with the callback output
  */
-export function mockFetch(): { fetch: Fetch; handleRequest: (handle: Fetch) => Promise<void> } {
+export function mockFetch() {
   const fetchQueue: ((handler: typeof fetch) => void)[] = [];
   const handlerQueue: Promise<typeof fetch>[] = [];
 

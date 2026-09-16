@@ -65,7 +65,7 @@ function createClient(
   create: ProviderFactory = dependencyFreeProvider,
   endpoint: Endpoint = 'mantle',
   requestSignal?: AbortSignal,
-): { client: OpenAI; fetch: FetchMock } {
+) {
   const fetch = vi.fn<Fetch>(async () => Response.json({ object: 'list', data: [], has_more: false }));
   const options = { provider: create(endpoint, tokenProvider), fetch, maxRetries: 0 };
   return {

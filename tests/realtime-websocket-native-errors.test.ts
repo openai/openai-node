@@ -33,6 +33,7 @@ describe.each([
       expect(socket).toBeInstanceOf(globalThis.WebSocket);
 
       const errors: (Error & { cause?: unknown })[] = [];
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- The common error-event view permits the same native-error test across stable and beta transports.
       const errorEmitter: { on: (event: 'error', listener: (error: Error) => void) => void } = realtime;
       errorEmitter.on('error', (error) => errors.push(error));
 

@@ -250,6 +250,7 @@ describe('AssistantStream run-step identity security', () => {
       let rejectedEvent: { event: string; data: Event };
 
       if (phase === 'next tool call') {
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- This event slot holds intentionally partial and malformed wire events from several lifecycle phases.
         rejectedEvent = {
           event: 'thread.run.step.delta',
           data: {
@@ -270,6 +271,7 @@ describe('AssistantStream run-step identity security', () => {
           },
         };
       } else if (phase === 'terminal step') {
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- The same fixture slot also holds terminal-run and delta events with different data contracts.
         rejectedEvent = {
           event: 'thread.run.step.completed',
           data: { ...runStep(active.id, 'call_active', privateArguments), status: 'completed' },

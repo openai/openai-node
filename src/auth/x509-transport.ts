@@ -241,6 +241,7 @@ function credentialDispatcher(
   requestTls: VerifiedX509TLSOptions,
 ): { dispatcher: Agent | ProxyAgent; proxy: X509ProxyMode } {
   if (proxyOptionsInput === undefined) {
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The dispatcher owner returns one contract for direct Agents and both supported CONNECT proxy modes.
     return { dispatcher: new Agent({ connect: requestTls }), proxy: 'direct' };
   }
 
@@ -274,6 +275,7 @@ function credentialDispatcher(
       dispatcherOptions.proxyTls.ca = proxyCA;
     }
   }
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared transport contract preserves the same dispatcher and proxy types across both construction paths.
   return { proxy, dispatcher: new ProxyAgent(dispatcherOptions) };
 }
 

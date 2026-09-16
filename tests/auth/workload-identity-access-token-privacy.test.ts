@@ -77,7 +77,7 @@ function oauthResponse(accessToken: string, expiresIn = 3600): Response {
 
 // oxlint-disable-next-line anti-slop/no-unknown-returns -- The adversarial token accessor can return malformed values that the SDK must validate.
 function accessorResponse(readAccessToken: () => unknown, useProxy = false): Response {
-  const payload: { access_token: unknown; expires_in: number } = {
+  const payload = {
     access_token: undefined,
     expires_in: 3600,
   };

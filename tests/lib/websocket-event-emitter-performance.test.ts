@@ -184,10 +184,7 @@ const emitterVariants = [
   { name: 'Responses internal emitter', create: () => new InternalEventEmitter<AuditedEventMap>() },
 ] as const;
 
-function measureListenerMovement(operation: () => void): {
-  elementMoves: number;
-  spliceCalls: number;
-} {
+function measureListenerMovement(operation: () => void) {
   const originalSplice = Array.prototype.splice;
   const originalFilter = Array.prototype.filter;
   let elementMoves = 0;
@@ -350,6 +347,7 @@ test.each([
     on: (event: 'close', listener: () => void) => void;
     emitted: (event: 'close') => Promise<[code: number, reason: string, unsent: unknown[]]>;
     socket: StableResponsesWS['socket'];
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- This common close-event interface allows one regression to exercise distinct public WebSocket classes.
   } = new WebSocket(client);
   const failure = new Error('synthetic close listener failure');
   const settled = vi.fn();
@@ -386,6 +384,7 @@ describe.each(emitterVariants)('$name listener compatibility', ({ create }) => {
       emitter.once('value', once);
       void emitter.emitted('value').then(settled, settled);
       let didThrow = false;
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- The sentinel is replaced by an arbitrary thrown value; the test must preserve that original value.
       let thrown: unknown = laterFailure;
 
       try {

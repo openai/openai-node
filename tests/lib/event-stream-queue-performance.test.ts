@@ -45,7 +45,7 @@ class QueueTestStream extends EventStream<QueueEvents> {
   }
 }
 
-function measureArrayMovement<T>(operation: () => T): { result: T; elementMoves: number } {
+function measureArrayMovement<T>(operation: () => T) {
   const originalShift = Array.prototype.shift;
   const originalSlice = Array.prototype.slice;
   let elementMoves = 0;

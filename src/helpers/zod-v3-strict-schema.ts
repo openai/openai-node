@@ -33,6 +33,7 @@ interface SchemaChild {
   path: string;
 }
 
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- Runtime Zod type names index this dictionary, including unsupported names outside the known entries.
 const simpleJSONDomains: Readonly<Record<string, JSONDomain['type']>> = {
   ZodString: 'string',
   ZodNumber: 'number',

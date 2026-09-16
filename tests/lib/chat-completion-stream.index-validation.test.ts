@@ -112,6 +112,7 @@ describe('ChatCompletionStream index validation', () => {
 
       try {
         await expect(stream.done()).rejects.toThrow(`invalid ${kind} index: __proto__`);
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- The pollution regression deliberately checks an arbitrary inherited string property on an array.
         expect(([] as unknown as Record<string, unknown>)[pollutionKey]).toBeUndefined();
         expect(getSnapshotArray(stream, kind)).toEqual([]);
       } finally {

@@ -282,6 +282,7 @@ function parseToolCall<Params extends ResponseCreateParamsBase>(
 ): ParsedResponseFunctionToolCall {
   const inputTool = getInputToolByName(params.tools ?? [], toolCall.name, toolCall.namespace);
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- Parsing replaces the initial null with an arbitrary caller-parser result, so unknown is required.
   let parsedArguments: unknown = null;
   if (isAutoParsableTool(inputTool)) {
     parsedArguments = inputTool.$parseRaw(toolCall.arguments);

@@ -495,6 +495,7 @@ function* iterateFormValue(key: string, value: unknown): Generator<FormEntry> {
 }
 
 function getStreamingFileName(value: Uploadable, options: CreateFormOptions): string {
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The runtime guard validates JavaScript and custom upload values before trusting the StreamingFile brand.
   if (isStreamingFile(value)) {
     const { name } = value;
     if (typeof name !== 'string' || !name) {
@@ -512,6 +513,7 @@ function getStreamingFileName(value: Uploadable, options: CreateFormOptions): st
 function getStreamingFileType(value: Uploadable): string {
   let type: string | undefined;
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- Runtime upload-brand checks intentionally accept unknown inputs despite the static Uploadable annotation.
   if (isStreamingFile(value) || isBlob(value)) {
     ({ type } = value);
   } else if (value instanceof Response) {
@@ -537,6 +539,7 @@ function validateStreamingFileType(type: string): string {
 }
 
 function getStreamingFileData(value: Uploadable): Exclude<Uploadable, StreamingFile> {
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The runtime guard validates the streaming wrapper before accessing its potentially custom data.
   if (isStreamingFile(value)) {
     return value.data;
   }

@@ -1335,6 +1335,7 @@ function createBufferedEventLedger(): {
     entry.identities.clear();
   };
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The ledger contract contextually types its callbacks and keeps retained-identity internals private.
   return {
     retain(graph) {
       const entry: BufferedLedgerEntry = { scalarBytes: 0, roots: new Set(), identities: new Set() };

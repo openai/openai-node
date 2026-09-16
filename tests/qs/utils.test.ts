@@ -233,7 +233,7 @@ describe('prototype-pollution safety', () => {
   });
 
   test('revalidates and replaces every alias after a source getter mutates a safe record', () => {
-    const shared: Record<string, unknown> = { safe: true };
+    const shared = { safe: true };
     let getterCalls = 0;
     const source = {
       first: shared,
@@ -326,7 +326,7 @@ describe('prototype-pollution safety', () => {
   });
 
   test('detaches earlier aliases before later proxy descriptor traps can mutate source records', () => {
-    const shared: Record<string, unknown> = { safe: true };
+    const shared = { safe: true };
     let inspections = 0;
     const later = new Proxy(
       { value: true },
@@ -354,7 +354,7 @@ describe('prototype-pollution safety', () => {
   });
 
   test('keeps unpublished snapshots safe when a later proxy mutates the original alias', () => {
-    const shared: Record<string, unknown> = { safe: true };
+    const shared = { safe: true };
     const later = new Proxy(
       { value: true },
       {
@@ -377,6 +377,7 @@ describe('prototype-pollution safety', () => {
 
   test('snapshots two thousand aliases to a shared two-thousand-record graph only once', () => {
     let inspections = 0;
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The proxy target is populated incrementally with a two-thousand-record graph after allocation.
     const root: Record<string, any> = new Proxy(
       {},
       {

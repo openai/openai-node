@@ -475,7 +475,7 @@ it.each(['byte', 'depth'] as const)(
         ? `{"value":"${'x'.repeat(17 * 1024 * 1024)}"}`
         : `{"value":${'['.repeat(128)}0${']'.repeat(128)}}`;
     const readArguments = vi.fn(() => unsafe);
-    const functionDelta: { name: string; arguments?: string } = { name: strictTool.function.name };
+    const functionDelta = { name: strictTool.function.name };
     Object.defineProperty(functionDelta, 'arguments', { enumerable: true, get: readArguments });
 
     async function* accessorChunks(): AsyncGenerator<Chunk> {

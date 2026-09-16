@@ -12,7 +12,7 @@ async function* skillAssetChunks(): AsyncGenerator<string> {
   yield 'streamed asset';
 }
 
-function createClient(): { client: OpenAI; requests: RecordedRequest[] } {
+function createClient() {
   const requests: RecordedRequest[] = [];
   const client = new OpenAI({
     apiKey: 'test-key',

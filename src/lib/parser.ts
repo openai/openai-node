@@ -77,7 +77,7 @@ export function makeParseableResponseFormat<ParsedT>(
 ): AutoParseableResponseFormat<ParsedT> {
   const obj = { ...response_format, type: 'json_schema' as const };
   obj.json_schema = { ...obj.json_schema };
-  delete (obj as { toJSON?: unknown }).toJSON;
+  delete (obj as typeof obj & { toJSON?: unknown }).toJSON;
   delete (obj.json_schema as { toJSON?: unknown }).toJSON;
 
   Object.defineProperties(obj, {
@@ -111,7 +111,7 @@ export function makeParseableTextFormat<ParsedT>(
   parser: (content: string) => ParsedT,
 ): AutoParseableTextFormat<ParsedT> {
   const obj = { ...response_format, type: 'json_schema' as const };
-  delete (obj as { toJSON?: unknown }).toJSON;
+  delete (obj as typeof obj & { toJSON?: unknown }).toJSON;
 
   Object.defineProperties(obj, {
     $brand: {
@@ -377,6 +377,7 @@ function parseToolCall<Params extends ChatCompletionCreateParams>(
     (inputTool) =>
       isChatCompletionFunctionTool(inputTool) && inputTool.function?.name === toolCall.function.name,
   ) as ChatCompletionFunctionTool | undefined; // TS doesn't narrow based on isChatCompletionTool
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The parser callback may return any value; null only represents an unparsed tool call.
   let parsedArguments: unknown = null;
   if (isAutoParsableTool(inputTool)) {
     parsedArguments = inputTool.$parseRaw(toolCall.function.arguments);

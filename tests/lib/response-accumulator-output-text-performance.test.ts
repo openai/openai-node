@@ -108,7 +108,7 @@ async function stream(events: ResponseStreamEvent[]): Promise<Response> {
   return ResponseStream.fromReadableStream(ReadableStreamFrom(chunks)).finalResponse();
 }
 
-function measureWork(kind: 'text' | 'output'): { count: number } {
+function measureWork(kind: 'text' | 'output') {
   const work = { count: 0 };
   const clone = globalThis.structuredClone;
   const instrument = <T extends object>(target: T, matches: (property: PropertyKey) => boolean) =>

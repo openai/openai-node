@@ -159,6 +159,7 @@ describe.each(formatFactories)(
         }));
         const getter = vi.fn(() => serializer);
         const metadataSymbol = Symbol('preserved-chat-format-metadata');
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- The fixture adds a callable toJSON field after selecting between a data property and an accessor.
         const metadata: UnsafeMetadata = {
           description: trustedDescription,
           [metadataSymbol]: 'preserved',
@@ -219,7 +220,7 @@ describe.each(formatFactories)(
       const inherited = Object.assign(Object.create({ toJSON: inheritedSerializer }), {
         description: trustedDescription,
       }) as UnsafeMetadata;
-      const hidden: UnsafeMetadata = { description: trustedDescription };
+      const hidden = { description: trustedDescription };
       Object.defineProperty(hidden, 'toJSON', { enumerable: false, value: hiddenSerializer });
 
       for (const metadata of [inherited, hidden]) {
@@ -340,14 +341,14 @@ describe('shared chat structured response-format factory', () => {
     const nestedSerializer = vi.fn(() => ({ strict: false }));
     const rootGetter = vi.fn(() => rootSerializer);
     const nestedGetter = vi.fn(() => nestedSerializer);
-    const nested: UnsafeMetadata = {
+    const nested = {
       name: trustedName,
       strict: true,
       description: trustedDescription,
       schema: trustedSchema,
     };
     Object.defineProperty(nested, 'toJSON', { enumerable: true, get: nestedGetter });
-    const original: UnsafeMetadata = { type: 'json_schema', json_schema: nested };
+    const original = { type: 'json_schema', json_schema: nested };
     Object.defineProperty(original, 'toJSON', { enumerable: true, get: rootGetter });
     Object.freeze(nested);
     Object.freeze(original);
@@ -377,7 +378,7 @@ describe('shared chat structured response-format factory', () => {
       description: trustedDescription,
       schema: trustedSchema,
     });
-    const hidden: UnsafeMetadata = {
+    const hidden = {
       name: trustedName,
       strict: true,
       description: trustedDescription,
@@ -403,7 +404,7 @@ describe('shared chat structured response-format factory', () => {
 
   test('preserves exceptions thrown by original enumerable metadata getters', () => {
     const failure = new Error('synthetic nested metadata getter failure');
-    const nested: UnsafeMetadata = {
+    const nested = {
       name: trustedName,
       strict: true,
       description: trustedDescription,

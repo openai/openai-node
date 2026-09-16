@@ -82,6 +82,7 @@ function createHandlerHarness(runtime: Runtime, failedClientIDs: number[] = []):
     }
   }
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The test module loader indexes this dependency registry using runtime import specifiers.
   const dependencies: Record<string, unknown> = {
     '../../uploadWebApiTestCases': { uploadWebApiTestCases },
     'fastest-levenshtein': { distance: () => 0 },
@@ -106,6 +107,7 @@ function createHandlerHarness(runtime: Runtime, failedClientIDs: number[] = []):
 
   const handlerExports: {
     default?: (request: unknown, response?: MockNodeResponse) => Promise<HandlerResult | undefined>;
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Executing the CommonJS module populates this initially empty exports object.
   } = {};
 
   runInNewContext(

@@ -41,7 +41,7 @@ function createdEvent(): ResponseStreamEvent {
   } as ResponseStreamEvent;
 }
 
-function unsupportedEvent(type: unknown = futureEventType): Record<string, unknown> {
+function unsupportedEvent(type: unknown = futureEventType) {
   return {
     type,
     sequence_number: 1,

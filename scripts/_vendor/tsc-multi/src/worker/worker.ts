@@ -15,6 +15,7 @@ const JS_MAP_EXT = `${JS_EXT}${MAP_EXT}`;
 const DTS_EXT = '.d.ts';
 const DTS_MAP_EXT = `${DTS_EXT}${MAP_EXT}`;
 
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- Preserve the vendored extension lookup contract, which accepts runtime file extensions.
 const extnameDeclMap: Record<string, string> = {
   '.js': '.d.ts',
   '.mjs': '.d.mts',

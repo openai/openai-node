@@ -42,7 +42,7 @@ const transitiveMethods: Method[] = [
   ['fileBatches.uploadAndPoll', 3, (c, o) => batches(c).uploadAndPoll('vs_123', uploads(), o)],
 ];
 
-function createClient(header?: string): { client: OpenAI; fetch: FetchMock } {
+function createClient(header?: string) {
   let polls = 0;
   const fetch = vi.fn<Fetch>(async (url, init) => {
     if (String(url).startsWith('data:')) {
@@ -154,12 +154,7 @@ function hiddenSignal(signal: AbortSignal, inherited: boolean): Options {
     : Object.defineProperty(options, 'signal', { value: signal });
 }
 
-function throwingStructuralSignal(controller: AbortController): {
-  signal: AbortSignal;
-  removeEventListener: ReturnType<typeof vi.fn<AbortSignal['removeEventListener']>>;
-  callbackErrors: unknown[];
-  failNextRemovals: (count?: number) => void;
-} {
+function throwingStructuralSignal(controller: AbortController) {
   const callbackErrors: unknown[] = [];
   const listeners = new Map<NonNullable<AbortListener>, NonNullable<AbortListener>>();
   let failuresRemaining = 0;

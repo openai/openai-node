@@ -467,7 +467,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
   test('captures accessor-backed event data once before exposing or routing its message', async () => {
     const first = { id: 'msg_first', role: 'assistant', content: [] };
     const second = { id: 'msg_second', role: 'assistant', content: [] };
-    const createdEvent: Event = { event: 'thread.message.created' };
+    const createdEvent = { event: 'thread.message.created' };
     const readData = vi.fn(function readStableData(this: Event) {
       expect(this).toBe(createdEvent);
       return readData.mock.calls.length === 1 ? first : second;
@@ -546,7 +546,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
 
   test('captures an accessor-backed assistant event discriminator exactly once', async () => {
     const message = { id: 'msg_discriminator', role: 'assistant', content: [] };
-    const createdEvent: Event = { data: message };
+    const createdEvent = { data: message };
     const readEvent = vi.fn(function readStableEvent(this: Event) {
       expect(this).toBe(createdEvent);
       return readEvent.mock.calls.length === 1 ? 'thread.message.created' : 'thread.run.completed';
@@ -1360,6 +1360,7 @@ describe('AssistantStream run-step lifecycle', () => {
       await expect(runner.done()).rejects.toThrow('Received a RunStepDelta before creation of a snapshot');
       expect(Object.getOwnPropertyDescriptor(Object.prototype, pollutionKey)).toBeUndefined();
       expect(({} as Record<string, unknown>)[pollutionKey]).toBeUndefined();
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- The pollution regression probes an arbitrary inherited string key on an otherwise empty array.
       expect(([] as unknown as Record<string, unknown>)[pollutionKey]).toBeUndefined();
     } finally {
       Reflect.deleteProperty(Object.prototype, pollutionKey);

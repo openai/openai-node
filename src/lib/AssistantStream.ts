@@ -99,10 +99,7 @@ export type RunSubmitToolOutputsParamsStream = Omit<RunSubmitToolOutputsParamsBa
   stream?: true;
 };
 
-function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
-  event: AssistantStreamEvent;
-  exposedEvent: AssistantStreamEvent;
-} {
+function stabilizeAssistantStreamEvent(event: AssistantStreamEvent) {
   const eventDescriptor = Object.getOwnPropertyDescriptor(event, 'event');
   const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
   const { event: eventType, data } = event;

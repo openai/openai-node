@@ -207,6 +207,7 @@ export function resolveBedrockEndpoint(options: BedrockEndpointOptions): {
     const endpoint =
       options.endpoint ?? parseBedrockEndpointHostname(new URL(baseURL).hostname)?.endpoint ?? 'mantle';
     validateCanonicalBedrockEndpoint(baseURL, endpoint, region);
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Preserve the declared endpoint resolver contract across configured URLs and inferred regions.
     return { endpoint, region, baseURL };
   }
   const endpoint = options.endpoint ?? 'mantle';
@@ -220,6 +221,7 @@ export function resolveBedrockEndpoint(options: BedrockEndpointOptions): {
     endpoint === 'runtime'
       ? `bedrock-runtime.${region}.${resolveRuntimeDnsSuffixes(region)[0]}`
       : `bedrock-mantle.${region}.api.aws`;
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The resolver intentionally returns its declared endpoint contract across all configuration paths.
   return { endpoint, region, baseURL: `https://${hostname}/openai/v1` };
 }
 
@@ -545,13 +547,16 @@ export function resolveBedrockBearerAuth(
 
   if (options.tokenProvider) {
     const tokenProvider = options.tokenProvider;
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared bearer-auth contract hides concrete authenticator implementations behind their factory.
     return { factory: () => new BedrockBearerAuth(tokenProvider), explicit: true };
   }
   if (options.apiKey != null) {
     const apiKey = options.apiKey;
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Explicit API keys use the same declared auth-factory contract as token providers.
     return { factory: () => new BedrockBearerAuth(async () => apiKey), explicit: true };
   }
   if (allowEnvironment && options.apiKey !== null && readEnv('AWS_BEARER_TOKEN_BEDROCK')) {
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Environment credentials must preserve the same declared auth-factory contract as explicit options.
     return {
       explicit: false,
       factory: () =>
@@ -567,5 +572,6 @@ export function resolveBedrockBearerAuth(
     };
   }
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared optional factory contract also represents the absence of bearer credentials.
   return { factory: undefined, explicit: false };
 }

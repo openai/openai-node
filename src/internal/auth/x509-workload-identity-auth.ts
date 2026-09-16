@@ -43,10 +43,7 @@ function assertSafeHeaders(headers: Headers): void {
   }
 }
 
-function exchangeDeadline(
-  timeout: number | undefined,
-  callerSignal: AbortSignal | null | undefined,
-): { signal: AbortSignal; dispose: () => void } {
+function exchangeDeadline(timeout: number | undefined, callerSignal: AbortSignal | null | undefined) {
   const deadline = new AbortController();
   const timer =
     timeout === undefined
@@ -104,10 +101,7 @@ interface X509TokenRequestContext {
   fetchOptions: MergedRequestInit;
 }
 
-function waitForRefresh(
-  attempt: X509RefreshAttempt,
-  signal: AbortSignal,
-): { result: Promise<X509ExchangedToken>; dispose: () => void } {
+function waitForRefresh(attempt: X509RefreshAttempt, signal: AbortSignal) {
   let abort: (() => void) | undefined;
   // AbortSignal remains callback-only on supported TypeScript/runtime combinations.
   // oxlint-disable-next-line promise/avoid-new -- A callback-only AbortSignal must race a shared refresh.
@@ -303,6 +297,7 @@ export class X509WorkloadIdentityAuth {
     if (!defaultHeaders || !requestHeaders) {
       throw new OpenAIError('X.509 workload identity requires snapshotted request headers.');
     }
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The exposed snapshot contract deliberately hides the private request-scope representation.
     return { defaultHeaders, requestHeaders };
   }
 

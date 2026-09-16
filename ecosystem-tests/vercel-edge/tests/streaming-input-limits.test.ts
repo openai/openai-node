@@ -47,7 +47,7 @@ function requestWithBodyChunks(
   chunks: string[],
   headers: Record<string, string> = {},
   cancel = jest.fn(),
-): { request: NextRequest; cancel: jest.Mock } {
+) {
   let index = 0;
   const body = new ReadableStream<Uint8Array>({
     pull(controller) {

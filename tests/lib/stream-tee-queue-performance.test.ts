@@ -18,12 +18,7 @@ function createNumberedStream(length: number, controller = new AbortController()
   return { stream: new Stream(() => ({ next }), controller), next, controller };
 }
 
-function measureArrayMovement<T>(operation: () => T): {
-  result: T;
-  elementMoves: number;
-  shiftCalls: number;
-  compactions: number;
-} {
+function measureArrayMovement<T>(operation: () => T) {
   const originalShift = Array.prototype.shift;
   const originalSlice = Array.prototype.slice;
   let elementMoves = 0;
@@ -55,7 +50,7 @@ function measureArrayMovement<T>(operation: () => T): {
   }
 }
 
-function capturePromiseQueues<T>(operation: () => T): { result: T; queues: Set<unknown[]> } {
+function capturePromiseQueues<T>(operation: () => T) {
   const originalPush = Array.prototype.push;
   const queues = new Set<unknown[]>();
 

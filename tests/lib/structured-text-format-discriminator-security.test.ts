@@ -173,7 +173,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
 
   test('evaluates an enumerable discriminator getter exactly once', () => {
     let getterCalls = 0;
-    const metadata: UnsafeFormatMetadata = { description: trustedDescription };
+    const metadata = { description: trustedDescription };
     Object.defineProperty(metadata, 'type', {
       configurable: true,
       enumerable: true,
@@ -195,7 +195,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
     const inherited = Object.assign(Object.create({ type: 'text' }), {
       description: trustedDescription,
     }) as UnsafeFormatMetadata;
-    const hidden: UnsafeFormatMetadata = { description: trustedDescription };
+    const hidden = { description: trustedDescription };
     Object.defineProperty(hidden, 'type', { value: 'json_object', enumerable: false });
 
     expectTrustedFormat(create(inherited));
@@ -277,6 +277,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
       }));
       const getter = vi.fn(() => serializer);
       const metadataSymbol = Symbol('preserved-serializer-metadata');
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- The fixture adds toJSON dynamically to compare hostile callable and accessor metadata.
       const metadata: UnsafeFormatMetadata = {
         description: trustedDescription,
         [metadataSymbol]: 'preserved',
@@ -339,7 +340,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
     const inherited = Object.assign(Object.create({ toJSON: inheritedSerializer }), {
       description: trustedDescription,
     }) as UnsafeFormatMetadata;
-    const hidden: UnsafeFormatMetadata = { description: trustedDescription };
+    const hidden = { description: trustedDescription };
     Object.defineProperty(hidden, 'toJSON', { enumerable: false, value: hiddenSerializer });
 
     for (const metadata of [inherited, hidden]) {
@@ -416,7 +417,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
 
   test('preserves exceptions from hostile metadata getters', () => {
     const failure = new Error('synthetic metadata getter failure');
-    const metadata: UnsafeFormatMetadata = { description: trustedDescription };
+    const metadata = { description: trustedDescription };
     Object.defineProperty(metadata, 'type', {
       enumerable: true,
       get: () => {

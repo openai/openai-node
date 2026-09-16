@@ -1498,6 +1498,7 @@ export class ChatCompletionStream<ParsedT = null>
         (tool) => isChatCompletionFunctionTool(tool) && tool.function.name === toolCallSnapshot.function.name,
       ) as ChatCompletionFunctionTool | undefined; // TS doesn't narrow based on isChatCompletionTool
 
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- The initial null is replaced with an arbitrary tool-parser result after snapshot validation.
       let parsedArguments: unknown = null;
       const parseable = isAutoParsableTool(inputTool) || inputTool?.function.strict === true;
       let argumentsSnapshot: string;

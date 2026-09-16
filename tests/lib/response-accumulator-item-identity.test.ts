@@ -31,6 +31,7 @@ function makeResponse(output: OutputItem[] = []): Response {
 }
 
 function makeOutput(type: string, id = 'item_123'): OutputItem {
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- This fixture builder adds the fields appropriate to each output-item variant after initialization.
   const item: EventFields = { id, type };
 
   switch (type) {
@@ -314,7 +315,7 @@ describe('ResponseAccumulator output item identity', () => {
       const original = structuredClone(snapshot);
       const readInheritedValue = vi.fn(() => (field === 'item_id' ? 'item_123' : 0));
       const prototype = Object.defineProperty({}, field, { get: readInheritedValue });
-      const event: EventFields = Object.assign(Object.create(prototype) as EventFields, {
+      const event = Object.assign(Object.create(prototype) as EventFields, {
         type: 'response.output_text.delta',
         sequence_number: 1,
         output_index: 0,
@@ -333,7 +334,7 @@ describe('ResponseAccumulator output item identity', () => {
       makeOutput('message', 'first_item'),
       makeOutput('message', 'second_item'),
     );
-    const event: EventFields = {
+    const event = {
       type: 'response.output_text.delta',
       sequence_number: 1,
       item_id: 'first_item',
@@ -362,7 +363,7 @@ describe('ResponseAccumulator output item identity', () => {
 
   test('snapshots item-scoped identity and content-index accessors once', () => {
     const snapshot = createSnapshot(makeOutput('message', 'item_123'));
-    const event: EventFields = {
+    const event = {
       type: 'response.output_text.delta',
       sequence_number: 1,
       output_index: 0,

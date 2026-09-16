@@ -83,6 +83,7 @@ describeOnUnix('monthly Node review proposal boundary', () => {
     bodyPath = path.join(fixture, 'body.md');
     outputPath = path.join(fixture, 'output');
     mkdirSync(path.join(checkout, '.github'), { recursive: true });
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Tests mutate several unrelated package fields by runtime key to verify the policy-change boundary.
     metadata = {
       name: 'policy-fixture',
       engines: { node: '>=22.0.0' },

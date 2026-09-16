@@ -48,7 +48,7 @@ const failureCases: FailureCase[] = [
   },
 ];
 
-function sensitiveToolCall(kind: FailureKind): Record<string, unknown> {
+function sensitiveToolCall(kind: FailureKind) {
   const providerMetadata = {
     authorization: `Bearer ${syntheticCredential}`,
     patient: syntheticPatient,
@@ -157,10 +157,8 @@ function createPublicStream(chunk: OpenAI.Chat.ChatCompletionChunk, logLevel: 'o
   return { stream, logger, fetch };
 }
 
-function attachSnapshot(
-  stream: ChatCompletionStream<null>,
-  kind: FailureKind,
-): { snapshot?: ChatCompletionSnapshot; original?: ChatCompletionSnapshot } {
+function attachSnapshot(stream: ChatCompletionStream<null>, kind: FailureKind) {
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The listener populates both optional snapshots after the capture object has been returned.
   const captured: { snapshot?: ChatCompletionSnapshot; original?: ChatCompletionSnapshot } = {};
 
   stream.on('chunk', (_chunk, snapshot) => {

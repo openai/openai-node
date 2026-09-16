@@ -432,7 +432,7 @@ function normalizeRootAnyOf(schema: JSONSchema): boolean {
     }
 
     const renames = definitionRenames.get(keyword);
-    const mergedDefinitions: Record<string, JSONSchemaDefinition> = { ...rootDefinitions };
+    const mergedDefinitions = { ...rootDefinitions };
     for (const [name, definition] of Object.entries(branchDefinitions)) {
       Object.defineProperty(mergedDefinitions, renames?.get(name) ?? name, {
         value: definition,
@@ -1430,6 +1430,7 @@ function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
 
   for (const ref of refsToPreserve) {
     const target = resolveLocalRef(root, ref);
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Local references require runtime schema validation even when the static return type is narrower.
     if (!isSchemaDefinition(target)) {
       if (rootOnly) {
         continue;
@@ -1510,6 +1511,7 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
 
   for (const ref of refsToPreserve) {
     const target = resolveLocalRef(root, ref);
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Validate referenced schema values at runtime before preserving them under generated definitions.
     if (!isSchemaDefinition(target)) {
       throw new Error('Local $ref cannot be preserved before allOf property removal: ' + JSON.stringify(ref));
     }
@@ -1556,6 +1558,7 @@ function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: 
       );
     }
     const resolved = resolveLocalRef(root, ref);
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Untrusted local references must pass the runtime schema predicate before normalization.
     if (resolved === undefined || !isSchemaDefinition(resolved)) {
       throw new Error(
         `Local $ref at \`${
@@ -1837,6 +1840,7 @@ function mergeObjectAllOf(
   if (path.length === 0) {
     for (const keyword of JSON_SCHEMA_ROOT_METADATA_KEYWORDS) {
       if (keyword in jsonSchema) {
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Root annotation keywords are copied dynamically; JSONSchema has no index signature for extension fields.
         (merged as Record<string, unknown>)[keyword] = (jsonSchema as Record<string, unknown>)[keyword];
       }
     }

@@ -407,7 +407,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
     'fails closed for a $failureKind parser rejection containing $privateValue through $boundary',
     async ({ privateValue, boundary, failureKind }) => {
       const target = new Error(`${privateValue} appeared in the malformed metadata preview`);
-      let rejected: object;
+      let rejected: Error;
       if (failureKind === 'revoked' || failureKind === 'nested revoked') {
         const temporary = Proxy.revocable(target, {});
         temporary.revoke();

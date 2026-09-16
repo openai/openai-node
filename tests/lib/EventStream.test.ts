@@ -665,7 +665,7 @@ describe('EventStream iterator buffer limits', () => {
   });
 
   test('propagates a newly shared descendant to every buffered owner before one dequeues', async () => {
-    const shared: { child: { text: string } } = { child: { text: 'small' } };
+    const shared = { child: { text: 'small' } };
     const stream = new TestStream();
     const iterator = stream.events('payload');
     stream.emitPayload({ first: true, shared });
@@ -702,7 +702,7 @@ describe('EventStream iterator buffer limits', () => {
   });
 
   test('rejects a late accessor added to a shared retained graph without invoking it', async () => {
-    const shared: Record<string, unknown> = { safe: true };
+    const shared = { safe: true };
     const stream = new TestStream();
     stream.events('payload');
     stream.emitPayload({ shared });
@@ -1418,6 +1418,7 @@ describe('EventStream iterator buffer limits', () => {
   test('revalidates queued payloads after later listeners mutate them in the same dispatch', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- A later listener adds the optional hidden field to the same object during dispatch.
     const payload: { text: string; hidden?: string } = { text: 'small' };
     stream.on('payload', (value) => {
       (value as typeof payload).hidden = 'x'.repeat(5 * 1024 * 1024);
@@ -1432,6 +1433,7 @@ describe('EventStream iterator buffer limits', () => {
   test('does not revalidate events discarded by an iterator returning during the same dispatch', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The listener adds hidden retained data only after the iterator returns.
     const payload: { text: string; hidden?: string } = { text: 'small' };
     stream.on('payload', (value) => {
       void iterator.return?.();
@@ -1450,6 +1452,7 @@ describe('EventStream iterator buffer limits', () => {
     const stream = new TestStream();
     const returned = stream.events('payload');
     const retained = stream.events('payload');
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Sibling iterator cancellation must not hide a later addition to the shared payload.
     const payload: { text: string; hidden?: string } = { text: 'small' };
     stream.on('payload', (value) => {
       void returned.return?.();
@@ -1481,6 +1484,7 @@ describe('EventStream iterator buffer limits', () => {
   test('revalidates preserved payload identities after mutation and before dequeue', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The queued object gains hidden retained data after emission and before dequeue.
     const payload: { text: string; hidden?: string } = { text: 'small' };
 
     stream.emitPayload(payload);
@@ -2243,9 +2247,11 @@ describe('EventStream iterator buffer limits', () => {
   test('buffers valid deeply nested parsed event snapshots without aborting the request', async () => {
     const stream = new TestStream();
     const iterator = stream.events('payload');
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The JSON fixture starts as a scalar and is repeatedly wrapped in arrays to test deep nesting.
     let parsed: unknown = 0;
 
     for (let depth = 0; depth < 128; depth += 1) {
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- Each iteration changes the JSON value from the previous nesting level to another array.
       parsed = [parsed];
     }
 
@@ -2267,6 +2273,7 @@ describe('EventStream iterator buffer limits', () => {
     const readAccessor = vi.fn(() => {
       throw new Error('accessor should not run');
     });
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The fixture adds its self-reference after allocation to create an actual cycle.
     const payload: { self?: unknown } = {};
 
     payload.self = payload;

@@ -9,6 +9,7 @@ const syntheticPatient = 'synthetic-patient-123-45-6789';
 const missingIndexMessage = 'Expected array delta entry to have an `index` property';
 
 function sensitiveToolCall(): Record<string, unknown> {
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- Callers add malformed or missing-index fields to this open-ended wire fixture before accumulation.
   return {
     type: 'function',
     id: 'call_sensitive',

@@ -103,7 +103,7 @@ function validateStaticCredentials(options: BedrockProviderOptions): AwsCredenti
   return credentials;
 }
 
-function requestTarget(parsedURL: URL): { path: string; query: Record<string, string | string[]> } {
+function requestTarget(parsedURL: URL) {
   const query: Record<string, string | string[]> = Object.create(null);
   for (const [name, value] of parsedURL.searchParams) {
     if (name === '__proto__') {

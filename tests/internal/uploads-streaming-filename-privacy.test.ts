@@ -7,7 +7,7 @@ interface CapturedRequest {
   body: string;
 }
 
-function createClient(): { client: OpenAI; requests: CapturedRequest[] } {
+function createClient() {
   const requests: CapturedRequest[] = [];
   const transport = Object.assign(
     async (url: Request | URL | string, options?: RequestInit): Promise<Response> => {

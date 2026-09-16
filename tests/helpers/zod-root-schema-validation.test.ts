@@ -168,6 +168,7 @@ describe('canonical strict vendor-converter roots', () => {
 
   it.each(['cyclic', 'fresh'] as const)('rejects a %s Proxy prototype after one inspection', (kind) => {
     let inspections = 0;
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The proxy prototype trap refers back to this binding, requiring an explicit nonstructural object type.
     const root: object = new Proxy(
       { type: 'object' as const },
       {
@@ -195,7 +196,7 @@ describe('canonical strict vendor-converter roots', () => {
   });
 
   it('neutralizes synthesized Proxy hooks and keyword reads by owning descriptor values', () => {
-    const target: Record<string, unknown> = { type: 'object', nullable: false, $ref: undefined };
+    const target = { type: 'object', nullable: false, $ref: undefined };
     const get = vi.fn((_subject: typeof target, key: PropertyKey) =>
       key === 'toJSON' ? () => ({ type: 'string' }) : 'string',
     );

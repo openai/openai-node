@@ -233,6 +233,7 @@ export class WorkloadIdentityAuth {
 
   private async refreshToken(generation: number): Promise<string> {
     const subjectToken = await this.config.provider.getToken();
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The token-exchange field dictionary gains an optional client_id after its required fields are initialized.
     const body: Record<string, string> = {
       grant_type: TOKEN_EXCHANGE_GRANT_TYPE,
       subject_token: subjectToken,

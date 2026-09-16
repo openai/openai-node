@@ -163,6 +163,7 @@ describe.each([
     it('preserves shared literal defaults and rejects cyclic JSON values', () => {
       const Account = z.object({ id: z.string() });
       const shared = { $ref: '#/definitions/account/admin' };
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- The optional self field is assigned after creation to form the cyclic JSON regression fixture.
       const cyclic: { $ref: string; self?: unknown } = { $ref: '#/definitions/account/admin' };
       cyclic.self = cyclic;
       const Root = z.object({

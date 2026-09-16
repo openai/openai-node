@@ -1110,6 +1110,7 @@ describe('.stream()', () => {
     await stream.done().catch(() => {});
 
     const collected: OpenAI.Chat.ChatCompletionChunk[] = [];
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The null sentinel is replaced with any thrown iterator value, which must remain uncoerced.
     let caught: unknown = null;
     try {
       for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
@@ -1311,6 +1312,7 @@ describe('.stream()', () => {
     await runner.done().catch(() => {});
 
     const collected: OpenAI.Chat.ChatCompletionChunk[] = [];
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The fixture records an arbitrary thrown value while separately preserving successfully delivered chunks.
     let caught: unknown = null;
     try {
       for await (const chunk of proxied) {

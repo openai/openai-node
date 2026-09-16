@@ -46,11 +46,7 @@ class EmittedTestStream extends EventStream<EmittedEvents> {
   }
 }
 
-function measureListenerMovement<T>(operation: () => T): {
-  result: T;
-  elementMoves: number;
-  spliceCalls: number;
-} {
+function measureListenerMovement<T>(operation: () => T) {
   const originalSplice = Array.prototype.splice;
   const originalFilter = Array.prototype.filter;
   let elementMoves = 0;

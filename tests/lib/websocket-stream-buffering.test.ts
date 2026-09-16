@@ -9,7 +9,7 @@ import {
 
 const BACKLOG_SIZE = 4096;
 
-function measureElementMovement<T>(operation: () => T): { result: T; elementMoves: number } {
+function measureElementMovement<T>(operation: () => T) {
   const originalShift = Array.prototype.shift;
   const originalSplice = Array.prototype.splice;
   const originalSlice = Array.prototype.slice;

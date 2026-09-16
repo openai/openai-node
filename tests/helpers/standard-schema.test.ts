@@ -22,14 +22,14 @@ type WeatherOutput = WeatherInput & {
   normalized: true;
 };
 
-const weatherJSONSchema: JSONSchema = {
+const weatherJSONSchema = {
   type: 'object',
   properties: {
     city: { type: 'string' },
     unit: { type: 'string', enum: ['c', 'f'] },
   },
   required: ['city', 'unit'],
-};
+} satisfies JSONSchema;
 
 const strictWeatherJSONSchema: JSONSchema = {
   ...weatherJSONSchema,
@@ -59,9 +59,7 @@ function validateWeather(value: unknown) {
   };
 }
 
-function makeStandardSchema(
-  jsonSchema: Record<string, unknown> = weatherJSONSchema as unknown as Record<string, unknown>,
-) {
+function makeStandardSchema(jsonSchema: Record<string, unknown> = weatherJSONSchema) {
   const input = vi.fn(() => jsonSchema);
   const output = vi.fn(() => ({ type: 'string' }));
 
@@ -2208,8 +2206,7 @@ function _typeTests() {
     '~standard': {
       ...standardSchema['~standard'],
       jsonSchema: {
-        input: (_options: { readonly target: 'draft-07' | 'draft-2020-12' }) =>
-          weatherJSONSchema as unknown as Record<string, unknown>,
+        input: (_options: { readonly target: 'draft-07' | 'draft-2020-12' }) => weatherJSONSchema,
       },
     },
   };
@@ -2219,7 +2216,7 @@ function _typeTests() {
       vendor: 'test',
       validate: validateWeather,
       jsonSchema: {
-        input: () => weatherJSONSchema as unknown as Record<string, unknown>,
+        input: () => weatherJSONSchema,
       },
     },
   };
