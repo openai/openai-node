@@ -148,8 +148,9 @@ jobs:
         with:
           node-version: '${{ matrix.node-version }}'
 
-      - name: Check Steady cache lifecycle
+      - name: Check Steady downloads and cache lifecycle
         run: |
+          node scripts/steady/download.test.cjs
           node scripts/steady/publication.test.cjs
           node scripts/steady/cache.test.cjs
 

@@ -91,9 +91,8 @@ app.use(express.text());
 //     method: 'POST',
 //     body: 'Tell me why dogs are better than cats',
 //   }).then(async res => {
-//     const decoder = new TextDecoder();
-//     for await (const chunk of res.body) {
-//       console.log(`chunk: ${decoder.decode(chunk)}`);
+//     for await (const chunk of res.body.pipeThrough(new TextDecoderStream())) {
+//       console.log(`chunk: ${chunk}`);
 //     }
 //   })
 //

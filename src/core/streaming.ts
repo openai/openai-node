@@ -352,10 +352,13 @@ export class Stream<Item> implements AsyncIterable<Item> {
    * which can be turned back into a Stream with `Stream.fromReadableStream()`.
    * Canceling a response-backed readable aborts its request. Canceling a tee
    * branch discards its buffered events and leaves sibling consumers running.
+   * Read or serialization failures also release the iterator without replacing the original error.
    */
   toReadableStream(): ReadableStream {
     const { controller } = this;
     let iter: AsyncIterator<Item>;
+    let cancellation: Promise<void> | undefined;
+    const cancel = () => (cancellation ??= this.#cancelIterator(iter, controller));
 
     return makeReadableStream({
       start: async () => {
@@ -373,9 +376,12 @@ export class Stream<Item> implements AsyncIterable<Item> {
           ctrl.enqueue(bytes);
         } catch (err) {
           ctrl.error(err);
+          // An errored readable never invokes its cancel hook. Release the source ourselves,
+          // without letting failed or stalled cleanup replace the read/serialization error.
+          void cancel().catch(() => undefined);
         }
       },
-      cancel: () => this.#cancelIterator(iter, controller),
+      cancel,
     });
   }
 
@@ -569,6 +575,15 @@ export async function* _iterSSEMessages(
         yield sse;
       }
     }
+    // Servers sometimes omit the trailing blank line that normally
+    // terminates the last event. Flush any in-progress event exactly once.
+    if (signal.aborted) {
+      return;
+    }
+    const pending = sseDecoder.flush();
+    if (pending) {
+      yield pending;
+    }
   } catch (error) {
     failed = true;
     if (!signal.aborted || (!isAbortError(error) && error !== signal.reason)) {
@@ -698,6 +713,15 @@ class SSEDecoder {
     }
 
     return null;
+  }
+
+  /**
+   * Emits a pending event at EOF when the stream omitted the trailing blank
+   * line. Returns `null` when no event is in progress so a record that already
+   * ended with a blank line is not delivered twice.
+   */
+  flush(): ServerSentEvent | null {
+    return this.decode('');
   }
 }
 

@@ -27,9 +27,9 @@ fi
 
 if [[ ! -e "$DENO_DIRECTORY" ]]; then
   mkdir "$temporary/deno"
-  curl --fail --location --proto '=https' --proto-redir '=https' --silent --show-error \
+  "$STEADY_ROOT/scripts/steady/download" \
     "https://github.com/denoland/deno/releases/download/v$DENO_VERSION/deno-$DENO_TARGET.zip" \
-    -o "$temporary/deno/deno.zip"
+    "$temporary/deno/deno.zip"
   [[ "$(steady_sha256 < "$temporary/deno/deno.zip")" == "$DENO_SHA256" ]] || steady_fail 'Deno download checksum mismatch.'
   unzip -q "$temporary/deno/deno.zip" -d "$temporary/deno"
   publish_directory "$temporary/deno" "$DENO_DIRECTORY"
