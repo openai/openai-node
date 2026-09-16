@@ -171,7 +171,10 @@ Steady, review the fork commit and run
 with the commit and its source digest; no launcher or test edits are needed.
 Then run `./scripts/steady/install`. Review the release checksums when changing Deno.
 Run `node scripts/steady/test.cjs` to check the
-installation, integrity checks, and mock-server lifecycle.
+installation, download retries, integrity checks, and mock-server lifecycle.
+The download retry regression uses a local HTTPS server and requires OpenSSL
+to generate a temporary test certificate. Run it alone with
+`node scripts/steady/download.test.cjs`.
 
 This checkout owns `scripts/steady/.cache`. Source and dependency entries are
 keyed by the Steady revision; the runtime and dependencies also include the Deno

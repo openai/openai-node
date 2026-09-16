@@ -48,7 +48,8 @@ jobs:
         run: pnpm exec tsc
 
   build:
-    timeout-minutes: 5
+    # Allow four five-minute Deno download attempts plus bootstrap and build checks.
+    timeout-minutes: 30
     name: build
     runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
@@ -148,8 +149,9 @@ jobs:
         with:
           node-version: '${{ matrix.node-version }}'
 
-      - name: Check Steady cache lifecycle
+      - name: Check Steady downloads and cache lifecycle
         run: |
+          node scripts/steady/download.test.cjs
           node scripts/steady/publication.test.cjs
           node scripts/steady/cache.test.cjs
 
