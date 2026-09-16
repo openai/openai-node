@@ -289,6 +289,7 @@ function prepareMergeSource(target: any, source: any, state: MergeState, assign 
   }
   state.inspectedSourceProperties += sourceKeys.length;
   const sourceIsArray = isArray(source);
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The query merge graph preserves heterogeneous scalar, array, and object values under its existing merge contract.
   const prepared: Record<string, any> = sourceIsArray ? [] : Object.create(null);
   preparedTargets.set(target, prepared);
 

@@ -9,9 +9,6 @@ const generatedFiles = requireConfig('./scripts/generated-files.cjs');
 const compatibilityRules = [
   'func-style',
   'sort-keys',
-  // SDK boundaries and fixtures accept unknown inputs and open JSON records;
-  // runtime type checks establish the contracts instead of assuming them.
-  'anti-slop/no-unsafe-dictionary-type',
   // Conditional literal fields preserve omission and create own data properties,
   // keeping complete request and wire fixtures visible in one construction.
   'anti-slop/no-conditional-empty-object-spread',
@@ -92,6 +89,24 @@ module.exports = defineConfig({
       files: [...fixtureAndVendorFiles, ...sdkBoundaryFiles],
       rules: {
         'anti-slop/no-unknown-parameters': 'off',
+      },
+    },
+    {
+      // Schema keywords, partial wire payloads, and captured option descriptors
+      // have open keys and unvalidated values. Keep dictionary checks elsewhere.
+      files: [
+        ...fixtureAndVendorFiles,
+        'src/helpers/**',
+        'src/lib/transform.ts',
+        'src/internal/assistant-stream-delta.ts',
+        'src/internal/uploads.ts',
+        'src/internal/ws.ts',
+        'src/auth/x509-transport.ts',
+        'src/lib/AssistantStream.ts',
+        'src/lib/agents/agent-session-stream.ts',
+      ],
+      rules: {
+        'anti-slop/no-unsafe-dictionary-type': 'off',
       },
     },
     {

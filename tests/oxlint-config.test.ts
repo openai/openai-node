@@ -72,6 +72,10 @@ test('permits unknown validator inputs while checking typed internal signatures'
   );
 });
 
+test('permits open schema dictionaries while checking typed internal data', () => {
+  checkBoundaryRule('no-unsafe-dictionary-type', 'export type Input = Record<string, unknown>;\n');
+});
+
 function spawnPnpm(args: string[], cwd: string) {
   const command = process.platform === 'win32' ? (process.env['ComSpec'] ?? 'cmd.exe') : 'pnpm';
   const commandArgs = process.platform === 'win32' ? ['/d', '/s', '/c', `pnpm ${args.join(' ')}`] : args;
@@ -201,7 +205,7 @@ test('inherits Ultracite native and anti-slop plugins and enforces their rules',
     expect(codes).toContain('anti-slop(no-reflect-get)');
     expect(codes).toContain('anti-slop(no-runtime-typeof)');
     expect(codes).toContain('anti-slop(no-unknown-parameters)');
-    expect(codes).not.toContain('anti-slop(no-unsafe-dictionary-type)');
+    expect(codes).toContain('anti-slop(no-unsafe-dictionary-type)');
     expect(codes).not.toContain('anti-slop(no-conditional-empty-object-spread)');
 
     const formatted = spawnSync(

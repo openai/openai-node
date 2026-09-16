@@ -453,6 +453,7 @@ export class AbstractChatCompletionRunner<
                   type: 'function',
                   function: {
                     name: t.function.name || t.function.function.name,
+                    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Tool parameter schemas use the published open JSON Schema dictionary contract, including arbitrary extensions.
                     parameters: t.function.parameters as Record<string, unknown>,
                     description: t.function.description,
                     strict: t.function.strict,
