@@ -282,7 +282,7 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
     expect(errors.mock.calls.map(([error]) => error.message)).toEqual(['request failed', 'socket failed']);
   });
 
-  test.each(websocketAPIErrorCases)('dispatches %s API errors', (_shape, apiError, expectedMessage) => {
+  test.each(websocketAPIErrorCases)('dispatches %s API errors', (_errorCase, apiError, expectedMessage) => {
     const websocket = createWebSocket();
     const events = vi.fn();
     const errors = vi.fn();

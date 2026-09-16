@@ -10,6 +10,7 @@ interface SchemaDefinition {
   typeName: string;
   checks?: readonly { kind: string; value?: unknown }[];
   coerce?: boolean;
+  // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- Zod v3 defines this property name on object schemas.
   shape: () => Record<string, SchemaNode>;
   type: SchemaNode;
   innerType: SchemaNode;

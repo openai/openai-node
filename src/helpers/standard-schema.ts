@@ -355,9 +355,9 @@ function getClosedObjectPropertySet(
 }
 
 function haveDisjointClosedObjectPropertySets(left: unknown, right: unknown): boolean {
-  const leftShape = getClosedObjectPropertySet(left);
-  const rightShape = getClosedObjectPropertySet(right);
-  if (!leftShape || !rightShape) {
+  const leftPropertySet = getClosedObjectPropertySet(left);
+  const rightPropertySet = getClosedObjectPropertySet(right);
+  if (!leftPropertySet || !rightPropertySet) {
     return false;
   }
 
@@ -366,8 +366,8 @@ function haveDisjointClosedObjectPropertySets(left: unknown, right: unknown): bo
   // an additional property. This proves oneOf exclusivity without widening
   // overlapping closed shapes.
   return (
-    leftShape.required.some((property) => !rightShape.properties.has(property)) ||
-    rightShape.required.some((property) => !leftShape.properties.has(property))
+    leftPropertySet.required.some((property) => !rightPropertySet.properties.has(property)) ||
+    rightPropertySet.required.some((property) => !leftPropertySet.properties.has(property))
   );
 }
 

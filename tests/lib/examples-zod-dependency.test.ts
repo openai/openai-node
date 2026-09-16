@@ -19,7 +19,7 @@ describe('standalone structured-output examples', () => {
 
   test.each(['zod/v3', 'zod/v4'])('resolve %s from the examples package', (subpath) => {
     const zod = createRequire(examplesPackagePath)(subpath) as {
-      z: { object: (shape: Record<string, unknown>) => { parse: (input: unknown) => unknown } };
+      z: { object: (properties: Record<string, unknown>) => { parse: (input: unknown) => unknown } };
     };
 
     expect(zod.z.object({}).parse({})).toEqual({});

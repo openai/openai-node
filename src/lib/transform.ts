@@ -707,7 +707,7 @@ function ensureStrictJsonSchema(
   // keywords without an explicit type, so those implicit object shapes need
   // the same strict handling as type: 'object'. Explicitly open object schemas
   // cannot be represented in Structured Outputs strict mode.
-  if (hasObjectShape(jsonSchema)) {
+  if (hasObjectConstraints(jsonSchema)) {
     if (!hasOwn(jsonSchema, 'additionalProperties')) {
       jsonSchema.additionalProperties = false;
     } else if (jsonSchema.additionalProperties !== false) {
@@ -728,7 +728,7 @@ function ensureStrictJsonSchema(
 
   // Handle object properties
   const properties = jsonSchema.properties;
-  if (hasObjectShape(jsonSchema)) {
+  if (hasObjectConstraints(jsonSchema)) {
     for (const key of required) {
       if (!isObject(properties) || !hasOwn(properties, key)) {
         throw new Error(
@@ -1109,7 +1109,7 @@ function hasObjectKeywords(schema: JSONSchema): boolean {
   return Object.keys(schema).some((keyword) => JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword));
 }
 
-function hasObjectShape(schema: JSONSchema): boolean {
+function hasObjectConstraints(schema: JSONSchema): boolean {
   const typ = schema.type;
   return (
     typ === 'object' ||
@@ -1140,7 +1140,7 @@ function normalizeObjectUnionWrapper(jsonSchema: JSONSchema, path: string[], roo
     delete jsonSchema.required;
   }
 
-  if (!hasObjectShape(jsonSchema)) {
+  if (!hasObjectConstraints(jsonSchema)) {
     return;
   }
 
@@ -1757,19 +1757,19 @@ function mergeObjectAllOf(
     return true;
   }
 
-  const parentHasObjectShape = hasObjectShapeWithoutAllOf(jsonSchema);
+  const parentIsMergeableObject = isMergeableObjectSchema(jsonSchema);
   const resolvedEntries = allOf.map((entry) =>
     isObject(entry) ? resolveObjectAllOfBranch(entry, root, normalizing) : undefined,
   );
   const objectBranches = resolvedEntries
     .map((entry) => entry?.schema)
-    .filter((entry): entry is JSONSchema => entry !== undefined && hasObjectShapeWithoutAllOf(entry));
-  if (!parentHasObjectShape && objectBranches.length === 0) {
+    .filter((entry): entry is JSONSchema => entry !== undefined && isMergeableObjectSchema(entry));
+  if (!parentIsMergeableObject && objectBranches.length === 0) {
     return false;
   }
   // A lone object branch with no object-valued parent is handled by the
   // existing safe single-allOf flattening path below.
-  if (!parentHasObjectShape && allOf.length === 1) {
+  if (!parentIsMergeableObject && allOf.length === 1) {
     return false;
   }
 
@@ -1782,7 +1782,7 @@ function mergeObjectAllOf(
   };
 
   if (
-    !parentHasObjectShape &&
+    !parentIsMergeableObject &&
     ['additionalProperties', 'properties', 'required', 'type'].some((keyword) => keyword in jsonSchema)
   ) {
     fail();
@@ -1801,7 +1801,7 @@ function mergeObjectAllOf(
   }
 
   const branches: { schema: JSONSchema; sourcePath: string[] | undefined }[] = [];
-  if (parentHasObjectShape) {
+  if (parentIsMergeableObject) {
     branches.push({ schema: jsonSchema, sourcePath: path });
   }
   for (const [index, entry] of allOf.entries()) {
@@ -1817,7 +1817,7 @@ function mergeObjectAllOf(
     // branch were preserved under stable root definitions before this merge,
     // so a valid definitions-only branch can now be discarded like an
     // annotation-only branch.
-    if (hasObjectShapeWithoutAllOf(branch)) {
+    if (isMergeableObjectSchema(branch)) {
       branches.push({
         schema: branch,
         sourcePath: branch === entry ? [...path, 'allOf', String(index)] : undefined,
@@ -2016,7 +2016,7 @@ function mergeObjectAllOf(
   return true;
 }
 
-function hasObjectShapeWithoutAllOf(schema: JSONSchema): boolean {
+function isMergeableObjectSchema(schema: JSONSchema): boolean {
   if (schema.type !== undefined) {
     return isMergeableObjectType(schema.type);
   }
