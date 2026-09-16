@@ -354,7 +354,10 @@ const packedPackagePath = require('node:path');
     }
     assert(!fs.existsSync(optionalUndici), 'Importing public authentication helpers must not install Undici');
 
-    const privateX509Modules = [
+    const privateModules = [
+      'openai/internal/chat-completion-runner-state',
+      'openai/internal/chat-completion-runner-state.js',
+      'openai/internal/chat-completion-runner-state.mjs',
       'openai/internal/auth/x509-transport-capability',
       'openai/internal/auth/x509-transport-capability.js',
       'openai/internal/auth/x509-transport-capability.mjs',
@@ -373,7 +376,7 @@ const packedPackagePath = require('node:path');
       'openai/internal/auth/x509-transport-state-browser.js',
       'openai/internal/auth/x509-transport-state-browser.mjs',
     ];
-    const moduleNames = JSON.stringify(privateX509Modules);
+    const moduleNames = JSON.stringify(privateModules);
     run(process.execPath, [
       '--input-type=commonjs',
       '--eval',
@@ -384,6 +387,19 @@ const packedPackagePath = require('node:path');
       '--eval',
       `for (const name of ${moduleNames}) { try { await import(name); throw new Error(name + ' is publicly accessible'); } catch (error) { if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error; } }`,
     ]);
+
+    assert(
+      ['.js', '.mjs'].every(
+        (extension) =>
+          !fs.existsSync(
+            path.join(
+              temporaryDirectory,
+              `node_modules/openai/internal/chat-completion-runner-state${extension}`,
+            ),
+          ),
+      ),
+      'Tool-runner mode must not be emitted as a shared mutable module',
+    );
 
     const unsupportedDispatcher =
       'assert.throws(direct, /Undici 5\\.2\\.0 or later/u); assert.throws(httpConnect, /Undici 5\\.2\\.0 or later/u); assert.throws(httpsConnect, /Undici 5\\.2\\.0 or later/u);';
