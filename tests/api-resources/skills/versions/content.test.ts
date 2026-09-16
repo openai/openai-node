@@ -10,6 +10,6 @@ const client = new OpenAI({
 
 describe('resource content', () => {
   test('retrieve: required and optional params', async () => {
-    const response = await client.skills.versions.content.retrieve('version', { skill_id: 'skill_123' });
+    await client.skills.versions.content.retrieve('version', { skill_id: 'skill_123' });
   });
 });

@@ -1,10 +1,5 @@
 import { MalformedJSON, partialParse } from '../_vendor/partial-json-parser/parser';
-import {
-  APIError,
-  ContentFilterFinishReasonError,
-  LengthFinishReasonError,
-  OpenAIError,
-} from '../error';
+import { APIError, ContentFilterFinishReasonError, LengthFinishReasonError, OpenAIError } from '../error';
 import type OpenAI from '../index';
 import { observeJSONRequestBody, type RequestOptions } from '../internal/request-options';
 import type { ReadableStream } from '../internal/shim-types';
@@ -1517,6 +1512,9 @@ export class ChatCompletionStream<ParsedT = null>
         );
       }
 
+      if (choiceSnapshot.finish_reason) {
+        state.done_tool_calls.add(toolCallIndex);
+      }
       this._emit('tool_calls.function.arguments.done', {
         name: toolCallSnapshot.function.name,
         index: toolCallIndex,

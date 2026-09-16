@@ -145,11 +145,9 @@ test('keeps distinct abort sources and immediately observes an already-aborted s
   expect(getEventListeners(second.signal, 'abort')).toHaveLength(0);
 });
 
-
-test('still aborts when a structural signal reason getter throws', () => {
-  const stream = new TestStream();
+test.each([false, true])('settles a throwing reason getter (already aborted=%s)', async (alreadyAborted) => {
   const target = new EventTarget();
-  let aborted = false;
+  let aborted = alreadyAborted;
   Object.defineProperties(target, {
     aborted: { get: () => aborted },
     reason: {
@@ -159,9 +157,30 @@ test('still aborts when a structural signal reason getter throws', () => {
     },
   });
   const signal = target as AbortSignal;
+  const unrelated = vi.fn();
+  signal.addEventListener('abort', unrelated);
+  const cancel = vi.fn();
+  const body = new ReadableStream<Uint8Array>({ cancel });
+  const fetch = vi.fn(async () => new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }));
+  const client = new OpenAI({ apiKey: 'synthetic-api-key', fetch });
+  const runner = client.chat.completions.runTools(
+    { model: 'gpt-4o-mini', messages: [], tools: [], stream: true },
+    { signal },
+  );
+  const assertion = expect(runner.done()).rejects.toBeInstanceOf(APIUserAbortError);
 
-  stream.observe(signal);
-  aborted = true;
-  expect(() => target.dispatchEvent(new Event('abort'))).not.toThrow();
-  expect(stream.controller.signal.aborted).toBe(true);
+  if (!alreadyAborted) {
+    await vi.waitFor(() => expect(body.locked).toBe(true));
+    aborted = true;
+    expect(() => target.dispatchEvent(new Event('abort'))).not.toThrow();
+  }
+
+  await assertion;
+  expect(runner.aborted).toBe(true);
+  expect(runner.controller.signal.aborted).toBe(true);
+  expect(getEventListeners(signal, 'abort')).toEqual([unrelated]);
+  expect(fetch).toHaveBeenCalledTimes(alreadyAborted ? 0 : 1);
+  expect(cancel).toHaveBeenCalledTimes(alreadyAborted ? 0 : 1);
+  expect(body.locked).toBe(false);
+  signal.removeEventListener('abort', unrelated);
 });

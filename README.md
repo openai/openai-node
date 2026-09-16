@@ -389,10 +389,10 @@ const job = await client.fineTuning.jobs
   .create({ model: 'gpt-4o', training_file: 'file-abc123' })
   .catch(async (err) => {
     if (err instanceof OpenAI.APIError) {
-      console.log(err.request_id);
+      console.log(err.requestID);
       console.log(err.status); // 400
-      console.log(err.name); // BadRequestError
-      console.log(err.headers); // {server: 'nginx', ...}
+      console.log(err instanceof OpenAI.BadRequestError); // true for an HTTP 400 response
+      console.log(err.headers); // response Headers
     } else {
       throw err;
     }
@@ -407,6 +407,7 @@ Error codes are as follows:
 | 401         | `AuthenticationError`      |
 | 403         | `PermissionDeniedError`    |
 | 404         | `NotFoundError`            |
+| 409         | `ConflictError`            |
 | 422         | `UnprocessableEntityError` |
 | 429         | `RateLimitError`           |
 | >=500       | `InternalServerError`      |
@@ -453,6 +454,12 @@ await client.chat.completions.create({ messages: [{ role: 'user', content: 'How 
 On timeout, an `APIConnectionTimeoutError` is thrown.
 
 Note that requests which time out will be [retried twice by default](#retries).
+
+### Cancellation
+
+Pass an `AbortSignal` in the request's `signal` option to cancel a request, including while its response body is being read.
+
+When native signal composition is unavailable or incompatible with the supplied signal, the SDK shares one listener per caller signal and holds request callbacks weakly. Cleanup depends on garbage collection; keeping a raw response or its body alive can keep its cancellation subscription alive after consumption. Older runtimes without `WeakRef` or `FinalizationRegistry` keep the existing fallback, which can retain a listener for each successful request until the caller aborts.
 
 ## Request IDs
 

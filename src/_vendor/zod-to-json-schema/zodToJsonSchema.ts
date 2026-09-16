@@ -137,12 +137,17 @@ const zodToJsonSchema = <Target extends Targets = 'jsonSchema7'>(
       }
 
       for (const [key, schema] of newDefinitions) {
-        definitions[key] =
-          parseDef(
-            zodDef(schema),
-            { ...refs, currentPath: [...refs.basePath, refs.definitionPath, key] },
-            true,
-          ) ?? {};
+        Object.defineProperty(definitions, key, {
+          value:
+            parseDef(
+              zodDef(schema),
+              { ...refs, currentPath: [...refs.basePath, refs.definitionPath, key] },
+              true,
+            ) ?? {},
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         processedDefinitions.add(key);
       }
     }

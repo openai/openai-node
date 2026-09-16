@@ -477,12 +477,11 @@ const projectRunners = {
   bun: async () => {
     if (state.fromNpm) {
       await run('bun', ['install', '-D', state.fromNpm]);
-      return;
+    } else {
+      const packFile = getPackFile();
+      await fs.copyFile(packFile, `./${TAR_NAME}`);
+      await run('bun', ['install', '-D', `./${TAR_NAME}`]);
     }
-
-    const packFile = getPackFile();
-    await fs.copyFile(packFile, `./${TAR_NAME}`);
-    await run('bun', ['install', '-D', `./${TAR_NAME}`]);
 
     await run('npm', ['run', 'tsc']);
 
@@ -539,7 +538,7 @@ const projectRunners = {
 };
 
 let projectNames = Object.keys(projectRunners) as (keyof typeof projectRunners)[];
-const projectNamesSet = new Set(projectNames);
+const projectNamesSet = new Set<string>(projectNames);
 
 async function startProxy() {
   const proxy = createServer((_req, res) => {
@@ -549,11 +548,22 @@ async function startProxy() {
   proxy.on('connect', (req, clientSocket, head) => {
     console.log('got proxied connection');
     const serverSocket = connect(443, 'api.openai.com', () => {
+      if (clientSocket.destroyed) {
+        serverSocket.destroy();
+        return;
+      }
       clientSocket.write('HTTP/1.1 200 Connection Established\r\nProxy-agent: Node.js-Proxy\r\n\r\n');
       serverSocket.write(head);
       serverSocket.pipe(clientSocket);
       clientSocket.pipe(serverSocket);
     });
+    const destroyTunnel = () => {
+      clientSocket.destroy();
+      serverSocket.destroy();
+    };
+    clientSocket.on('error', destroyTunnel);
+    serverSocket.on('error', destroyTunnel);
+    clientSocket.on('close', () => serverSocket.destroy());
   });
 
   await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
@@ -613,9 +623,30 @@ function parseArgs() {
         description: 'number of parallel jobs to run',
       },
       retry: {
-        type: 'number',
-        default: 0,
+        type: 'string',
+        default: '0',
         description: 'number of times to retry failing jobs',
+        coerce: (value: unknown) => {
+          const retry = Number(value);
+          const decimal = /^[+-]?(?<whole>\d*)(?:\.(?<fraction>\d*))?(?:e(?<exponent>[+-]?\d+))?$/iu.exec(
+            String(value).trim(),
+          )?.groups;
+          let hasFraction = false;
+          if (decimal) {
+            const { whole = '', fraction = '', exponent = '0' } = decimal;
+            const digits = whole + fraction;
+            let significantDigits = digits.length;
+            while (digits[significantDigits - 1] === '0') {
+              significantDigits--;
+            }
+            // Check the original digits: Number can round a fraction to an integer or zero.
+            hasFraction = significantDigits > 0 && Number(exponent) < significantDigits - whole.length;
+          }
+          if (!Number.isSafeInteger(retry) || retry < 0 || hasFraction) {
+            throw new Error('--retry must be a non-negative safe integer.');
+          }
+          return retry;
+        },
       },
       retryDelay: {
         type: 'number',
@@ -631,6 +662,14 @@ function parseArgs() {
         type: 'boolean',
         default: false,
       },
+    })
+    .check((args) => {
+      for (const project of args._) {
+        if (typeof project !== 'string' || !projectNamesSet.has(project)) {
+          throw new Error(`Unknown ecosystem project: ${JSON.stringify(project)}`);
+        }
+      }
+      return true;
     })
     .help().argv;
 }
@@ -842,6 +881,7 @@ async function main() {
                       '--skip-pack',
                       '--noCleanup',
                       `--retry=${args.retry}`,
+                      `--retryDelay=${args.retryDelay}`,
                       ...(args.live ? ['--live'] : []),
                       ...(args.verbose ? ['--verbose'] : []),
                       ...(args.deploy ? ['--deploy'] : []),

@@ -1444,6 +1444,7 @@ export class EventStream<EventTypes extends BaseEvents> {
     this.controller.abort();
   }
 
+  /** Creates a user-abort error retaining this runner's cancellation reason. */
   protected _userAbortError(): APIUserAbortError {
     const error = new APIUserAbortError();
     Object.defineProperty(error, 'cause', {
@@ -2011,7 +2012,8 @@ export class EventStream<EventTypes extends BaseEvents> {
         try {
           for (const registration of listeners as any) {
             if (!registration.removed) {
-              registration.listener(...(args as any));
+              const { listener } = registration;
+              listener(...(args as any));
             }
           }
         } finally {

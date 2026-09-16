@@ -1,3 +1,4 @@
+import { compiledFixture, compiledFixtureConfig } from '../utils/compiled-fixtures';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -22,13 +23,7 @@ const examples = [
 async function runExample(file: string, baseURL: string, bedrock: boolean) {
   const child = spawn(
     process.execPath,
-    [
-      path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '--swc',
-      '-r',
-      path.join(root, 'node_modules/tsconfig-paths/register.js'),
-      path.join(root, 'examples', file),
-    ],
+    ['-r', path.join(root, 'node_modules/tsconfig-paths/register.js'), compiledFixture('examples', file)],
     {
       cwd: root,
       // Never inherit real credentials, profiles, proxy settings, or Node preload hooks.
@@ -40,8 +35,9 @@ async function runExample(file: string, baseURL: string, bedrock: boolean) {
         AWS_CONFIG_FILE: devNull,
         AWS_EC2_METADATA_DISABLED: 'true',
         OPENAI_LOG: 'off',
-        TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+        TS_NODE_PROJECT: compiledFixtureConfig(),
         DISABLE_V8_COMPILE_CACHE: '1',
+        NODE_COMPILE_CACHE: process.env['NODE_COMPILE_CACHE'],
         NO_PROXY: '127.0.0.1',
         no_proxy: '127.0.0.1',
       },
@@ -216,4 +212,45 @@ describe.each(examples)('$file exit status', ({ file, kind, model }) => {
       }
     }
   });
+});
+
+test('manual conversation example drains large error diagnostics before exiting', async () => {
+  const message = `Synthetic rejection start:${'x'.repeat(1024 * 1024)}:synthetic rejection end`;
+  const requests: { method: string | undefined; url: string | undefined }[] = [];
+  const server = createServer((request, response) => {
+    requests.push({ method: request.method, url: request.url });
+    request.resume();
+    request.on('end', () => {
+      response.writeHead(400, { 'content-type': 'application/json', connection: 'close' });
+      response.end(JSON.stringify({ error: { message, type: 'invalid_request_error' } }));
+    });
+  });
+
+  try {
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Expected a loopback HTTP address');
+    }
+    const result = await runExample(
+      'responses/manual-conversation-state.ts',
+      `http://127.0.0.1:${address.port}/v1`,
+      false,
+    );
+
+    expect(result).toMatchObject({ code: 1, signal: null, stdout: '' });
+    expect(requests).toEqual([{ method: 'POST', url: '/v1/responses' }]);
+    expect(result.stderr).toContain('BadRequestError: 400 Synthetic rejection start:');
+    // Compare without dumping the synthetic megabyte into a failed assertion.
+    expect(result.stderr.includes(message)).toBe(true);
+    expect(result.stderr).not.toContain(credential);
+  } finally {
+    if (server.listening) {
+      const closed = once(server, 'close');
+      server.close();
+      server.closeAllConnections();
+      await closed;
+    }
+  }
 });

@@ -1,4 +1,4 @@
-import { zodToJsonSchema } from 'openai/_vendor/zod-to-json-schema';
+import { zodToJsonSchema } from 'openai/_vendor/zod-to-json-schema/index';
 import { vi } from 'vitest';
 import {
   zodFunction,
@@ -309,6 +309,59 @@ it('preserves non-strict registered and nullable roots', () => {
   expect(zodToJsonSchema(root.nullable(), { target: 'openApi3' })).toMatchObject({
     type: 'object',
     nullable: true,
+  });
+});
+
+describe.each(['definitions', '$defs'] as const)('%s vendor definitions', (definitionPath) => {
+  it.each([
+    { kind: 'unnamed', name: undefined },
+    { kind: 'named', name: 'Root' },
+  ])('serializes an own __proto__ definition for $kind roots', ({ name }) => {
+    const shared = z3.object({ value: z3.string() });
+    const ordinary = z3.string();
+    const definitions = Object.freeze({ ['__proto__']: shared, ordinary });
+    const prototypeDescriptors = Object.getOwnPropertyDescriptors(Object.prototype);
+    const schema = zodToJsonSchema(z3.object({ first: shared, second: shared }), {
+      definitions,
+      definitionPath,
+      name,
+    });
+    const outputDefinitions = Object.getOwnPropertyDescriptor(schema, definitionPath)?.value;
+    const expectedShared = {
+      type: 'object',
+      properties: { value: { type: 'string' } },
+      required: ['value'],
+      additionalProperties: false,
+    };
+
+    expect(Object.getOwnPropertyDescriptor(outputDefinitions, '__proto__')).toEqual({
+      value: expectedShared,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+    expect(Object.getPrototypeOf(outputDefinitions)).toBe(Object.prototype);
+
+    const serialized = JSON.stringify(schema);
+    expect(serialized).toContain('"__proto__":');
+    const restored = JSON.parse(serialized);
+    expect(Object.getOwnPropertyDescriptor(restored[definitionPath], '__proto__')?.value).toEqual(
+      expectedShared,
+    );
+    expect(restored[definitionPath].ordinary).toEqual({ type: 'string' });
+    const root = name === undefined ? restored : restored[definitionPath][name];
+    expect(root.properties).toEqual({
+      first: { $ref: `#/${definitionPath}/__proto__` },
+      second: { $ref: `#/${definitionPath}/__proto__` },
+    });
+    if (name !== undefined) {
+      expect(restored.$ref).toBe(`#/${definitionPath}/${name}`);
+    }
+    expect(Object.getOwnPropertyDescriptor(definitions, '__proto__')?.value).toBe(shared);
+    expect(definitions.ordinary).toBe(ordinary);
+    expect(Object.getOwnPropertyNames(definitions)).toEqual(['__proto__', 'ordinary']);
+    expect(Object.getPrototypeOf(definitions)).toBe(Object.prototype);
+    expect(Object.getOwnPropertyDescriptors(Object.prototype)).toEqual(prototypeDescriptors);
   });
 });
 

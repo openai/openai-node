@@ -86,7 +86,7 @@ describe('Stream.fromSSEResponse', () => {
     expect(body.locked).toBe(false);
   });
 
-  test.each(['raw', 'helper'])('settles public %s Responses aborts', async (kind) => {
+  test('settles public raw Responses aborts', async () => {
     const cancel = vi.fn();
     const body = new ReadableStream<Uint8Array>({ cancel });
     const client = new OpenAI({
@@ -98,31 +98,70 @@ describe('Stream.fromSSEResponse', () => {
     // oxlint-disable-next-line unicorn/prefer-add-event-listener -- Existing caller handlers must survive streaming.
     caller.signal.onabort = onabort;
     const params = { model: 'gpt-4o', input: 'hello' };
-    const completion: Promise<unknown> =
-      kind === 'raw'
-        ? client.responses
-            .create({ ...params, stream: true }, { signal: caller.signal })
-            .then((stream) => stream[Symbol.asyncIterator]().next())
-        : client.responses.stream(params, { signal: caller.signal }).finalResponse();
-    const rawAssertion =
-      kind === 'raw'
-        ? expect(settlesSoon(completion)).resolves.toEqual({ value: undefined, done: true })
-        : undefined;
+    const completion = client.responses
+      .create({ ...params, stream: true }, { signal: caller.signal })
+      .then((stream) => stream[Symbol.asyncIterator]().next());
+    const assertion = expect(settlesSoon(completion)).resolves.toEqual({ value: undefined, done: true });
     const reason = new Error('private caller abort reason');
 
     await vi.waitFor(() => expect(body.locked).toBe(true));
     caller.abort(reason);
 
-    if (kind === 'raw') {
-      await rawAssertion;
-    } else {
-      await expect(settlesSoon(completion)).rejects.toMatchObject({ cause: reason });
-    }
+    await assertion;
     expect(caller.signal.reason).toBe(reason);
     expect(caller.signal.onabort).toBe(onabort);
     expect(cancel).toHaveBeenCalledWith(undefined);
     expect(body.locked).toBe(false);
   });
+
+  test.each(['ChatCompletionStream', 'ResponseStream', 'AssistantStream'] as const)(
+    'preserves the abort reason when %s is reading a response body',
+    async (kind) => {
+      const cancel = vi.fn();
+      const body = new ReadableStream<Uint8Array>({ cancel });
+      const client = new OpenAI({
+        apiKey: 'test-key',
+        fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+      });
+      const caller = new AbortController();
+      const removeListener = vi.spyOn(caller.signal, 'removeEventListener');
+      const options = { signal: caller.signal };
+      const onAbort = vi.fn();
+      const createStream = {
+        ChatCompletionStream: () =>
+          client.chat.completions.stream({ model: 'gpt-4o', messages: [] }, options).on('abort', onAbort),
+        ResponseStream: () =>
+          client.responses.stream({ model: 'gpt-4o', input: 'hello' }, options).on('abort', onAbort),
+        AssistantStream: () =>
+          client.beta.threads.runs
+            .stream('thread_123', { assistant_id: 'asst_123' }, options)
+            .on('abort', onAbort),
+      };
+      const stream = createStream[kind]();
+      const completion = (async () => {
+        try {
+          await settlesSoon(stream.done());
+        } catch (error) {
+          return error;
+        }
+        return undefined;
+      })();
+      const reason = new Error('private caller abort reason');
+
+      await vi.waitFor(() => expect(body.locked).toBe(true));
+      caller.abort(reason);
+
+      const error = await completion;
+      expect(error).toBeInstanceOf(APIUserAbortError);
+      expect(error).toMatchObject({ cause: reason });
+      expect(onAbort.mock.calls).toEqual([[error]]);
+      expect(stream.aborted).toBe(true);
+      expect(stream.controller.signal.reason).toBe(reason);
+      expect(removeListener).toHaveBeenCalledWith('abort', expect.any(Function));
+      expect(cancel.mock.calls).toEqual([[undefined]]);
+      expect(body.locked).toBe(false);
+    },
+  );
 
   test('finishes at the completion sentinel without waiting for the response body to close', async () => {
     const cancel = vi.fn();
