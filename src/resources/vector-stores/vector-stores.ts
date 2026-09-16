@@ -381,9 +381,9 @@ export interface VectorStoreCreateParams {
   expires_after?: VectorStoreCreateParams.ExpiresAfter;
 
   /**
-   * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-   * the vector store should use. Useful for tools like `file_search` that can access
-   * files.
+   * A list of [File](https://developers.openai.com/api/reference/resources/files)
+   * IDs that the vector store should use. Useful for tools like `file_search` that
+   * can access files.
    */
   file_ids?: Array<string>;
 

@@ -157,8 +157,8 @@ export interface Batch {
    * Model ID used to process the batch, like `gpt-6-astra`. OpenAI offers a wide
    * range of models with different capabilities, performance characteristics, and
    * price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model?: string;
 
@@ -272,7 +272,7 @@ export namespace BatchUsage {
   export interface InputTokensDetails {
     /**
      * The number of tokens that were retrieved from the cache.
-     * [More on prompt caching](https://platform.openai.com/docs/guides/prompt-caching).
+     * [More on prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching).
      */
     cached_tokens: number;
   }
@@ -316,11 +316,12 @@ export interface BatchCreateParams {
   /**
    * The ID of an uploaded file that contains requests for the new batch.
    *
-   * See [upload file](https://platform.openai.com/docs/api-reference/files/create)
+   * See
+   * [upload file](https://developers.openai.com/api/reference/resources/files/methods/create)
    * for how to upload a file.
    *
    * Your input file must be formatted as a
-   * [JSONL file](https://platform.openai.com/docs/api-reference/batch/request-input),
+   * [JSONL file](https://developers.openai.com/api/docs/guides/batch#1-prepare-your-batch-file),
    * and must be uploaded with the purpose `batch`. The file can contain up to 50,000
    * requests, and can be up to 200 MB in size.
    */

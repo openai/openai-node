@@ -1444,19 +1444,38 @@ export class EventStream<EventTypes extends BaseEvents> {
     this.controller.abort();
   }
 
+  /** Creates a user-abort error retaining this runner's cancellation reason. */
+  protected _userAbortError(): APIUserAbortError {
+    const error = new APIUserAbortError();
+    Object.defineProperty(error, 'cause', {
+      value: this.controller.signal.reason,
+      writable: true,
+      configurable: true,
+    });
+    return error;
+  }
+
+  #abortFromSignal(signal: AbortSignal) {
+    try {
+      this.controller.abort(signal.reason);
+    } catch {
+      this.controller.abort();
+    }
+  }
+
   protected _listenForAbort(signal: AbortSignal | null | undefined) {
     if (!signal || this.ended) {
       return;
     }
     if (signal.aborted) {
-      this.controller.abort();
+      this.#abortFromSignal(signal);
       return;
     }
     if (this.#abortListeners.some((registration) => registration.signal === signal)) {
       return;
     }
 
-    const listener = () => this.controller.abort();
+    const listener = () => this.#abortFromSignal(signal);
     signal.addEventListener('abort', listener, { once: true });
     this.#abortListeners.push({ signal, listener });
   }
@@ -1897,7 +1916,7 @@ export class EventStream<EventTypes extends BaseEvents> {
   #handleError(this: EventStream<EventTypes>, error: unknown) {
     this.#errored = true;
     if (error instanceof Error && error.name === 'AbortError') {
-      error = new APIUserAbortError();
+      error = this._userAbortError();
     }
     if (error instanceof APIUserAbortError) {
       this.#aborted = true;

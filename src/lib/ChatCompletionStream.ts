@@ -1,11 +1,5 @@
 import { MalformedJSON, partialParse } from '../_vendor/partial-json-parser/parser';
-import {
-  APIError,
-  APIUserAbortError,
-  ContentFilterFinishReasonError,
-  LengthFinishReasonError,
-  OpenAIError,
-} from '../error';
+import { APIError, ContentFilterFinishReasonError, LengthFinishReasonError, OpenAIError } from '../error';
 import type OpenAI from '../index';
 import { observeJSONRequestBody, type RequestOptions } from '../internal/request-options';
 import type { ReadableStream } from '../internal/shim-types';
@@ -1765,7 +1759,7 @@ export class ChatCompletionStream<ParsedT = null>
       this.#addChunk(chunk);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
     return this._addChatCompletion(this.#endRequest());
   }
@@ -1818,7 +1812,7 @@ export class ChatCompletionStream<ParsedT = null>
       }
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
     if (this.#currentChatCompletionSnapshot) {
       return this._addChatCompletion(this.#endRequest());
