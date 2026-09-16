@@ -107,17 +107,20 @@ function createAzureClient(
     baseURL?: string;
   } = {},
 ): AzureOpenAI {
-  return new AzureOpenAI({
+  const clientOptions: ConstructorParameters<typeof AzureOpenAI>[0] = {
     apiVersion: '2024-10-01-preview',
     baseURL: options.baseURL ?? 'https://azure.example.com/openai/',
     ...(options.tokenProvider
       ? { azureADTokenProvider: async () => 'azure-token' }
       : { apiKey: 'azure-key' }),
-    ...(options.deployment === undefined ? {} : { deployment: options.deployment }),
-    ...(options.dangerouslyAllowBrowser === undefined
-      ? {}
-      : { dangerouslyAllowBrowser: options.dangerouslyAllowBrowser }),
-  });
+  };
+  if (options.deployment !== undefined) {
+    clientOptions.deployment = options.deployment;
+  }
+  if (options.dangerouslyAllowBrowser !== undefined) {
+    clientOptions.dangerouslyAllowBrowser = options.dangerouslyAllowBrowser;
+  }
+  return new AzureOpenAI(clientOptions);
 }
 
 beforeEach(() => {
@@ -552,12 +555,15 @@ describe.each([
     );
 
     expect(model.url.toString()).toBe('wss://example.com/v1/realtime?model=gpt-realtime');
-    expect(lastNodeSocket().options.headers).toMatchObject({
+    const expectedHeaders = {
       Authorization: 'Bearer test-key',
       'User-Agent': `OpenAI/JS ${VERSION}`,
       'X-Custom': 'value',
-      ...(beta ? { 'OpenAI-Beta': 'realtime=v1' } : {}),
-    });
+    };
+    if (beta) {
+      Object.assign(expectedHeaders, { 'OpenAI-Beta': 'realtime=v1' });
+    }
+    expect(lastNodeSocket().options.headers).toMatchObject(expectedHeaders);
 
     const sideband = new Realtime({ callID: 'call-123' }, client);
     expect(sideband.url.searchParams.get('call_id')).toBe('call-123');

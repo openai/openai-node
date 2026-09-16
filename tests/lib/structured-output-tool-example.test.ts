@@ -118,7 +118,6 @@ test.each(cases)('structured-output tool example: $name', async ({ output, succe
         id: 'resp_synthetic',
         object: 'response',
         created_at: 0,
-        ...(status === undefined ? {} : { status }),
         error: status === 'failed' ? { code: 'server_error', message: 'Synthetic response failure' } : null,
         incomplete_details: status === 'incomplete' ? { reason: 'max_output_tokens' } : null,
         instructions: null,
@@ -131,6 +130,9 @@ test.each(cases)('structured-output tool example: $name', async ({ output, succe
         tools: JSON.parse(body.toString()).tools,
         top_p: 1,
       };
+      if (status !== undefined) {
+        responseBody.status = status;
+      }
       response.writeHead(200, { 'content-type': 'application/json', connection: 'close' });
       response.end(JSON.stringify(responseBody));
     });

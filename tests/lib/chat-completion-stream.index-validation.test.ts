@@ -61,11 +61,14 @@ function createStream(chunks: OpenAI.Chat.ChatCompletionChunk[], n?: number | nu
     },
   } as unknown as OpenAI;
 
-  return ChatCompletionStream.createChatCompletion(client, {
+  const params: Parameters<typeof ChatCompletionStream.createChatCompletion>[1] = {
     model: 'gpt-test',
     messages: [],
-    ...(n === undefined ? {} : { n }),
-  });
+  };
+  if (n !== undefined) {
+    params.n = n;
+  }
+  return ChatCompletionStream.createChatCompletion(client, params);
 }
 
 function getSnapshotArray(stream: ChatCompletionStream, kind: StreamIndexKind): unknown[] | undefined {

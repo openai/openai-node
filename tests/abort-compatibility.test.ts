@@ -296,11 +296,14 @@ describe('fallback caller abort subscriptions', () => {
           return originalResponse;
         },
       });
-      const pending = client.get('/items', {
-        signal: caller.signal,
-        ...(mode === 'sse' ? { stream: true } : {}),
-        ...(mode === 'binary' ? { __binaryResponse: true } : {}),
-      });
+      const options: Parameters<typeof client.get>[1] = { signal: caller.signal };
+      if (mode === 'sse') {
+        options.stream = true;
+      }
+      if (mode === 'binary') {
+        options.__binaryResponse = true;
+      }
+      const pending = client.get('/items', options);
       const response = await pending.asResponse();
       expect(response).toBe(originalResponse);
       expect(response.bodyUsed).toBe(false);

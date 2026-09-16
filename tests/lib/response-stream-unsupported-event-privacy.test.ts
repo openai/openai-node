@@ -308,11 +308,10 @@ describe('unsupported Responses event diagnostic privacy', () => {
             },
           } as ResponseStreamEvent)
         : createSnapshot();
-      const event = {
-        type,
-        sequence_number: 1,
-        ...(itemScoped ? { output_index: 0, item_id: 'mcp_123' } : {}),
-      } as ResponseStreamEvent;
+      const event = { type, sequence_number: 1 } as ResponseStreamEvent;
+      if (itemScoped) {
+        Object.assign(event, { output_index: 0, item_id: 'mcp_123' });
+      }
 
       expect(accumulateResponse(event, snapshot)).toBe(snapshot);
     },

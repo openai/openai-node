@@ -243,16 +243,17 @@ main();`,
     const [exitCode, signal] = await once(child, 'close');
     expect(signal).toBeNull();
     expect(requests).toHaveLength(resumed ? 2 : 1);
+    const expectedBody = {
+      ...(background ? { background: true } : { model: 'gpt-4o-2024-08-06' }),
+      stream: true,
+    };
+    if (source === 'streaming-tools') {
+      Object.assign(expectedBody, { tools: [{ type: 'function', name: 'query', strict: true }] });
+    }
     expect(requests[0]).toMatchObject({
       method: 'POST',
       url: '/v1/responses',
-      body: {
-        ...(background ? { background: true } : { model: 'gpt-4o-2024-08-06' }),
-        ...(source === 'streaming-tools'
-          ? { tools: [{ type: 'function', name: 'query', strict: true }] }
-          : {}),
-        stream: true,
-      },
+      body: expectedBody,
       syntheticAuthorization: true,
     });
     expect(exitCode).toBe(status === 'completed' ? 0 : 1);

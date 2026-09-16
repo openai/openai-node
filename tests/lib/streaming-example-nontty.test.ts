@@ -38,10 +38,11 @@ test.each(cases)('$filename (tool=$hasToolCall, empty=$emptyToolCalls)', async (
       }
       let deltas: ChatCompletionChunk.Choice.Delta[];
       if (requests.length > 1 || !hasToolCall) {
-        deltas = [
-          { role: 'assistant', content: 'Synthetic ', ...(emptyToolCalls ? { tool_calls: [] } : {}) },
-          { content: 'recommendation.' },
-        ];
+        const first: ChatCompletionChunk.Choice.Delta = { role: 'assistant', content: 'Synthetic ' };
+        if (emptyToolCalls) {
+          first.tool_calls = [];
+        }
+        deltas = [first, { content: 'recommendation.' }];
       } else if (usesTools) {
         deltas = [
           {

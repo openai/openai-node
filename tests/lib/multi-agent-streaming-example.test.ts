@@ -120,10 +120,11 @@ test.each([
   ['incomplete', false, null],
   ['incomplete', true, { agent_name: '/root' }],
 ] as const)('reports a %s root response (partial output: %s)', async (status, partialOutput, agent) => {
-  const result = await runExample([
-    ...(partialOutput ? [textEvent] : []),
-    { ...terminalEvent(status), ...(agent === undefined ? {} : { agent }) },
-  ]);
+  const terminal = terminalEvent(status);
+  if (agent !== undefined) {
+    terminal.agent = agent;
+  }
+  const result = await runExample([...(partialOutput ? [textEvent] : []), terminal]);
 
   expect(result.exitCode).toBe(1);
   expect(result.stderr).toContain(`Response ended with response.${status}.`);
@@ -161,10 +162,11 @@ test.each(
     ].map((owner) => ({ ...owner, ending })),
   ),
 )('accepts $ending after coordinator completion with $ownership ownership', async ({ agent, ending }) => {
-  const result = await runExample(
-    [textEvent, { ...terminalEvent('completed'), ...(agent === undefined ? {} : { agent }) }],
-    ending,
-  );
+  const terminal = terminalEvent('completed');
+  if (agent !== undefined) {
+    terminal.agent = agent;
+  }
+  const result = await runExample([textEvent, terminal], ending);
 
   expect(result.exitCode).toBe(0);
   expect(result.stderr).toBe('');

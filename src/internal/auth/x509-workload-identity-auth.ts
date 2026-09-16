@@ -263,17 +263,18 @@ export class X509WorkloadIdentityAuth {
 
   /** Reconstructs the immutable selectors captured before caller-owned identity mutation. */
   identitySnapshot(): X509WorkloadIdentity {
-    return {
+    const identity: X509WorkloadIdentity = {
       type: 'x509',
       identityProviderId: this.#identityProviderId,
       serviceAccountId: this.#serviceAccountId,
-      ...(this.#configuredRefreshBufferMs === undefined
-        ? {}
-        : { refreshBufferMs: this.#configuredRefreshBufferMs }),
-      ...(this.#configuredRefreshBufferSeconds === undefined
-        ? {}
-        : { refreshBufferSeconds: this.#configuredRefreshBufferSeconds }),
     };
+    if (this.#configuredRefreshBufferMs !== undefined) {
+      identity.refreshBufferMs = this.#configuredRefreshBufferMs;
+    }
+    if (this.#configuredRefreshBufferSeconds !== undefined) {
+      identity.refreshBufferSeconds = this.#configuredRefreshBufferSeconds;
+    }
+    return identity;
   }
 
   /** Preserves explicitly headerless requests without presenting a certificate to the issuer. */
@@ -542,11 +543,19 @@ export class X509WorkloadIdentityAuth {
       wallStartedAt,
       monotonicStartedAt,
       owner: this,
-      ...(deadlineArmed ? { deadlineArmed } : {}),
-      ...(request ? { request } : {}),
-      ...(effectiveSignal ? { effectiveSignal } : {}),
-      ...(requestOwner ? { requestOwner } : {}),
     };
+    if (deadlineArmed) {
+      scope.deadlineArmed = deadlineArmed;
+    }
+    if (request) {
+      scope.request = request;
+    }
+    if (effectiveSignal) {
+      scope.effectiveSignal = effectiveSignal;
+    }
+    if (requestOwner) {
+      scope.requestOwner = requestOwner;
+    }
     return (operation) =>
       this.#transport.resume(scope, async () => {
         try {

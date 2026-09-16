@@ -213,8 +213,10 @@ export function makeChatCompletionReadableStreamMessageChunk(
   const payload: ChatCompletionReadableStreamMessage = {
     type: 'message',
     message,
-    ...(toolCallIds ? { tool_call_ids: toolCallIds } : {}),
   };
+  if (toolCallIds) {
+    payload.tool_call_ids = toolCallIds;
+  }
 
   return {
     id: chunk.id,
@@ -997,10 +999,9 @@ function shadowSerializedParserMetadata(
 function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): ChatCompletionInputTool {
   const source =
     serialized.source ??
-    ({
-      type: serialized.type,
-      ...(serialized.type === 'function' ? { function: {} } : {}),
-    } as ChatCompletionInputTool);
+    ((serialized.type === 'function'
+      ? { type: serialized.type, function: {} }
+      : { type: serialized.type }) as ChatCompletionInputTool);
   const descriptors = Object.getOwnPropertyDescriptors(source);
   descriptors.type = serializedParserDescriptor(descriptors.type, serialized.type);
 
@@ -2336,8 +2337,10 @@ function finalizeChatCompletion<ParsedT>(
     created,
     model,
     object: 'chat.completion',
-    ...(system_fingerprint ? { system_fingerprint } : {}),
   };
+  if (system_fingerprint) {
+    completion.system_fingerprint = system_fingerprint;
+  }
 
   return maybeParseChatCompletion(completion, params);
 }

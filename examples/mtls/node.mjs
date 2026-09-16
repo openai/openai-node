@@ -13,13 +13,11 @@ const cert = await readFile(requiredEnv('OPENAI_MTLS_CERT_PATH'));
 const key = await readFile(requiredEnv('OPENAI_MTLS_KEY_PATH'));
 const passphrase = process.env['OPENAI_MTLS_KEY_PASSPHRASE'];
 
-const dispatcher = new Agent({
-  connect: {
-    cert,
-    key,
-    ...(passphrase === undefined ? {} : { passphrase }),
-  },
-});
+const connect = { cert, key };
+if (passphrase !== undefined) {
+  connect.passphrase = passphrase;
+}
+const dispatcher = new Agent({ connect });
 
 try {
   const client = new OpenAI({

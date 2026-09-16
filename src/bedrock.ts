@@ -281,9 +281,11 @@ export class BedrockOpenAI extends OpenAI {
     const bedrockTokenProvider =
       options.apiKey === undefined ? (options.bedrockTokenProvider ?? this.bedrockTokenProvider) : undefined;
 
-    return super.withOptions({
-      ...options,
-      ...(bedrockTokenProvider ? { apiKey: undefined, bedrockTokenProvider } : {}),
-    } as Partial<ClientOptions>);
+    const clientOptions = { ...options };
+    if (bedrockTokenProvider) {
+      clientOptions.apiKey = undefined;
+      clientOptions.bedrockTokenProvider = bedrockTokenProvider;
+    }
+    return super.withOptions(clientOptions as Partial<ClientOptions>);
   }
 }

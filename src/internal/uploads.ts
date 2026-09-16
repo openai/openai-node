@@ -73,12 +73,11 @@ export function toStreamingFile(
     validateStreamingFileType(type);
   }
 
-  return {
-    [brand_privateStreamingFile]: true,
-    data,
-    name,
-    ...(type ? { type } : {}),
-  };
+  const file: StreamingFile = { [brand_privateStreamingFile]: true, data, name };
+  if (type) {
+    return { ...file, type };
+  }
+  return file;
 }
 
 /**

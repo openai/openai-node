@@ -680,12 +680,11 @@ describe('resource completions', () => {
         { role: 'assistant', content },
         { role: 'user', content: 'Continue' },
       ];
-      const runner = openai.chat.completions.runTools({
-        messages,
-        model: 'gpt-4o-mini',
-        tools: [],
-        ...(stream === undefined ? {} : { stream }),
-      });
+      const params: ChatCompletionToolRunnerParams<[]> = { messages, model: 'gpt-4o-mini', tools: [] };
+      if (stream !== undefined) {
+        params.stream = stream;
+      }
+      const runner = openai.chat.completions.runTools(params);
       const listener = new RunnerListener(runner);
 
       await handleRequest(async (request) => {
@@ -1357,6 +1356,19 @@ describe('resource completions', () => {
         const { fetch, handleRequest } = mockChatCompletionFetch();
         const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
         const controller = new AbortController();
+        const definition = {
+          name: 'abortable',
+          function: (_args: unknown, activeRunner: Pick<ChatCompletionRunner<unknown>, 'controller'>) => {
+            controller.abort(abortReason);
+            activeRunner.controller.signal.throwIfAborted();
+            return 'unreachable';
+          },
+          parameters: {},
+          description: 'aborts while running',
+        };
+        const tool = parsed
+          ? { type: 'function' as const, function: { ...definition, parse: (args: string) => ({ args }) } }
+          : { type: 'function' as const, function: definition };
         const runner = openai.chat.completions.runTools(
           {
             messages: [{ role: 'user', content: 'run the tool' }],
@@ -1364,25 +1376,7 @@ describe('resource completions', () => {
             ...(named
               ? { tool_choice: { type: 'function' as const, function: { name: 'abortable' } } }
               : { parallel_tool_calls: false }),
-            tools: [
-              {
-                type: 'function',
-                function: {
-                  name: 'abortable',
-                  ...(parsed ? { parse: (args: string) => ({ args }) } : {}),
-                  function: (
-                    _args: unknown,
-                    activeRunner: Pick<ChatCompletionRunner<unknown>, 'controller'>,
-                  ) => {
-                    controller.abort(abortReason);
-                    activeRunner.controller.signal.throwIfAborted();
-                    return 'unreachable';
-                  },
-                  parameters: {},
-                  description: 'aborts while running',
-                },
-              },
-            ],
+            tools: [tool],
           },
           { signal: controller.signal, maxChatCompletions: 1 },
         );

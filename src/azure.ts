@@ -139,12 +139,11 @@ export class AzureOpenAI extends OpenAI {
       throw new Errors.OpenAIError('baseURL and endpoint are mutually exclusive');
     }
 
-    super({
-      apiKey: azureADTokenProvider ?? apiKey,
-      baseURL,
-      ...opts,
-      ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
-    });
+    const clientOptions: ClientOptions = { apiKey: azureADTokenProvider ?? apiKey, baseURL, ...opts };
+    if (dangerouslyAllowBrowser !== undefined) {
+      clientOptions.dangerouslyAllowBrowser = dangerouslyAllowBrowser;
+    }
+    super(clientOptions);
 
     this.apiVersion = apiVersion;
     this.deploymentName = deployment;

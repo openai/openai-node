@@ -35,12 +35,15 @@ let dispatcher: Agent;
 let transport: X509Transport;
 
 function exchange(signal?: AbortSignal) {
-  return exchangeX509Token({
+  const options: Parameters<typeof exchangeX509Token>[0] = {
     transport,
     identityProviderId: 'synthetic-identity-provider',
     serviceAccountId: 'synthetic-service-account',
-    ...(signal ? { signal } : {}),
-  });
+  };
+  if (signal) {
+    options.signal = signal;
+  }
+  return exchangeX509Token(options);
 }
 
 function mockResponse(body: unknown, init?: ResponseInit) {

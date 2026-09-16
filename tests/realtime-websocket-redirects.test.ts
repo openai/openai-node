@@ -64,14 +64,17 @@ function createClient(apiKey = 'test-key', baseURL = 'https://example.com/v1/'):
 function createAzureClient(
   options: { tokenProvider?: boolean; deployment?: string; baseURL?: string } = {},
 ): AzureOpenAI {
-  return new AzureOpenAI({
+  const clientOptions: ConstructorParameters<typeof AzureOpenAI>[0] = {
     apiVersion: '2024-10-01-preview',
     baseURL: options.baseURL ?? 'https://azure.example.com/openai/',
     ...(options.tokenProvider
       ? { azureADTokenProvider: async () => 'azure-token' }
       : { apiKey: 'azure-key' }),
-    ...(options.deployment === undefined ? {} : { deployment: options.deployment }),
-  });
+  };
+  if (options.deployment !== undefined) {
+    clientOptions.deployment = options.deployment;
+  }
+  return new AzureOpenAI(clientOptions);
 }
 
 function createPlainConnection(options: { port?: number | string }): ReturnType<typeof connect> {

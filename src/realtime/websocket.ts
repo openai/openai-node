@@ -319,15 +319,15 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       throw new Error('Azure OpenAI Realtime requires an API key');
     }
     const { dangerouslyAllowBrowser } = options;
-    return new OpenAIRealtimeWebSocket(
-      {
-        ...connection,
-        ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
-        __resolvedApiKey: isApiKeyProvider,
-        __apiKey: apiKey,
-      },
-      client,
-    );
+    const connectionOptions: ConstructorParameters<typeof OpenAIRealtimeWebSocket>[0] = {
+      ...connection,
+      __resolvedApiKey: isApiKeyProvider,
+      __apiKey: apiKey,
+    };
+    if (dangerouslyAllowBrowser !== undefined) {
+      connectionOptions.dangerouslyAllowBrowser = dangerouslyAllowBrowser;
+    }
+    return new OpenAIRealtimeWebSocket(connectionOptions, client);
   }
 
   /**

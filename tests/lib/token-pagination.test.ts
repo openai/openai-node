@@ -14,12 +14,15 @@ test('environment files forward signed page tokens and preserve filters and requ
       requests.push(url);
       expect(index).toBeLessThan(2);
       expect(url.pathname).toBe('/v1/agents/environments/env_test/files');
-      expect(Object.fromEntries(url.searchParams)).toEqual({
+      const expectedQuery = {
         path: '/workspace/test',
         order: 'asc',
         limit: '1',
-        ...(index ? { page: token } : {}),
-      });
+      };
+      if (index) {
+        Object.assign(expectedQuery, { page: token });
+      }
+      expect(Object.fromEntries(url.searchParams)).toEqual(expectedQuery);
       const headers = new Headers(init?.headers);
       expect(headers.get('x-pagination-test')).toBe('preserved');
       expect(headers.get('openai-beta')).toBe('agents=v1');

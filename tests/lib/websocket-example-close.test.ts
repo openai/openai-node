@@ -236,10 +236,13 @@ test('completes all turns and closes normally without reporting an unfinished re
 
 describe.each(apiErrors)('$name API errors', ({ event }) => {
   test.each([false, true])('handles the failure once when followed by a close: %s', async (close) => {
-    const result = await runExample(() => ({
-      events: [event],
-      ...(close ? { close: 'clean' as const } : {}),
-    }));
+    const result = await runExample(() => {
+      const reply: Reply = { events: [event] };
+      if (close) {
+        reply.close = 'clean';
+      }
+      return reply;
+    });
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain('Synthetic API failure');

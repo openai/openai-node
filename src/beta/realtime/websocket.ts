@@ -331,15 +331,15 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       throw new Error('No deployment name provided');
     }
     const { dangerouslyAllowBrowser } = options;
-    return new OpenAIRealtimeWebSocket(
-      {
-        model: deploymentName,
-        ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
-        __resolvedApiKey: isApiKeyProvider,
-        __apiKey: apiKey,
-      },
-      client,
-    );
+    const connectionOptions: ConstructorParameters<typeof OpenAIRealtimeWebSocket>[0] = {
+      model: deploymentName,
+      __resolvedApiKey: isApiKeyProvider,
+      __apiKey: apiKey,
+    };
+    if (dangerouslyAllowBrowser !== undefined) {
+      connectionOptions.dangerouslyAllowBrowser = dangerouslyAllowBrowser;
+    }
+    return new OpenAIRealtimeWebSocket(connectionOptions, client);
   }
 
   /**

@@ -101,11 +101,13 @@ describe('vector-store batch upload orchestration', () => {
     const originalFileIds = fileIds === undefined ? undefined : [...fileIds];
     const options = { maxConcurrency: limit };
 
-    const result = client.vectorStores.fileBatches.uploadAndPoll(
-      'vs_123',
-      { files: createFiles(1), ...(fileIds === undefined ? {} : { fileIds }) },
-      options,
-    );
+    const body: Parameters<typeof client.vectorStores.fileBatches.uploadAndPoll>[1] = {
+      files: createFiles(1),
+    };
+    if (fileIds !== undefined) {
+      body.fileIds = fileIds;
+    }
+    const result = client.vectorStores.fileBatches.uploadAndPoll('vs_123', body, options);
 
     await expect(result).rejects.toBeInstanceOf(RangeError);
     await expect(result).rejects.toThrow('maxConcurrency must be greater than 0');

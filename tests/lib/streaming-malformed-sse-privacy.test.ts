@@ -1,3 +1,4 @@
+import type { ClientOptions } from 'openai';
 import { vi } from 'vitest';
 
 import OpenAI from 'openai';
@@ -46,13 +47,16 @@ async function createPublicStream(
     data?: string;
   } = {},
 ): Promise<PublicStream> {
-  const client = new OpenAI({
+  const clientOptions: ClientOptions = {
     apiKey: 'sk-synthetic-client-credential',
     maxRetries: 0,
     logLevel: options.logLevel ?? 'error',
-    ...(options.logger ? { logger: options.logger } : {}),
     fetch: async () => createResponse(surface, options.data),
-  });
+  };
+  if (options.logger) {
+    clientOptions.logger = options.logger;
+  }
+  const client = new OpenAI(clientOptions);
 
   if (surface.surface === 'assistants') {
     return await client.beta.threads.runs.create('thread_synthetic', {

@@ -93,11 +93,14 @@ function validateStaticCredentials(options: BedrockProviderOptions): AwsCredenti
     throw new Errors.OpenAIError('A static AWS `sessionToken` must not be empty when provided.');
   }
 
-  return {
+  const credentials: AwsCredentialIdentity = {
     accessKeyId: options.accessKeyId,
     secretAccessKey: options.secretAccessKey,
-    ...(options.sessionToken ? { sessionToken: options.sessionToken } : {}),
   };
+  if (options.sessionToken) {
+    credentials.sessionToken = options.sessionToken;
+  }
+  return credentials;
 }
 
 function requestTarget(parsedURL: URL): { path: string; query: Record<string, string | string[]> } {
@@ -226,16 +229,23 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
     const target = requestTarget(parsedURL);
 
     await prepareBedrockAuth(request, context, {
-      resolve: () =>
-        this.signatureV4().sign({
+      resolve: () => {
+        const signer = this.signatureV4();
+        const signable: Parameters<typeof signer.sign>[0] = {
           protocol: parsedURL.protocol,
           hostname: parsedURL.hostname,
-          ...(parsedURL.port ? { port: Number(parsedURL.port) } : {}),
           method,
           ...target,
           headers: Object.fromEntries(headers.entries()),
-          ...(body === undefined ? {} : { body }),
-        }),
+        };
+        if (parsedURL.port) {
+          signable.port = Number(parsedURL.port);
+        }
+        if (body !== undefined) {
+          signable.body = body;
+        }
+        return signer.sign(signable);
+      },
       failureMessage: this.options.usesDefaultChain
         ? 'Could not find credentials for Bedrock. Pass AWS credentials to `bedrock(...)` or configure the default AWS credential chain.'
         : 'Failed to resolve AWS credentials for Bedrock. Verify your AWS profile, environment variables, or runtime identity configuration and try again.',

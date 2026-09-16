@@ -99,6 +99,16 @@ function makeChatCompletion(
   args?: string,
   refusal: string | null = null,
 ): OpenAI.Chat.ChatCompletion {
+  const message: OpenAI.Chat.ChatCompletionMessage = { role: 'assistant', content, refusal };
+  if (args !== undefined) {
+    message.tool_calls = [
+      {
+        id: 'call_privacy',
+        type: 'function',
+        function: { name: 'lookup', arguments: args },
+      },
+    ];
+  }
   return {
     id: 'chatcmpl_privacy',
     object: 'chat.completion',
@@ -109,22 +119,7 @@ function makeChatCompletion(
         index: 0,
         finish_reason: args === undefined ? 'stop' : 'tool_calls',
         logprobs: null,
-        message: {
-          role: 'assistant',
-          content,
-          refusal,
-          ...(args === undefined
-            ? {}
-            : {
-                tool_calls: [
-                  {
-                    id: 'call_privacy',
-                    type: 'function',
-                    function: { name: 'lookup', arguments: args },
-                  },
-                ],
-              }),
-        },
+        message,
       },
     ],
   } as OpenAI.Chat.ChatCompletion;
@@ -262,24 +257,22 @@ function createStreamingContentClient(
   format: typeof chatFormat | (typeof helperFamilies)[number]['chatFormat'],
   refusal?: string,
 ) {
-  const chunks = contents.map((content, index): OpenAI.Chat.ChatCompletionChunk => ({
-    id: 'chatcmpl_content_privacy',
-    object: 'chat.completion.chunk',
-    created: 0,
-    model: 'gpt-test',
-    choices: [
-      {
-        index: 0,
-        finish_reason: null,
-        logprobs: null,
-        delta: {
-          ...(index === 0 ? { role: 'assistant' as const } : {}),
-          ...(index === 0 && refusal ? { refusal } : {}),
-          content,
-        },
-      },
-    ],
-  }));
+  const chunks = contents.map((content, index): OpenAI.Chat.ChatCompletionChunk => {
+    const delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta = { content };
+    if (index === 0) {
+      delta.role = 'assistant';
+      if (refusal) {
+        delta.refusal = refusal;
+      }
+    }
+    return {
+      id: 'chatcmpl_content_privacy',
+      object: 'chat.completion.chunk',
+      created: 0,
+      model: 'gpt-test',
+      choices: [{ index: 0, finish_reason: null, logprobs: null, delta }],
+    };
+  });
   const completedChunk: OpenAI.Chat.ChatCompletionChunk = {
     id: 'chatcmpl_content_privacy',
     object: 'chat.completion.chunk',

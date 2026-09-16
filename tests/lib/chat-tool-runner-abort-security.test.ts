@@ -1,3 +1,4 @@
+import type { ChatCompletionToolRunnerParams } from 'openai/resources/chat/completions';
 import { vi } from 'vitest';
 import OpenAI from 'openai';
 import { APIUserAbortError, OpenAIError } from 'openai/error';
@@ -703,12 +704,9 @@ describe.each([
         callbackStarted.resolve(true);
         return callbackResult.promise;
       });
-      const params = {
+      const params: ChatCompletionToolRunnerParams<[string]> = {
         model: 'gpt-4o-mini',
         parallel_tool_calls: parallelToolCalls,
-        ...(forcedToolChoice
-          ? { tool_choice: { type: 'function' as const, function: { name: 'readBalance' } } }
-          : {}),
         messages: [{ role: 'user' as const, content: 'read the current balance' }],
         tools: [
           {
@@ -722,6 +720,9 @@ describe.each([
           },
         ],
       };
+      if (forcedToolChoice) {
+        params.tool_choice = { type: 'function', function: { name: 'readBalance' } };
+      }
       const options = {
         signal: controller.signal,
         maxChatCompletions: 1,
@@ -875,12 +876,9 @@ describe.each([
                   await callbackReady.promise;
                 },
           );
-          const params = {
+          const params: ChatCompletionToolRunnerParams<[string]> = {
             model: 'gpt-4o-mini',
             parallel_tool_calls: exitRoute !== 'sequential limit',
-            ...(exitRoute === 'forced tool'
-              ? { tool_choice: { type: 'function' as const, function: { name: 'readBalance' } } }
-              : {}),
             messages: [{ role: 'user' as const, content: 'read the current balance' }],
             tools: [
               {
@@ -894,6 +892,9 @@ describe.each([
               },
             ],
           };
+          if (exitRoute === 'forced tool') {
+            params.tool_choice = { type: 'function', function: { name: 'readBalance' } };
+          }
           const options = { signal: controller.signal, maxChatCompletions: 1, afterCompletion };
           const runner: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, null> = streaming
             ? client.chat.completions.runTools({ ...params, stream: true }, options)

@@ -72,12 +72,14 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     this.url = buildRealtimeURL(client, props);
     assertTrustedRealtimeURL(client, this.url);
     assertBedrockWebSocketOrigin(client, this.url);
-    const headers = {
+    const headers: NonNullable<WS.ClientOptions['headers']> = {
       'User-Agent': `${client.constructor.name}/JS ${VERSION}`,
       ...props.options?.headers,
-      ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${apiKey}` }),
-      'OpenAI-Beta': 'realtime=v1',
     };
+    if (!isAzure(client) || props.__resolvedApiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+    headers['OpenAI-Beta'] = 'realtime=v1';
 
     this.socket = new WS.WebSocket(
       this.url,
@@ -179,16 +181,16 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     if (!deploymentName) {
       throw new Error('No deployment name provided');
     }
+    const socketOptions = { ...props.options };
+    const headers: NonNullable<WS.ClientOptions['headers']> = { ...props.options?.headers };
+    if (!isApiKeyProvider) {
+      headers['api-key'] = apiKey;
+    }
+    socketOptions.headers = headers;
     return new OpenAIRealtimeWS(
       {
         model: deploymentName,
-        options: {
-          ...props.options,
-          headers: {
-            ...props.options?.headers,
-            ...(isApiKeyProvider ? {} : { 'api-key': apiKey }),
-          },
-        },
+        options: socketOptions,
         __resolvedApiKey: isApiKeyProvider,
         __apiKey: apiKey,
       },

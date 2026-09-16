@@ -185,17 +185,14 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
       this.#stream = subscription.data;
       this.#response = subscription.response;
       this.#checkAbort();
-      await this.#sessions.events.create(
-        this.#sessionID,
-        {
-          events: [this.#input],
-          ...(this.#inputKey === undefined ? {} : { 'Idempotency-Key': this.#inputKey }),
-        },
-        {
-          ...options,
-          headers: buildHeaders([options.headers, { 'Idempotency-Key': this.#inputKey ?? null }]),
-        },
-      );
+      const input: Parameters<Sessions['events']['create']>[1] = { events: [this.#input] };
+      if (this.#inputKey !== undefined) {
+        input['Idempotency-Key'] = this.#inputKey;
+      }
+      await this.#sessions.events.create(this.#sessionID, input, {
+        ...options,
+        headers: buildHeaders([options.headers, { 'Idempotency-Key': this.#inputKey ?? null }]),
+      });
       this.#checkAbort();
       this.#reading = true;
       for await (const event of this.#stream) {

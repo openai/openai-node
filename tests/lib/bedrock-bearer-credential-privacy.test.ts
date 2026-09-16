@@ -1,3 +1,4 @@
+import type { ClientOptions } from 'openai';
 import { vi } from 'vitest';
 
 import OpenAI, { BedrockOpenAI, OpenAIError } from 'openai';
@@ -91,12 +92,14 @@ function createBedrockClient({
   logger?: TestLogger;
   tokenProvider?: TokenProvider;
 }): OpenAI {
-  const clientOptions = {
+  const clientOptions: Pick<ClientOptions, 'fetch' | 'maxRetries' | 'logLevel' | 'logger'> = {
     fetch,
     maxRetries: 0,
-    logLevel: 'debug' as const,
-    ...(logger ? { logger } : {}),
+    logLevel: 'debug',
   };
+  if (logger) {
+    clientOptions.logger = logger;
+  }
 
   if (entrypoint === 'legacy') {
     return new BedrockOpenAI({

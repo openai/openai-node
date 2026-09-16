@@ -29,11 +29,11 @@ function makeResponse(output: OutputItem[] = []): Response {
 
 function outputItem(value: Record<string, unknown>): OutputItem {
   const { type } = value;
-  return {
-    id: 'item_123',
-    ...(type === 'function_call' || type === 'custom_tool_call' ? { call_id: 'call_123' } : {}),
-    ...value,
-  } as unknown as OutputItem;
+  const defaults = { id: 'item_123' };
+  if (type === 'function_call' || type === 'custom_tool_call') {
+    Object.assign(defaults, { call_id: 'call_123' });
+  }
+  return { ...defaults, ...value } as unknown as OutputItem;
 }
 
 function snapshotFor(item: Record<string, unknown>): Response {
@@ -58,14 +58,11 @@ function applyEvent(snapshot: Response, event: Record<string, unknown>): Respons
     !type.startsWith('response.output_item.') &&
     !type.startsWith('response.shell_call_command.');
 
-  return accumulateResponse(
-    {
-      sequence_number: 1,
-      ...(requiresItemID && !hasOwn(event, 'item_id') ? { item_id: output?.id ?? 'item_123' } : {}),
-      ...event,
-    } as ResponseStreamEvent,
-    snapshot,
-  );
+  const defaults = { sequence_number: 1 };
+  if (requiresItemID && !hasOwn(event, 'item_id')) {
+    Object.assign(defaults, { item_id: output?.id ?? 'item_123' });
+  }
+  return accumulateResponse({ ...defaults, ...event } as ResponseStreamEvent, snapshot);
 }
 
 describe('ResponseAccumulator output and content events', () => {

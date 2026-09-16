@@ -133,8 +133,10 @@ test.each(cases)('$file serializes get($id) results', async ({ file, streaming, 
           role: 'assistant',
           content: first ? null : 'Synthetic lookup complete.',
           refusal: null,
-          ...(first ? { function_call: { name: 'get', arguments: JSON.stringify({ id }) } } : {}),
         };
+        if (first) {
+          message.function_call = { name: 'get', arguments: JSON.stringify({ id }) };
+        }
         const completion: ChatCompletion = {
           id: 'chatcmpl_synthetic',
           object: 'chat.completion',

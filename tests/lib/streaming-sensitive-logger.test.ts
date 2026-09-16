@@ -1,3 +1,4 @@
+import type { ClientOptions } from 'openai';
 import { vi } from 'vitest';
 import OpenAI, { APIError } from 'openai';
 
@@ -25,17 +26,22 @@ function createClient({
   logger?: ReturnType<typeof createLogger>;
   logLevel?: 'off' | 'error';
 }) {
-  return new OpenAI({
+  const options: ClientOptions = {
     apiKey: 'synthetic-client-api-key',
     maxRetries: 0,
-    ...(logger ? { logger } : {}),
-    ...(logLevel ? { logLevel } : {}),
     fetch: async () =>
       new Response(`event: ${event}\ndata: ${data}\n\n`, {
         status: 200,
         headers: { 'content-type': 'text/event-stream' },
       }),
-  });
+  };
+  if (logger) {
+    options.logger = logger;
+  }
+  if (logLevel) {
+    options.logLevel = logLevel;
+  }
+  return new OpenAI(options);
 }
 
 async function createRun(client: OpenAI) {

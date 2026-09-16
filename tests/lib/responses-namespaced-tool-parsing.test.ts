@@ -35,15 +35,18 @@ function namespace(name: string, tools: NamespaceTool['tools']): NamespaceTool {
 }
 
 function toolCall(scope?: string, name = 'lookup', args = '{"city":"Paris"}'): ResponseFunctionToolCall {
-  return {
+  const call: ResponseFunctionToolCall = {
     type: 'function_call',
     id: `fc_${scope ?? 'top'}_${name}`,
     call_id: `call_${scope ?? 'top'}_${name}`,
     name,
-    ...(scope === undefined ? {} : { namespace: scope }),
     arguments: args,
     status: 'completed',
   };
+  if (scope !== undefined) {
+    call.namespace = scope;
+  }
+  return call;
 }
 
 function responseFixture(output: Response['output'], incomplete = false): Response {
@@ -209,9 +212,11 @@ test.each(modes)('%s does not fall back across namespaces or from custom tools',
 test.each([false, null, undefined])(
   'does not infer strictness from a nested strict=%s tool',
   async (strict) => {
-    const tools = [
-      namespace('crm', [{ type: 'function', name: 'lookup', ...(strict === undefined ? {} : { strict }) }]),
-    ];
+    const tool: NamespaceTool.Function = { type: 'function', name: 'lookup' };
+    if (strict !== undefined) {
+      tool.strict = strict;
+    }
+    const tools = [namespace('crm', [tool])];
     expect(hasAutoParseableInput({ model: 'gpt-5.5', tools })).toBe(false);
     expect(shouldParseToolCall({ model: 'gpt-5.5', tools }, toolCall('crm'))).toBe(false);
     const result = await request('parse', tools, [toolCall('crm', 'lookup', 'not JSON')]);

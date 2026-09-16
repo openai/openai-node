@@ -19,10 +19,10 @@ const workloadIdentity: WorkloadIdentity = {
 };
 
 function tokenExchangeResponse(expiresIn: unknown, accessToken: string): Response {
-  const body = {
-    access_token: accessToken,
-    ...(expiresIn === undefined ? {} : { expires_in: expiresIn }),
-  };
+  const body = { access_token: accessToken };
+  if (expiresIn !== undefined) {
+    Object.assign(body, { expires_in: expiresIn });
+  }
 
   if (typeof expiresIn === 'number' && !Number.isFinite(expiresIn)) {
     const response = Response.json({ access_token: accessToken });

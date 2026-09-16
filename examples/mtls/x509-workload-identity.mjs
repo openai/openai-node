@@ -25,14 +25,19 @@ const [{ default: OpenAI }, { workloadIdentity }] = await Promise.all([
   import('openai'),
   import('openai/auth/x509-transport'),
 ]);
-const credential = workloadIdentity.fromX509({
+const credentialOptions = {
   certificateChain: cert,
   privateKey: key,
   identityProviderId,
   serviceAccountId,
-  ...(passphrase === undefined ? {} : { passphrase }),
-  ...(proxyURL ? { proxy: { url: proxyURL, mode: proxy } } : {}),
-});
+};
+if (passphrase !== undefined) {
+  credentialOptions.passphrase = passphrase;
+}
+if (proxyURL) {
+  credentialOptions.proxy = { url: proxyURL, mode: proxy };
+}
+const credential = workloadIdentity.fromX509(credentialOptions);
 try {
   const client = new OpenAI({
     credential,

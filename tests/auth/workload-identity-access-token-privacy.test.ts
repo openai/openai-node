@@ -1,3 +1,4 @@
+import type { ClientOptions } from 'openai';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import type { Server } from 'node:http';
@@ -117,14 +118,17 @@ function createHarness(accessToken: string, tokenType: TokenType = 'jwt') {
 type Harness = ReturnType<typeof createHarness>;
 
 function createPublicClient(harness: Harness, logger?: ReturnType<typeof createLogger>): OpenAI {
-  return new OpenAI({
+  const options: ClientOptions = {
     apiKey: null,
     workloadIdentity: harness.config,
     fetch: harness.fetch,
     maxRetries: 0,
     logLevel: logger ? 'debug' : 'off',
-    ...(logger ? { logger } : {}),
-  });
+  };
+  if (logger) {
+    options.logger = logger;
+  }
+  return new OpenAI(options);
 }
 
 function createLogger() {

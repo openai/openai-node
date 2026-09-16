@@ -1,3 +1,4 @@
+import type { ClientOptions } from 'openai';
 import { X509Certificate } from 'node:crypto';
 import { Agent, ProxyAgent, fetch } from 'undici';
 import { expect } from 'vitest';
@@ -32,7 +33,7 @@ function createAgent(certificate: TestCertificate): Agent {
 }
 
 function createProxyAgent(proxyURL: URL, encrypted: boolean): ProxyAgent {
-  return new ProxyAgent({
+  const options: ProxyAgent.Options = {
     uri: proxyURL.href,
     token: PROXY_AUTHORIZATION,
     requestTls: {
@@ -41,17 +42,16 @@ function createProxyAgent(proxyURL: URL, encrypted: boolean): ProxyAgent {
       key: lab.firstClient.privateKey,
       servername: 'localhost',
     },
-    ...(encrypted
-      ? {
-          proxyTls: {
-            ca: lab.proxyCertificateAuthority,
-            cert: lab.proxyClient.certificate,
-            key: lab.proxyClient.privateKey,
-            servername: 'localhost',
-          },
-        }
-      : {}),
-  });
+  };
+  if (encrypted) {
+    options.proxyTls = {
+      ca: lab.proxyCertificateAuthority,
+      cert: lab.proxyClient.certificate,
+      key: lab.proxyClient.privateKey,
+      servername: 'localhost',
+    };
+  }
+  return new ProxyAgent(options);
 }
 
 function createSDKClient(
@@ -381,10 +381,11 @@ describe('real-wire X.509 transport conformance', () => {
           provider,
           defaultQuery: { api_key: 'synthetic-provider-private-api-key' },
         });
-        const clone = original.withOptions({
-          credential,
-          ...(defaultQuery === undefined ? {} : { defaultQuery }),
-        });
+        const options: ClientOptions = { credential };
+        if (defaultQuery !== undefined) {
+          options.defaultQuery = defaultQuery;
+        }
+        const clone = original.withOptions(options);
 
         expect(clone.baseURL).toBe('https://mtls.api.openai.com/v1');
         expect(clone.apiKey).toBeNull();

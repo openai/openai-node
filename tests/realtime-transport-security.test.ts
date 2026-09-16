@@ -1,3 +1,4 @@
+import type { ClientOptions } from 'openai';
 import { vi } from 'vitest';
 import type { Mock } from 'vitest';
 
@@ -46,23 +47,26 @@ const nativeRealtimeSurfaces = [
 ] as const;
 
 function createClient(apiKey = 'permanent-secret', dangerouslyAllowBrowser?: boolean): OpenAI {
-  return new OpenAI({
-    apiKey,
-    baseURL: 'https://trusted.example.com/v1/',
-    ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
-  });
+  const options: ClientOptions = { apiKey, baseURL: 'https://trusted.example.com/v1/' };
+  if (dangerouslyAllowBrowser !== undefined) {
+    options.dangerouslyAllowBrowser = dangerouslyAllowBrowser;
+  }
+  return new OpenAI(options);
 }
 
 function createAzureClient(tokenProvider = false, dangerouslyAllowBrowser?: boolean): AzureOpenAI {
-  return new AzureOpenAI({
+  const options: ConstructorParameters<typeof AzureOpenAI>[0] = {
     apiVersion: '2024-10-01-preview',
     baseURL: 'https://azure.example.com/openai/',
     deployment: 'chat',
     ...(tokenProvider
       ? { azureADTokenProvider: async () => 'azure-bearer-secret' }
       : { apiKey: 'azure-api-key-secret' }),
-    ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
-  });
+  };
+  if (dangerouslyAllowBrowser !== undefined) {
+    options.dangerouslyAllowBrowser = dangerouslyAllowBrowser;
+  }
+  return new AzureOpenAI(options);
 }
 
 function lastNativeSocket(): CapturingNativeSocket {
@@ -155,13 +159,11 @@ describe.each(nativeRealtimeSurfaces)('$name native realtime browser-worker secu
     const client = createClient(key, clientOptIn);
 
     withBrowserWorker('DedicatedWorkerGlobalScope', () => {
-      const realtime = new Realtime(
-        {
-          model: 'gpt-realtime',
-          ...(connectionOptIn === undefined ? {} : { dangerouslyAllowBrowser: true }),
-        },
-        client,
-      );
+      const options: ConstructorParameters<typeof Realtime>[0] = { model: 'gpt-realtime' };
+      if (connectionOptIn !== undefined) {
+        options.dangerouslyAllowBrowser = true;
+      }
+      const realtime = new Realtime(options, client);
 
       expect(realtime.socket).toBe(lastNativeSocket());
     });

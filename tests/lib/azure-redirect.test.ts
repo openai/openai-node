@@ -23,18 +23,20 @@ describe('azure redirect safety', () => {
   ] as const)(
     'disables automatic redirects for static API keys despite %s',
     async (_configuration, clientRedirect, requestRedirect) => {
-      const client = new AzureOpenAI({
-        baseURL,
-        apiKey,
-        apiVersion,
-        ...(clientRedirect ? { fetchOptions: { redirect: clientRedirect } } : {}),
-      });
+      const clientOptions: ConstructorParameters<typeof AzureOpenAI>[0] = { baseURL, apiKey, apiVersion };
+      if (clientRedirect) {
+        clientOptions.fetchOptions = { redirect: clientRedirect };
+      }
+      const client = new AzureOpenAI(clientOptions);
 
-      const { req } = await client.buildRequest({
+      const options: Parameters<typeof client.buildRequest>[0] = {
         path: '/foo',
         method: 'get',
-        ...(requestRedirect ? { fetchOptions: { redirect: requestRedirect } } : {}),
-      });
+      };
+      if (requestRedirect) {
+        options.fetchOptions = { redirect: requestRedirect };
+      }
+      const { req } = await client.buildRequest(options);
 
       expect(req.headers.get('api-key')).toBe(apiKey);
       expect(req.redirect).toBe('manual');
@@ -105,7 +107,7 @@ describe('azure redirect safety', () => {
     'preserves %s for bearer-only authentication',
     async (_configuration, clientRedirect, requestRedirect, expectedRedirect) => {
       let requestedInit: RequestInit | undefined;
-      const client = new AzureOpenAI({
+      const clientOptions: ConstructorParameters<typeof AzureOpenAI>[0] = {
         baseURL,
         azureADTokenProvider: async () => 'azure-ad-token',
         apiVersion,
@@ -113,8 +115,11 @@ describe('azure redirect safety', () => {
           requestedInit = init;
           return globalThis.Response.json({ ok: true });
         },
-        ...(clientRedirect ? { fetchOptions: { redirect: clientRedirect } } : {}),
-      });
+      };
+      if (clientRedirect) {
+        clientOptions.fetchOptions = { redirect: clientRedirect };
+      }
+      const client = new AzureOpenAI(clientOptions);
 
       await client.get('/foo', requestRedirect ? { fetchOptions: { redirect: requestRedirect } } : undefined);
 
@@ -132,19 +137,21 @@ describe('azure redirect safety', () => {
   ] as const)(
     'preserves %s when the API key header is explicitly removed',
     async (_configuration, clientRedirect, requestRedirect, expectedRedirect) => {
-      const client = new AzureOpenAI({
-        baseURL,
-        apiKey,
-        apiVersion,
-        ...(clientRedirect ? { fetchOptions: { redirect: clientRedirect } } : {}),
-      });
+      const clientOptions: ConstructorParameters<typeof AzureOpenAI>[0] = { baseURL, apiKey, apiVersion };
+      if (clientRedirect) {
+        clientOptions.fetchOptions = { redirect: clientRedirect };
+      }
+      const client = new AzureOpenAI(clientOptions);
 
-      const { req } = await client.buildRequest({
+      const options: Parameters<typeof client.buildRequest>[0] = {
         path: '/foo',
         method: 'get',
         headers: { 'api-key': null },
-        ...(requestRedirect ? { fetchOptions: { redirect: requestRedirect } } : {}),
-      });
+      };
+      if (requestRedirect) {
+        options.fetchOptions = { redirect: requestRedirect };
+      }
+      const { req } = await client.buildRequest(options);
 
       expect(req.headers.has('api-key')).toBe(false);
       expect(req.redirect).toBe(expectedRedirect);

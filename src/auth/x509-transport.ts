@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createPrivateKey, X509Certificate } from 'node:crypto';
+import type { PrivateKeyInput } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { types } from 'node:util';
 import { Agent, ProxyAgent } from 'undici';
@@ -177,10 +178,11 @@ function validatedCredentialOptions(options: X509CredentialOptions): ValidatedX5
   const ca = snapshotCertificateAuthorities(configured['ca']);
 
   const leaf = new X509Certificate(certificateChain);
-  const privateKey = createPrivateKey({
-    key: privateKeyPEM,
-    ...(passphrase === undefined ? {} : { passphrase }),
-  });
+  const privateKeyOptions: PrivateKeyInput = { key: privateKeyPEM };
+  if (passphrase !== undefined) {
+    privateKeyOptions.passphrase = passphrase;
+  }
+  const privateKey = createPrivateKey(privateKeyOptions);
   if (!leaf.checkPrivateKey(privateKey)) {
     throw new Error('X.509 credential private key must match its leaf client certificate.');
   }
@@ -262,22 +264,17 @@ function credentialDispatcher(
   }
   const auth = proxyAuthentication(url);
 
-  return {
-    proxy,
-    dispatcher: new ProxyAgent({
-      uri: url.href,
-      ...(auth === undefined ? {} : { auth }),
-      requestTls,
-      ...(proxy === 'https-connect'
-        ? {
-            proxyTls: {
-              rejectUnauthorized: true,
-              ...(proxyCA === undefined ? {} : { ca: proxyCA }),
-            },
-          }
-        : {}),
-    }),
-  };
+  const dispatcherOptions: ProxyAgent.Options = { uri: url.href, requestTls };
+  if (auth !== undefined) {
+    dispatcherOptions.auth = auth;
+  }
+  if (proxy === 'https-connect') {
+    dispatcherOptions.proxyTls = { rejectUnauthorized: true };
+    if (proxyCA !== undefined) {
+      dispatcherOptions.proxyTls.ca = proxyCA;
+    }
+  }
+  return { proxy, dispatcher: new ProxyAgent(dispatcherOptions) };
 }
 
 /** Creates one frozen, caller-attested Node.js transport for X.509 workload authentication. */
@@ -295,13 +292,17 @@ export function createX509Transport(options: X509TransportOptions): X509Transpor
         throw error;
       }
     },
-    exchange: async (identityProviderId, serviceAccountId, signal) =>
-      await exchangeX509Token({
+    exchange: async (identityProviderId, serviceAccountId, signal) => {
+      const exchangeOptions: Parameters<typeof exchangeX509Token>[0] = {
         transport: capability,
         identityProviderId,
         serviceAccountId,
-        ...(signal ? { signal } : {}),
-      }),
+      };
+      if (signal) {
+        exchangeOptions.signal = signal;
+      }
+      return await exchangeX509Token(exchangeOptions);
+    },
     run: (operation) =>
       scopes.run({ wallStartedAt: Date.now(), monotonicStartedAt: performance.now() }, operation),
     current: () => scopes.getStore(),
@@ -315,13 +316,17 @@ export function createX509Transport(options: X509TransportOptions): X509Transpor
 export function fromX509(options: X509CredentialOptions): X509Credential {
   const configured = validatedCredentialOptions(options);
 
-  const requestTls = {
+  const requestTls: VerifiedX509TLSOptions = {
     cert: configured.certificateChain,
     key: configured.privateKey,
-    rejectUnauthorized: true as const,
-    ...(configured.passphrase === undefined ? {} : { passphrase: configured.passphrase }),
-    ...(configured.ca === undefined ? {} : { ca: configured.ca }),
+    rejectUnauthorized: true,
   };
+  if (configured.passphrase !== undefined) {
+    requestTls.passphrase = configured.passphrase;
+  }
+  if (configured.ca !== undefined) {
+    requestTls.ca = configured.ca;
+  }
   const { dispatcher, proxy } = credentialDispatcher(configured.proxy, requestTls);
 
   try {
@@ -331,14 +336,15 @@ export function fromX509(options: X509CredentialOptions): X509Credential {
       certificateIdentity: 'static',
       proxy,
     });
-    const identity: X509WorkloadIdentity = Object.freeze({
+    const identity: X509WorkloadIdentity = {
       type: 'x509',
       identityProviderId: configured.identityProviderId,
       serviceAccountId: configured.serviceAccountId,
-      ...(configured.refreshBufferSeconds === undefined
-        ? {}
-        : { refreshBufferSeconds: configured.refreshBufferSeconds }),
-    });
+    };
+    if (configured.refreshBufferSeconds !== undefined) {
+      identity.refreshBufferSeconds = configured.refreshBufferSeconds;
+    }
+    Object.freeze(identity);
     const credential = new OwnedX509Credential(dispatcher);
     rememberX509Credential(credential, Object.freeze({ identity, transport }));
     return credential;

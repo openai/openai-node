@@ -362,12 +362,11 @@ describe('JSON response parsing', () => {
     ['Application/JSON', undefined],
     ['application/json', '0'],
   ])('accepts an empty %s response with content-length %s', async (contentType, contentLength) => {
-    const response = new Response('', {
-      headers: {
-        'content-type': contentType,
-        ...(contentLength === undefined ? {} : { 'content-length': contentLength }),
-      },
-    });
+    const headers = new Headers({ 'content-type': contentType });
+    if (contentLength !== undefined) {
+      headers.set('content-length', contentLength);
+    }
+    const response = new Response('', { headers });
     const fetch = vi.fn(async () => response);
     const client = new OpenAI({ apiKey: 'test-key', fetch });
 

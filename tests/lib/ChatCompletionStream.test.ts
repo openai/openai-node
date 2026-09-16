@@ -155,10 +155,13 @@ describe('.stream()', () => {
     ['', ''],
   ])('keeps chunk obfuscation out of accumulated completions (%s, %s)', async (first, last) => {
     const padding = [first, last];
-    const chunks = contentChunks('Hello', ' world').map((chunk, index) => ({
-      ...chunk,
-      ...(padding[index] === undefined ? {} : { obfuscation: padding[index] }),
-    }));
+    const chunks = contentChunks('Hello', ' world').map((chunk, index) => {
+      const result = { ...chunk };
+      if (padding[index] !== undefined) {
+        result.obfuscation = padding[index];
+      }
+      return result;
+    });
     const original = JSON.stringify(chunks);
     const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
       model: 'gpt-test',
@@ -1432,21 +1435,19 @@ describe('.stream()', () => {
       const chunks = customToolChunks().map((chunk) => ({
         ...chunk,
         choices: chunk.choices.flatMap((choice) =>
-          [0, 1].map((index) => ({
-            ...choice,
-            index,
-            delta: {
-              ...choice.delta,
-              ...(choice.delta.tool_calls
-                ? {
-                    tool_calls: choice.delta.tool_calls.map((toolCall) => ({
-                      ...toolCall,
-                      ...(toolCall.id ? { id: `${toolCall.id}_${index}` } : {}),
-                    })),
-                  }
-                : {}),
-            },
-          })),
+          [0, 1].map((index) => {
+            const delta = { ...choice.delta };
+            if (choice.delta.tool_calls) {
+              delta.tool_calls = choice.delta.tool_calls.map((toolCall) => {
+                const result = { ...toolCall };
+                if (toolCall.id) {
+                  result.id = `${toolCall.id}_${index}`;
+                }
+                return result;
+              });
+            }
+            return { ...choice, index, delta };
+          }),
         ),
       }));
       const fetch = vi.fn(async () => responseWithAnnotations(chunks, annotationCount));
@@ -1513,21 +1514,25 @@ describe('.stream()', () => {
       { index: 0, arguments: '"SF"}' },
       { index: 1, arguments: '"NY"}' },
     ];
-    const chunks = fragments.map((fragment, position) =>
-      customToolChunk({
-        ...(position === 0 ? { role: 'assistant' } : {}),
-        tool_calls: [
-          {
-            index: fragment.index,
-            ...(position < 2 ? { id: `call_${fragment.index}`, type: 'function' as const } : {}),
-            function: {
-              ...(position < 2 ? { name: 'get_weather' } : {}),
-              arguments: fragment.arguments,
-            },
-          },
-        ],
-      }),
-    );
+    const chunks = fragments.map((fragment, position) => {
+      const fn: OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall.Function = {
+        arguments: fragment.arguments,
+      };
+      const toolCall: OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall = {
+        index: fragment.index,
+        function: fn,
+      };
+      const delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta = { tool_calls: [toolCall] };
+      if (position === 0) {
+        delta.role = 'assistant';
+      }
+      if (position < 2) {
+        toolCall.id = `call_${fragment.index}`;
+        toolCall.type = 'function';
+        fn.name = 'get_weather';
+      }
+      return customToolChunk(delta);
+    });
     chunks.push(customToolChunk({}, 'tool_calls'));
     const client = streamingClient(false, async () => responseWithAnnotations(chunks, 0));
     const stream = client.chat.completions.stream({

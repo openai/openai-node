@@ -66,11 +66,13 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     }
     this.url = buildRealtimeURL(client, props);
     assertBedrockWebSocketOrigin(client, this.url);
-    const headers = {
+    const headers: NonNullable<WS.ClientOptions['headers']> = {
       'User-Agent': `${client.constructor.name}/JS ${VERSION}`,
       ...props.options?.headers,
-      ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${apiKey}` }),
     };
+    if (!isAzure(client) || props.__resolvedApiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
 
     this.socket = new WS.WebSocket(
       this.url,
@@ -171,16 +173,16 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     if (!apiKey) {
       throw new Error('Azure OpenAI Realtime requires an API key');
     }
+    const socketOptions = { ...props.options };
+    const headers: NonNullable<WS.ClientOptions['headers']> = { ...props.options?.headers };
+    if (!isApiKeyProvider) {
+      headers['api-key'] = apiKey;
+    }
+    socketOptions.headers = headers;
     return new OpenAIRealtimeWS(
       {
         ...connection,
-        options: {
-          ...props.options,
-          headers: {
-            ...props.options?.headers,
-            ...(isApiKeyProvider ? {} : { 'api-key': apiKey }),
-          },
-        },
+        options: socketOptions,
         __resolvedApiKey: isApiKeyProvider,
         __apiKey: apiKey,
       },

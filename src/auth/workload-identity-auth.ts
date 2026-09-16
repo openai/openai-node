@@ -176,13 +176,17 @@ export class WorkloadIdentityAuth {
     this.config = {
       identityProviderId,
       serviceAccountId,
-      ...(clientId === undefined ? {} : { clientId }),
-      ...(refreshBufferSeconds === undefined ? {} : { refreshBufferSeconds }),
       provider: {
         tokenType: provider.tokenType,
         getToken: provider.getToken.bind(provider),
       },
     };
+    if (clientId !== undefined) {
+      this.config.clientId = clientId;
+    }
+    if (refreshBufferSeconds !== undefined) {
+      this.config.refreshBufferSeconds = refreshBufferSeconds;
+    }
     this.fetch = fetch ?? Shims.getDefaultFetch();
   }
 

@@ -89,16 +89,16 @@ async function* contentFragments(fragments: Iterable<string>): AsyncGenerator<Ch
 async function* argumentFragments(fragments: Iterable<string>): AsyncGenerator<Chunk> {
   let first = true;
   for (const fragment of fragments) {
-    yield chunk({
-      ...(first ? { role: 'assistant' as const } : {}),
-      tool_calls: [
-        {
-          index: 0,
-          ...(first ? { id: 'call_bounded', type: 'function' as const } : {}),
-          function: { ...(first ? { name: 'bounded_tool' } : {}), arguments: fragment },
-        },
-      ],
-    });
+    const fn: OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall.Function = { arguments: fragment };
+    const toolCall: OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall = { index: 0, function: fn };
+    const delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta = { tool_calls: [toolCall] };
+    if (first) {
+      delta.role = 'assistant';
+      toolCall.id = 'call_bounded';
+      toolCall.type = 'function';
+      fn.name = 'bounded_tool';
+    }
+    yield chunk(delta);
     first = false;
   }
   yield chunk({}, 'tool_calls');
@@ -107,16 +107,16 @@ async function* argumentFragments(fragments: Iterable<string>): AsyncGenerator<C
 async function* namedArgumentFragments(name: string, fragments: Iterable<string>): AsyncGenerator<Chunk> {
   let first = true;
   for (const fragment of fragments) {
-    yield chunk({
-      ...(first ? { role: 'assistant' as const } : {}),
-      tool_calls: [
-        {
-          index: 0,
-          ...(first ? { id: 'call_named', type: 'function' as const } : {}),
-          function: { ...(first ? { name } : {}), arguments: fragment },
-        },
-      ],
-    });
+    const fn: OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall.Function = { arguments: fragment };
+    const toolCall: OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall = { index: 0, function: fn };
+    const delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta = { tool_calls: [toolCall] };
+    if (first) {
+      delta.role = 'assistant';
+      toolCall.id = 'call_named';
+      toolCall.type = 'function';
+      fn.name = name;
+    }
+    yield chunk(delta);
     first = false;
   }
   yield chunk({}, 'tool_calls');
@@ -746,14 +746,16 @@ it.each(['removed', 'accessor', 'serializer', 'oversized', 'cyclic source'] as c
       kind === 'oversized'
         ? Object.fromEntries(Array.from({ length: 4097 }, (_, index) => [`field${index}`, index]))
         : { type: 'object', properties: kind === 'accessor' || kind === 'serializer' ? nested : {} };
-    const serialize = vi.fn(() => ({
-      type: 'function',
-      function: {
+    const serialize = vi.fn(() => {
+      const fn: OpenAI.Chat.ChatCompletionFunctionTool['function'] = {
         name: strictTool.function.name,
         strict: true,
-        ...(kind === 'removed' ? {} : { parameters }),
-      },
-    }));
+      };
+      if (kind !== 'removed') {
+        fn.parameters = parameters;
+      }
+      return { type: 'function', function: fn };
+    });
     Object.defineProperty(tool, 'toJSON', { configurable: true, value: serialize });
 
     const completion = await ChatCompletionStream.createChatCompletion(
@@ -3231,8 +3233,7 @@ it('charges repeated whole-snapshot strict-tool scans to the cumulative parse-wo
 
   async function* toolFragments(): AsyncGenerator<Chunk> {
     for (let index = 0; index < toolCount; index += 1) {
-      yield chunk({
-        ...(index === 0 ? { role: 'assistant' as const } : {}),
+      const delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta = {
         tool_calls: [
           {
             index,
@@ -3241,7 +3242,11 @@ it('charges repeated whole-snapshot strict-tool scans to the cumulative parse-wo
             function: { name: strictTool.function.name, arguments: argumentsJSON },
           },
         ],
-      });
+      };
+      if (index === 0) {
+        delta.role = 'assistant';
+      }
+      yield chunk(delta);
     }
     yield chunk({}, 'tool_calls');
   }
