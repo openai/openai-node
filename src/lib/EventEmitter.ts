@@ -167,6 +167,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
     event: Event,
   ): Promise<EmittedEventResult<EventParameters<EventTypes, Event>>> {
     return new Promise((resolve, reject) => {
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       const onError = (error: unknown) => {
         // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
         this.off(event, onEvent as any);

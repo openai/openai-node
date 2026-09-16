@@ -612,6 +612,7 @@ export class AbstractChatCompletionRunner<
     }
   }
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Public tool callbacks can return any JavaScript value; this boundary normalizes their results for the API.
   static #stringifyFunctionCallResult(rawContent: unknown): string {
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Chat history and tool-choice inputs can contain runtime variants that select different runner behavior.
     if (typeof rawContent === 'string') {

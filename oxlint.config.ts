@@ -11,7 +11,6 @@ const compatibilityRules = [
   'sort-keys',
   // SDK boundaries and fixtures accept unknown inputs and open JSON records;
   // runtime type checks establish the contracts instead of assuming them.
-  'anti-slop/no-unknown-parameters',
   'anti-slop/no-unsafe-dictionary-type',
   // Conditional literal fields preserve omission and create own data properties,
   // keeping complete request and wire fixtures visible in one construction.
@@ -85,6 +84,14 @@ module.exports = defineConfig({
       ],
       rules: {
         'anti-slop/no-runtime-typeof': 'off',
+      },
+    },
+    {
+      // Validators, transport failures, and application callbacks must accept
+      // unknown inputs before establishing or forwarding their actual contracts.
+      files: [...fixtureAndVendorFiles, ...sdkBoundaryFiles],
+      rules: {
+        'anti-slop/no-unknown-parameters': 'off',
       },
     },
     {

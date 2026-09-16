@@ -249,6 +249,7 @@ export function assertBedrockRequestOrigin(baseURL: string, requestURL: string):
 }
 
 /** Validates a final WebSocket URL before a legacy Bedrock client resolves or attaches credentials. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The WebSocket authentication boundary verifies the caller client at runtime before trusting provider metadata.
 export function assertBedrockWebSocketOrigin(client: unknown, requestURL: URL): void {
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
   if (typeof client !== 'object' || client === null || !(brand_privateBedrockClient in client)) {
@@ -353,6 +354,7 @@ function resolveAbortableBedrockAuth<T>(
       }
     };
 
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const rejectSignalFailure = (error: unknown) => {
       if (failure.error) {
         return;
