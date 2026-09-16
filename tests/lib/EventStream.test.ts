@@ -745,6 +745,41 @@ describe('EventStream iterator buffer limits', () => {
     stream.end();
   });
 
+  test.each(['callable', 'accessor', 'noncallable'] as const)(
+    'ignores a %s own call property on the captured Date intrinsic',
+    async (kind) => {
+      const intrinsic = Date.prototype.getTime;
+      const originalCall = Object.getOwnPropertyDescriptor(intrinsic, 'call');
+      const replacement = vi.fn(() => 0);
+      const readCall = vi.fn(() => replacement);
+      const payload = new Date(1_725_000_000_000);
+      const stream = new TestStream();
+      const iterator = stream.events('payload');
+      Object.defineProperty(intrinsic, 'call', {
+        configurable: true,
+        ...(kind === 'accessor' ? { get: readCall } : { value: kind === 'callable' ? replacement : null }),
+      });
+
+      try {
+        stream.emitPayload(payload);
+
+        const result = await iterator.next();
+        expect(result.value?.[0]).toBe(payload);
+        expect(payload.getTime()).toBe(1_725_000_000_000);
+        expect(stream.controller.signal.aborted).toBe(false);
+        expect(replacement).not.toHaveBeenCalled();
+        expect(readCall).not.toHaveBeenCalled();
+      } finally {
+        if (originalCall) {
+          Object.defineProperty(intrinsic, 'call', originalCall);
+        } else {
+          Reflect.deleteProperty(intrinsic, 'call');
+        }
+        stream.end();
+      }
+    },
+  );
+
   test.each([
     // SAFETY: This is deliberately a prototype-only spoof without native slots; it is passed only to stream validation, which must reject it.
     { name: 'local', create: () => Object.create(Date.prototype) as Date },
@@ -966,6 +1001,49 @@ describe('EventStream iterator buffer limits', () => {
     expect(stream.controller.signal.aborted).toBe(true);
     await expect(iterator.next()).rejects.toThrow(/iterator buffer limit/iu);
   });
+
+  test.each(['callable', 'accessor', 'noncallable'] as const)(
+    'ignores a %s own call property on the captured symbol intrinsic',
+    async (kind) => {
+      const intrinsic = Object.getOwnPropertyDescriptor(Symbol.prototype, 'description')?.get;
+      if (!intrinsic) {
+        throw new Error('Expected the native Symbol description getter');
+      }
+      const originalCall = Object.getOwnPropertyDescriptor(intrinsic, 'call');
+      const replacement = vi.fn(() => 'small');
+      const readCall = vi.fn(() => replacement);
+      const small = Symbol('small');
+      const smallStream = new TestStream();
+      const smallIterator = smallStream.events('payload');
+      const oversizedStream = new TestStream();
+      const oversizedIterator = oversizedStream.events('payload');
+      Object.defineProperty(intrinsic, 'call', {
+        configurable: true,
+        ...(kind === 'accessor' ? { get: readCall } : { value: kind === 'callable' ? replacement : null }),
+      });
+
+      try {
+        smallStream.emitPayload(small);
+        oversizedStream.emitPayload(Symbol('x'.repeat(5 * 1024 * 1024)));
+
+        const result = await smallIterator.next();
+        expect(result.value?.[0]).toBe(small);
+        expect(smallStream.controller.signal.aborted).toBe(false);
+        expect(oversizedStream.controller.signal.aborted).toBe(true);
+        await expect(oversizedIterator.next()).rejects.toThrow(/iterator buffer limit/iu);
+        expect(replacement).not.toHaveBeenCalled();
+        expect(readCall).not.toHaveBeenCalled();
+      } finally {
+        if (originalCall) {
+          Object.defineProperty(intrinsic, 'call', originalCall);
+        } else {
+          Reflect.deleteProperty(intrinsic, 'call');
+        }
+        smallStream.end();
+        oversizedStream.end();
+      }
+    },
+  );
 
   test('charges a repeatedly retained symbol description only once', async () => {
     const symbol = Symbol('x'.repeat(3 * 1024 * 1024));

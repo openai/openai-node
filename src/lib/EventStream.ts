@@ -618,7 +618,8 @@ function estimateRetainedBufferBytes(
       return { bytes: 0, kind: 'map' };
     }
     case 'Date': {
-      dateTimestampGetter.call(current);
+      // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the captured intrinsic without reading its mutable call property.
+      Reflect.apply(dateTimestampGetter, current, []);
       return { bytes: 8, kind: 'date' };
     }
     case 'Set': {
@@ -941,7 +942,8 @@ function inspectBufferedEventGraph(
           return false;
         }
         // SAFETY: The captured Symbol description getter is called after the symbol branch and returns a string or undefined by its native contract.
-        const description = symbolDescriptionGetter.call(current) as string | undefined;
+        // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the captured intrinsic without reading its mutable call property.
+        const description = Reflect.apply(symbolDescriptionGetter, current, []) as string | undefined;
         return charge(8 + (description?.length ?? 0) * 2);
       })
     ) {
