@@ -286,7 +286,7 @@ describe('instantiate client', () => {
 
   test('explicit global fetch', async () => {
     // make sure the global fetch type is assignable to our Fetch type
-    const client = new OpenAI({
+    new OpenAI({
       baseURL: 'http://localhost:5000/',
       apiKey: 'My API Key',
       adminAPIKey: 'My Admin API Key',

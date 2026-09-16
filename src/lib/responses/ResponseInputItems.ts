@@ -15,7 +15,8 @@ type ResponseAdditionalToolsInputItem = Extract<ResponseInputItem, { type: 'addi
 /**
  * Normalizes a mixed array of stored response history items into clean
  * `ResponseInputItem`s that can be sent back to `responses.create()`. Known items
- * that cannot be replayed without changing their meaning are omitted.
+ * that cannot be replayed without changing their meaning are omitted. SDK-only
+ * parsed values are removed without changing the stored items.
  *
  * @throws {TypeError} If an item type is not supported by the installed SDK.
  */
@@ -33,12 +34,38 @@ export function toResponseInputItems(items: Iterable<ResponseInputItemLike>): Re
 /**
  * Normalizes a stored response history item into a clean `ResponseInputItem`, or
  * returns `null` when a known item cannot be replayed without changing its
- * meaning.
+ * meaning. SDK-only parsed values are removed without changing the stored item.
  *
  * @throws {TypeError} If the item type is not supported by the installed SDK.
  */
 export function toResponseInputItem(item: ResponseInputItemLike): ResponseInputItem | null {
   switch (item.type) {
+    case 'message': {
+      if (item.role !== 'assistant' || !('id' in item) || !Array.isArray(item.content)) {
+        return stripCreatedBy(item);
+      }
+      const content = item.content.map((part) => {
+        if ((part.type === 'output_text' || part.type === 'refusal') && 'parsed' in part) {
+          const { parsed: _parsed, ...inputPart } = part;
+          return inputPart;
+        }
+        return part;
+      });
+      if (content.every((part, index) => part === item.content[index])) {
+        return stripCreatedBy(item);
+      }
+      return { ...stripCreatedBy(item), content };
+    }
+
+    case 'function_call': {
+      const inputItem = stripCreatedBy(item);
+      if (!('parsed_arguments' in inputItem)) {
+        return inputItem;
+      }
+      const { parsed_arguments: _parsedArguments, ...withoutParsedArguments } = inputItem;
+      return withoutParsedArguments;
+    }
+
     case 'additional_tools': {
       if (item.role !== 'developer') {
         return null;
@@ -87,7 +114,6 @@ export function toResponseInputItem(item: ResponseInputItemLike): ResponseInputI
     case 'configuration_update':
     case 'custom_tool_call':
     case 'file_search_call':
-    case 'function_call':
     case 'function_call_output':
     case 'image_generation_call':
     case 'item_reference':
@@ -97,7 +123,6 @@ export function toResponseInputItem(item: ResponseInputItemLike): ResponseInputI
     case 'mcp_approval_response':
     case 'mcp_call':
     case 'mcp_list_tools':
-    case 'message':
     case 'program':
     case 'program_output':
     case 'reasoning':

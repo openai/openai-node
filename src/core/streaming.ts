@@ -9,6 +9,10 @@ import type { OpenAI } from '../client';
 
 type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
+function isTransportAbortError(error: unknown): boolean {
+  return !(error instanceof APIError) && isAbortError(error);
+}
+
 type StreamTeeQueue<Item> = {
   readonly length: number;
   readonly canceled: boolean;
@@ -115,8 +119,17 @@ export class Stream<Item> implements AsyncIterable<Item> {
       consumed = true;
       let done = false;
       let receivedCompletionSentinel = false;
+      const messages = _iterSSEMessages(response, controller);
+      const closeMessages = messages.return.bind(messages);
+      messages.return = (value) => {
+        // Abort before nested iterator cleanup can wait on the response body's cancellation.
+        if (!receivedCompletionSentinel) {
+          controller.abort();
+        }
+        return closeMessages(value);
+      };
       try {
-        for await (const sse of _iterSSEMessages(response, controller)) {
+        for await (const sse of messages) {
           if (sse.data === '[DONE]') {
             receivedCompletionSentinel = true;
             break;
@@ -159,7 +172,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
         // Abort errors and cleanup failures after the completion sentinel are non-fatal.
         if (
           receivedCompletionSentinel ||
-          isAbortError(e) ||
+          isTransportAbortError(e) ||
           (controller.signal.aborted && e === controller.signal.reason)
         ) {
           return;
@@ -248,9 +261,6 @@ export class Stream<Item> implements AsyncIterable<Item> {
       let done = false;
       try {
         for await (const line of iterLines()) {
-          if (done) {
-            continue;
-          }
           if (line) {
             let data: Item;
             try {
@@ -342,10 +352,13 @@ export class Stream<Item> implements AsyncIterable<Item> {
    * which can be turned back into a Stream with `Stream.fromReadableStream()`.
    * Canceling a response-backed readable aborts its request. Canceling a tee
    * branch discards its buffered events and leaves sibling consumers running.
+   * Read or serialization failures also release the iterator without replacing the original error.
    */
   toReadableStream(): ReadableStream {
     const { controller } = this;
     let iter: AsyncIterator<Item>;
+    let cancellation: Promise<void> | undefined;
+    const cancel = () => (cancellation ??= this.#cancelIterator(iter, controller));
 
     return makeReadableStream({
       start: async () => {
@@ -363,9 +376,12 @@ export class Stream<Item> implements AsyncIterable<Item> {
           ctrl.enqueue(bytes);
         } catch (err) {
           ctrl.error(err);
+          // An errored readable never invokes its cancel hook. Release the source ourselves,
+          // without letting failed or stalled cleanup replace the read/serialization error.
+          void cancel().catch(() => undefined);
         }
       },
-      cancel: () => this.#cancelIterator(iter, controller),
+      cancel,
     });
   }
 
@@ -559,6 +575,15 @@ export async function* _iterSSEMessages(
         yield sse;
       }
     }
+    // Servers sometimes omit the trailing blank line that normally
+    // terminates the last event. Flush any in-progress event exactly once.
+    if (signal.aborted) {
+      return;
+    }
+    const pending = sseDecoder.flush();
+    if (pending) {
+      yield pending;
+    }
   } catch (error) {
     failed = true;
     if (!signal.aborted || (!isAbortError(error) && error !== signal.reason)) {
@@ -688,6 +713,15 @@ class SSEDecoder {
     }
 
     return null;
+  }
+
+  /**
+   * Emits a pending event at EOF when the stream omitted the trailing blank
+   * line. Returns `null` when no event is in progress so a record that already
+   * ended with a blank line is not delivered twice.
+   */
+  flush(): ServerSentEvent | null {
+    return this.decode('');
   }
 }
 

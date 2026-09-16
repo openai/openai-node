@@ -28,6 +28,9 @@ async function main() {
       if (message.type === 'error') {
         throw message.error;
       }
+      if (message.type === 'close') {
+        throw new Error('WebSocket closed before the coordinator response completed.');
+      }
       if (message.type !== 'message') {
         continue;
       }

@@ -118,6 +118,7 @@ describe('WorkloadIdentityAuth', () => {
     });
     const initialTime = Date.now();
     const dateNow = vi.spyOn(Date, 'now').mockReturnValue(initialTime);
+    const performanceNow = vi.spyOn(performance, 'now').mockReturnValue(0);
     const auth = new WorkloadIdentityAuth(config, customFetch);
 
     try {
@@ -134,12 +135,14 @@ describe('WorkloadIdentityAuth', () => {
       await vi.waitFor(() => expect(customFetch).toHaveBeenCalledTimes(2));
     } finally {
       dateNow.mockRestore();
+      performanceNow.mockRestore();
     }
   });
 
   test('keeps the configured refresh buffer for normal-lifetime tokens', async () => {
     const initialTime = Date.now();
     const dateNow = vi.spyOn(Date, 'now').mockReturnValue(initialTime);
+    const performanceNow = vi.spyOn(performance, 'now').mockReturnValue(0);
     const backgroundExchange = pendingTokenExchange();
     const config: WorkloadIdentity = {
       identityProviderId: 'test-identity-provider-id',
@@ -172,6 +175,7 @@ describe('WorkloadIdentityAuth', () => {
       await expect(auth.getToken()).resolves.toBe('refreshed-token');
     } finally {
       dateNow.mockRestore();
+      performanceNow.mockRestore();
     }
   });
 

@@ -73,7 +73,7 @@ async function runWorker({
   try {
     return await new Promise<number>((resolve, reject) => {
       worker.on('error', reject);
-      worker.on('exit', resolve);
+      worker.on('exit', (code) => resolve(code ?? 1));
     });
   } finally {
     removeExitHandler();

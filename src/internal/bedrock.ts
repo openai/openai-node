@@ -290,7 +290,7 @@ export function assertValidBedrockBearerCredential(credential: string): void {
   }
 }
 
-interface BedrockBearerSignalFailure {
+interface BedrockAuthSignalFailure {
   error?: { value: unknown };
   removeListeners?: () => void;
 }
@@ -313,13 +313,13 @@ function removeBedrockAbortListener(signal: AbortSignal, listener: () => void): 
   }
 }
 
-function resolveAbortableBedrockBearerToken(
-  tokenProvider: ApiKeySetter,
+function resolveAbortableBedrockAuth<T>(
+  operation: () => Promise<T>,
   signals: readonly AbortSignal[],
-  failure: BedrockBearerSignalFailure,
-): Promise<string> {
+  failure: BedrockAuthSignalFailure,
+): Promise<T> {
   // oxlint-disable-next-line promise/avoid-new -- AbortSignal events require a Promise callback bridge.
-  return new Promise<string>((resolve, reject) => {
+  return new Promise<T>((resolve, reject) => {
     let settled = false;
     const listeners: { signal: AbortSignal; listener: () => void }[] = [];
 
@@ -333,13 +333,13 @@ function resolveAbortableBedrockBearerToken(
     };
     failure.removeListeners = removeListeners;
 
-    const settle = (result: { token: string } | { error: unknown }) => {
+    const settle = (result: { value: T } | { error: unknown }) => {
       if (settled) {
         return;
       }
       settled = true;
-      if ('token' in result) {
-        resolve(result.token);
+      if ('value' in result) {
+        resolve(result.value);
       } else {
         removeListeners();
         reject(result.error);
@@ -399,24 +399,73 @@ function resolveAbortableBedrockBearerToken(
       }
     }
 
-    let token: Promise<string>;
+    let pending: Promise<T>;
     try {
-      token = tokenProvider();
+      pending = operation();
     } catch (error) {
       settle({ error });
       return;
     }
 
-    const observeToken = async () => {
+    const observeResult = async () => {
       try {
-        settle({ token: await token });
+        settle({ value: await pending });
       } catch (error) {
         settle({ error });
       }
     };
     // Observe the result even if the provider synchronously triggered cancellation.
-    void observeToken();
+    void observeResult();
   });
+}
+
+/**
+ * Resolves Bedrock authentication work with caller cancellation, then applies
+ * its result synchronously after the final cancellation checks.
+ *
+ * @internal
+ */
+export async function prepareBedrockAuth<T>(
+  request: FinalizedRequestInit,
+  context: ProviderRequestContext,
+  operation: {
+    resolve: () => Promise<T>;
+    failureMessage: string;
+    apply: (value: T) => void;
+  },
+): Promise<void> {
+  const signals: AbortSignal[] = [];
+  for (const signal of [context.options.signal, request.signal]) {
+    if (signal != null && !signals.includes(signal)) {
+      signals.push(signal);
+    }
+  }
+  const signalFailure: BedrockAuthSignalFailure = {};
+  let value: T;
+  try {
+    try {
+      value =
+        signals.length > 0
+          ? await resolveAbortableBedrockAuth(operation.resolve, signals, signalFailure)
+          : await operation.resolve();
+    } catch (cause) {
+      if (signalFailure.error && Object.is(cause, signalFailure.error.value)) {
+        throw cause;
+      }
+      throw errorWithCause(operation.failureMessage, cause);
+    }
+    if (signalFailure.error) {
+      throw signalFailure.error.value;
+    }
+    for (const signal of signals) {
+      if (signal.aborted) {
+        throw createBedrockUserAbortError(signal);
+      }
+    }
+  } finally {
+    signalFailure.removeListeners?.();
+  }
+  operation.apply(value);
 }
 
 class BedrockBearerAuth implements BedrockRequestAuth {
@@ -430,52 +479,29 @@ class BedrockBearerAuth implements BedrockRequestAuth {
     const headers = new Headers(request.headers);
     assertProviderOwnsAuthorization(headers);
 
-    const signals: AbortSignal[] = [];
-    for (const signal of [context.options.signal, request.signal]) {
-      if (signal != null && !signals.includes(signal)) {
-        signals.push(signal);
-      }
-    }
-    const signalFailure: BedrockBearerSignalFailure = {};
-    let token: unknown;
-    try {
-      try {
-        token =
-          signals.length > 0
-            ? await resolveAbortableBedrockBearerToken(() => this.tokenProvider(), signals, signalFailure)
-            : await this.tokenProvider();
-      } catch (cause) {
-        if (signalFailure.error && Object.is(cause, signalFailure.error.value)) {
-          throw cause;
+    await prepareBedrockAuth(request, context, {
+      resolve: () => this.tokenProvider(),
+      failureMessage: 'Failed to resolve a bearer credential for Bedrock.',
+      apply: (token) => {
+        if (typeof token !== 'string' || !token.trim()) {
+          throw new Errors.OpenAIError(
+            'The Bedrock bearer credential provider must return a non-empty string.',
+          );
         }
-        throw errorWithCause('Failed to resolve a bearer credential for Bedrock.', cause);
-      }
-      if (signalFailure.error) {
-        throw signalFailure.error.value;
-      }
-      for (const signal of signals) {
-        if (signal.aborted) {
-          throw createBedrockUserAbortError(signal);
+        assertValidBedrockBearerCredential(token);
+        try {
+          headers.set('authorization', `Bearer ${token}`);
+        } catch (error) {
+          if (error instanceof TypeError) {
+            // oxlint-disable-next-line eslint/preserve-caught-error -- The original error contains the bearer credential.
+            throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
+          }
+          throw error;
         }
-      }
-    } finally {
-      signalFailure.removeListeners?.();
-    }
-    if (typeof token !== 'string' || !token.trim()) {
-      throw new Errors.OpenAIError('The Bedrock bearer credential provider must return a non-empty string.');
-    }
-    assertValidBedrockBearerCredential(token);
-    try {
-      headers.set('authorization', `Bearer ${token}`);
-    } catch (error) {
-      if (error instanceof TypeError) {
-        // oxlint-disable-next-line eslint/preserve-caught-error -- The original error contains the bearer credential.
-        throw new TypeError('Bedrock bearer credential contains an invalid HTTP header value.');
-      }
-      throw error;
-    }
-    request.redirect = 'manual';
-    request.headers = headers;
+        request.redirect = 'manual';
+        request.headers = headers;
+      },
+    });
   }
 }
 

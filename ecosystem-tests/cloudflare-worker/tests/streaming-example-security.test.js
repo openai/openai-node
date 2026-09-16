@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 import ts from 'typescript';
@@ -99,6 +100,7 @@ async function loadExample(filename, environment = {}) {
 		['openai', { default: OpenAI }],
 		['express', { default: express }],
 		['node:crypto', { timingSafeEqual }],
+		['node:events', { once }],
 		[
 			'node:fs',
 			{

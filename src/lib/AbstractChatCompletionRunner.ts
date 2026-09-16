@@ -1,4 +1,4 @@
-import { APIUserAbortError, OpenAIError } from '../error';
+import { OpenAIError } from '../error';
 import type OpenAI from '../index';
 import type { RequestOptions } from '../internal/request-options';
 import { uuid4 } from '../internal/utils/uuid';
@@ -128,6 +128,7 @@ export class AbstractChatCompletionRunner<
 > extends EventStream<EventTypes> {
   protected _chatCompletions: ParsedChatCompletion<ParsedT>[] = [];
   #completionArrivedBeforeAbort = false;
+  #afterCompletionInvoked = false;
   /** Mutable conversation history, including initial input, assistant replies, and tool results. */
   messages: ChatCompletionMessageParam[] = [];
 
@@ -306,6 +307,9 @@ export class AbstractChatCompletionRunner<
   protected override _emitFinal(
     this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, ParsedT>,
   ) {
+    if (this.#afterCompletionInvoked) {
+      this.#throwIfAborted();
+    }
     const completion = this._chatCompletions[this._chatCompletions.length - 1];
     if (completion) {
       this._emit('finalChatCompletion', completion);
@@ -331,6 +335,12 @@ export class AbstractChatCompletionRunner<
 
     if (this._chatCompletions.some((c) => c.usage)) {
       this._emit('totalUsage', this.#calculateTotalUsage());
+    }
+  }
+
+  #throwIfAborted() {
+    if (this.controller.signal.aborted) {
+      throw this._userAbortError();
     }
   }
 
@@ -385,6 +395,14 @@ export class AbstractChatCompletionRunner<
     const singleFunctionToCall =
       typeof tool_choice !== 'string' && tool_choice.type === 'function' && tool_choice?.function?.name;
     const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS, afterCompletion } = options || {};
+    const runAfterCompletion = async (completion: ChatCompletion) => {
+      if (afterCompletion == null) {
+        return;
+      }
+      this.#afterCompletionInvoked = true;
+      await afterCompletion(completion, runner);
+      this.#throwIfAborted();
+    };
 
     // Normalize tool definitions before invoking callbacks.
     const inputTools = params.tools.map((tool): RunnableToolFunction<any> => {
@@ -480,20 +498,34 @@ export class AbstractChatCompletionRunner<
           parsed = await fn.parse(args);
         } catch (error) {
           if (this.controller.signal.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
           }
           const content = error instanceof Error ? error.message : String(error);
           return { message: { role, tool_call_id, content }, functionCalled: false };
         }
         if (this.controller.signal.aborted) {
-          throw new APIUserAbortError();
+          throw this._userAbortError();
         }
-        rawContent = await fn.function(parsed, runner, toolContext);
+        try {
+          rawContent = await fn.function(parsed, runner, toolContext);
+        } catch (error) {
+          if (this.controller.signal.aborted && Object.is(error, this.controller.signal.reason)) {
+            throw this._userAbortError();
+          }
+          throw error;
+        }
       } else {
         if (this.controller.signal.aborted && !bufferedToolCall) {
-          throw new APIUserAbortError();
+          throw this._userAbortError();
         }
-        rawContent = await fn.function(args, runner, toolContext);
+        try {
+          rawContent = await fn.function(args, runner, toolContext);
+        } catch (error) {
+          if (this.controller.signal.aborted && Object.is(error, this.controller.signal.reason)) {
+            throw this._userAbortError();
+          }
+          throw error;
+        }
       }
 
       const content = AbstractChatCompletionRunner.#stringifyFunctionCallResult(rawContent);
@@ -520,7 +552,7 @@ export class AbstractChatCompletionRunner<
         throw new OpenAIError(`missing message in ChatCompletion response`);
       }
       if (!message.tool_calls?.length) {
-        await afterCompletion?.(chatCompletion, runner);
+        await runAfterCompletion(chatCompletion);
         return;
       }
 
@@ -531,11 +563,11 @@ export class AbstractChatCompletionRunner<
             this._addMessage(result.message);
           }
           if (this.controller.signal.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
           }
 
           if (singleFunctionToCall && result.functionCalled) {
-            await afterCompletion?.(chatCompletion, runner);
+            await runAfterCompletion(chatCompletion);
             return;
           }
         }
@@ -560,11 +592,11 @@ export class AbstractChatCompletionRunner<
           }
         }
         if (this.controller.signal.aborted) {
-          throw new APIUserAbortError();
+          throw this._userAbortError();
         }
       }
 
-      await afterCompletion?.(chatCompletion, runner);
+      await runAfterCompletion(chatCompletion);
     }
   }
 

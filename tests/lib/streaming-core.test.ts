@@ -86,7 +86,7 @@ describe('Stream.fromSSEResponse', () => {
     expect(body.locked).toBe(false);
   });
 
-  test.each(['raw', 'helper'])('settles public %s Responses aborts', async (kind) => {
+  test('settles public raw Responses aborts', async () => {
     const cancel = vi.fn();
     const body = new ReadableStream<Uint8Array>({ cancel });
     const client = new OpenAI({
@@ -98,16 +98,10 @@ describe('Stream.fromSSEResponse', () => {
     // oxlint-disable-next-line unicorn/prefer-add-event-listener -- Existing caller handlers must survive streaming.
     caller.signal.onabort = onabort;
     const params = { model: 'gpt-4o', input: 'hello' };
-    const completion: Promise<unknown> =
-      kind === 'raw'
-        ? client.responses
-            .create({ ...params, stream: true }, { signal: caller.signal })
-            .then((stream) => stream[Symbol.asyncIterator]().next())
-        : client.responses.stream(params, { signal: caller.signal }).finalResponse();
-    const assertion =
-      kind === 'raw'
-        ? expect(settlesSoon(completion)).resolves.toEqual({ value: undefined, done: true })
-        : expect(settlesSoon(completion)).rejects.toBeInstanceOf(APIUserAbortError);
+    const completion = client.responses
+      .create({ ...params, stream: true }, { signal: caller.signal })
+      .then((stream) => stream[Symbol.asyncIterator]().next());
+    const assertion = expect(settlesSoon(completion)).resolves.toEqual({ value: undefined, done: true });
     const reason = new Error('private caller abort reason');
 
     await vi.waitFor(() => expect(body.locked).toBe(true));
@@ -119,6 +113,55 @@ describe('Stream.fromSSEResponse', () => {
     expect(cancel).toHaveBeenCalledWith(undefined);
     expect(body.locked).toBe(false);
   });
+
+  test.each(['ChatCompletionStream', 'ResponseStream', 'AssistantStream'] as const)(
+    'preserves the abort reason when %s is reading a response body',
+    async (kind) => {
+      const cancel = vi.fn();
+      const body = new ReadableStream<Uint8Array>({ cancel });
+      const client = new OpenAI({
+        apiKey: 'test-key',
+        fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+      });
+      const caller = new AbortController();
+      const removeListener = vi.spyOn(caller.signal, 'removeEventListener');
+      const options = { signal: caller.signal };
+      const onAbort = vi.fn();
+      const createStream = {
+        ChatCompletionStream: () =>
+          client.chat.completions.stream({ model: 'gpt-4o', messages: [] }, options).on('abort', onAbort),
+        ResponseStream: () =>
+          client.responses.stream({ model: 'gpt-4o', input: 'hello' }, options).on('abort', onAbort),
+        AssistantStream: () =>
+          client.beta.threads.runs
+            .stream('thread_123', { assistant_id: 'asst_123' }, options)
+            .on('abort', onAbort),
+      };
+      const stream = createStream[kind]();
+      const completion = (async () => {
+        try {
+          await settlesSoon(stream.done());
+        } catch (error) {
+          return error;
+        }
+        return undefined;
+      })();
+      const reason = new Error('private caller abort reason');
+
+      await vi.waitFor(() => expect(body.locked).toBe(true));
+      caller.abort(reason);
+
+      const error = await completion;
+      expect(error).toBeInstanceOf(APIUserAbortError);
+      expect(error).toMatchObject({ cause: reason });
+      expect(onAbort.mock.calls).toEqual([[error]]);
+      expect(stream.aborted).toBe(true);
+      expect(stream.controller.signal.reason).toBe(reason);
+      expect(removeListener).toHaveBeenCalledWith('abort', expect.any(Function));
+      expect(cancel.mock.calls).toEqual([[undefined]]);
+      expect(body.locked).toBe(false);
+    },
+  );
 
   test('finishes at the completion sentinel without waiting for the response body to close', async () => {
     const cancel = vi.fn();
@@ -234,6 +277,35 @@ describe('Stream.fromSSEResponse', () => {
     }
 
     expect(controller.signal.aborted).toBe(true);
+  });
+
+  test.each([
+    ['a trailing blank line', '\n\n'],
+    ['a single trailing newline', '\n'],
+    ['no trailing newline', ''],
+  ])('delivers the terminal finish_reason event when the stream ends with %s', async (_, ending) => {
+    const response = responseForSSE(
+      `data: {"choices":[{"delta":{"content":"hi"},"finish_reason":null}]}\n\ndata: {"choices":[{"delta":{},"finish_reason":"stop"}]}${ending}`,
+    );
+    const stream = Stream.fromSSEResponse(response, new AbortController());
+
+    await expect(collect(stream)).resolves.toEqual([
+      { choices: [{ delta: { content: 'hi' }, finish_reason: null }] },
+      { choices: [{ delta: {}, finish_reason: 'stop' }] },
+    ]);
+  });
+
+  test('delivers response.completed when the server omits the trailing blank line', async () => {
+    const response = responseForSSE(
+      'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"hi"}\n\n' +
+        'event: response.completed\ndata: {"type":"response.completed"}',
+    );
+    const stream = Stream.fromSSEResponse(response, new AbortController(), undefined, true);
+
+    await expect(collect(stream)).resolves.toEqual([
+      { event: 'response.output_text.delta', data: { type: 'response.output_text.delta', delta: 'hi' } },
+      { event: 'response.completed', data: { type: 'response.completed' } },
+    ]);
   });
 });
 
@@ -933,22 +1005,17 @@ describe('_iterSSEMessages', () => {
     }
   });
 
-  test('ignores an SSE message that ends without its required blank-line delimiter', async () => {
-    const response = responseForSSE('data: {"flushed":true}\n');
+  test.each([
+    ['no trailing newline', 'data: {"flushed":true}'],
+    ['a single LF', 'data: {"flushed":true}\n'],
+    ['a single CR', 'data: {"flushed":true}\r'],
+    ['a single CRLF', 'data: {"flushed":true}\r\n'],
+  ])('emits an SSE message that ends with %s', async (_, wire) => {
+    const response = responseForSSE(wire);
 
-    await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toEqual([]);
-  });
-
-  test('ignores an SSE message that ends with only a single carriage return', async () => {
-    const response = responseForSSE('data: {"flushed":true}\r');
-
-    await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toEqual([]);
-  });
-
-  test('ignores an SSE message that ends with only a single CRLF line ending', async () => {
-    const response = responseForSSE('data: {"flushed":true}\r\n');
-
-    await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toEqual([]);
+    await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toMatchObject([
+      { event: null, data: '{"flushed":true}' },
+    ]);
   });
 
   test('emits exactly one SSE message that ends with two carriage returns', async () => {
@@ -957,5 +1024,49 @@ describe('_iterSSEMessages', () => {
     await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toMatchObject([
       { event: null, data: '{"flushed":true}' },
     ]);
+  });
+
+  test.each([
+    ['a trailing blank line', '\n\n'],
+    ['a single trailing newline', '\n'],
+    ['no trailing newline', ''],
+  ])('delivers every event when the final record ends with %s', async (_, ending) => {
+    const response = responseForSSE(`data: {"id":1}\n\ndata: {"id":2}${ending}`);
+
+    await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toMatchObject([
+      { event: null, data: '{"id":1}' },
+      { event: null, data: '{"id":2}' },
+    ]);
+  });
+
+  test('does not emit a comment-only trailer after a completed event', async () => {
+    const response = responseForSSE('data: {"id":1}\n\n: keepalive');
+
+    await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toMatchObject([
+      { event: null, data: '{"id":1}' },
+    ]);
+  });
+
+  test('does not emit a comment-only stream at EOF', async () => {
+    const response = responseForSSE(': keepalive');
+
+    await expect(collect(_iterSSEMessages(response, new AbortController()))).resolves.toEqual([]);
+  });
+
+  test('does not flush a leftover event after abort', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(source) {
+        source.enqueue(encoder.encode('data: {"id":1}\n\ndata: {"id":2}'));
+      },
+      cancel,
+    });
+    const controller = new AbortController();
+    const events = _iterSSEMessages(new Response(body), controller);
+
+    await expect(events.next()).resolves.toMatchObject({ value: { data: '{"id":1}' }, done: false });
+    controller.abort();
+    await expect(events.next()).resolves.toEqual({ value: undefined, done: true });
+    expect(cancel).toHaveBeenCalled();
   });
 });

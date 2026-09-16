@@ -76,6 +76,10 @@ async function main() {
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
   }
+
+  if (fineTune.status !== 'succeeded') {
+    throw new Error('Fine-tuning job did not complete successfully.');
+  }
 }
 
 main().catch((err) => {

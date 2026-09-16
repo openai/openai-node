@@ -83,6 +83,104 @@ function toolCallDelta(id: string) {
 }
 
 describe('AssistantStream run-step identity security', () => {
+  describe.each([
+    ['SSE', publicAssistantStream],
+    ['serialized stream', assistantStream],
+  ] as const)('%s run-step delta identity', (_transport, createStream) => {
+    test.each(['replacement', '', null, 123])(
+      'rejects a root id containing %j before raw dispatch',
+      async (id) => {
+        const step = runStep('step_original');
+        const created = { event: 'thread.run.step.created', data: step };
+        const runner = createStream([
+          created,
+          {
+            event: 'thread.run.step.delta',
+            data: { id: step.id, delta: { id, metadata: { changed: true } } },
+          },
+          completedRun(),
+        ]);
+        const rawEvent = vi.fn();
+        const stepDelta = vi.fn();
+        runner.on('event', rawEvent);
+        runner.on('runStepDelta', stepDelta);
+
+        await expect(runner.done()).rejects.toThrow('Run-step deltas must not contain an id field');
+
+        expect(rawEvent).toHaveBeenCalledTimes(1);
+        expect(stepDelta).not.toHaveBeenCalled();
+        expect(runner.currentEvent()).toEqual(created);
+        expect(runner.currentRunStepSnapshot()).toEqual(step);
+      },
+    );
+
+    test.each(['mutate', 'replace'] as const)(
+      'rejects a root id introduced by a raw listener: %s',
+      async (mode) => {
+        const step = runStep('step_original');
+        const runner = createStream([
+          { event: 'thread.run.step.created', data: step },
+          toolCallDelta(step.id),
+          completedRun(),
+        ]);
+        const stepDelta = vi.fn();
+        const toolCreated = vi.fn();
+        runner.on('event', (event) => {
+          if (event.event === 'thread.run.step.delta') {
+            const delta = Object.assign(mode === 'mutate' ? event.data.delta : {}, event.data.delta, {
+              id: 'listener_id',
+            });
+            event.data.delta = delta;
+          }
+        });
+        runner.on('runStepDelta', stepDelta);
+        runner.on('toolCallCreated', toolCreated);
+
+        await expect(runner.done()).rejects.toThrow('Run-step deltas must not contain an id field');
+
+        expect(stepDelta).not.toHaveBeenCalled();
+        expect(toolCreated).not.toHaveBeenCalled();
+        expect(runner.currentRunStepSnapshot()).toEqual(step);
+      },
+    );
+
+    test('preserves valid delta identity, nested tool IDs, and extension fields', async () => {
+      const step = runStep('step_original');
+      const delta = {
+        metadata: { marker: 'retained' },
+        step_details: {
+          type: 'tool_calls',
+          tool_calls: [{ index: 0, id: '_suffix', function: { arguments: ' updated' } }],
+        },
+      };
+      const runner = createStream([
+        { event: 'thread.run.step.created', data: step },
+        { event: 'thread.run.step.delta', data: { id: step.id, delta } },
+        completedRun(),
+      ]);
+      let rawDelta: unknown;
+      runner.on('event', (event) => {
+        if (event.event === 'thread.run.step.delta') {
+          rawDelta = event.data.delta;
+        }
+      });
+      const stepDelta = vi.fn();
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(stepDelta).toHaveBeenCalledTimes(1);
+      expect(stepDelta.mock.calls[0]?.[0]).toBe(rawDelta);
+      expect(stepDelta.mock.calls[0]?.[1]).toMatchObject({
+        id: step.id,
+        metadata: { marker: 'retained' },
+        step_details: {
+          tool_calls: [{ id: 'call_trusted_suffix', function: { arguments: '{"to":"trusted"} updated' } }],
+        },
+      });
+    });
+  });
+
   test.each(['step_trusted', 'step_foreign'])(
     'rejects creation of %s while a trusted run step remains active',
     async (injectedID) => {

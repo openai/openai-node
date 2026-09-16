@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import { AzureOpenAI, APIUserAbortError, OpenAIError, toStreamingFile } from 'openai';
 import type { AzureClientOptions } from 'openai';
-import type { RequestInit, RequestInfo, Response } from 'openai/internal/builtin-types';
+import type { RequestInit, RequestInfo, Response as FetchResponse } from 'openai/internal/builtin-types';
 
 const defaultFetch = fetch;
 
@@ -293,7 +293,7 @@ describe('instantiate azure client', () => {
         async (dangerouslyAllowBrowser) => {
           const azureADTokenProvider = vi.fn(async () => 'AZURE_ENTRA_BEARER_SECRET');
           const customFetch = vi.fn(
-            async (_url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> =>
+            async (_url: RequestInfo, { headers }: RequestInit = {}): Promise<FetchResponse> =>
               new globalThis.Response(JSON.stringify({ ok: true }), { headers: headers ?? [] }),
           );
           const client = new AzureOpenAI({
@@ -346,7 +346,7 @@ describe('instantiate azure client', () => {
     });
 
     test('with azureADTokenProvider', async () => {
-      const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> =>
+      const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<FetchResponse> =>
         Response.json({ a: 1 }, { headers: headers ?? [] });
       const client = new AzureOpenAI({
         baseURL: 'http://localhost:5000/',
@@ -374,7 +374,7 @@ describe('instantiate azure client', () => {
 
     test('AAD token is refreshed', async () => {
       let fail = true;
-      const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> => {
+      const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<FetchResponse> => {
         if (fail) {
           fail = false;
           return new Response(undefined, {
@@ -412,7 +412,7 @@ describe('instantiate azure client', () => {
   });
 
   test('uses api-key header when apiKey is provided', async () => {
-    const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<Response> =>
+    const testFetch = async (url: RequestInfo, { headers }: RequestInit = {}): Promise<FetchResponse> =>
       Response.json({ a: 1 }, { headers: headers ?? [] });
     const client = new AzureOpenAI({
       baseURL: 'http://localhost:5000/',
@@ -454,7 +454,7 @@ describe('instantiate azure client', () => {
 
 describe('azure withOptions', () => {
   const env = process.env;
-  const testFetch = async (url: RequestInfo): Promise<Response> =>
+  const testFetch = async (url: RequestInfo): Promise<FetchResponse> =>
     Response.json({ url }, { headers: { 'content-type': 'application/json' } });
 
   beforeEach(() => {
@@ -645,7 +645,7 @@ describe('azure request building', () => {
   const client = new AzureOpenAI({ baseURL: 'https://example.com', apiKey: 'My API Key', apiVersion });
 
   describe('model to deployment mapping', () => {
-    const testFetch = async (url: RequestInfo): Promise<Response> =>
+    const testFetch = async (url: RequestInfo): Promise<FetchResponse> =>
       Response.json({ url }, { headers: { 'content-type': 'application/json' } });
     describe('with client-level deployment', () => {
       const client = new AzureOpenAI({
@@ -1015,7 +1015,7 @@ describe('azure request building', () => {
 describe('retries', () => {
   test('retry on timeout', async () => {
     let count = 0;
-    const testFetch = async (url: RequestInfo, { signal }: RequestInit = {}): Promise<Response> => {
+    const testFetch = async (url: RequestInfo, { signal }: RequestInit = {}): Promise<FetchResponse> => {
       if (count++ === 0) {
         return new Promise((resolve, reject) =>
           signal?.addEventListener('abort', () => reject(new Error('timed out'))),
@@ -1045,7 +1045,7 @@ describe('retries', () => {
 
   test('retry on 429 with retry-after', async () => {
     let count = 0;
-    const testFetch = async (url: RequestInfo, { signal }: RequestInit = {}): Promise<Response> => {
+    const testFetch = async (url: RequestInfo, { signal }: RequestInit = {}): Promise<FetchResponse> => {
       if (count++ === 0) {
         return new Response(undefined, {
           status: 429,
@@ -1077,7 +1077,7 @@ describe('retries', () => {
 
   test('retry on 429 with retry-after-ms', async () => {
     let count = 0;
-    const testFetch = async (url: RequestInfo, { signal }: RequestInit = {}): Promise<Response> => {
+    const testFetch = async (url: RequestInfo, { signal }: RequestInit = {}): Promise<FetchResponse> => {
       if (count++ === 0) {
         return new Response(undefined, {
           status: 429,

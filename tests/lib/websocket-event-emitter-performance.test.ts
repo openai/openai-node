@@ -33,6 +33,7 @@ interface FakeBrowserSocket {
 
 interface PublicWebSocket {
   on: (event: string, listener: Listener) => unknown;
+  once: (event: string, listener: Listener) => unknown;
   emitted: (event: string) => Promise<unknown>;
   socket: unknown;
 }
@@ -248,6 +249,28 @@ afterEach(() => {
 });
 
 describe.each(websocketVariants)('$name event waiters', ({ event, create, dispatch }) => {
+  test.each(['on', 'once'] as const)('preserves callback receivers for %s listeners', (method) => {
+    const client = new OpenAI({ apiKey: 'synthetic-api-key', baseURL: 'https://example.test/v1' });
+    const connection = create(client);
+    const unbound = vi.fn();
+    const bound = vi.fn();
+    const context = { name: 'caller-owned context' };
+    const first = { type: event, response: { id: 'first_response' } };
+    const second = { type: event, response: { id: 'second_response' } };
+
+    connection[method](event, unbound);
+    connection[method](event, bound.bind(context));
+    dispatch(connection, first);
+    dispatch(connection, second);
+
+    const calls = method === 'once' ? [[first]] : [[first], [second]];
+    expect(bound.mock.calls).toEqual(calls);
+    expect(bound.mock.contexts).toEqual(calls.map(() => context));
+    expect(unbound.mock.calls).toEqual(calls);
+    expect(unbound.mock.contexts).toHaveLength(calls.length);
+    expect(unbound.mock.contexts.every((receiver) => receiver === undefined)).toBe(true);
+  });
+
   test.each(['success', 'error'] as const)(
     'settles 4,096 concurrent public waiters in linear time when %s arrives first',
     async (mode) => {

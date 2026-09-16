@@ -14,6 +14,7 @@
 // Remote HTTPS requests must include: Authorization: Bearer <OPENAI_EXAMPLE_AUTH_TOKEN>
 
 import { timingSafeEqual } from 'node:crypto';
+import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:https';
 import OpenAI from 'openai';
@@ -90,9 +91,8 @@ app.use(express.text());
 //     method: 'POST',
 //     body: 'Tell me why dogs are better than cats',
 //   }).then(async res => {
-//     const decoder = new TextDecoder();
-//     for await (const chunk of res.body) {
-//       console.log(`chunk: ${decoder.decode(chunk)}`);
+//     for await (const chunk of res.body.pipeThrough(new TextDecoderStream())) {
+//       console.log(`chunk: ${chunk}`);
 //     }
 //   })
 //
@@ -138,6 +138,32 @@ function rethrowUnlessClientAbort(
   }
 }
 
+async function writeResponseChunk(
+  res: Response,
+  chunk: string,
+  disconnect: ReturnType<typeof watchClientDisconnect>,
+): Promise<void> {
+  if (res.write(chunk) === false && disconnect) {
+    try {
+      await once(res, 'drain', { signal: disconnect.signal });
+    } catch (error) {
+      if (
+        !disconnect.signal.aborted ||
+        typeof error !== 'object' ||
+        error === null ||
+        !('name' in error) ||
+        error.name !== 'AbortError' ||
+        !('code' in error) ||
+        error.code !== 'ABORT_ERR' ||
+        !('cause' in error) ||
+        error.cause !== disconnect.signal.reason
+      ) {
+        throw error;
+      }
+    }
+  }
+}
+
 const handleRequest = async (req: Request, res: Response) => {
   console.log('Received request:', req.body);
 
@@ -170,7 +196,7 @@ const handleRequest = async (req: Request, res: Response) => {
         break;
       }
 
-      res.write(chunk.choices[0]?.delta.content || '');
+      await writeResponseChunk(res, chunk.choices[0]?.delta.content || '', disconnect);
 
       if (disconnect?.signal.aborted || res.destroyed) {
         break;

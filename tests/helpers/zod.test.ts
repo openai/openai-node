@@ -107,6 +107,39 @@ it('converts Zod v4 discriminated unions to anyOf for strict schemas', () => {
   expect(schema.properties.data.anyOf).toHaveLength(2);
 });
 
+describe.each([
+  { version: 'v4', schema: zv4.object({ value: zv4.xor([zv4.string(), zv4.number()]) }) },
+  {
+    version: 'v4 mini',
+    schema: zv4Mini.object({ value: zv4Mini.xor([zv4Mini.string(), zv4Mini.number()]) }),
+  },
+])('Zod $version XOR schemas', ({ schema }) => {
+  it.each([
+    { name: 'response format', create: () => zodResponseFormat(schema, 'xor') },
+    { name: 'text format', create: () => zodTextFormat(schema, 'xor') },
+    { name: 'chat function', create: () => zodFunction({ name: 'xor', parameters: schema }) },
+    { name: 'Responses function', create: () => zodResponsesFunction({ name: 'xor', parameters: schema }) },
+  ])('rejects oneOf in $name without changing the input schema', ({ create }) => {
+    const original = zv4.toJSONSchema(schema, { target: 'draft-7' });
+
+    expect(create).toThrow(
+      'Schema at `properties/value` uses unsupported keyword `oneOf` and cannot be represented in strict Structured Outputs.',
+    );
+    expect(zv4.toJSONSchema(schema, { target: 'draft-7' })).toEqual(original);
+  });
+
+  it('preserves oneOf in a non-strict Realtime function', () => {
+    const tool = zodRealtimeFunction({ name: 'xor', parameters: schema });
+
+    expect(tool.parameters).toMatchObject({
+      type: 'object',
+      properties: { value: { oneOf: [{ type: 'string' }, { type: 'number' }] } },
+      required: ['value'],
+    });
+    expect(tool).not.toHaveProperty('strict');
+  });
+});
+
 describe('Zod v4 mini', () => {
   const MiniSchema = zv4Mini.object({ hello: zv4Mini.literal('world') });
   const expectedSchema = {

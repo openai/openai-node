@@ -1,4 +1,26 @@
 import { concatBytes, encodeUTF8 } from './utils/bytes';
+import { OpenAIError } from '../core/error';
+
+/** Options for an independently buffered WebSocket stream iterator. */
+export interface WebSocketStreamOptions {
+  /**
+   * Maximum queued records, including raw data, errors and lifecycle events.
+   * Must be a positive safe integer. Omitted means unlimited. Overflow discards
+   * this iterator's backlog and rejects its next() calls with a WebSocketError,
+   * without closing the shared socket or affecting other iterators.
+   * This bounds event count, not payload bytes or total memory.
+   */
+  maxBufferedEvents?: number | undefined;
+}
+
+/** Snapshots and validates the iterator's limit before listeners are attached. */
+export function getMaxBufferedEvents(options?: WebSocketStreamOptions): number | undefined {
+  const limit = options?.maxBufferedEvents;
+  if (limit !== undefined && (!Number.isSafeInteger(limit) || limit <= 0)) {
+    throw new OpenAIError('maxBufferedEvents must be a positive safe integer');
+  }
+  return limit;
+}
 
 /** Reconnection event passed to the `onReconnecting` handler and event listeners. */
 export interface ReconnectingEvent<Parameters = Record<string, unknown>> {
@@ -64,14 +86,53 @@ const REDIRECT_SAFE_WEBSOCKET_HEADERS = new Set([
   'x-trace-id',
 ]);
 
+function isWebSocketCredentialHeader(name: string): boolean {
+  return !REDIRECT_SAFE_WEBSOCKET_HEADERS.has(name.toLowerCase().split('_').join('-'));
+}
+
+/**
+ * Snapshots credential values in final socket options before validation and dispatch.
+ * Reports potential caller authentication, including custom headers; the server
+ * remains responsible for validating credentials. Noncredential headers are left intact.
+ */
+export function snapshotWebSocketCredentials(options: {
+  auth?: unknown;
+  headers?: Record<string, unknown> | undefined;
+}): boolean {
+  if (options.auth !== null && options.auth !== undefined) {
+    options.auth = String(options.auth);
+  }
+  const credentials = new Map<string, boolean>();
+  const headers = options.headers ?? {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (!isWebSocketCredentialHeader(name)) {
+      continue;
+    }
+    let snapshot = value;
+    if (Array.isArray(value)) {
+      snapshot = value.map(String);
+    } else if (value !== null && value !== undefined) {
+      snapshot = String(value);
+    }
+    headers[name] = snapshot;
+    const values = Array.isArray(snapshot) ? snapshot : [snapshot];
+    credentials.set(
+      name.toLowerCase(),
+      values.some((item) => typeof item === 'string' && item.trim().length > 0),
+    );
+  }
+  // Node applies header names case-insensitively, and Authorization overrides Basic auth.
+  return (
+    [...credentials.values()].some(Boolean) ||
+    (!credentials.has('authorization') && typeof options.auth === 'string' && options.auth.trim().length > 0)
+  );
+}
+
 /** Prevents WebSocket redirects from forwarding caller or SDK credentials to another origin. */
 export function protectWebSocketOptionsFromCredentialRedirects<Options extends CredentialedWebSocketOptions>(
   options: Options,
 ): Options {
-  const hasSensitiveHeader = Object.keys(options.headers ?? {}).some((name) => {
-    const normalized = name.toLowerCase().split('_').join('-');
-    return !REDIRECT_SAFE_WEBSOCKET_HEADERS.has(normalized);
-  });
+  const hasSensitiveHeader = Object.keys(options.headers ?? {}).some(isWebSocketCredentialHeader);
 
   if (!options.auth && !hasSensitiveHeader) {
     return options;

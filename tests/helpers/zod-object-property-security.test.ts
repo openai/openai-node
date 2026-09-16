@@ -8,8 +8,9 @@ import {
 import { hasOwn } from 'openai/internal/utils/values';
 import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
+import * as zv4Mini from 'zod/v4-mini';
 
-type SupportedZodSchema = zv3.ZodTypeAny | zv4.ZodType;
+type SupportedZodSchema = zv3.ZodTypeAny | zv4.ZodType | zv4Mini.ZodMiniType;
 
 const schemaName = 'object_property_security';
 const rootPropertyPath = `#/definitions/${schemaName}/properties/__proto__`;
@@ -143,17 +144,69 @@ it('fails closed because Zod v3 silently omits __proto__ from parsed objects', (
   expect(() => zodResponseFormat(schema, schemaName)).toThrow(unsupportedPropertyError(rootPropertyPath));
 });
 
-describe.each(schemaHelpers.filter(({ strict }) => strict))('$name Zod v4 compatibility', ({ getSchema }) => {
-  it('preserves the existing strict __proto__ property rejection', () => {
-    const schema = zv4.object(
+const v4ObjectSchemas = [
+  {
+    version: 'v4',
+    schema: zv4.object(
       Object.fromEntries([
         ['__proto__', zv4.string()],
         ['safe', zv4.number()],
       ]),
-    );
+    ),
+  },
+  {
+    version: 'v4 Mini',
+    schema: zv4Mini.object(
+      Object.fromEntries([
+        ['__proto__', zv4Mini.string()],
+        ['safe', zv4Mini.number()],
+      ]),
+    ),
+  },
+];
 
-    expect(() => getSchema(schema)).toThrow(
-      'Object schema at `<root>` requires property `__proto__` but does not declare it in `properties`.',
+describe.each(schemaHelpers.filter(({ strict }) => strict))('$name Zod v4 compatibility', ({ getSchema }) => {
+  it.each(v4ObjectSchemas)(
+    'rejects a $version __proto__ property before accepting the schema',
+    ({ schema }) => {
+      expect(() => getSchema(schema)).toThrow(unsupportedPropertyError('#/properties/__proto__'));
+    },
+  );
+
+  it.each(v4ObjectSchemas)('rejects a nested $version __proto__ property', ({ schema }) => {
+    expect(() => getSchema(zv4.object({ nested: schema }))).toThrow(
+      unsupportedPropertyError('#/properties/nested/properties/__proto__'),
     );
   });
+
+  it('rejects an optional property that Zod would silently omit', () => {
+    const schema = zv4.object({ ['__proto__']: zv4.string().optional(), safe: zv4.number() });
+
+    expect(() => getSchema(schema)).toThrow(unsupportedPropertyError('#/properties/__proto__'));
+  });
+});
+
+it('rejects a reusable Zod v4 definition whose declared field is omitted during parsing', () => {
+  const definition = zv4.object({ ['__proto__']: zv4.string(), safe: zv4.number() });
+  const parsed = definition.parse(JSON.parse('{"__proto__":"hidden","safe":1}'));
+
+  expect(parsed).toEqual({ safe: 1 });
+  expect(hasOwn(parsed, '__proto__')).toBe(false);
+  expect(() =>
+    zodResponseFormat(zv4.object({ nested: definition }), schemaName, {
+      schemaDefinitions: { omitted_field: definition },
+    }),
+  ).toThrow(unsupportedPropertyError('#/properties/nested/properties/__proto__'));
+});
+
+it('preserves __proto__ keys in literal default data', () => {
+  const literal = JSON.parse('{"__proto__":{"kept":true},"tag":"value"}');
+  const schema = zv4.object({ payload: zv4.any().default(literal) });
+  const format = zodResponseFormat(schema, schemaName);
+  // oxlint-disable-next-line unicorn/prefer-structured-clone -- Check the JSON wire representation.
+  const wireSchema = JSON.parse(JSON.stringify(format.json_schema.schema));
+
+  expect(wireSchema.properties.payload.default).toEqual(literal);
+  expect(hasOwn(wireSchema.properties.payload.default, '__proto__')).toBe(true);
+  expect(format.$parseRaw('{}')).toEqual({ payload: literal });
 });
