@@ -538,7 +538,21 @@ const responseEventRoutingFields = [
   'summary_index',
 ] as const;
 
-function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumulatorEvent {
+// These fields are snapshotted before the event-specific validators inspect them.
+interface ResponseEventPayload {
+  item_id?: unknown;
+  output_index?: unknown;
+  content_index?: unknown;
+  annotation_index?: unknown;
+  command_index?: unknown;
+  summary_index?: unknown;
+  item?: unknown;
+  part?: unknown;
+}
+
+function sanitizeResponseEvent(
+  event: ResponseAccumulatorEvent & ResponseEventPayload,
+): ResponseAccumulatorEvent {
   let descriptor: PropertyDescriptor | undefined;
   try {
     descriptor = Object.getOwnPropertyDescriptor(event, 'type');
@@ -569,13 +583,13 @@ function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumul
     try {
       for (const field of responseEventRoutingFields) {
         const routingDescriptor = Object.getOwnPropertyDescriptor(event, field);
-        stableValues.set(field, routingDescriptor ? Reflect.get(event, field, event) : undefined);
+        stableValues.set(field, routingDescriptor ? event[field] : undefined);
       }
 
       if (type === 'response.output_item.done') {
-        stableValues.set('item', structuredClone(Reflect.get(event, 'item', event)));
+        stableValues.set('item', structuredClone(event.item));
       } else if (type === 'response.content_part.added' || type === 'response.content_part.done') {
-        stableValues.set('part', structuredClone(Reflect.get(event, 'part', event)));
+        stableValues.set('part', structuredClone(event.part));
       }
     } catch {
       return assertNever(event as never);
@@ -584,6 +598,7 @@ function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumul
 
   return new Proxy(event, {
     get(target, property) {
+      // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys with the original target as accessor receiver.
       return stableValues.has(property) ? stableValues.get(property) : Reflect.get(target, property, target);
     },
   });

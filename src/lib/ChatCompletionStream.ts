@@ -635,6 +635,7 @@ function cloneParserConfigObject<Value extends object>(
     }
 
     descriptors[field] = {
+      // oxlint-disable-next-line anti-slop/no-reflect-get -- Generic config cloning must resolve inherited/accessor keys outside the declared config shape.
       value: descriptor && 'value' in descriptor ? descriptor.value : Reflect.get(value, field, value),
       enumerable: descriptor?.enumerable ?? false,
       configurable: descriptor?.configurable ?? true,
@@ -1120,6 +1121,7 @@ function observeSerializedChatCompletionParserParams(
         if (Array.isArray(value)) {
           tools = new Proxy(value, {
             get(target, property) {
+              // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys with the original target as accessor receiver.
               const actual = Reflect.get(target, property, target) as unknown;
               if (typeof property === 'string') {
                 const index = Number(property);
@@ -2153,6 +2155,7 @@ function finalizeChatCompletion<ParsedT>(
         }
         const stableChoice = new Proxy(choice, {
           get(target, property, receiver) {
+            // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
             return property === 'message' ? validated.message : Reflect.get(target, property, receiver);
           },
         });
@@ -2168,6 +2171,7 @@ function finalizeChatCompletion<ParsedT>(
             if (property === 'tool_calls') {
               return validated.toolCallCollection;
             }
+            // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
             return Reflect.get(target, property, receiver);
           },
         });
@@ -2256,6 +2260,7 @@ function finalizeChatCompletion<ParsedT>(
                         if (property === 'name') {
                           return captured.name;
                         }
+                        // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
                         return Reflect.get(target, property, receiver);
                       },
                     });
@@ -2269,6 +2274,7 @@ function finalizeChatCompletion<ParsedT>(
                             if (property === 'function') {
                               return stableFunction;
                             }
+                            // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
                             return Reflect.get(target, property, receiver);
                           },
                         })

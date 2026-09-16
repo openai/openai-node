@@ -573,6 +573,7 @@ describe('AssistantStream run-step identity security', () => {
     const source = runStep('step_proxy_canonical');
     const first = new Proxy(source, {
       get(target, property, receiver) {
+        // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
         return property === 'id' ? readID() : Reflect.get(target, property, receiver);
       },
     });

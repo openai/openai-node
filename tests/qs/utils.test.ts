@@ -122,7 +122,7 @@ describe('prototype-pollution safety', () => {
     expect(has(target, '__proto__')).toBe(false);
     expect(has(target, 'constructor')).toBe(false);
     expect(has(target, 'prototype')).toBe(false);
-    expect(Reflect.get(Object.prototype, 'polluted')).toBeUndefined();
+    expect(Object.prototype).not.toHaveProperty('polluted');
   });
 
   test('merge ignores unsafe keys in nested objects', () => {
@@ -134,7 +134,7 @@ describe('prototype-pollution safety', () => {
     expect(merge(target, source)).toBe(target);
     expect(Object.getPrototypeOf(target.nested)).toBe(Object.prototype);
     expect(target.nested).toEqual({ safe: true });
-    expect(Reflect.get(Object.prototype, 'polluted')).toBeUndefined();
+    expect(Object.prototype).not.toHaveProperty('polluted');
   });
 
   test('sanitizes newly adopted nested records without changing the source', () => {

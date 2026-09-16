@@ -285,6 +285,7 @@ describe('bedrock provider', () => {
           ) {
             credentialEnvironmentReads(property);
           }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
           return Reflect.get(target, property, receiver);
         },
       });

@@ -82,6 +82,7 @@ function accessorResponse(readAccessToken: () => unknown, useProxy = false): Res
   const body = useProxy
     ? new Proxy(payload, {
         get(target, property, receiver) {
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
           return property === 'access_token' ? readAccessToken() : Reflect.get(target, property, receiver);
         },
       })

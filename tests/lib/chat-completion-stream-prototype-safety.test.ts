@@ -166,6 +166,7 @@ describe('ChatCompletionStream prototype safety', () => {
         const decoded: OpenAI.Chat.ChatCompletionChunk = originalParse(serialized);
         // JSON transport cannot preserve symbols, so restore provider metadata after real decoding.
         Object.defineProperty(firstChoice(decoded).delta, providerMetadata, {
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Provider symbol metadata intentionally lies outside the public delta type and must survive decoding.
           value: Reflect.get(delta, providerMetadata),
           enumerable: true,
         });
@@ -188,7 +189,7 @@ describe('ChatCompletionStream prototype safety', () => {
       }
 
       expect(Object.getPrototypeOf(message)).toBe(Object.prototype);
-      expect(Reflect.get(message, providerMetadata)).toBe('symbol metadata');
+      expect(message).toMatchObject({ [providerMetadata]: 'symbol metadata' });
       expect(message).toHaveProperty('constructor', 'provider-constructor');
       expect(message).toHaveProperty('prototype', 'provider-prototype');
     } finally {

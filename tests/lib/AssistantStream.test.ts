@@ -587,6 +587,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
           dataReads += 1;
           return message;
         }
+        // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
         return Reflect.get(target, key, receiver);
       },
     });
@@ -750,6 +751,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     const source = { id: 'msg_proxy_canonical', role: 'assistant', content: [] };
     const first = new Proxy(source, {
       get(target, property, receiver) {
+        // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
         return property === 'id' ? readID() : Reflect.get(target, property, receiver);
       },
     });

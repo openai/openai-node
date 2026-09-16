@@ -953,6 +953,7 @@ it('never binds a descriptor tool parser to a different value actually read thro
   const readActualTool = vi.fn(() => actualTool);
   const tools = new Proxy([descriptorTool], {
     get(target, property, receiver) {
+      // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
       return property === '0' ? readActualTool() : Reflect.get(target, property, receiver);
     },
   });
@@ -2664,6 +2665,7 @@ it.each(['choice', 'message'] as const)(
               read();
               return unsafeMessage;
             }
+            // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
             return Reflect.get(target, property, receiver);
           },
         });
@@ -2674,6 +2676,7 @@ it.each(['choice', 'message'] as const)(
               read();
               return property === 'content' ? unsafe : 'Request refused';
             }
+            // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
             return Reflect.get(target, property, receiver);
           },
         });
@@ -2722,6 +2725,7 @@ it.each(['strict', 'auto-parseable'] as const)(
       }
       choice.message = new Proxy(choice.message, {
         get(target, property, receiver) {
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
           return property === 'tool_calls' ? read() : Reflect.get(target, property, receiver);
         },
       });
@@ -2856,6 +2860,7 @@ it.each([
             read(property);
             return property === 'arguments' ? unsafe : 'unvalidated_tool';
           }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
           return Reflect.get(target, property, receiver);
         },
       });

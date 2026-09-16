@@ -181,6 +181,7 @@ describe('fallback caller abort subscriptions', () => {
           ? new Proxy(caller.signal, {
               getPrototypeOf: () => null,
               get(target, property) {
+                // oxlint-disable-next-line anti-slop/no-reflect-get -- The compatibility proxy must preserve native AbortSignal accessors with the signal as receiver.
                 const value = Reflect.get(target, property, target);
                 return typeof value === 'function' ? value.bind(target) : value;
               },

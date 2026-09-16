@@ -161,6 +161,7 @@ describe('line decoder', () => {
                 throw new Error('LineDecoder rescanned buffered bytes');
               }
             }
+            // oxlint-disable-next-line anti-slop/no-reflect-get -- The instrumented typed-array proxy must forward arbitrary keys with the native target as receiver.
             const value = Reflect.get(target, property, target);
             return typeof value === 'function' ? value.bind(target) : value;
           },

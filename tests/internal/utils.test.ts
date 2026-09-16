@@ -118,6 +118,7 @@ describe('environment and request utilities', () => {
               throw new Error('listener cleanup failed');
             };
           }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- The compatibility proxy must preserve native AbortSignal accessors with the signal as receiver.
           return Reflect.get(target, property, target);
         },
       });
@@ -153,6 +154,7 @@ describe('environment and request utilities', () => {
           if (property === 'addEventListener') {
             return () => controller.abort(new Error('aborted during registration'));
           }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- The compatibility proxy must preserve native AbortSignal accessors with the signal as receiver.
           return Reflect.get(target, property, target);
         },
       });

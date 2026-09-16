@@ -175,6 +175,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
           if (property === 'type') {
             return getter();
           }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
           return Reflect.get(target, property, receiver);
         },
       });
@@ -222,6 +223,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
           if (property === 'type') {
             return getter();
           }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
           return Reflect.get(target, property, receiver);
         },
       });

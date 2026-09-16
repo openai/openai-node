@@ -881,6 +881,7 @@ describe('EventStream iterator buffer limits', () => {
       if (retained.length === 0) {
         throw new Error('Expected retained handler state');
       }
+      // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
       return Reflect.get(target, property, receiver);
     });
     const proxy = new Proxy({}, { get: read });

@@ -105,8 +105,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
 } {
   const eventDescriptor = Object.getOwnPropertyDescriptor(event, 'event');
   const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
-  const eventType = Reflect.get(event, 'event', event) as AssistantStreamEvent['event'];
-  const data = Reflect.get(event, 'data', event) as AssistantStreamEvent['data'];
+  const { event: eventType, data } = event;
   let stableData = data;
   if (
     eventType === 'thread.message.created' ||
@@ -123,10 +122,11 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     eventType === 'thread.run.step.expired'
   ) {
     const messageID = Object.getOwnPropertyDescriptor(data, 'id');
-    if (messageID && 'value' in messageID && Reflect.get(data, 'id', data) !== messageID.value) {
+    if (messageID && 'value' in messageID && data.id !== messageID.value) {
       const canonicalID = messageID.value as unknown;
       stableData = new Proxy(data, {
         get(target, property) {
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys with the original target as accessor receiver.
           return property === 'id' ? canonicalID : Reflect.get(target, property, target);
         },
       }) as AssistantStreamEvent['data'];

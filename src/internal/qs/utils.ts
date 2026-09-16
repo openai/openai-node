@@ -131,7 +131,7 @@ function sanitizeAdoptions(state: MergeState): void {
   const detached: AdoptedRecord[] = [];
   for (const record of visited) {
     for (const key of record.keys) {
-      const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor | undefined;
+      const descriptor = record.descriptors[key];
       if (!descriptor) {
         continue;
       }
@@ -204,7 +204,7 @@ function sanitizeAdoptions(state: MergeState): void {
       if (isUnsafePropertyKey(key)) {
         continue;
       }
-      const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor | undefined;
+      const descriptor = record.descriptors[key];
       if (!descriptor) {
         continue;
       }
@@ -245,6 +245,7 @@ function previewTarget(state: MergeState, target: object, key: PropertyKey): any
     return descriptor.value;
   }
 
+  // oxlint-disable-next-line anti-slop/no-reflect-get -- Generic query merging snapshots arbitrary inherited/accessor keys before mutation.
   const value = Reflect.get(target, key, target);
   let prepared = state.preparedTargets.get(target);
   if (!prepared) {
