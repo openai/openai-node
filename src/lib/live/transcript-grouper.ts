@@ -73,8 +73,10 @@ function normalizeTranscript(
   const { event_id: id, delta: text, start_ms: startMs, end_ms: endMs } = event;
   const speaker = event.type === 'session.input_transcript.delta' ? 'user' : 'assistant';
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate streamed transcript identifiers and text before grouping, and probe optional timer capabilities.
     typeof id !== 'string' ||
     !id ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate streamed transcript identifiers and text before grouping, and probe optional timer capabilities.
     typeof text !== 'string' ||
     !Number.isSafeInteger(startMs) ||
     startMs < 0 ||
@@ -272,9 +274,11 @@ export class TranscriptGrouper extends EventEmitter<TranscriptGrouperEvents> {
     );
     const timer: unknown = this.timer;
     if (
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate streamed transcript identifiers and text before grouping, and probe optional timer capabilities.
       typeof timer === 'object' &&
       timer !== null &&
       'unref' in timer &&
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate streamed transcript identifiers and text before grouping, and probe optional timer capabilities.
       typeof timer.unref === 'function'
     ) {
       timer.unref();

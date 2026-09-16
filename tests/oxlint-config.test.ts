@@ -15,6 +15,56 @@ const repoRoot = process.cwd();
 const oxlint = path.join(repoRoot, 'node_modules/oxlint/bin/oxlint');
 const oxfmt = path.join(repoRoot, 'node_modules/oxfmt/bin/oxfmt');
 
+function checkBoundaryRule(rule: string, source: string): void {
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'openai-node-boundary-lint-'));
+  const files = [
+    'src/helpers/standard-schema.ts',
+    'tests/boundary.test.ts',
+    'examples/boundary.ts',
+    'ecosystem-tests/boundary.ts',
+    'src/_vendor/boundary.ts',
+    'src/lib/Util.ts',
+  ];
+
+  try {
+    copyFileSync(path.join(repoRoot, 'oxlint.config.ts'), path.join(fixtureRoot, 'oxlint.config.ts'));
+    mkdirSync(path.join(fixtureRoot, 'scripts'));
+    copyFileSync(
+      path.join(repoRoot, 'scripts/generated-files.cjs'),
+      path.join(fixtureRoot, 'scripts/generated-files.cjs'),
+    );
+    symlinkSync(path.join(repoRoot, 'node_modules'), path.join(fixtureRoot, 'node_modules'), 'junction');
+    for (const file of files) {
+      mkdirSync(path.dirname(path.join(fixtureRoot, file)), { recursive: true });
+      writeFileSync(path.join(fixtureRoot, file), source);
+    }
+
+    const linted = spawnSync(process.execPath, [oxlint, '--format', 'json', ...files], {
+      cwd: fixtureRoot,
+      encoding: 'utf-8',
+    });
+    expect(linted.status).toBe(1);
+    // SAFETY: These diagnostics come from the controlled linter invocation; assertions below verify enforcement in each fixture.
+    const { diagnostics } = JSON.parse(linted.stdout) as {
+      diagnostics: { code: string; filename: string }[];
+    };
+    expect(
+      diagnostics
+        .filter(({ code }) => code === `anti-slop(${rule})`)
+        .map(({ filename }) => filename.split(path.sep).join('/')),
+    ).toEqual(['src/lib/Util.ts']);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+}
+
+test('permits boundary typeof validation while checking typed internal modules', () => {
+  checkBoundaryRule(
+    'no-runtime-typeof',
+    "export function validate(value: unknown): boolean { return typeof value === 'string'; }\n",
+  );
+});
+
 function spawnPnpm(args: string[], cwd: string) {
   const command = process.platform === 'win32' ? (process.env['ComSpec'] ?? 'cmd.exe') : 'pnpm';
   const commandArgs = process.platform === 'win32' ? ['/d', '/s', '/c', `pnpm ${args.join(' ')}`] : args;
@@ -142,7 +192,7 @@ test('inherits Ultracite native and anti-slop plugins and enforces their rules',
     const codes = diagnostics.map(({ code }) => code);
     expect(codes).toContain('unicorn(no-instanceof-array)');
     expect(codes).toContain('anti-slop(no-reflect-get)');
-    expect(codes).not.toContain('anti-slop(no-runtime-typeof)');
+    expect(codes).toContain('anti-slop(no-runtime-typeof)');
     expect(codes).not.toContain('anti-slop(no-unknown-parameters)');
     expect(codes).not.toContain('anti-slop(no-unsafe-dictionary-type)');
     expect(codes).not.toContain('anti-slop(no-conditional-empty-object-spread)');

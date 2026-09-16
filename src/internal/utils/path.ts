@@ -46,6 +46,7 @@ export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
         if (
           index !== params.length &&
           (value == null ||
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Path parameters may arrive from JavaScript callers and require runtime validation before URL encoding.
             (typeof value === 'object' &&
               // handle values from other realms
               value.toString ===

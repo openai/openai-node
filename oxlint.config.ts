@@ -11,12 +11,40 @@ const compatibilityRules = [
   'sort-keys',
   // SDK boundaries and fixtures accept unknown inputs and open JSON records;
   // runtime type checks establish the contracts instead of assuming them.
-  'anti-slop/no-runtime-typeof',
   'anti-slop/no-unknown-parameters',
   'anti-slop/no-unsafe-dictionary-type',
   // Conditional literal fields preserve omission and create own data properties,
   // keeping complete request and wire fixtures visible in one construction.
   'anti-slop/no-conditional-empty-object-spread',
+];
+
+// Fixtures exercise malformed inputs, examples receive application-owned values,
+// and vendored code retains its upstream validation contracts.
+const fixtureAndVendorFiles = [
+  'tests/**',
+  'examples/**',
+  'ecosystem-tests/**',
+  'src/_vendor/**',
+  'scripts/_vendor/**',
+];
+
+// These modules own parsing, transport adaptation, or application callback
+// boundaries. They establish types from external values rather than assuming them.
+const sdkBoundaryFiles = [
+  'src/auth/**',
+  'src/internal/auth/**',
+  'src/helpers/**',
+  'src/realtime/**',
+  'src/beta/realtime/**',
+  'src/lib/*Stream.ts',
+  'src/lib/webrtc/**',
+  'src/core/streaming.ts',
+  'src/internal/uploads.ts',
+  'src/internal/to-file.ts',
+  'src/internal/assistant-stream-delta.ts',
+  'src/lib/parser.ts',
+  'src/lib/transform.ts',
+  'src/lib/agents/agent-session-stream.ts',
 ];
 
 module.exports = defineConfig({
@@ -44,6 +72,21 @@ module.exports = defineConfig({
   },
   ignorePatterns: [...core.ignorePatterns, 'dist/**', 'coverage/**', ...generatedFiles],
   overrides: [
+    {
+      // Runtime validation and host capability detection need typeof at the
+      // boundary itself, including checks that throw instead of returning a predicate.
+      files: [
+        ...fixtureAndVendorFiles,
+        ...sdkBoundaryFiles,
+        'src/providers/**',
+        'src/internal/qs/**',
+        'src/internal/stream-utils.ts',
+        'src/internal/ws*.ts',
+      ],
+      rules: {
+        'anti-slop/no-runtime-typeof': 'off',
+      },
+    },
     {
       // This example intentionally shows both mutually exclusive Next.js router
       // response styles in one place.

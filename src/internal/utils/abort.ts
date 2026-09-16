@@ -15,6 +15,7 @@ const weakGlobals = globalThis as typeof globalThis & {
   FinalizationRegistry?: new (cleanup: (value: AbortCallback) => void) => AbortFinalizer;
 };
 const finalizer =
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Weak references and finalizers are optional host capabilities, so probe them before constructing either.
   typeof weakGlobals.FinalizationRegistry === 'function'
     ? new weakGlobals.FinalizationRegistry((cleanup) => {
         try {
@@ -74,6 +75,7 @@ export function retainRequestAbortCallback(
   abort: AbortCallback,
   requestSignal: AbortSignal,
 ): void {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Weak references and finalizers are optional host capabilities, so probe them before constructing either.
   if (typeof weakGlobals.WeakRef === 'function' && finalizer && !requestSignal.aborted) {
     let callbacks = callbackOwners.get(owner);
     if (!callbacks) {
@@ -101,6 +103,7 @@ export function addRequestAbortListener(
       // No listener was installed for an already aborted signal.
     };
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Weak references and finalizers are optional host capabilities, so probe them before constructing either.
   if (typeof weakGlobals.WeakRef !== 'function' || !finalizer) {
     signal.addEventListener('abort', abort, { once: true });
     return () => signal.removeEventListener('abort', abort);

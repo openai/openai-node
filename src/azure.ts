@@ -101,6 +101,7 @@ export class AzureOpenAI extends OpenAI {
       );
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Azure accepts JavaScript credential configuration; distinguish static keys from callable token providers.
     if (typeof azureADTokenProvider === 'function') {
       dangerouslyAllowBrowser ??= true;
     }
@@ -225,6 +226,7 @@ export class AzureOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Azure accepts JavaScript credential configuration; distinguish static keys from callable token providers.
     if (security.bearerAuth && typeof this._options.apiKey === 'string') {
       return buildHeaders([{ 'api-key': this.apiKey }]);
     }

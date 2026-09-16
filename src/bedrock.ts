@@ -164,6 +164,7 @@ export class BedrockOpenAI extends OpenAI {
     }
 
     // SAFETY: The widening keeps a runtime guard for JavaScript callers that supply an API-key function despite the declared string contract.
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject a JavaScript function supplied as a static Bedrock API key before it can become a credential.
     if (typeof (apiKey as unknown) === 'function') {
       throw new Errors.OpenAIError(
         'Pass refreshable Bedrock credentials via `bedrockTokenProvider`, not `apiKey`.',
