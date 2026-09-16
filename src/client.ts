@@ -856,6 +856,10 @@ export class OpenAI {
     return Errors.APIError.generate(status, normalizedError, message, headers);
   }
 
+  _hasApiKeyProvider(): boolean {
+    return typeof this._options.apiKey === 'function';
+  }
+
   /**
    * Resolves a function-based API key and retains the resolved value on this client.
    * Returns whether a provider was invoked. Internal callers can capture this

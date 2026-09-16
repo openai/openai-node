@@ -88,7 +88,7 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
       this._connectInitial();
     }
 
-    protected _createSocket(_url: URL, headers: Record<string, string>): FakeResponseSocket {
+    _createSocket(_url: URL, headers: Record<string, string>): FakeResponseSocket {
       const socket = new FakeResponseSocket();
       this.connections.push(socket);
       this.connectionHeaders.push(headers);
@@ -116,6 +116,33 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
 
     expect(websocket.url.toString()).toBe('wss://example.com/v1/responses');
     expect(websocket.connectionHeaders).toEqual([{ Authorization: 'Bearer test-key' }]);
+  });
+
+  test('allows a custom transport to authenticate an unresolved function-key client', () => {
+    const apiKey = vi.fn(async () => 'test-key');
+    const client = new OpenAI({ apiKey, baseURL: 'https://example.com/v1/' });
+    const connect = vi.fn((_url: URL, _headers: Record<string, string>) => new FakeResponseSocket());
+
+    const createSocket = vi
+      .spyOn(TestResponsesWebSocket.prototype, '_createSocket')
+      .mockImplementationOnce((url, headers) => {
+        expect(headers).toEqual({});
+        return connect(url, { ...headers, Authorization: 'Bearer transport-managed-key' });
+      });
+
+    let websocket: TestResponsesWebSocket | undefined;
+    try {
+      websocket = new TestResponsesWebSocket(client);
+      expect(apiKey).not.toHaveBeenCalled();
+      expect(connect).toHaveBeenCalledTimes(1);
+      expect(connect).toHaveBeenCalledWith(new URL('wss://example.com/v1/responses'), {
+        Authorization: 'Bearer transport-managed-key',
+      });
+      expect(websocket.socket).toBe(connect.mock.results[0]!.value);
+    } finally {
+      websocket?.close();
+      createSocket.mockRestore();
+    }
   });
 
   test('forwards repeated compaction progress to listeners and the stream', async () => {

@@ -86,14 +86,53 @@ const REDIRECT_SAFE_WEBSOCKET_HEADERS = new Set([
   'x-trace-id',
 ]);
 
+function isWebSocketCredentialHeader(name: string): boolean {
+  return !REDIRECT_SAFE_WEBSOCKET_HEADERS.has(name.toLowerCase().split('_').join('-'));
+}
+
+/**
+ * Snapshots credential values in final socket options before validation and dispatch.
+ * Reports potential caller authentication, including custom headers; the server
+ * remains responsible for validating credentials. Noncredential headers are left intact.
+ */
+export function snapshotWebSocketCredentials(options: {
+  auth?: unknown;
+  headers?: Record<string, unknown> | undefined;
+}): boolean {
+  if (options.auth !== null && options.auth !== undefined) {
+    options.auth = String(options.auth);
+  }
+  const credentials = new Map<string, boolean>();
+  const headers = options.headers ?? {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (!isWebSocketCredentialHeader(name)) {
+      continue;
+    }
+    let snapshot = value;
+    if (Array.isArray(value)) {
+      snapshot = value.map(String);
+    } else if (value !== null && value !== undefined) {
+      snapshot = String(value);
+    }
+    headers[name] = snapshot;
+    const values = Array.isArray(snapshot) ? snapshot : [snapshot];
+    credentials.set(
+      name.toLowerCase(),
+      values.some((item) => typeof item === 'string' && item.trim().length > 0),
+    );
+  }
+  // Node applies header names case-insensitively, and Authorization overrides Basic auth.
+  return (
+    [...credentials.values()].some(Boolean) ||
+    (!credentials.has('authorization') && typeof options.auth === 'string' && options.auth.trim().length > 0)
+  );
+}
+
 /** Prevents WebSocket redirects from forwarding caller or SDK credentials to another origin. */
 export function protectWebSocketOptionsFromCredentialRedirects<Options extends CredentialedWebSocketOptions>(
   options: Options,
 ): Options {
-  const hasSensitiveHeader = Object.keys(options.headers ?? {}).some((name) => {
-    const normalized = name.toLowerCase().split('_').join('-');
-    return !REDIRECT_SAFE_WEBSOCKET_HEADERS.has(normalized);
-  });
+  const hasSensitiveHeader = Object.keys(options.headers ?? {}).some(isWebSocketCredentialHeader);
 
   if (!options.auth && !hasSensitiveHeader) {
     return options;
