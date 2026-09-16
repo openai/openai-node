@@ -29,7 +29,18 @@ import type {
 } from '../resources/chat/completions/completions';
 import { Stream } from '../streaming';
 import { AbstractChatCompletionRunner } from './AbstractChatCompletionRunner';
-import type { AbstractChatCompletionRunnerEvents } from './AbstractChatCompletionRunner';
+import type { AbstractChatCompletionRunnerEvents, RunnerOptions } from './AbstractChatCompletionRunner';
+import type {
+  ChatCompletionRunner,
+  ChatCompletionToolRunnerParamsWithContext,
+  ChatCompletionToolRunnerParamsWithoutContext,
+} from './ChatCompletionRunner';
+import type {
+  ChatCompletionStreamingRunner,
+  ChatCompletionStreamingToolRunnerParamsWithContext,
+  ChatCompletionStreamingToolRunnerParamsWithoutContext,
+} from './ChatCompletionStreamingRunner';
+import type { BaseFunctionsArgs } from './RunnableFunction';
 
 function parseStructuredStreamingJSON(content: string): unknown {
   try {
@@ -1248,6 +1259,7 @@ export class ChatCompletionStream<ParsedT = null>
   implements AsyncIterable<ChatCompletionChunk>
 {
   #params: ChatCompletionCreateParams | null;
+  #rejectsUnfinishedTurns = false;
   #audioDoneChoiceIndexes: Set<number>;
   #choiceEventStates: ChoiceEventState[];
   #currentChatCompletionSnapshot: ChatCompletionSnapshot | undefined;
@@ -1711,6 +1723,21 @@ export class ChatCompletionStream<ParsedT = null>
     return finalizeChatCompletion(snapshot, this.#params, audioDoneChoiceIndexes, validatedMessages);
   }
 
+  /** Rejects unfinished turns before tool callbacks while preserving ordinary stream and replay behavior. */
+  protected override _runTools<FunctionsArgs extends BaseFunctionsArgs, ToolContext>(
+    client: OpenAI,
+    params:
+      | ChatCompletionToolRunnerParamsWithContext<FunctionsArgs, ToolContext>
+      | ChatCompletionToolRunnerParamsWithoutContext<FunctionsArgs>
+      | ChatCompletionStreamingToolRunnerParamsWithContext<FunctionsArgs, ToolContext>
+      | ChatCompletionStreamingToolRunnerParamsWithoutContext<FunctionsArgs>,
+    runner: ChatCompletionRunner<any> | ChatCompletionStreamingRunner<any>,
+    options?: RunnerOptions,
+  ): Promise<void> {
+    this.#rejectsUnfinishedTurns = true;
+    return super._runTools(client, params, runner, options);
+  }
+
   protected override async _createChatCompletion(
     client: OpenAI,
     params: ChatCompletionCreateParams,
@@ -1890,7 +1917,7 @@ export class ChatCompletionStream<ParsedT = null>
       if (finish_reason) {
         choice.finish_reason = finish_reason;
 
-        if (this.#params && hasAutoParseableInput(this.#params)) {
+        if (this.#params && (this.#rejectsUnfinishedTurns || hasAutoParseableInput(this.#params))) {
           if (finish_reason === 'length') {
             throw new LengthFinishReasonError();
           }
