@@ -82,11 +82,11 @@ function validateSchemaDefinitions(schemaDefinitions: ZodSchemaDefinitions | und
 
 function escapeSchemaDefinitionRefs<T extends object>(
   schema: T,
-  schemaDefinitions: ZodSchemaDefinitions | undefined,
+  definitionNames: ReadonlyMap<string, string>,
 ): T {
   const refReplacements = new Map(
-    Object.keys(schemaDefinitions ?? {}).map((name) => [
-      `#/definitions/${name}`,
+    [...definitionNames].map(([id, name]) => [
+      `#/definitions/${id}`,
       `#/definitions/${encodeSchemaDefinitionRefToken(name)}`,
     ]),
   );
@@ -147,7 +147,10 @@ function zodV3ToJsonSchema(
       : undefined),
   });
 
-  const escapedSchema = escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
+  const escapedSchema = escapeSchemaDefinitionRefs(
+    jsonSchema,
+    new Map(Object.keys(options.schemaDefinitions ?? {}).map((name) => [name, name])),
+  );
   assertJSONSerializableSchema(escapedSchema);
   return escapedSchema;
 }
@@ -157,15 +160,28 @@ function zodV4ToJsonSchema(
   options: { schemaDefinitions?: ZodSchemaDefinitions | undefined } = {},
 ): Record<string, unknown> {
   const metadata = options.schemaDefinitions ? z4.registry<Record<string, unknown>>() : undefined;
+  const definitionNames = new Map<string, string>();
   for (const [name, definition] of Object.entries(options.schemaDefinitions ?? {})) {
-    metadata?.add(definition as unknown as z4.ZodType, { id: name });
+    // Avoid `/` and `~` so Zod versions that escape JSON Pointer tokens emit the same IDs.
+    const id = encodeURIComponent(name).replace(/~/g, '%7E');
+    definitionNames.set(id, name);
+    metadata?.add(definition as unknown as z4.ZodType, { id });
   }
 
   const jsonSchema = z4.toJSONSchema(schema, {
     target: 'draft-7',
     ...(metadata ? { metadata } : undefined),
-    override: ({ zodSchema, jsonSchema }) => {
+    override: ({ zodSchema, jsonSchema, path }) => {
       const def = zodSchema._zod.def;
+
+      if (def.type === 'object' && hasOwn(def.shape, '__proto__')) {
+        const propertyPath = [...path, 'properties', '__proto__']
+          .map((part) => encodeSchemaDefinitionRefToken(String(part)))
+          .join('/');
+        throw new Error(
+          `Zod field at \`#/${propertyPath}\` uses unsupported property name \`__proto__\`, which Zod omits from parsed output.`,
+        );
+      }
 
       if (def.type === 'union' && 'discriminator' in def && Array.isArray(jsonSchema.oneOf)) {
         if (jsonSchema.anyOf !== undefined) {
@@ -182,7 +198,15 @@ function zodV4ToJsonSchema(
     },
   }) as JSONSchema;
 
-  const escapedSchema = escapeSchemaDefinitionRefs(jsonSchema, options.schemaDefinitions);
+  const escapedSchema = escapeSchemaDefinitionRefs(jsonSchema, definitionNames);
+  if (escapedSchema.definitions) {
+    escapedSchema.definitions = Object.fromEntries(
+      Object.entries(escapedSchema.definitions).map(([id, definition]) => [
+        definitionNames.get(id) ?? id,
+        definition,
+      ]),
+    );
+  }
 
   return toStrictJsonSchema(escapedSchema) as Record<string, unknown>;
 }
@@ -390,7 +414,8 @@ export function zodFunction<Parameters extends ZodTypeLike>(
 
 /** Builds a strict Chat Completions function tool from the supplied Zod schema. */
 export function zodFunction<Parameters extends ZodTypeLike>(options: ZodFunctionOptions<Parameters>) {
-  const zodSchema = options.parameters as unknown as ZodSchema;
+  const parameters = options.parameters;
+  const zodSchema = parameters as unknown as ZodSchema;
 
   return makeParseableTool<any>(
     {
@@ -406,7 +431,7 @@ export function zodFunction<Parameters extends ZodTypeLike>(options: ZodFunction
     },
     {
       callback: options.function,
-      parser: (args) => parseZodObject(options.parameters, args),
+      parser: (args) => parseZodObject(parameters, args),
     },
   );
 }
@@ -444,7 +469,8 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
   /** Callback signature associated with validated function-call arguments. */
   function: (args: InferZodType<Parameters>) => unknown;
 }> {
-  const zodSchema = options.parameters as unknown as ZodSchema;
+  const parameters = options.parameters;
+  const zodSchema = parameters as unknown as ZodSchema;
 
   return makeParseableResponseTool<any>(
     {
@@ -458,7 +484,7 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
     },
     {
       callback: options.function,
-      parser: (args) => parseZodObject(options.parameters, args),
+      parser: (args) => parseZodObject(parameters, args),
     },
   );
 }

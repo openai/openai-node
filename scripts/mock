@@ -31,9 +31,9 @@ echo "==> Starting mock server with URL ${URL}"
 # Run steady mock on the given spec
 if [ "$1" == "--daemon" ]; then
   # Verify the locked local binary is available before the startup timeout.
-  ./node_modules/.bin/steady --version
+  ./scripts/run-steady --version
 
-  ./node_modules/.bin/steady --host 127.0.0.1 -p 4010 --validator-query-array-format=brackets --validator-form-array-format=brackets --validator-query-object-format=brackets --validator-form-object-format=brackets "$URL" &> .stdy.log &
+  ./scripts/run-steady --host 127.0.0.1 -p 4010 --validator-query-array-format=brackets --validator-form-array-format=brackets --validator-query-object-format=brackets --validator-form-object-format=brackets "$URL" &> .stdy.log &
   steady_pid=$!
 
   cleanup_steady() {
@@ -67,5 +67,5 @@ if [ "$1" == "--daemon" ]; then
   trap - EXIT
   echo
 else
-  ./node_modules/.bin/steady --host 127.0.0.1 -p 4010 --validator-query-array-format=brackets --validator-form-array-format=brackets --validator-query-object-format=brackets --validator-form-object-format=brackets "$URL"
+  ./scripts/run-steady --host 127.0.0.1 -p 4010 --validator-query-array-format=brackets --validator-form-array-format=brackets --validator-query-object-format=brackets --validator-form-object-format=brackets "$URL"
 fi

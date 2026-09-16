@@ -10,8 +10,9 @@ vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
 const spawnMock = spawn as MockedFunction<typeof spawn>;
 const devicePrefix = ['darwin', 'win32', 'cygwin'].includes(process.platform) ? '' : 'hw';
 
-function mockFfmpeg() {
+function mockFfmpeg(started = true) {
   const ffmpeg = Object.assign(new EventEmitter(), {
+    pid: started ? 123 : undefined,
     stdout: new PassThrough(),
     stderr: new PassThrough(),
     kill: vi.fn().mockReturnValue(true),
@@ -342,6 +343,37 @@ describe('recordAudio', () => {
 
     await expect(recordAudio()).rejects.toThrow('ffmpeg was not found');
   });
+
+  test.each(['an already-aborted caller', 'a caller-listener setup failure'] as const)(
+    'does not signal a process without a PID after %s',
+    async (scenario) => {
+      const ffmpeg = mockFfmpeg(false);
+      const caller = new AbortController();
+      const spawnFailure = new Error('ffmpeg could not start');
+      const setupFailure = new Error('caller listener could not be installed');
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      if (scenario === 'an already-aborted caller') {
+        caller.abort();
+      } else {
+        vi.spyOn(caller.signal, 'addEventListener').mockImplementationOnce(() => {
+          throw setupFailure;
+        });
+      }
+
+      const recording = recordAudio({ signal: caller.signal });
+      const rejection = expect(recording).rejects.toBe(
+        scenario === 'an already-aborted caller' ? spawnFailure : setupFailure,
+      );
+      expect(() => ffmpeg.emit('error', spawnFailure)).not.toThrow();
+      ffmpeg.emit('close', -2);
+      await rejection;
+
+      expect(ffmpeg.kill).not.toHaveBeenCalled();
+      expect(getEventListeners(caller.signal, 'abort')).toHaveLength(0);
+      expect(ffmpeg.stdout.listenerCount('data')).toBe(0);
+      expect(() => ffmpeg.emit('error', spawnFailure)).not.toThrow();
+    },
+  );
 
   test('terminates ffmpeg when recording setup fails after it starts', async () => {
     const ffmpeg = mockFfmpeg();

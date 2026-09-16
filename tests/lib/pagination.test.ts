@@ -80,6 +80,23 @@ describe('PagePromise', () => {
 });
 
 describe('CursorPage', () => {
+  test.each([null, undefined])(
+    'accepts an unusable resource ID (%s) without requesting another page',
+    (id) => {
+      const item: { id?: string | null } = id === undefined ? {} : { id };
+      const page = new CursorPage<{ id?: string | null }>(
+        {} as any,
+        response,
+        { data: [item], has_more: true },
+        options,
+      );
+
+      expect(page.getPaginatedItems()).toEqual([item]);
+      expect(page.hasNextPage()).toBe(false);
+      expect(page.nextPageRequestOptions()).toBeNull();
+    },
+  );
+
   test('uses the last item ID as the cursor while preserving request options', () => {
     const page = new CursorPage<Item>(
       {} as any,

@@ -1,4 +1,26 @@
 import { concatBytes, encodeUTF8 } from './utils/bytes';
+import { OpenAIError } from '../core/error';
+
+/** Options for an independently buffered WebSocket stream iterator. */
+export interface WebSocketStreamOptions {
+  /**
+   * Maximum queued records, including raw data, errors and lifecycle events.
+   * Must be a positive safe integer. Omitted means unlimited. Overflow discards
+   * this iterator's backlog and rejects its next() calls with a WebSocketError,
+   * without closing the shared socket or affecting other iterators.
+   * This bounds event count, not payload bytes or total memory.
+   */
+  maxBufferedEvents?: number | undefined;
+}
+
+/** Snapshots and validates the iterator's limit before listeners are attached. */
+export function getMaxBufferedEvents(options?: WebSocketStreamOptions): number | undefined {
+  const limit = options?.maxBufferedEvents;
+  if (limit !== undefined && (!Number.isSafeInteger(limit) || limit <= 0)) {
+    throw new OpenAIError('maxBufferedEvents must be a positive safe integer');
+  }
+  return limit;
+}
 
 /** Reconnection event passed to the `onReconnecting` handler and event listeners. */
 export interface ReconnectingEvent<Parameters = Record<string, unknown>> {

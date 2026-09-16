@@ -142,6 +142,10 @@ for await (const event of initial) {
     responseId = event.response.id;
   }
 
+  if (event.type === 'response.failed' || event.type === 'response.incomplete') {
+    throw new Error('The background response did not complete successfully.');
+  }
+
   if (event.type === 'response.completed') {
     completed = true;
   }
@@ -170,11 +174,16 @@ if (!completed) {
 }
 
 const response = await finalStream.finalResponse();
+if (response.status !== 'completed') {
+  throw new Error('The background response did not complete successfully.');
+}
 console.log(response.output_text);
 ```
 
-Reuse the initial response only after receiving `response.completed`. A clean end to the stream can still leave a
-background response queued or in progress, in which case retrieve it to continue streaming.
+Reuse the initial response only after receiving `response.completed`. Failed or incomplete terminal events are errors,
+not interruptions to resume. A clean end without a terminal event can still leave a background response queued or in
+progress, in which case retrieve it to continue streaming. Check the final snapshot's status before treating its output
+as complete.
 
 `starting_after` suppresses events that the application has already handled. The helper still replays earlier events
 internally so snapshots and `finalResponse()` include the entire response. When resuming a response that used parsed

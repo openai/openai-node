@@ -1,5 +1,6 @@
 import * as Errors from './error';
 import { OpenAI } from './client';
+import { resolveRealtimeAPIKey } from './internal/realtime-credentials';
 import type { ApiKeySetter, ClientOptions } from './client';
 import { assertNoDataResidency } from './internal/data-residency';
 import {
@@ -225,11 +226,6 @@ export class BedrockOpenAI extends OpenAI {
     const configuredBaseURL = this._options.baseURL ?? this.baseURL;
     assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
 
-    const security = options.__security ?? { bearerAuth: true };
-    if (security.adminAPIKeyAuth && !security.bearerAuth) {
-      await this._callApiKey();
-    }
-
     await super.prepareOptions(options);
     assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
   }
@@ -240,6 +236,10 @@ export class BedrockOpenAI extends OpenAI {
   ): Promise<void> {
     assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, context.url);
     await super.prepareRequest(request, context);
+    assertBedrockRequestOrigin(
+      this._options.baseURL ?? this.baseURL,
+      this.buildURL(context.options.path, null, context.options.defaultBaseURL),
+    );
     request.redirect = 'manual';
   }
 
@@ -248,8 +248,19 @@ export class BedrockOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
-    const credential = this.apiKey;
-    if ((security.bearerAuth || security.adminAPIKeyAuth) && credential !== null) {
+    if (security.bearerAuth || security.adminAPIKeyAuth) {
+      assertBedrockRequestOrigin(
+        this._options.baseURL ?? this.baseURL,
+        this.buildURL(opts.path, null, opts.defaultBaseURL),
+      );
+      const { apiKey: credential } = await resolveRealtimeAPIKey(this);
+      assertBedrockRequestOrigin(
+        this._options.baseURL ?? this.baseURL,
+        this.buildURL(opts.path, null, opts.defaultBaseURL),
+      );
+      if (credential === null) {
+        return undefined;
+      }
       assertValidBedrockBearerCredential(credential);
       try {
         return buildHeaders([{ Authorization: `Bearer ${credential}` }]);

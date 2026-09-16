@@ -7,6 +7,8 @@ import { OpenAI } from '../../../client';
 import { VERSION } from '../../../version';
 import { OpenAIError } from '../../../core/error';
 
+export type { WebSocketStreamOptions } from '../../../internal/ws';
+
 export type { ResponsesWSReconnectOptions } from './ws-base';
 
 export interface ResponsesWSClientOptions extends WS.ClientOptions, ResponsesWSBaseOptions {
@@ -14,12 +16,7 @@ export interface ResponsesWSClientOptions extends WS.ClientOptions, ResponsesWSB
   auth?: string;
 }
 
-const CREDENTIAL_HEADERS = new Set([
-  'authorization',
-  'proxy-authorization',
-  'cookie',
-  'x-api-key',
-]);
+const CREDENTIAL_HEADERS = new Set(['authorization', 'proxy-authorization', 'cookie', 'x-api-key']);
 
 function hasCredentialValue(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(hasCredentialValue);

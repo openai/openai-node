@@ -20,7 +20,7 @@ import type {
 } from '../resources/beta/threads/runs/runs';
 import type { ReadableStream } from '../internal/shim-types';
 import { Stream } from '../streaming';
-import { APIUserAbortError, OpenAIError } from '../error';
+import { APIError, APIUserAbortError, OpenAIError } from '../error';
 import type {
   AssistantStreamEvent,
   MessageStreamEvent,
@@ -322,7 +322,10 @@ export class AssistantStream
     return Object.values(this.#runStepSnapshots);
   }
 
-  /** Waits for successful completion and returns the final snapshot of every observed message. */
+  /**
+   * Waits for successful completion and returns the final snapshot of every observed message.
+   * Terminal message events replace accumulated snapshots without mutating earlier snapshots.
+   */
   async finalMessages(): Promise<Message[]> {
     await this.done();
 
@@ -479,6 +482,9 @@ export class AssistantStream
       case 'thread.message.delta':
       case 'thread.message.completed':
       case 'thread.message.incomplete': {
+        if (messageID !== undefined && this.#messageSnapshot) {
+          this.#reserveMessageAlias(this.#messageSnapshot, messageID);
+        }
         this.#handleMessage(stableEvent);
         if (messageID !== undefined) {
           this.#reserveMessageAlias(stableEvent.data, messageID);
@@ -491,10 +497,7 @@ export class AssistantStream
       }
 
       case 'error': {
-        //This is included for completeness, but errors are processed in the SSE event processing so this should not occur
-        throw new Error(
-          'Encountered an error event in event processing - errors should be processed earlier',
-        );
+        throw new APIError(undefined, stableEvent.data, undefined, undefined);
       }
       default: {
         assertNever(stableEvent);
@@ -520,6 +523,13 @@ export class AssistantStream
 
     if (typeof runStepID !== 'string' || runStepID.length === 0) {
       throw new OpenAIError('Received assistant run-step event with an invalid run-step ID');
+    }
+
+    if (event.event === 'thread.run.step.delta') {
+      const delta = event.data.delta;
+      if (delta && hasOwn(delta, 'id')) {
+        throw new OpenAIError('Run-step deltas must not contain an id field');
+      }
     }
 
     if (event.event === 'thread.run.step.created') {
@@ -839,10 +849,14 @@ export class AssistantStream
           throw new Error('Received a RunStepDelta before creation of a snapshot');
         }
 
-        const data = event.data;
+        const delta = event.data.delta;
 
-        if (data.delta) {
-          const accumulated = accumulateAssistantStreamDelta(snapshot, data.delta, true) as Runs.RunStep;
+        if (delta) {
+          // Raw-event listeners can replace or modify the delta after initial validation.
+          if (hasOwn(delta, 'id')) {
+            throw new OpenAIError('Run-step deltas must not contain an id field');
+          }
+          const accumulated = accumulateAssistantStreamDelta(snapshot, delta, true) as Runs.RunStep;
           this.#runStepSnapshots[runStepID] = accumulated;
         }
 
@@ -921,9 +935,9 @@ export class AssistantStream
       case 'thread.message.in_progress':
       case 'thread.message.completed':
       case 'thread.message.incomplete': {
-        //No changes on other thread events
+        //Terminal events provide the authoritative message snapshot.
         if (snapshot) {
-          return [snapshot, newContent];
+          return [event.event === 'thread.message.in_progress' ? snapshot : event.data, newContent];
         }
         throw new Error('Received thread message event with no existing snapshot');
       }

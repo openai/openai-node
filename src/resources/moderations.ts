@@ -10,7 +10,8 @@ import { RequestOptions } from '../internal/request-options';
 export class Moderations extends APIResource {
   /**
    * Classifies if text and/or image inputs are potentially harmful. Learn more in
-   * the [moderation guide](https://platform.openai.com/docs/guides/moderation).
+   * the
+   * [moderation guide](https://developers.openai.com/api/docs/guides/moderation).
    */
   create(body: ModerationCreateParams, options?: RequestOptions): APIPromise<ModerationCreateResponse> {
     return this._client.post('/moderations', { body, ...options, __security: { bearerAuth: true } });
@@ -350,9 +351,9 @@ export interface ModerationCreateParams {
 
   /**
    * The content moderation model you would like to use. Learn more in
-   * [the moderation guide](https://platform.openai.com/docs/guides/moderation), and
-   * learn about available models
-   * [here](https://platform.openai.com/docs/models#moderation).
+   * [the moderation guide](https://developers.openai.com/api/docs/guides/moderation),
+   * and learn about available models
+   * [here](https://developers.openai.com/api/docs/guides/moderation).
    */
   model?: (string & {}) | ModerationModel;
 }

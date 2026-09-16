@@ -35,30 +35,33 @@ describe.each([
     const apiKey = vi.fn(async () => 'sk-refreshed');
     const client = new OpenAI({ apiKey });
 
-    expect(() => new Responses(client)).toThrow(/unresolved function-based apiKey/);
+    expect(() => new Responses(client)).toThrow(/unresolved function-based apiKey/u);
     expect(apiKey).not.toHaveBeenCalled();
     expect(handshake).not.toHaveBeenCalled();
   });
 
-  test.each(['Authorization', 'authorization'])('allows caller-supplied %s with an unresolved function api key', (headerName) => {
-    const apiKey = vi.fn(async () => 'sk-refreshed');
-    const client = new OpenAI({ apiKey });
-    const responses = new Responses(client, {
-      headers: { [headerName]: 'Bearer caller-managed-token' },
-    });
-    try {
-      expect(apiKey).not.toHaveBeenCalled();
-      expect(handshake).toHaveBeenCalledTimes(1);
-      expect(handshake).toHaveBeenCalledWith(
-        expect.any(URL),
-        expect.objectContaining({
-          headers: expect.objectContaining({ [headerName]: 'Bearer caller-managed-token' }),
-        }),
-      );
-    } finally {
-      responses.close();
-    }
-  });
+  test.each(['Authorization', 'authorization'])(
+    'allows caller-supplied %s with an unresolved function api key',
+    (headerName) => {
+      const apiKey = vi.fn(async () => 'sk-refreshed');
+      const client = new OpenAI({ apiKey });
+      const responses = new Responses(client, {
+        headers: { [headerName]: 'Bearer caller-managed-token' },
+      });
+      try {
+        expect(apiKey).not.toHaveBeenCalled();
+        expect(handshake).toHaveBeenCalledTimes(1);
+        expect(handshake).toHaveBeenCalledWith(
+          expect.any(URL),
+          expect.objectContaining({
+            headers: expect.objectContaining({ [headerName]: 'Bearer caller-managed-token' }),
+          }),
+        );
+      } finally {
+        responses.close();
+      }
+    },
+  );
 
   test.each([
     { name: 'Basic auth', options: { auth: 'user:pass' } },
@@ -90,7 +93,7 @@ describe.each([
       },
     });
 
-    expect(() => new Responses(client, { headers })).toThrow(/unresolved function-based apiKey/);
+    expect(() => new Responses(client, { headers })).toThrow(/unresolved function-based apiKey/u);
     expect(reads).toBe(1);
     expect(handshake).not.toHaveBeenCalled();
   });

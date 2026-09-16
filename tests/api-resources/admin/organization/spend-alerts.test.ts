@@ -26,7 +26,7 @@ describe('resource spendAlerts', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.admin.organization.spendAlerts.create({
+    await client.admin.organization.spendAlerts.create({
       currency: 'USD',
       interval: 'month',
       notification_channel: {
@@ -66,7 +66,7 @@ describe('resource spendAlerts', () => {
   });
 
   test('update: required and optional params', async () => {
-    const response = await client.admin.organization.spendAlerts.update('alert_id', {
+    await client.admin.organization.spendAlerts.update('alert_id', {
       currency: 'USD',
       interval: 'month',
       notification_channel: {

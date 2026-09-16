@@ -128,6 +128,7 @@ type ResponseIgnoredEvent = Extract<
       | 'response.audio.done'
       | 'response.audio.transcript.delta'
       | 'response.audio.transcript.done'
+      | 'response.compaction.compacting'
       | 'response.image_generation_call.partial_image'
       | 'response.mcp_list_tools.in_progress'
       | 'response.mcp_list_tools.completed'
@@ -153,6 +154,7 @@ function validateArrayIndex(
   allowAppend = false,
 ): void {
   if (
+    !Array.isArray(collection) ||
     !Number.isSafeInteger(index) ||
     index < 0 ||
     index > collection.length ||
@@ -327,6 +329,7 @@ const expectedOutputItemTypes = {
   'response.mcp_list_tools.in_progress': 'mcp_list_tools',
   'response.mcp_list_tools.completed': 'mcp_list_tools',
   'response.mcp_list_tools.failed': 'mcp_list_tools',
+  'response.compaction.compacting': 'compaction',
 } satisfies Record<
   Exclude<ResponseItemScopedEvent['type'], 'response.content_part.added' | 'response.content_part.done'>,
   Response['output'][number]['type']
@@ -513,6 +516,7 @@ const supportedResponseEventTypes = createSupportedResponseEventTypes([
   'response.audio.done',
   'response.audio.transcript.delta',
   'response.audio.transcript.done',
+  'response.compaction.compacting',
   'response.image_generation_call.partial_image',
   'response.mcp_list_tools.in_progress',
   'response.mcp_list_tools.completed',
@@ -1150,6 +1154,7 @@ function isIgnoredResponseEvent(event: ResponseAccumulatorEvent): event is Respo
     case 'response.audio.done':
     case 'response.audio.transcript.delta':
     case 'response.audio.transcript.done':
+    case 'response.compaction.compacting':
     case 'response.image_generation_call.partial_image':
     case 'response.mcp_list_tools.in_progress':
     case 'response.mcp_list_tools.completed':

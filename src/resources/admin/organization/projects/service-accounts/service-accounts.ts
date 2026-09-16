@@ -205,6 +205,12 @@ export namespace ServiceAccountCreateResponse {
     object: 'organization.project.service_account.api_key';
 
     value: string;
+
+    /**
+     * The Unix timestamp (in seconds) when the API key expires, or null if it does not
+     * expire.
+     */
+    expires_at?: number | null;
   }
 }
 
@@ -226,6 +232,15 @@ export interface ServiceAccountCreateParams {
    * Create the service account without default roles or an API key.
    */
   create_service_account_only?: boolean | null;
+
+  /**
+   * Number of seconds until the initial API key expires. If omitted or null, the key
+   * does not expire unless the effective organization or project policy requires an
+   * expiration. When a policy sets a maximum lifetime, this value must be provided
+   * and must not exceed that limit. A non-null value cannot be used when
+   * `create_service_account_only` is true.
+   */
+  expires_in_seconds?: number | null;
 }
 
 export interface ServiceAccountRetrieveParams {
