@@ -8,7 +8,7 @@ const commentedRecipe = source.match(/\/\/ {3}fetch\([\s\S]*?\/\/ {3}\}\)\n/u)?.
 if (!commentedRecipe) {
   throw new Error('The raw streaming example must include its fetch consumer recipe.');
 }
-const recipe = commentedRecipe.replaceAll(/^\/\/ ?/gmu, '');
+const recipe = commentedRecipe.replace(/^\/\/ ?/gmu, '');
 
 test.each([
   {

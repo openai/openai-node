@@ -492,6 +492,7 @@ module.exports = defineConfig({
         'src/lib/transform.ts',
         'src/realtime/internal-base.ts',
         'tests/helpers/zod.test.ts',
+        'tests/lib/raw-streaming-fetch-example.test.ts',
         'tests/path.test.ts',
         'tests/qs/stringify.test.ts',
         'tests/utils/mock-snapshots.ts',
