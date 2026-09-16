@@ -48,8 +48,7 @@ jobs:
         run: pnpm exec tsc
 
   build:
-    # Allow four five-minute Deno download attempts plus bootstrap and build checks.
-    timeout-minutes: 30
+    timeout-minutes: 5
     name: build
     runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'

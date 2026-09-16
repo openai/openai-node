@@ -164,17 +164,21 @@ and caches dependencies using the fork's frozen Deno lockfile. It requires
 Git, Node.js, curl 7.71.0 or newer, unzip, and sha256sum or shasum. The installation supports
 macOS and Linux on x64/ARM64, and Windows x64 through Git Bash.
 
+The runtime download retries failures up to three times, with a 60-second retry
+window, a 15-second connection timeout, and a 15-second stall timeout. Progressing
+downloads have no fixed duration limit; the retry window does not terminate an
+active transfer.
+
 `./scripts/run-steady` verifies the local source and runtime, then runs without
 downloading dependencies. Pass a local OpenAPI specification path. To update
 Steady, review the fork commit and run
 `node scripts/steady/update.cjs <full-commit-sha>`. This updates the manifest
 with the commit and its source digest; no launcher or test edits are needed.
 Then run `./scripts/steady/install`. Review the release checksums when changing Deno.
-Run `node scripts/steady/test.cjs` to check the
-installation, download retries, integrity checks, and mock-server lifecycle.
-The download retry regression uses a local HTTPS server and requires OpenSSL
-to generate a temporary test certificate. Run it alone with
-`node scripts/steady/download.test.cjs`.
+Run `node scripts/steady/test.cjs` to check the download retries,
+installation, integrity checks, and mock-server lifecycle. These tests require
+OpenSSL to create temporary certificates for their local HTTPS download fixtures.
+Run just the download regressions with `node scripts/steady/download.test.cjs`.
 
 This checkout owns `scripts/steady/.cache`. Source and dependency entries are
 keyed by the Steady revision; the runtime and dependencies also include the Deno
