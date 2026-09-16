@@ -161,7 +161,7 @@ The mock server uses [the OpenAI Steady fork](https://github.com/openai-oss-fork
 `scripts/steady/manifest.json` is the single source of dependency pins: the
 Steady Git commit and source digest, plus the Deno version and runtime checksums. `./scripts/steady/install` fetches that source, verifies the runtime,
 and caches dependencies using the fork's frozen Deno lockfile. It requires
-Git, Node.js, curl, unzip, and sha256sum or shasum. The installation supports
+Git, Node.js, curl 7.71.0 or newer, unzip, and sha256sum or shasum. The installation supports
 macOS and Linux on x64/ARM64, and Windows x64 through Git Bash.
 
 `./scripts/run-steady` verifies the local source and runtime, then runs without
