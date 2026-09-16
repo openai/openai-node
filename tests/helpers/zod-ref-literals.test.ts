@@ -17,7 +17,9 @@ function schemaProperties(schema: unknown): Record<string, JSONSchemaRecord> {
 
 describe.each([
   { version: 'v3', z: zv3 },
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Run shared schema-factory cases across Zod versions whose nominal class types differ.
   { version: 'v4', z: zv4 as unknown as typeof zv3 },
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Run shared schema-factory cases across Zod versions whose nominal class types differ.
   { version: 'v4 Mini', z: zv4Mini as unknown as typeof zv3 },
 ])('Zod $version definition names', ({ z }) => {
   it('keeps raw, pointer-escaped, and percent-escaped definition names distinct on the wire', () => {
@@ -55,6 +57,7 @@ describe.each([
 
 describe.each([
   { version: 'v3', z: zv3 },
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Run shared schema-factory cases across Zod versions whose nominal class types differ.
   { version: 'v4', z: zv4 as unknown as typeof zv3 },
 ])('Zod $version schema reference literals', ({ version, z }) => {
   const referenceLiteral = () => z.object({ $ref: z.string() });
@@ -183,6 +186,7 @@ describe.each([
       expect(firstDefault.$ref).toBe('#/definitions/account/admin');
       expect(secondDefault.$ref).toBe('#/definitions/account/admin');
       expect(() =>
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The cyclic default is intentionally outside the string schema type to test serialization rejection.
         zodResponseFormat(z.object({ value: z.string().default(cyclic as unknown as string) }), 'cyclic'),
       ).toThrow(/circular JSON value/u);
       expect(cyclic.self).toBe(cyclic);
@@ -220,7 +224,9 @@ describe('Zod v4 schema reference literals', () => {
     const alternateLiteral = { $ref: '#/definitions/account/admin', tag: 'ALSO KEEP' };
     const Root = zv4.object({
       account: Account,
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Preserve object-valued literal fixtures used to verify ref-looking data is never rewritten as a schema ref.
       constant: zv4.literal(literal as unknown as string),
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Preserve object-valued literal fixtures used to verify ref-looking data is never rewritten as a schema ref.
       enumeration: zv4.literal([literal, alternateLiteral] as unknown as readonly string[]),
     });
 

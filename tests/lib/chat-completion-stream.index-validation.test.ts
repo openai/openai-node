@@ -48,6 +48,7 @@ function createChunk(
 }
 
 function createStream(chunks: OpenAI.Chat.ChatCompletionChunk[], n?: number | null): ChatCompletionStream {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The stream fixture implements only the completions.create transport used by this test.
   const client = {
     chat: {
       completions: {
@@ -107,12 +108,13 @@ describe('ChatCompletionStream index validation', () => {
   describe.each<StreamIndexKind>(['choice', 'tool call'])('%s indices', (kind) => {
     it('rejects an index that would pollute the global Array prototype', async () => {
       const pollutionKey = `sdk${kind.replace(' ', '')}PrototypePolluted`;
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect an arbitrary prototype property after a malicious index to prove no array pollution occurred.
       const prototype = Array.prototype as unknown as Record<string, unknown>;
       const stream = createStream([createChunk('__proto__', kind, { [pollutionKey]: 'owned' })]);
 
       try {
         await expect(stream.done()).rejects.toThrow(`invalid ${kind} index: __proto__`);
-        // oxlint-disable-next-line anti-slop/no-known-value-widening -- The pollution regression deliberately checks an arbitrary inherited string property on an array.
+        // oxlint-disable-next-line anti-slop/no-known-value-widening, anti-slop/no-chained-type-assertions -- The pollution regression deliberately checks an arbitrary inherited string property on an array.
         expect(([] as unknown as Record<string, unknown>)[pollutionKey]).toBeUndefined();
         expect(getSnapshotArray(stream, kind)).toEqual([]);
       } finally {

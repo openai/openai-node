@@ -129,6 +129,7 @@ describe('isolated X.509 workload-identity token exchange', () => {
     await expect(
       exchangeX509Token({
         transport,
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inject an object with toJSON where a string is required to verify validation precedes serialization.
         identityProviderId: { toJSON } as unknown as string,
         serviceAccountId: 'synthetic-service-account',
       }),

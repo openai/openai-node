@@ -251,6 +251,7 @@ describe('embedding request compatibility', () => {
       object: 'embedding' as const,
       index: 1,
       // The existing raw parser types the wire value as numeric before decoding.
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The raw wire parser exposes base64 embeddings under the numeric-array API type before decoding.
       embedding: encodedVector as unknown as number[],
     };
     entries[1] = entry;
@@ -284,8 +285,10 @@ describe('embedding request compatibility', () => {
     const appended: OpenAI.Embedding = {
       object: 'embedding',
       index: 1,
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The raw wire parser exposes base64 embeddings under the numeric-array API type before decoding.
       embedding: encodedVector as unknown as number[],
     };
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The raw wire parser exposes base64 embeddings under the numeric-array API type before decoding.
     let value = encodedVector as unknown as number[];
     entries.push({
       object: 'embedding',

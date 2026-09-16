@@ -144,7 +144,7 @@ function zodV3ToJsonSchema(
     $refStrategy: 'extract-to-root',
     nullableStrategy: 'property',
     ...(options.schemaDefinitions
-      ? { definitions: options.schemaDefinitions as unknown as Record<string, z3.ZodType> }
+      ? { definitions: options.schemaDefinitions as Record<string, z3.ZodType> }
       : undefined),
   });
 
@@ -166,7 +166,7 @@ function zodV4ToJsonSchema(
     // Avoid `/` and `~` so Zod versions that escape JSON Pointer tokens emit the same IDs.
     const id = encodeURIComponent(name).replace(/~/g, '%7E');
     definitionNames.set(id, name);
-    metadata?.add(definition as unknown as z4.ZodType, { id });
+    metadata?.add(definition as z4.ZodType, { id });
   }
 
   const jsonSchema = z4.toJSONSchema(schema, {
@@ -241,13 +241,13 @@ function parseZodObject<ZodInput extends ZodTypeLike>(
 
   if (typeof parser === 'function') {
     const result = parser.call(zodObject, parsed) as InferZodType<ZodInput>;
-    if (!isZodV4(zodObject as unknown as ZodSchema)) {
+    if (!isZodV4(zodObject as ZodSchema)) {
       assertJSONSerializableSchema(result);
     }
     return result;
   }
 
-  return z4.parse(zodObject as unknown as ZodV4Schema, parsed) as InferZodType<ZodInput>;
+  return z4.parse(zodObject as ZodV4Schema, parsed) as InferZodType<ZodInput>;
 }
 
 /**
@@ -298,7 +298,7 @@ export function zodResponseFormat<ZodInput extends ZodTypeLike>(
   name: string,
   props?: ZodResponseFormatProps,
 ): AutoParseableResponseFormat<InferZodType<ZodInput>> {
-  const zodSchema = zodObject as unknown as ZodSchema;
+  const zodSchema = zodObject as ZodSchema;
   const { schemaDefinitions, ...responseFormatProps } = props ?? {};
   validateSchemaDefinitions(schemaDefinitions);
 
@@ -344,7 +344,7 @@ export function zodTextFormat<ZodInput extends ZodTypeLike>(
   name: string,
   props?: Omit<ResponseFormatTextJSONSchemaConfig, 'schema' | 'type' | 'strict' | 'name'>,
 ): AutoParseableTextFormat<InferZodType<ZodInput>> {
-  const zodSchema = zodObject as unknown as ZodSchema;
+  const zodSchema = zodObject as ZodSchema;
 
   return makeParseableTextFormat<InferZodType<ZodInput>>(
     {
@@ -417,7 +417,7 @@ export function zodFunction<Parameters extends ZodTypeLike>(
 /** Builds a strict Chat Completions function tool from the supplied Zod schema. */
 export function zodFunction<Parameters extends ZodTypeLike>(options: ZodFunctionOptions<Parameters>) {
   const parameters = options.parameters;
-  const zodSchema = parameters as unknown as ZodSchema;
+  const zodSchema = parameters as ZodSchema;
 
   return makeParseableTool<any>(
     {
@@ -474,7 +474,7 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
   function: (args: InferZodType<Parameters>) => unknown;
 }> {
   const parameters = options.parameters;
-  const zodSchema = parameters as unknown as ZodSchema;
+  const zodSchema = parameters as ZodSchema;
 
   return makeParseableResponseTool<any>(
     {
@@ -514,7 +514,7 @@ export function zodRealtimeFunction<Parameters extends ZodTypeLike>(options: {
   /** Optional model-visible explanation of when and how the function should be used. */
   description?: string | undefined;
 }): RealtimeFunctionTool {
-  const zodSchema = options.parameters as unknown as ZodSchema;
+  const zodSchema = options.parameters as ZodSchema;
 
   return {
     type: 'function',

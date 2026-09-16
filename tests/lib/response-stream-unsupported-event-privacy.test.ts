@@ -473,6 +473,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
       const created = createdEvent();
       const event = unsupportedEvent();
       const stream = ResponseStream.fromReadableStream(
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The mixed wire-event fixture serializes protocol events and unsupported records through one test stream.
         readableStream([created as unknown as Record<string, unknown>, event]),
       );
       const events = vi.fn();
@@ -570,6 +571,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
     };
     const stream = ResponseStream.fromReadableStream(
       readableStream([
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The mixed wire-event fixture serializes protocol events and unsupported records through one test stream.
         createdEvent() as unknown as Record<string, unknown>,
         { type: 'error', sequence_number: 1, error: payload },
       ]),

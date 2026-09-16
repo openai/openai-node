@@ -210,6 +210,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
     metadata[metadataSymbol] = 'preserved';
 
     const format = create(metadata);
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Deliberately mutate format metadata beyond its declared discriminator to test captured parser invariants.
     const record = format as unknown as UnsafeFormatMetadata;
 
     expectTrustedFormat(format);
@@ -328,6 +329,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
       expect(serializer).not.toHaveBeenCalled();
       expect(getter).toHaveBeenCalledTimes(useAccessor ? 1 : 0);
       expect(Object.getOwnPropertyDescriptor(format, 'toJSON')).toBeUndefined();
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect the synthetic symbol property preserved outside the published text format type.
       expect((format as unknown as UnsafeFormatMetadata)[metadataSymbol]).toBe('preserved');
       expect(Object.isFrozen(metadata)).toBe(true);
       expect(response.output_parsed).toEqual(expectedParsed);
@@ -409,6 +411,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
     expect(format.$parseRaw(responseText)).toEqual(expectedParsed);
     expect(() => format.$parseRaw('{"city":42}')).toThrow();
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Deliberately mutate format metadata beyond its declared discriminator to test captured parser invariants.
     const mutableFormat = format as unknown as UnsafeFormatMetadata;
     mutableFormat['type'] = 'text';
     mutableFormat['strict'] = false;
@@ -433,7 +436,7 @@ describe('shared structured text-format factory', () => {
   test('normalizes a direct malformed factory input without mutating its frozen configuration', () => {
     const parser = vi.fn((content: string) => JSON.parse(content) as ParsedWeather);
     const original = Object.freeze({
-      type: 'text' as unknown as 'json_schema',
+      type: 'text' as 'json_schema',
       name: trustedName,
       strict: true,
       description: trustedDescription,

@@ -431,9 +431,9 @@ export function assertSupportedZodV3Schema(
   definitions: Record<string, ZodV3Schema> | undefined,
 ): void {
   const visited = new Set<SchemaDefinition>();
-  visit(schema as unknown as SchemaNode, '$', visited);
+  visit(schema as SchemaNode, '$', visited);
   for (const [name, definition] of Object.entries(definitions ?? {})) {
-    visit(definition as unknown as SchemaNode, `$.definitions.${name}`, visited);
+    visit(definition as SchemaNode, `$.definitions.${name}`, visited);
   }
 }
 

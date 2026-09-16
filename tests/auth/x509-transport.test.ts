@@ -416,6 +416,7 @@ describe('explicit X.509 transport capability', () => {
 
   test('rejects opaque custom dispatchers without touching their methods', () => {
     const dispatch = vi.fn();
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- This dispatcher lookalike must be rejected because it is not a genuine Undici Agent.
     const dispatcher = { dispatch } as unknown as Agent;
 
     expect(() => createX509Transport(directOptions(dispatcher))).toThrow(/Undici Agent or ProxyAgent/u);

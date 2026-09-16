@@ -33,7 +33,7 @@ function outputItem(value: Record<string, unknown>): OutputItem {
   if (type === 'function_call' || type === 'custom_tool_call') {
     Object.assign(defaults, { call_id: 'call_123' });
   }
-  return { ...defaults, ...value } as unknown as OutputItem;
+  return { ...defaults, ...value } as OutputItem;
 }
 
 function snapshotFor(item: Record<string, unknown>): Response {
@@ -993,6 +993,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       type: 'message',
       content: [{ type: 'output_text', text: '', annotations: [] }],
     });
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
     const output = snapshot.output[0] as unknown as { content: [{ annotations: unknown[] }] };
     const [{ annotations }] = output.content;
 
@@ -1079,6 +1080,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       type: 'message',
       content: [{ type: 'output_text', text: '', annotations: [] }],
     });
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
     const output = snapshot.output[0] as unknown as { content: [{ annotations: unknown[] }] };
     const [{ annotations }] = output.content;
     let inheritedSetterCalled = false;
@@ -1132,6 +1134,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       type: 'message',
       content: [{ type: 'output_text', text: 'unchanged', annotations: [] }],
     });
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
     const contentOutput = contentSnapshot.output[0] as unknown as {
       content: [{ type: string; text: string; annotations: unknown[] }];
     };
@@ -1156,6 +1159,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       type: 'reasoning',
       summary: [{ type: 'summary_text', text: 'unchanged' }],
     });
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
     const summaryOutput = summarySnapshot.output[0] as unknown as {
       summary: [{ type: string; text: string }];
     };
@@ -1180,6 +1184,7 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
       type: 'message',
       content: [{ type: 'output_text', text: '', annotations: [{}] }],
     });
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The preceding synthetic event establishes this content/summary variant; inspect its array to test descriptor-safe updates.
     const annotationOutput = annotationSnapshot.output[0] as unknown as {
       content: [{ annotations: unknown[] }];
     };

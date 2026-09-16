@@ -61,7 +61,7 @@ export function createEmbedding(
           if (Array.isArray(embedding)) {
             continue;
           }
-          embeddingBase64Obj.embedding = toFloat32Array(embedding as unknown as string);
+          embeddingBase64Obj.embedding = toFloat32Array(embedding as string);
         }
       }
     }

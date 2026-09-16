@@ -63,6 +63,7 @@ const privacyStandardSchema = {
   '~standard': {
     version: 1 as const,
     vendor: 'structured-output-privacy',
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Standard Schema types is phantom input/output evidence, intentionally undefined at runtime.
     types: undefined as unknown as { input: { ok: boolean }; output: { ok: boolean } },
     validate(value: unknown) {
       return { value: value as { ok: boolean } };

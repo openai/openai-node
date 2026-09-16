@@ -141,7 +141,7 @@ describe('vector-store batch upload orchestration', () => {
 
     await expect(
       client.vectorStores.fileBatches.uploadAndPoll('vs_123', {
-        files: files as unknown as Uploadable[],
+        files: files as Uploadable[],
         fileIds: ['existing'],
       }),
     ).rejects.toThrow(

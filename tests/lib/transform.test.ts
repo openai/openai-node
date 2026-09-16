@@ -359,6 +359,7 @@ describe('toStrictJsonSchema', () => {
     });
 
     test('reports the root path for invalid root ref values and boolean targets', () => {
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The numeric ref is deliberately invalid JSON Schema and must be rejected by runtime validation.
       expect(() => toStrictJsonSchema({ $ref: 1 } as unknown as JSONSchema)).toThrow(
         'Received non-string $ref - 1; path=<root>',
       );
@@ -1980,7 +1981,7 @@ describe('toStrictJsonSchema', () => {
             },
           },
           required: ['value'],
-        } as unknown as JSONSchema;
+        } as JSONSchema;
 
         expect(() => toStrictJsonSchema(schema)).toThrow('uses unsupported keyword `allOf`');
       },
@@ -2229,7 +2230,7 @@ describe('toStrictJsonSchema', () => {
             },
           },
           required: ['value'],
-        } as unknown as JSONSchema;
+        } as JSONSchema;
 
         expect(() => toStrictJsonSchema(schema)).toThrow(
           'cannot be merged without changing Draft 7 validation',

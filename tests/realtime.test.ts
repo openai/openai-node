@@ -163,6 +163,7 @@ describe('stable realtime custom URL builder', () => {
   test.each([
     new URL('ws://sap.example.com/realtime'),
     new URL('https://sap.example.com/realtime'),
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Supply a malformed JavaScript URL value to exercise runtime URL validation.
     'not a valid URL' as unknown as URL,
   ])('rejects insecure or malformed custom URLs %#', (customURL) => {
     expect(() =>

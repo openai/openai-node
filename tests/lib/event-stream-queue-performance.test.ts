@@ -74,6 +74,7 @@ function measureArrayMovement<T>(operation: () => T) {
 }
 
 function createChatStream(chunks: OpenAI.Chat.ChatCompletionChunk[]): ChatCompletionStream {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The queue fixture implements only completions.create and supplies deterministic async chunks.
   const client = {
     chat: {
       completions: {

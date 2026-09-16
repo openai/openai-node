@@ -95,6 +95,7 @@ function sensitiveToolCall(kind: FailureKind) {
 }
 
 function makeSensitiveChunk(kind: FailureKind): OpenAI.Chat.ChatCompletionChunk {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- This fixture intentionally omits required tool fields to exercise finalization rejection and redaction.
   return {
     id: 'chatcmpl_synthetic_private',
     object: 'chat.completion.chunk',
@@ -168,6 +169,7 @@ function attachSnapshot(stream: ChatCompletionStream<null>, kind: FailureKind) {
     }
 
     if (kind === 'missing-function-name' || kind === 'missing-function-arguments') {
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Mutate the synthetic tool/snapshot outside its declared protocol type to test finalization validation.
       const record = tool as unknown as Record<string, unknown>;
       const fn = record['function'] as Record<string, unknown>;
       const key = kind === 'missing-function-name' ? 'name' : 'arguments';
@@ -279,6 +281,7 @@ describe('chat completion tool-finalization diagnostic privacy', () => {
       makeReadableStream(makeSensitiveChunk('missing-type')),
     );
     stream.on('chunk', (_chunk, snapshot) => {
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Mutate the synthetic tool/snapshot outside its declared protocol type to test finalization validation.
       mutateSnapshot(snapshot as unknown as Record<string, unknown>);
     });
 
@@ -311,6 +314,7 @@ describe('chat completion tool-finalization diagnostic privacy', () => {
     'preserves valid completed $name tool calls and confidential content',
     async (type) => {
       const chunk = makeSensitiveChunk(type === 'function' ? 'missing-function-name' : 'missing-custom-name');
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Mutate the synthetic tool/snapshot outside its declared protocol type to test finalization validation.
       const toolCall = chunk.choices[0]?.delta.tool_calls?.[0] as unknown as Record<string, unknown>;
       if (type === 'custom') {
         toolCall['custom'] = { name: 'trusted_custom_tool', input: syntheticToolArguments };

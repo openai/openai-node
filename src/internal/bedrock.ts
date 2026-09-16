@@ -260,6 +260,7 @@ export function assertBedrockWebSocketOrigin(client: unknown, requestURL: URL): 
   }
 
   assertBedrockRequestOrigin(
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The private Bedrock client brand checked above identifies the client baseURL contract.
     (client as unknown as { baseURL: string }).baseURL,
     normalizedRequestURL.toString(),
   );

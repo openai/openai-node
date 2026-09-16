@@ -30,6 +30,7 @@ const nonStrictTool: OpenAI.Chat.ChatCompletionFunctionTool = {
 };
 
 function createClient(chunks: AsyncIterable<Chunk>): OpenAI {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The deterministic stream client implements only completions.create, avoiding unrelated SDK transport behavior.
   return {
     chat: {
       completions: {
@@ -560,6 +561,7 @@ it.each([false, true] as const)(
         [Symbol.asyncIterator]: () => chunks[Symbol.asyncIterator](),
       };
     });
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The deterministic stream client implements only completions.create, avoiding unrelated SDK transport behavior.
     const client = { chat: { completions: { create } } } as unknown as OpenAI;
     const stream = ChatCompletionStream.createChatCompletion(client, {
       model: 'gpt-test',
@@ -1610,6 +1612,7 @@ it('preserves the serialized branded response parser while the streaming respons
       [Symbol.asyncIterator]: () => chunks[Symbol.asyncIterator](),
     };
   });
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The deterministic stream client implements only completions.create, avoiding unrelated SDK transport behavior.
   const client = { chat: { completions: { create } } } as unknown as OpenAI;
 
   const completion = await ChatCompletionStream.createChatCompletion(client, {

@@ -140,6 +140,7 @@ const nodeFetchTransports = [
   {
     name: 'node-fetch v2 mixed-in Body',
     Response: NodeFetch2Response,
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- This node-fetch v2 fixture mixes Body methods into its Response prototype at runtime.
     parserPrototype: NodeFetch2Response.prototype as unknown as typeof NodeFetchBody.prototype,
     preservesBOM: true,
   },
@@ -325,6 +326,7 @@ describe('successful workload OAuth response JSON privacy', () => {
     'sanitizes malformed $transport.name successful OAuth bodies on $surface',
     async ({ surface, transport }) => {
       const readJSON = vi.spyOn(transport.parserPrototype, 'json');
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Exercise a deliberately minimal node-fetch-compatible response without requiring native Response internals.
       const response = new transport.Response(
         `${PRIVATE_TOKEN} customer-private-record`,
       ) as unknown as Response;
@@ -343,6 +345,7 @@ describe('successful workload OAuth response JSON privacy', () => {
     'preserves $transport.name tokens, body consumption, and caching on $surface',
     async ({ surface, transport }) => {
       const readJSON = vi.spyOn(transport.parserPrototype, 'json');
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Exercise a deliberately minimal node-fetch-compatible response without requiring native Response internals.
       const response = new transport.Response(
         JSON.stringify({ access_token: 'safe-body-token', expires_in: 3600 }),
       ) as unknown as Response;
@@ -364,6 +367,7 @@ describe('successful workload OAuth response JSON privacy', () => {
     'preserves $transport.name UTF-8 BOM decoding behavior on $surface',
     async ({ surface, transport }) => {
       const body = `\uFEFF${JSON.stringify({ access_token: 'safe-body-token', expires_in: 3600 })}`;
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Exercise a deliberately minimal node-fetch-compatible response without requiring native Response internals.
       const response = new transport.Response(body) as unknown as Response;
       const harness = createHarness(async () => response);
       const run = operationFor(surface, harness);

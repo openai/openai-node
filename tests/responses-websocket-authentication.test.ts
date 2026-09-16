@@ -79,7 +79,7 @@ describe.each([
       Responses,
       (baseURL) => new OpenAI({ baseURL, apiKey: async () => 'SYNTHETIC_KEY' }),
       // JavaScript callers can pass values that Node serializes into header strings.
-      { headers: { Authorization: credential as unknown as string } },
+      { headers: { Authorization: credential as string } },
     );
     expect(headers.authorization).toBe('Bearer SYNTHETIC_TOKEN');
     expect(serializations).toBe(1);

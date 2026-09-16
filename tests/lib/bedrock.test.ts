@@ -220,6 +220,7 @@ describe('instantiate bedrock client', () => {
       () =>
         new BedrockOpenAI({
           baseURL: 'https://example.com/openai/v1',
+          // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- A function apiKey deliberately violates the legacy constructor type to test its provider guidance.
           apiKey: (async () => 'provider token') as unknown as string,
         }),
     ).toThrow(/bedrockTokenProvider/);

@@ -140,40 +140,37 @@ const websocketVariants: WebSocketVariant[] = [
   {
     name: 'stable browser Realtime',
     event: 'response.done',
-    create: (client) =>
-      new StableBrowserRealtime({ model: 'gpt-realtime' }, client) as unknown as PublicWebSocket,
+    create: (client) => new StableBrowserRealtime({ model: 'gpt-realtime' }, client) as PublicWebSocket,
     dispatch: dispatchBrowser,
   },
   {
     name: 'beta browser Realtime',
     event: 'response.done',
-    create: (client) =>
-      new BetaBrowserRealtime({ model: 'gpt-realtime' }, client) as unknown as PublicWebSocket,
+    create: (client) => new BetaBrowserRealtime({ model: 'gpt-realtime' }, client) as PublicWebSocket,
     dispatch: dispatchBrowser,
   },
   {
     name: 'stable Node Realtime',
     event: 'response.done',
-    create: (client) =>
-      new StableNodeRealtime({ model: 'gpt-realtime' }, client) as unknown as PublicWebSocket,
+    create: (client) => new StableNodeRealtime({ model: 'gpt-realtime' }, client) as PublicWebSocket,
     dispatch: dispatchNodeRealtime,
   },
   {
     name: 'beta Node Realtime',
     event: 'response.done',
-    create: (client) => new BetaNodeRealtime({ model: 'gpt-realtime' }, client) as unknown as PublicWebSocket,
+    create: (client) => new BetaNodeRealtime({ model: 'gpt-realtime' }, client) as PublicWebSocket,
     dispatch: dispatchNodeRealtime,
   },
   {
     name: 'stable Responses WebSocket',
     event: 'response.completed',
-    create: (client) => new StableResponsesWS(client) as unknown as PublicWebSocket,
+    create: (client) => new StableResponsesWS(client) as PublicWebSocket,
     dispatch: dispatchResponses,
   },
   {
     name: 'beta Responses WebSocket',
     event: 'response.completed',
-    create: (client) => new BetaResponsesWS(client) as unknown as PublicWebSocket,
+    create: (client) => new BetaResponsesWS(client) as PublicWebSocket,
     dispatch: dispatchResponses,
   },
 ];
@@ -226,10 +223,12 @@ function measureListenerMovement(operation: () => void) {
 }
 
 function emit(emitter: AuditedEmitter, event: keyof AuditedEvents, ...values: unknown[]): void {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Exercise the shared protected emitter hook on each concrete emitter without changing its public API.
   (emitter as unknown as { _emit: (name: string, ...args: unknown[]) => void })._emit(event, ...values);
 }
 
 function hasListener(emitter: AuditedEmitter, event: keyof AuditedEvents): boolean | undefined {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Exercise the shared protected emitter hook on each concrete emitter without changing its public API.
   return (emitter as unknown as { _hasListener: (name: string) => boolean | undefined })._hasListener(event);
 }
 
@@ -365,7 +364,7 @@ test.each([
 
 describe.each(emitterVariants)('$name listener compatibility', ({ create }) => {
   function createEmitter(): AuditedEmitter {
-    return create() as unknown as AuditedEmitter;
+    return create() as AuditedEmitter;
   }
 
   test.each([undefined, false, new Error('first listener failure')] as const)(

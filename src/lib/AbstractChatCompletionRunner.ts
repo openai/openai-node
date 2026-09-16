@@ -424,7 +424,7 @@ export class AbstractChatCompletionRunner<
         };
       }
 
-      return tool as any as RunnableToolFunction<any>;
+      return tool as RunnableToolFunction<any>;
     });
 
     const functionsByName: Record<string, RunnableFunction<any, ToolContext>> = Object.create(null);
@@ -447,7 +447,8 @@ export class AbstractChatCompletionRunner<
                     strict: t.function.strict,
                   },
                 }
-              : (t as unknown as ChatCompletionTool),
+              : // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Preserve the existing non-function tool pass-through; runnable and wire schema interfaces have incompatible index signatures.
+                (t as unknown as ChatCompletionTool),
           )
         : (undefined as any);
 

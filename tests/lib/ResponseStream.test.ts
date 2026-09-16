@@ -413,6 +413,7 @@ describe('.stream()', () => {
         yield* events;
       },
     };
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The test client implements only responses.create to supply the controlled transport.
     const client = { responses: { create: vi.fn(async () => transport) } } as unknown as OpenAI;
     const stream = ResponseStream.createResponse(client, { model: 'gpt-test', input: 'route safely' });
     const emitted = vi.fn();
@@ -1205,7 +1206,7 @@ describe('.stream()', () => {
       content_index: 0,
       delta: 'boom',
       logprobs: [],
-    } as unknown as ResponseStreamEvent;
+    } as ResponseStreamEvent;
 
     const stream = ResponseStream.fromReadableStream(
       readableStreamFromEvents([...validEvents, malformedEvent]),

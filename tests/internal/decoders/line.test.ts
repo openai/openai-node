@@ -149,6 +149,7 @@ describe('line decoder', () => {
     let scanned = 0;
 
     inspectBuffers((operations) => {
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The constructor instrumentation delegates allocation to the native Uint8Array while counting indexed reads.
       const constructorSpy = vi.spyOn(globalThis, 'Uint8Array').mockImplementation(function trackBuffer(
         ...args: unknown[]
       ) {

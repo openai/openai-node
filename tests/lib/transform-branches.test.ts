@@ -207,7 +207,7 @@ describe('object intersection normalization for exclusivity', () => {
     { allOf: [false] },
     { allOf: [{ type: 'object', properties: { value: { type: 'string' } } }, { type: 'string' }] },
     { allOf: [{ type: 'object', required: [1] }, { type: 'object' }] },
-  ] as unknown as JSONSchema[])('fails closed for unsupported intersection shapes', (schema) => {
+  ] as JSONSchema[])('fails closed for unsupported intersection shapes', (schema) => {
     expect(normalizeObjectAllOfForExclusivity(schema, schema)).toBeUndefined();
   });
 });
@@ -248,7 +248,7 @@ describe('strict schema edge cases', () => {
     { enum: 'invalid' },
     { oneOf: [{ type: 'null' }, { type: 'null' }] },
     { type: ['string', 'null'], not: { type: 'null' } },
-  ] as unknown as JSONSchema[])(
+  ] as JSONSchema[])(
     'does not silently accept optional properties when null is not proven valid',
     (property) => {
       expect(() =>

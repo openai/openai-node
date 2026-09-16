@@ -72,7 +72,7 @@ function invoke(input: Request): Promise<Response> {
     response: { send: (stream: ReadableStream<Uint8Array>) => Response },
   ) => Promise<Response>;
 
-  return (handler as unknown as EdgeHandler)(input, {
+  return (handler as EdgeHandler)(input, {
     send: (stream) => new Response(stream),
   });
 }

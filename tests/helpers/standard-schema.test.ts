@@ -70,6 +70,7 @@ function makeStandardSchema(jsonSchema: Record<string, unknown> = weatherJSONSch
       '~standard': {
         version: 1 as const,
         vendor: 'test',
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Standard Schema types is phantom input/output evidence, intentionally undefined at runtime.
         types: undefined as unknown as {
           input: WeatherInput;
           output: WeatherOutput;
@@ -109,6 +110,7 @@ function makeValidationOnlySchema() {
     '~standard': {
       version: 1 as const,
       vendor: 'test',
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Standard Schema types is phantom input/output evidence, intentionally undefined at runtime.
       types: undefined as unknown as {
         input: WeatherInput;
         output: WeatherOutput;

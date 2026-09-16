@@ -948,11 +948,9 @@ export class AssistantStream
     currentContent: MessageContent | undefined,
     cacheArrays: boolean,
   ): TextContentBlock | ImageFileContentBlock {
-    return accumulateAssistantStreamDelta(
-      currentContent as unknown as Record<any, any>,
-      contentElement,
-      cacheArrays,
-    ) as TextContentBlock | ImageFileContentBlock;
+    return accumulateAssistantStreamDelta(currentContent as Record<any, any>, contentElement, cacheArrays) as
+      | TextContentBlock
+      | ImageFileContentBlock;
   }
 
   /**

@@ -35,6 +35,7 @@ describe('Page', () => {
     const page = new Page<Item>(
       {} as any,
       response,
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The undefined page data deliberately tests malformed-response fallback behavior.
       { object: 'list', data: undefined as unknown as Item[] },
       options,
     );

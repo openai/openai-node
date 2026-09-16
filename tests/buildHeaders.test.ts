@@ -141,6 +141,7 @@ describe('buildHeaders', () => {
       return normalized;
     };
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Install a deliberately locale-sensitive Headers implementation to verify ASCII-only name normalization.
     globalThis.Headers = LocaleSensitiveHeaders as unknown as typeof Headers;
     try {
       const result = buildHeaders([

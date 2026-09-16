@@ -63,7 +63,7 @@ class FakeBrowserSocket {
 }
 
 const originalWebSocket = globalThis.WebSocket;
-const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
+const nodeSocketConstructor = vi.mocked(WS.WebSocket);
 const azureCredentialCases = [
   {
     authentication: 'an Azure API key',
@@ -951,6 +951,7 @@ describe('stable Node realtime custom URL builder', () => {
     expect(
       () =>
         new StableNodeRealtime(
+          // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Return a malformed URL from a custom URL builder to verify rejection before opening a socket.
           { model: 'gpt-realtime', buildRealtimeURL: () => 'not a valid URL' as unknown as URL },
           createClient(),
         ),

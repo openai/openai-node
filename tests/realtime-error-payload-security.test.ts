@@ -127,6 +127,7 @@ describe.each([
       new OpenAI({ apiKey: 'test-key', baseURL: 'https://example.com/v1/' }),
     );
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The socket constructor is replaced by FakeSocket in this fixture; retain access to its error injection method.
     return { realtime, socket: realtime.socket as unknown as FakeSocket };
   }
 

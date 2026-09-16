@@ -207,6 +207,7 @@ describe.each(formatFactories)(
         expect(serializer).not.toHaveBeenCalled();
         expect(getter).toHaveBeenCalledTimes(useAccessor ? 1 : 0);
         expect(Object.getOwnPropertyDescriptor(format.json_schema, 'toJSON')).toBeUndefined();
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect synthetic symbol metadata preserved outside the declared JSON Schema fields.
         expect((format.json_schema as unknown as UnsafeMetadata)[metadataSymbol]).toBe('preserved');
         expect(Object.isFrozen(metadata)).toBe(true);
         expect(completion.choices[0]?.message.parsed).toEqual(expectedParsed);
@@ -251,6 +252,7 @@ describe.each(formatFactories)(
       expect(() => format.$parseRaw('{"city":42}')).toThrow();
       expect(isParseableResponseFormat(format)).toBe(true);
 
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Deliberately mutate the published discriminator to verify the parser uses its captured contract.
       const mutable = format as unknown as UnsafeMetadata;
       mutable['type'] = 'text';
       format.json_schema.strict = false;
@@ -298,7 +300,7 @@ describe('shared chat structured response-format factory', () => {
       [nestedSymbol]: 'nested-preserved',
     });
     const original = Object.freeze({
-      type: 'text' as unknown as 'json_schema',
+      type: 'text' as 'json_schema',
       json_schema: originalNested,
       toJSON: rootSerializer,
       [rootSymbol]: 'root-preserved',
@@ -324,7 +326,9 @@ describe('shared chat structured response-format factory', () => {
     expect(nestedSerializer).not.toHaveBeenCalled();
     expect(Object.getOwnPropertyDescriptor(format, 'toJSON')).toBeUndefined();
     expect(Object.getOwnPropertyDescriptor(format.json_schema, 'toJSON')).toBeUndefined();
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect synthetic symbol metadata preserved outside the declared JSON Schema fields.
     expect((format as unknown as UnsafeMetadata)[rootSymbol]).toBe('root-preserved');
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect synthetic symbol metadata preserved outside the declared JSON Schema fields.
     expect((format.json_schema as unknown as UnsafeMetadata)[nestedSymbol]).toBe('nested-preserved');
     expect(format.json_schema).not.toBe(originalNested);
     expect(original.type).toBe('text');
@@ -354,6 +358,7 @@ describe('shared chat structured response-format factory', () => {
     Object.freeze(original);
 
     const format = makeParseableResponseFormat(
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inject caller-owned serialization metadata beyond the declared format type to test boundary validation.
       original as unknown as Parameters<typeof makeParseableResponseFormat>[0],
       (value) => JSON.parse(value) as ParsedWeather,
     );
@@ -419,6 +424,7 @@ describe('shared chat structured response-format factory', () => {
 
     expect(() =>
       makeParseableResponseFormat(
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inject caller-owned serialization metadata beyond the declared format type to test boundary validation.
         { type: 'json_schema', json_schema: nested } as unknown as Parameters<
           typeof makeParseableResponseFormat
         >[0],

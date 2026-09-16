@@ -1360,7 +1360,7 @@ describe('AssistantStream run-step lifecycle', () => {
       await expect(runner.done()).rejects.toThrow('Received a RunStepDelta before creation of a snapshot');
       expect(Object.getOwnPropertyDescriptor(Object.prototype, pollutionKey)).toBeUndefined();
       expect(({} as Record<string, unknown>)[pollutionKey]).toBeUndefined();
-      // oxlint-disable-next-line anti-slop/no-known-value-widening -- The pollution regression probes an arbitrary inherited string key on an otherwise empty array.
+      // oxlint-disable-next-line anti-slop/no-known-value-widening, anti-slop/no-chained-type-assertions -- The pollution regression probes an arbitrary inherited string key on an otherwise empty array.
       expect(([] as unknown as Record<string, unknown>)[pollutionKey]).toBeUndefined();
     } finally {
       Reflect.deleteProperty(Object.prototype, pollutionKey);

@@ -1,6 +1,5 @@
 import type { ClientOptions } from 'openai';
 import { vi } from 'vitest';
-import type { Mock } from 'vitest';
 
 import OpenAI, { AzureOpenAI, OpenAIError } from 'openai';
 import { OpenAIRealtimeWebSocket as StableNativeRealtime } from 'openai/realtime/websocket';
@@ -40,7 +39,7 @@ vi.mock('ws', () => ({
   WebSocket: vi.fn(createNodeSocket),
 }));
 
-const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
+const nodeSocketConstructor = vi.mocked(WS.WebSocket);
 const nativeRealtimeSurfaces = [
   { name: 'stable', Realtime: StableNativeRealtime, beta: false },
   { name: 'beta', Realtime: BetaNativeRealtime, beta: true },
@@ -218,7 +217,7 @@ describe('beta realtime WebSocket destination security', () => {
     expect(
       () =>
         new Realtime(
-          // oxlint-disable-next-line anti-slop/no-known-value-widening -- The regression intentionally omits required options while injecting an unsupported destination override.
+          // oxlint-disable-next-line anti-slop/no-known-value-widening, anti-slop/no-chained-type-assertions -- The regression intentionally omits required options while injecting an unsupported destination override.
           { __url: new URL('wss://trusted.example.com/v1/realtime') } as unknown as { model: string },
           createClient(),
         ),

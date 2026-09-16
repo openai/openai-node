@@ -792,6 +792,7 @@ describe('bedrock provider', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The undefined provider result intentionally violates its declared type to test runtime credential rejection.
   test.each([[''], ['   '], [undefined as unknown as string]])(
     'rejects an invalid value returned by a bearer credential provider',
     async (token) => {

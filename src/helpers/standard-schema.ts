@@ -561,7 +561,7 @@ function resolveStandardJSONSchema<Schema extends StandardSchemaLike>(
     );
   }
 
-  return toStrictJsonSchema(normalizeStructuredOutputSchema(schema)) as unknown as Record<string, unknown>;
+  return toStrictJsonSchema(normalizeStructuredOutputSchema(schema)) as Record<string, unknown>;
 }
 
 /**

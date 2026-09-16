@@ -90,6 +90,7 @@ function makeOutput(type: string, id = 'item_123'): OutputItem {
     }
   }
 
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The synthetic output builder selects the protocol fields for each item discriminator at runtime.
   return item as unknown as OutputItem;
 }
 
@@ -301,7 +302,7 @@ describe('ResponseAccumulator output item identity', () => {
       delta: ' injected',
     });
 
-    expect(() => accumulateResponse(event as unknown as ResponseStreamEvent, snapshot)).toThrow(
+    expect(() => accumulateResponse(event as ResponseStreamEvent, snapshot)).toThrow(
       'missing output at index undefined',
     );
     expect(reads).toBe(0);
@@ -323,6 +324,7 @@ describe('ResponseAccumulator output item identity', () => {
         ...(field === 'item_id' ? { content_index: 0 } : { item_id: 'item_123' }),
       });
 
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- This synthetic event uses getters or inherited fields to test identity validation at the accumulator boundary.
       expect(() => accumulateResponse(event as unknown as ResponseStreamEvent, snapshot)).toThrow();
       expect(readInheritedValue).not.toHaveBeenCalled();
       expect(snapshot).toEqual(original);
@@ -350,6 +352,7 @@ describe('ResponseAccumulator output item identity', () => {
       },
     });
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- This synthetic event uses getters or inherited fields to test identity validation at the accumulator boundary.
     expect(accumulateResponse(event as unknown as ResponseStreamEvent, snapshot)).toBe(snapshot);
 
     const [first, second] = snapshot.output;
@@ -386,6 +389,7 @@ describe('ResponseAccumulator output item identity', () => {
       },
     });
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- This synthetic event uses getters or inherited fields to test identity validation at the accumulator boundary.
     expect(accumulateResponse(event as unknown as ResponseStreamEvent, snapshot)).toBe(snapshot);
     expect(identityReads).toBe(1);
     expect(indexReads).toBe(1);
@@ -505,6 +509,7 @@ describe('ResponseAccumulator output item identity', () => {
     (itemID) => {
       const snapshot = createSnapshot();
       const item = makeOutput('message');
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       (item as unknown as EventFields)['id'] = itemID;
 
       expect(() =>
@@ -622,9 +627,11 @@ describe('ResponseAccumulator output item identity', () => {
     (type) => {
       const first = makeOutput(type, 'first_item');
       const duplicate = makeOutput(type, 'second_item');
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       (duplicate as unknown as EventFields)['call_id'] = (first as unknown as EventFields)['call_id'];
       const snapshot = createSnapshot(first);
       const original = structuredClone(snapshot);
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       const callID = (first as unknown as EventFields)['call_id'];
 
       expect(() =>
@@ -644,6 +651,7 @@ describe('ResponseAccumulator output item identity', () => {
     (type) => {
       const first = makeOutput(type, 'first_item');
       const duplicate = makeOutput(type, 'second_item');
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       (duplicate as unknown as EventFields)['call_id'] = (first as unknown as EventFields)['call_id'];
 
       expect(() => createSnapshot(first, duplicate)).toThrow(`duplicate output item identity 'call:${type}:`);
@@ -657,6 +665,7 @@ describe('ResponseAccumulator output item identity', () => {
       const original = structuredClone(snapshot);
       const first = makeOutput(type, 'first_item');
       const duplicate = makeOutput(type, 'second_item');
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       (duplicate as unknown as EventFields)['call_id'] = (first as unknown as EventFields)['call_id'];
 
       expect(() =>
@@ -709,7 +718,9 @@ describe('ResponseAccumulator output item identity', () => {
       const snapshot = createSnapshot(item);
       const original = structuredClone(snapshot);
       const replacement = structuredClone(item);
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       (replacement as unknown as EventFields)['call_id'] = 'foreign_call';
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       const originalCallID = (item as unknown as EventFields)['call_id'];
 
       expect(() =>
@@ -727,6 +738,7 @@ describe('ResponseAccumulator output item identity', () => {
   test('preserves a valid shell call and matching output under namespaced routing identities', () => {
     const shell = makeOutput('shell_call', 'shell_item');
     const output = makeOutput('shell_call_output', 'output_item');
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
     (output as unknown as EventFields)['call_id'] = (shell as unknown as EventFields)['call_id'];
     const snapshot = createSnapshot(shell, output);
 
@@ -829,6 +841,7 @@ describe('ResponseAccumulator output item identity', () => {
       undefined,
       context,
     );
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The uncloneable method is intentionally outside the wire type to test transactional clone failure.
     const uncloneable = {
       ...makeOutput('message'),
       uncloneable() {
@@ -938,6 +951,7 @@ describe('ResponseAccumulator output item identity', () => {
       const snapshot = createSnapshot(item);
       const original = structuredClone(snapshot);
       const replacement = structuredClone(item);
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       (replacement as unknown as EventFields)['call_id'] = 'foreign_call';
 
       expect(() =>

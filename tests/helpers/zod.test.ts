@@ -199,6 +199,7 @@ describe('Zod v4 mini', () => {
 
 describe.each([
   { version: 'v3', z: zv3 },
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Run shared schema-factory cases across Zod versions whose nominal class types differ.
   { version: 'v4', z: zv4 as any as typeof zv3 },
 ])('zodRealtimeFunction (Zod $version)', ({ z }) => {
   it('builds a Realtime function tool without strict', () => {
@@ -277,6 +278,7 @@ it('preserves inferred output types', () => {
 
 describe.each([
   { version: 'v3', z: zv3 },
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Run shared schema-factory cases across Zod versions whose nominal class types differ.
   { version: 'v4', z: zv4 as any as typeof zv3 },
 ])('zodResponseFormat (Zod $version)', ({ version, z }) => {
   it('does the thing', () => {

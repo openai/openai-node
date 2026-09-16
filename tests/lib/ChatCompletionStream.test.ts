@@ -16,6 +16,7 @@ import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 import { expectType } from '../utils/typing';
 
 function mockStreamingClient(chunks: OpenAI.Chat.ChatCompletionChunk[]): OpenAI {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The stream fixture implements only completions.create and drives deterministic chunks.
   return {
     chat: {
       completions: {
@@ -199,6 +200,7 @@ describe('.stream()', () => {
       ],
     };
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The stream fixture implements only completions.create and drives deterministic chunks.
     const client = {
       chat: {
         completions: {
@@ -248,6 +250,7 @@ describe('.stream()', () => {
       ],
     };
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The stream fixture implements only completions.create and drives deterministic chunks.
     const client = {
       chat: {
         completions: {
@@ -308,6 +311,7 @@ describe('.stream()', () => {
           },
         ],
       },
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The Azure filter-only chunk intentionally lacks a delta to exercise provider compatibility.
       {
         id: '',
         object: '',
@@ -339,6 +343,7 @@ describe('.stream()', () => {
   });
 
   it('finalizes audio streams that end with an expires_at-only chunk', async () => {
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Audio delta fields are intentionally ahead of the generated chunk type and exercise supported runtime accumulation.
     const chunks = [
       {
         id: 'chatcmpl-test',
@@ -427,6 +432,7 @@ describe('.stream()', () => {
   });
 
   it('does not infer a finish_reason if audio continues after expires_at', async () => {
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Audio delta fields are intentionally ahead of the generated chunk type and exercise supported runtime accumulation.
     const chunks = [
       {
         id: 'chatcmpl-test',
@@ -1089,7 +1095,7 @@ describe('.stream()', () => {
         model: 'gpt-4',
         choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ] as OpenAI.Chat.ChatCompletionChunk[];
     // Yield valid chunks, then throw to error the stream after they have been
     // delivered (mimics a connection drop mid-response).
     const readable = new Stream(async function* failingChunks() {
@@ -1201,7 +1207,7 @@ describe('.stream()', () => {
         model: 'gpt-4',
         choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ] as OpenAI.Chat.ChatCompletionChunk[];
     const readable = new Stream(async function* failingChunks() {
       for (const chunk of chunks) {
         yield chunk;
@@ -1236,7 +1242,7 @@ describe('.stream()', () => {
           created: 1,
           model: 'gpt-4',
           choices: [{ index: 0, delta: { role: 'assistant', content: 'hel' }, finish_reason: null }],
-        } as unknown as OpenAI.Chat.ChatCompletionChunk;
+        } as OpenAI.Chat.ChatCompletionChunk;
         // Hang so the only way the consumer stops is by breaking out.
         await Promise.race([]);
       },
@@ -1262,7 +1268,7 @@ describe('.stream()', () => {
         model: 'gpt-4',
         choices: [{ index: 0, delta: { role: 'assistant', content: 'hello' }, finish_reason: 'stop' }],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ] as OpenAI.Chat.ChatCompletionChunk[];
     const readable = new Stream(async function* completeChunks() {
       for (const chunk of chunks) {
         yield chunk;
@@ -1292,7 +1298,7 @@ describe('.stream()', () => {
         model: 'gpt-4',
         choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ] as OpenAI.Chat.ChatCompletionChunk[];
     const readable = new Stream(async function* failingChunks() {
       for (const chunk of chunks) {
         yield chunk;

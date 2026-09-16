@@ -55,7 +55,7 @@ class FakeBrowserSocket {
 }
 
 const originalWebSocket = globalThis.WebSocket;
-const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
+const nodeSocketConstructor = vi.mocked(WS.WebSocket);
 
 function expectPrivateBedrockCredentialFailure(failure: unknown, credential: string): void {
   expect(failure).toBeInstanceOf(TypeError);

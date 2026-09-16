@@ -22,6 +22,7 @@ function createNodeHarness(): AdapterHarness {
     send: vi.fn(),
     close: vi.fn(),
   });
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The real EventEmitter fixture supplies the ws operations needed to audit listener ownership.
   const adapter = new NodeWebSocket(socket as unknown as ConstructorParameters<typeof NodeWebSocket>[0]);
 
   return {
@@ -70,6 +71,7 @@ function createBrowserHarness(): AdapterHarness {
 }
 
 function listenerBookkeeping(adapter: WebSocketLike): Map<string, Map<unknown, unknown>> {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect private adapter bookkeeping to verify listener entries are released; keep the public adapter interface unchanged.
   return (adapter as unknown as { _listenerMap: Map<string, Map<unknown, unknown>> })._listenerMap;
 }
 

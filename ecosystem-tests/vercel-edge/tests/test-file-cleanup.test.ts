@@ -24,6 +24,7 @@ function registerUploadTests(
   const tests = new Map<string, () => Promise<void>>();
 
   uploadWebApiTestCases({
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The upload lifecycle fixture supplies only the file create/delete endpoints exercised by the helper.
     client: { files: { create, delete: deleteFile } } as unknown as OpenAI,
     it: (description, handler) => tests.set(description, handler),
     expectEqual,
