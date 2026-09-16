@@ -27,6 +27,10 @@ The repository's pnpm scripts use Bash. On Windows, install [Git for Windows](ht
 and run the development commands from Git Bash, where `bash` is available on `PATH`. If you run pnpm from
 PowerShell instead, add the Git for Windows `bin` directory that contains `bash.exe` to `PATH` first.
 
+The `build (Windows)` CI job runs `./scripts/bootstrap` and `pnpm build` on a Windows runner with
+Git Bash, using the repository's pinned Node.js and pnpm versions. The build also checks that the
+compiled CommonJS and ESM entrypoints can be loaded.
+
 The repository keeps formatter inputs on LF through `.gitattributes`. Git does not rewrite unchanged files
 when an existing `core.autocrlf=true` checkout first pulls that rule. If `git ls-files --eol AGENTS.md`
 still reports `w/crlf` and `pnpm lint` reports widespread formatting failures, first make sure
@@ -294,11 +298,12 @@ requires GitHub Actions OIDC trusted publishing; local token-based publishing is
 The table describes workflow execution and npm publication dependencies for changes targeting `main`
 in `openai/openai-node`.
 Required merge checks are configured in repository rules. The `test matrix` check requires the Node.js
-tests, benchmarks, and credential-free ecosystem job to succeed.
+tests, benchmarks, credential-free ecosystem job, and Windows build to succeed.
 
 | Checks                                                              | PR             | Merge queue   | Push to `main`    | Release PR     | npm publication                             |
 | ------------------------------------------------------------------- | -------------- | ------------- | ----------------- | -------------- | ------------------------------------------- |
 | CI lint, build, Node.js tests, packed-package tests, benchmarks     | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
+| Windows contributor bootstrap and SDK build                         | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
 | Credential-free ecosystem startup/import and compatibility checks   | Runs           | Runs          | Runs              | Runs           | CI gate                                     |
 | Live examples and live ecosystem tests                              | Skipped        | Skipped       | Runs²             | Skipped        | CI gate²                                    |
 | CodeQL merge protection, breaking-change detection, Castiron checks | Runs           | Runs          | Not triggered     | Runs           | Merge protection; no separate release gate  |
