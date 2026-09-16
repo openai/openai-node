@@ -1,6 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createPrivateKey, X509Certificate } from 'node:crypto';
-import type { PrivateKeyInput } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { types } from 'node:util';
 import { Agent, ProxyAgent } from 'undici';
@@ -191,11 +190,11 @@ function validatedCredentialOptions(options: X509CredentialOptions): ValidatedX5
   const ca = snapshotCertificateAuthorities(configured['ca']);
 
   const leaf = new X509Certificate(certificateChain);
-  const privateKeyOptions: PrivateKeyInput = { key: privateKeyPEM };
-  if (passphrase !== undefined) {
-    privateKeyOptions.passphrase = passphrase;
-  }
-  const privateKey = createPrivateKey(privateKeyOptions);
+  const privateKey = createPrivateKey({
+    key: privateKeyPEM,
+    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Create an own data property so an inherited setter cannot intercept the private-key passphrase.
+    ...(passphrase === undefined ? {} : { passphrase }),
+  });
   if (!leaf.checkPrivateKey(privateKey)) {
     throw new Error('X.509 credential private key must match its leaf client certificate.');
   }
@@ -282,16 +281,22 @@ function credentialDispatcher(
   }
   const auth = proxyAuthentication(url);
 
-  const dispatcherOptions: ProxyAgent.Options = { uri: url.href, requestTls };
-  if (auth !== undefined) {
-    dispatcherOptions.auth = auth;
-  }
-  if (proxy === 'https-connect') {
-    dispatcherOptions.proxyTls = { rejectUnauthorized: true };
-    if (proxyCA !== undefined) {
-      dispatcherOptions.proxyTls.ca = proxyCA;
-    }
-  }
+  const dispatcherOptions: ProxyAgent.Options = {
+    uri: url.href,
+    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Define proxy credentials as own data without invoking inherited setters.
+    ...(auth === undefined ? {} : { auth }),
+    requestTls,
+    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Keep the optional proxy TLS configuration as an own data property.
+    ...(proxy === 'https-connect'
+      ? {
+          proxyTls: {
+            rejectUnauthorized: true,
+            // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Define explicit proxy trust roots as own data without invoking inherited setters.
+            ...(proxyCA === undefined ? {} : { ca: proxyCA }),
+          },
+        }
+      : {}),
+  };
   // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared transport contract preserves the same dispatcher and proxy types across both construction paths.
   return { proxy, dispatcher: new ProxyAgent(dispatcherOptions) };
 }
@@ -311,17 +316,14 @@ export function createX509Transport(options: X509TransportOptions): X509Transpor
         throw error;
       }
     },
-    exchange: async (identityProviderId, serviceAccountId, signal) => {
-      const exchangeOptions: Parameters<typeof exchangeX509Token>[0] = {
+    exchange: async (identityProviderId, serviceAccountId, signal) =>
+      await exchangeX509Token({
         transport: capability,
         identityProviderId,
         serviceAccountId,
-      };
-      if (signal) {
-        exchangeOptions.signal = signal;
-      }
-      return await exchangeX509Token(exchangeOptions);
-    },
+        // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Preserve the cancellation signal as own data without invoking inherited setters.
+        ...(signal ? { signal } : {}),
+      }),
     run: (operation) =>
       scopes.run({ wallStartedAt: Date.now(), monotonicStartedAt: performance.now() }, operation),
     current: () => scopes.getStore(),
@@ -339,13 +341,11 @@ export function fromX509(options: X509CredentialOptions): X509Credential {
     cert: configured.certificateChain,
     key: configured.privateKey,
     rejectUnauthorized: true,
+    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Define the TLS passphrase as own data so inherited setters cannot intercept it.
+    ...(configured.passphrase === undefined ? {} : { passphrase: configured.passphrase }),
+    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Define explicit workload trust roots as own data without invoking inherited setters.
+    ...(configured.ca === undefined ? {} : { ca: configured.ca }),
   };
-  if (configured.passphrase !== undefined) {
-    requestTls.passphrase = configured.passphrase;
-  }
-  if (configured.ca !== undefined) {
-    requestTls.ca = configured.ca;
-  }
   const { dispatcher, proxy } = credentialDispatcher(configured.proxy, requestTls);
 
   try {
@@ -355,15 +355,15 @@ export function fromX509(options: X509CredentialOptions): X509Credential {
       certificateIdentity: 'static',
       proxy,
     });
-    const identity: X509WorkloadIdentity = {
+    const identity: X509WorkloadIdentity = Object.freeze({
       type: 'x509',
       identityProviderId: configured.identityProviderId,
       serviceAccountId: configured.serviceAccountId,
-    };
-    if (configured.refreshBufferSeconds !== undefined) {
-      identity.refreshBufferSeconds = configured.refreshBufferSeconds;
-    }
-    Object.freeze(identity);
+      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Preserve the optional refresh setting as own data without invoking inherited setters.
+      ...(configured.refreshBufferSeconds === undefined
+        ? {}
+        : { refreshBufferSeconds: configured.refreshBufferSeconds }),
+    });
     const credential = new OwnedX509Credential(dispatcher);
     rememberX509Credential(credential, Object.freeze({ identity, transport }));
     return credential;
