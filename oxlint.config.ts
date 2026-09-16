@@ -2,13 +2,14 @@ const requireConfig = require('node:module').createRequire(__filename);
 
 const { defineConfig } = requireConfig('oxlint');
 const core = requireConfig('ultracite/oxlint/core').default;
+const antiSlop = requireConfig('ultracite/oxlint/anti-slop').default;
 const generatedFiles = requireConfig('./scripts/generated-files.cjs');
 
 // Existing handwritten SDK patterns predate these preset rules.
 const compatibilityRules = ['func-style', 'sort-keys'];
 
 module.exports = defineConfig({
-  extends: [core],
+  extends: [core, antiSlop],
   categories: {
     correctness: 'off',
   },

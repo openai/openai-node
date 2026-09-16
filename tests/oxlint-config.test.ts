@@ -90,7 +90,7 @@ test('formats an existing CRLF checkout after the LF policy is pulled', () => {
   }
 });
 
-test('inherits Ultracite native plugins and enforces their rules', () => {
+test('inherits Ultracite native and anti-slop plugins and enforces their rules', () => {
   const printed = spawnSync(process.execPath, [oxlint, '--print-config', 'src/internal/uploads.ts'], {
     cwd: repoRoot,
     encoding: 'utf-8',
@@ -114,7 +114,10 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
 
   try {
     const fixturePath = path.join(fixtureRoot, 'native-plugin.ts');
-    writeFileSync(fixturePath, 'const values = [];\nconsole.log(values instanceof Array);\n');
+    writeFileSync(
+      fixturePath,
+      "const values = [];\nconsole.log(values instanceof Array);\nconsole.log(Reflect.get({ value: 1 }, 'value'));\n",
+    );
 
     const linted = spawnSync(
       process.execPath,
@@ -126,6 +129,7 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
 
     const { diagnostics } = JSON.parse(linted.stdout) as { diagnostics: { code: string }[] };
     expect(diagnostics.map(({ code }) => code)).toContain('unicorn(no-instanceof-array)');
+    expect(diagnostics.map(({ code }) => code)).toContain('anti-slop(no-reflect-get)');
 
     const formatted = spawnSync(
       process.execPath,
