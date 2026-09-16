@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { Stream } from 'openai/core/streaming';
 import type { OpenAIError } from 'openai/error';
-import { APIConnectionError } from 'openai/error';
+import { APIConnectionError, APIUserAbortError } from 'openai/error';
 import { PassThrough } from 'node:stream';
 import {
   ParsingToolFunction,
@@ -387,13 +387,8 @@ class StreamingRunnerListener {
     expect(this.eventChatCompletions).toEqual(this.runner.allChatCompletions());
     const runnerMessages = this.runner.messages.filter((message) => !ignoredMessages.has(message));
     expect(this.eventMessages).toEqual(runnerMessages.slice(-this.eventMessages.length));
-    if (error) {
-      expect(this.error?.message).toEqual(error);
-      expect(this.runner.errored).toBe(true);
-    } else {
-      expect(this.error).toBeUndefined();
-      expect(this.runner.errored).toBe(false);
-    }
+    expect(this.error).toBeUndefined();
+    expect(this.runner.errored).toBe(false);
     expect(this.gotEnd).toBe(true);
   }
 }
@@ -1253,6 +1248,7 @@ describe('resource completions', () => {
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
       const controller = new AbortController();
+      const abortReason = new Error('stop after assistant message');
       const runner = openai.chat.completions.runTools(
         {
           messages: [{ role: 'user', content: 'tell me what the weather is like' }],
@@ -1276,7 +1272,7 @@ describe('resource completions', () => {
 
       runner.on('message', (message) => {
         if (message.role === 'assistant') {
-          controller.abort();
+          controller.abort(abortReason);
         }
       });
       await handleRequest(async (request) => {
@@ -1312,7 +1308,8 @@ describe('resource completions', () => {
         };
       });
 
-      await runner.done().catch(() => {});
+      const abortError = await runner.done().catch((error) => error);
+      expect(abortError).toMatchObject({ cause: abortReason });
 
       expect(listener.messages).toEqual([
         {
@@ -1338,6 +1335,85 @@ describe('resource completions', () => {
       await listener.sanityCheck({ error: 'Request was aborted.' });
       expect(runner.aborted).toBe(true);
     });
+    test.each([
+      { parsed: false, named: false, reason: new Error('stop during tool callback') },
+      { parsed: true, named: false, reason: new Error('stop during parsed tool callback') },
+      { parsed: false, named: true, reason: new Error('stop during named tool callback') },
+      { parsed: true, named: true, reason: new Error('stop during named parsed tool callback') },
+      { parsed: false, named: false, reason: Number.NaN },
+      { parsed: true, named: false, reason: Number.NaN },
+    ])(
+      'classifies callback cancellation (parsed=$parsed, named=$named, reason=$reason)',
+      async ({ parsed, named, reason: abortReason }) => {
+        const { fetch, handleRequest } = mockChatCompletionFetch();
+        const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+        const controller = new AbortController();
+        const runner = openai.chat.completions.runTools(
+          {
+            messages: [{ role: 'user', content: 'run the tool' }],
+            model: 'gpt-3.5-turbo',
+            ...(named
+              ? { tool_choice: { type: 'function' as const, function: { name: 'abortable' } } }
+              : { parallel_tool_calls: false }),
+            tools: [
+              {
+                type: 'function',
+                function: {
+                  name: 'abortable',
+                  ...(parsed ? { parse: (args: string) => ({ args }) } : {}),
+                  function: (
+                    _args: unknown,
+                    activeRunner: Pick<ChatCompletionRunner<unknown>, 'controller'>,
+                  ) => {
+                    controller.abort(abortReason);
+                    activeRunner.controller.signal.throwIfAborted();
+                    return 'unreachable';
+                  },
+                  parameters: {},
+                  description: 'aborts while running',
+                },
+              },
+            ],
+          },
+          { signal: controller.signal, maxChatCompletions: 1 },
+        );
+        const listener = new RunnerListener(runner);
+
+        await handleRequest(async () => ({
+          id: '1',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'tool_calls',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: null,
+                refusal: null,
+                parsed: null,
+                tool_calls: [
+                  {
+                    type: 'function',
+                    id: 'abort-call',
+                    function: { arguments: '', name: 'abortable' },
+                  },
+                ],
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        }));
+
+        const error = await runner.done().catch((error) => error);
+        expect(error).toBeInstanceOf(APIUserAbortError);
+        expect(error.cause).toBe(abortReason);
+        expect(runner.aborted).toBe(true);
+        expect(listener.gotAbort).toBe(true);
+      },
+    );
+
     test('successful flow with parse', async () => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 

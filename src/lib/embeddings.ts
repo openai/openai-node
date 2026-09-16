@@ -46,8 +46,11 @@ export function createEmbedding(
   loggerFor(client).debug('embeddings/decoding base64 embeddings from base64');
 
   return response._thenUnwrap((data) => {
-    if (data && data.data) {
-      const embeddings = data.data;
+    const embeddings = data?.data;
+    if (embeddings !== undefined) {
+      if (!Array.isArray(embeddings)) {
+        throw new TypeError('Expected embeddings response data to be an array');
+      }
       const { length } = embeddings;
       // Preserve the original iteration length and skip sparse-array holes.
       for (let index = 0; index < length; index += 1) {

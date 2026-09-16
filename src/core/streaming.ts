@@ -9,6 +9,10 @@ import type { OpenAI } from '../client';
 
 type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
+function isTransportAbortError(error: unknown): boolean {
+  return !(error instanceof APIError) && isAbortError(error);
+}
+
 type StreamTeeQueue<Item> = {
   readonly length: number;
   readonly canceled: boolean;
@@ -168,7 +172,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
         // Abort errors and cleanup failures after the completion sentinel are non-fatal.
         if (
           receivedCompletionSentinel ||
-          isAbortError(e) ||
+          isTransportAbortError(e) ||
           (controller.signal.aborted && e === controller.signal.reason)
         ) {
           return;
@@ -257,9 +261,6 @@ export class Stream<Item> implements AsyncIterable<Item> {
       let done = false;
       try {
         for await (const line of iterLines()) {
-          if (done) {
-            continue;
-          }
           if (line) {
             let data: Item;
             try {

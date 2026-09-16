@@ -7,13 +7,14 @@ import path from 'node:path';
 const client = new OpenAI();
 
 const main = async () => {
+  const partialImages = 3;
   const stream = await client.images.generate({
     model: 'gpt-image-1',
     prompt: 'A cute baby sea otter',
     n: 1,
     size: '1024x1024',
     stream: true,
-    partial_images: 3,
+    partial_images: partialImages,
   });
 
   let receivedFinalImage = false;
@@ -22,11 +23,15 @@ const main = async () => {
     let imageBuffer: Buffer;
     switch (event.type) {
       case 'image_generation.partial_image': {
-        console.log(`  Partial image ${event.partial_image_index + 1}/3 received`);
+        const index = event.partial_image_index;
+        if (!Number.isInteger(index) || index < 0 || index >= partialImages) {
+          throw new Error('Invalid partial image index.');
+        }
+        console.log(`  Partial image ${index + 1}/${partialImages} received`);
         console.log(`   Size: ${event.b64_json.length} characters (base64)`);
 
         // Save partial image to file
-        filename = `partial_${event.partial_image_index + 1}.png`;
+        filename = `partial_${index + 1}.png`;
         imageBuffer = Buffer.from(event.b64_json, 'base64');
         fs.writeFileSync(filename, imageBuffer);
         console.log(`   💾 Saved to: ${path.resolve(filename)}`);

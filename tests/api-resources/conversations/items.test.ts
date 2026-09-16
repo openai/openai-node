@@ -29,7 +29,7 @@ describe('resource items', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.conversations.items.create('conv_123', {
+    await client.conversations.items.create('conv_123', {
       items: [
         {
           content: 'string',
@@ -54,7 +54,7 @@ describe('resource items', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    const response = await client.conversations.items.retrieve('msg_abc', {
+    await client.conversations.items.retrieve('msg_abc', {
       conversation_id: 'conv_123',
       include: ['file_search_call.results'],
     });
@@ -99,6 +99,6 @@ describe('resource items', () => {
   });
 
   test('delete: required and optional params', async () => {
-    const response = await client.conversations.items.delete('msg_abc', { conversation_id: 'conv_123' });
+    await client.conversations.items.delete('msg_abc', { conversation_id: 'conv_123' });
   });
 });

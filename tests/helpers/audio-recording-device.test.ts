@@ -29,6 +29,7 @@ describe.each([
     runtime.platform = platform;
     const output = Buffer.from('synthetic audio');
     const ffmpeg = Object.assign(new ChildProcess(), {
+      pid: 123,
       stdout: new PassThrough(),
       kill: vi.fn(),
     });

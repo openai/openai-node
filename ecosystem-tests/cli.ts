@@ -548,11 +548,22 @@ async function startProxy() {
   proxy.on('connect', (req, clientSocket, head) => {
     console.log('got proxied connection');
     const serverSocket = connect(443, 'api.openai.com', () => {
+      if (clientSocket.destroyed) {
+        serverSocket.destroy();
+        return;
+      }
       clientSocket.write('HTTP/1.1 200 Connection Established\r\nProxy-agent: Node.js-Proxy\r\n\r\n');
       serverSocket.write(head);
       serverSocket.pipe(clientSocket);
       clientSocket.pipe(serverSocket);
     });
+    const destroyTunnel = () => {
+      clientSocket.destroy();
+      serverSocket.destroy();
+    };
+    clientSocket.on('error', destroyTunnel);
+    serverSocket.on('error', destroyTunnel);
+    clientSocket.on('close', () => serverSocket.destroy());
   });
 
   await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
@@ -870,6 +881,7 @@ async function main() {
                       '--skip-pack',
                       '--noCleanup',
                       `--retry=${args.retry}`,
+                      `--retryDelay=${args.retryDelay}`,
                       ...(args.live ? ['--live'] : []),
                       ...(args.verbose ? ['--verbose'] : []),
                       ...(args.deploy ? ['--deploy'] : []),

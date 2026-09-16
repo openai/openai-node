@@ -304,10 +304,8 @@ describe.each([...directMethods, ...transitiveMethods])(
 
       await expect(pending).resolves.toMatchObject({ completed: { status: 'completed' } });
       expect(requestCount(fetch)).toBe(requests + 1);
-      expect(getEventListeners(controller.signal, 'abort')).toEqual([
-        ...retainedListeners,
-        expect.any(Function),
-      ]);
+      // The next HTTP request reuses the shared bridge; only the polling timer's listener is removed.
+      expect(getEventListeners(controller.signal, 'abort')).toEqual(retainedListeners);
       expect(vi.getTimerCount()).toBe(0);
       expect(removeEventListener).toHaveBeenCalledTimes(2);
       expect(callbackErrors).toEqual([]);

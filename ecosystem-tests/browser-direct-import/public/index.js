@@ -7,6 +7,10 @@ import { distance } from './node_modules/fastest-levenshtein/esm/mod.js';
 /** @type {TestCase[]} */
 const tests = [];
 
+const live = /** @type {typeof globalThis & { __OPENAI_ECOSYSTEM_TEST_LIVE__?: boolean }} */ (
+  globalThis
+).__OPENAI_ECOSYSTEM_TEST_LIVE__ === true;
+
 /** @typedef {{ path: string[]; passed: boolean; error?: string }} TestResult */
 
 async function runTests() {
@@ -119,9 +123,6 @@ const model = 'whisper-1';
 const apiKey = /** @type {typeof globalThis & { __OPENAI_ECOSYSTEM_TEST_API_KEY__?: string }} */ (
   globalThis
 ).__OPENAI_ECOSYSTEM_TEST_API_KEY__;
-const live = /** @type {typeof globalThis & { __OPENAI_ECOSYSTEM_TEST_LIVE__?: boolean }} */ (
-  globalThis
-).__OPENAI_ECOSYSTEM_TEST_LIVE__ === true;
 
 const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
 

@@ -1,3 +1,4 @@
+import { compiledFixture } from './utils/compiled-fixtures';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,29 +14,19 @@ function normalizeLineEndings(value: string) {
 }
 
 function runCli(args: string[], cwd = root, env: Partial<NodeJS.ProcessEnv> = {}) {
-  return spawnSync(
-    process.execPath,
-    [
-      path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '-r',
-      path.join(root, 'node_modules/tsconfig-paths/register.js'),
-      path.join(root, 'ecosystem-tests/cli.ts'),
-      ...args,
-    ],
-    {
-      cwd,
-      encoding: 'utf-8',
-      env: {
-        ...process.env,
-        OPENAI_API_KEY: undefined,
-        DISABLE_V8_COMPILE_CACHE: '1',
-        TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
-        TS_NODE_TRANSPILE_ONLY: 'true',
-        ...env,
-      },
-      timeout: 15_000,
+  return spawnSync(process.execPath, [compiledFixture('ecosystem-tests/cli.ts'), ...args], {
+    cwd,
+    encoding: 'utf-8',
+    env: {
+      ...process.env,
+      OPENAI_API_KEY: undefined,
+      DISABLE_V8_COMPILE_CACHE: '1',
+      TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+      TS_NODE_TRANSPILE_ONLY: 'true',
+      ...env,
     },
-  );
+    timeout: 15_000,
+  });
 }
 
 function workflowJob(workflow: string, name: string) {
@@ -269,10 +260,16 @@ describe('ecosystem test CLI', () => {
   });
 
   test.each([
-    { name: 'sequential', options: [], packageOption: '--fromNpm' },
-    { name: 'explicit worker count', options: ['--jobs=2'], packageOption: '--fromNpm' },
-    { name: 'parallel', options: ['--parallel'], packageOption: '--from-npm' },
-  ])('installs the selected local package in $name mode', ({ options, packageOption }) => {
+    { name: 'sequential', options: [], packageOption: '--fromNpm', retryDelay: 7 },
+    { name: 'explicit worker count', options: ['--jobs=2'], packageOption: '--fromNpm', retryDelay: 25 },
+    { name: 'parallel', options: ['--parallel'], packageOption: '--from-npm', retryDelay: 0 },
+    {
+      name: 'default-delay parallel',
+      options: ['--parallel'],
+      packageOption: '--from-npm',
+      retryDelay: undefined,
+    },
+  ])('installs and retries a local package in $name mode', ({ options, packageOption, retryDelay }) => {
     const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-ecosystem-cli-'));
     const dependency = path.join(fixture, 'selected package = fixture');
     const projects = ['node-js', 'cloudflare-worker'];
@@ -317,18 +314,30 @@ describe('ecosystem test CLI', () => {
           [
             "const fs = require('node:fs');",
             "const { version } = require('openai/package.json');",
+            "const firstAttempt = !fs.existsSync('installed-version.txt');",
             "fs.writeFileSync('installed-version.txt', version);",
+            'if (firstAttempt) process.exit(1);',
           ].join('\n'),
         );
       }
 
       const result = runCli(
-        [...projects, `${packageOption}=${dependency}`, '--noCleanup', ...options],
+        [
+          ...projects,
+          `${packageOption}=${dependency}`,
+          '--noCleanup',
+          '--retry=1',
+          ...(retryDelay === undefined ? [] : [`--retryDelay=${retryDelay}`]),
+          ...options,
+        ],
         fixture,
       );
 
       expect(result.error, result.stdout + result.stderr).toBeUndefined();
       expect(result.status, result.stdout + result.stderr).toBe(0);
+      expect((result.stdout + result.stderr).match(/next retry in \d+ms/gu)).toEqual(
+        projects.map(() => `next retry in ${retryDelay ?? 1000}ms`),
+      );
       for (const project of projects) {
         expect(
           readFileSync(path.join(fixture, 'ecosystem-tests', project, 'installed-version.txt'), 'utf-8'),

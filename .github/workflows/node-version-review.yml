@@ -1,8 +1,7 @@
 # Asks Codex once a month to compare this repository with the official Node.js
 # lifecycle, make any needed support-policy edits, validate them, and open a
 # draft pull request. If nothing has drifted, the run makes no pull request.
-# Because GitHub suppresses CI events for its own token, checks start when a
-# maintainer marks the draft ready; human review is always required before merge.
+# Human review is always required before merge.
 name: Monthly Node.js version review
 
 on:
@@ -14,22 +13,94 @@ concurrency:
   group: monthly-node-version-review
   cancel-in-progress: false
 
-permissions:
-  contents: write
-  pull-requests: write
+# Proposal generation and validation never receive repository write authority.
+permissions: {}
 
 jobs:
-  review:
+  propose:
     if: github.repository == 'openai/openai-node' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     environment: ci
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
     steps:
-      - name: Check out main
+      - name: Check out the workflow commit
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          ref: main
+          ref: ${{ github.sha }}
           persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Ask Codex to review Node.js support
+        id: codex
+        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56 # v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/prompts/node-version-review.md
+          codex-version: '0.144.6'
+          codex-args: '["--config","web_search=\"live\"","--ephemeral"]'
+          permission-profile: ':workspace'
+          safety-strategy: drop-sudo
+
+      - name: Export the untrusted proposal as JSON
+        env:
+          EXPECTED_BASE_SHA: ${{ github.sha }}
+          PROPOSAL_PATH: ${{ runner.temp }}/node-review-export/proposal.json
+          REVIEW_BODY: ${{ steps.codex.outputs.final-message }}
+        run: |
+          python3 scripts/node-version-review.py export \
+            --base-sha "$EXPECTED_BASE_SHA" \
+            --proposal "$PROPOSAL_PATH"
+
+      - name: Upload the original proposal
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: node-review-proposal-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/node-review-export/proposal.json
+          if-no-files-found: error
+          retention-days: 1
+
+  validate:
+    needs: propose
+    if: github.repository == 'openai/openai-node' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the workflow commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download the original proposal
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.propose.outputs.artifact-id }}
+          path: ${{ runner.temp }}/node-review-proposal
+          merge-multiple: true
+          digest-mismatch: error
+
+      - name: Verify and apply the proposal
+        id: proposal
+        env:
+          EXPECTED_BASE_SHA: ${{ github.sha }}
+          PROPOSAL_PATH: ${{ runner.temp }}/node-review-proposal/proposal.json
+          BODY_PATH: ${{ runner.temp }}/node-review-body.md
+        run: |
+          python3 scripts/node-version-review.py apply \
+            --base-sha "$EXPECTED_BASE_SHA" \
+            --proposal "$PROPOSAL_PATH" \
+            --body-output "$BODY_PATH"
 
       - name: Set up pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
@@ -44,17 +115,6 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           ./scripts/steady/install
-
-      - name: Ask Codex to review Node.js support
-        id: codex
-        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56 # v1
-        with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt-file: .github/codex/prompts/node-version-review.md
-          codex-version: '0.144.6'
-          codex-args: '["--config","web_search=\"live\"","--ephemeral"]'
-          permission-profile: ':workspace'
-          safety-strategy: drop-sudo
 
       - name: Check Node.js version policy
         run: node --experimental-strip-types scripts/check-node-version-policy.ts
@@ -89,22 +149,62 @@ jobs:
       - name: Run tests
         run: ./scripts/test
 
+  publish:
+    needs: [propose, validate]
+    if: github.repository == 'openai/openai-node' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out the workflow commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      # create-pull-request resets the working branch to origin/main. Keep both
+      # refs at the validated commit so a concurrent main update cannot rebase it.
+      - name: Preserve the validated base
+        env:
+          EXPECTED_BASE_SHA: ${{ github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_BASE_SHA"
+          git checkout -B main "$EXPECTED_BASE_SHA"
+          git update-ref refs/remotes/origin/main "$EXPECTED_BASE_SHA"
+
+      - name: Download the original proposal
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.propose.outputs.artifact-id }}
+          path: ${{ runner.temp }}/node-review-proposal
+          merge-multiple: true
+          digest-mismatch: error
+
+      - name: Verify and apply the proposal
+        id: proposal
+        env:
+          EXPECTED_BASE_SHA: ${{ github.sha }}
+          PROPOSAL_PATH: ${{ runner.temp }}/node-review-proposal/proposal.json
+          BODY_PATH: ${{ runner.temp }}/node-review-body.md
+        run: |
+          python3 scripts/node-version-review.py apply \
+            --base-sha "$EXPECTED_BASE_SHA" \
+            --proposal "$PROPOSAL_PATH" \
+            --body-output "$BODY_PATH"
+
       - name: Open or update the draft pull request
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
           token: ${{ github.token }}
+          base: main
           branch: codex/monthly-node-version-update
           delete-branch: true
           draft: always-true
           commit-message: 'chore(node): review supported Node.js versions'
           title: 'chore(node): review supported Node.js versions'
-          body: |
-            Automated monthly review of the Node.js support policy.
-
-            ${{ steps.codex.outputs.final-message }}
-
-            Before marking this draft ready, choose the release classification
-            required by `NODE_VERSION_POLICY.md` and update the title.
+          body-path: ${{ runner.temp }}/node-review-body.md
           add-paths: |
             .nvmrc
             package.json

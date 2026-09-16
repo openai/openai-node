@@ -7,7 +7,7 @@ import type {
   ResponseFunctionCallArgumentsDeltaEvent,
   ResponseTextDeltaEvent,
 } from 'openai/lib/responses/EventTypes';
-import type { Response, ResponseStreamEvent } from 'openai/resources/responses/responses';
+import type { Response as APIResponse, ResponseStreamEvent } from 'openai/resources/responses/responses';
 import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 
 test('parsed response events include every API event with unchanged non-delta shapes', () => {
@@ -31,6 +31,71 @@ test('parsed response deltas retain their required snapshots', () => {
 });
 
 describe('.stream()', () => {
+  it.each([0, 2])('forwards %i compaction progress events over SSE', async (count) => {
+    const item = { id: 'cmp_123', type: 'compaction', encrypted_content: '' } as const;
+    const completed = { ...item, encrypted_content: 'encrypted-test-summary' };
+    const progress = Array.from({ length: count }, (_, index) => ({
+      type: 'response.compaction.compacting' as const,
+      sequence_number: index + 2,
+      output_index: 0,
+      item_id: item.id,
+    }));
+    const events: ResponseStreamEvent[] = [
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      { type: 'response.output_item.added', sequence_number: 1, output_index: 0, item },
+      ...progress,
+      { type: 'response.output_item.done', sequence_number: count + 2, output_index: 0, item: completed },
+      {
+        type: 'response.completed',
+        sequence_number: count + 3,
+        response: makeResponse({ status: 'completed', output: [completed] }),
+      },
+    ];
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async () =>
+        new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
+          headers: { 'content-type': 'text/event-stream' },
+        }),
+    });
+    const stream = client.responses.stream({ model: 'test-model', input: [{ type: 'compaction_trigger' }] });
+    const named = vi.fn();
+    const generic = vi.fn();
+    stream.on('response.compaction.compacting', named);
+    stream.on('event', generic);
+    const received = [];
+    for await (const event of stream) {
+      received.push(event);
+    }
+    expect(received).toEqual(events);
+    expect(named.mock.calls).toEqual(progress.map((event) => [event]));
+    expect(generic.mock.calls).toEqual(events.map((event) => [event]));
+    const final = await stream.finalResponse();
+    expect(final.output).toEqual([completed]);
+  });
+
+  it.each(['on', 'once'] as const)('preserves callback receivers for %s listeners', async (method) => {
+    const events: ResponseStreamEvent[] = [
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      { type: 'response.completed', sequence_number: 1, response: makeResponse({ status: 'completed' }) },
+    ];
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+    const unbound = vi.fn();
+    const bound = vi.fn();
+    const context = { name: 'caller-owned context' };
+
+    stream[method]('event', unbound);
+    stream[method]('event', bound.bind(context));
+    await stream.done();
+
+    const calls = (method === 'once' ? events.slice(0, 1) : events).map((event) => [event]);
+    expect(bound.mock.calls).toEqual(calls);
+    expect(bound.mock.contexts).toEqual(calls.map(() => context));
+    expect(unbound.mock.calls).toEqual(calls);
+    expect(unbound.mock.contexts).toHaveLength(calls.length);
+    expect(unbound.mock.contexts.every((receiver) => receiver === undefined)).toBe(true);
+  });
+
   it('replays prior events when resuming by ID so snapshots stay complete', async () => {
     const requests: string[] = [];
     const response = {
@@ -189,7 +254,7 @@ describe('.stream()', () => {
   ] as const)(
     'dispatches the originally validated text route when a raw listener $mutation $field',
     async ({ field, mutation }) => {
-      const output: Response['output'] = [
+      const output: APIResponse['output'] = [
         {
           id: 'msg_first',
           type: 'message',
@@ -256,7 +321,7 @@ describe('.stream()', () => {
   );
 
   it('dispatches validated function-call routes even when raw listeners alter their identities', async () => {
-    const output: Response['output'] = [
+    const output: APIResponse['output'] = [
       {
         id: 'function_first',
         type: 'function_call',
@@ -307,7 +372,7 @@ describe('.stream()', () => {
   });
 
   it('captures a custom-transport routing accessor exactly once for accumulation and dispatch', async () => {
-    const output: Response['output'] = [
+    const output: APIResponse['output'] = [
       {
         id: 'msg_first',
         type: 'message',
@@ -359,6 +424,88 @@ describe('.stream()', () => {
     expect(emitted).toHaveBeenCalledWith(
       expect.objectContaining({ output_index: 0, content_index: 0, snapshot: 'first!' }),
     );
+  });
+
+  describe.each(['SSE', 'serialized stream'])('%s shell output collections', (transport) => {
+    function shellStream(commands: unknown, commandIndex: number, eventType: 'delta' | 'done') {
+      const events = [
+        {
+          type: 'response.created',
+          sequence_number: 0,
+          response: {
+            ...makeResponse(),
+            output: [
+              {
+                id: 'sh_123',
+                type: 'shell_call',
+                call_id: 'call_123',
+                status: 'in_progress',
+                action: { commands },
+              },
+              {
+                id: 'sho_123',
+                type: 'shell_call_output',
+                call_id: 'call_123',
+                status: 'in_progress',
+                output: [],
+              },
+            ],
+          },
+        },
+        {
+          type: `response.shell_call_output_content.${eventType}`,
+          sequence_number: 1,
+          item_id: 'sho_123',
+          output_index: 1,
+          command_index: commandIndex,
+          ...(eventType === 'delta'
+            ? { delta: { stdout: 'result' } }
+            : { output: [{ stdout: 'result', stderr: '', outcome: { type: 'exit', exit_code: 0 } }] }),
+        },
+      ];
+      if (transport === 'serialized stream') {
+        const encoder = new TextEncoder();
+        return ResponseStream.fromReadableStream(
+          ReadableStreamFrom(events.map((event) => encoder.encode(`${JSON.stringify(event)}\n`))),
+        );
+      }
+      const client = new OpenAI({
+        apiKey: 'test-key',
+        fetch: async () =>
+          new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
+            headers: { 'content-type': 'text/event-stream' },
+          }),
+      });
+      return client.responses.stream({ model: 'gpt-4o', input: 'test' });
+    }
+
+    it.each(['delta', 'done'] as const)(
+      'rejects an array-like command collection before %s',
+      async (type) => {
+        const stream = shellStream({ length: 4, 3: 'echo test' }, 3, type);
+        const emitted = vi.fn();
+        stream.on(`response.shell_call_output_content.${type}`, emitted);
+
+        await expect(stream.finalResponse()).rejects.toThrow('missing command at index 3');
+        expect(emitted).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['delta', 'done'] as const)('preserves large command arrays for %s', async (type) => {
+      const commandIndex = 100_000;
+      const stream = shellStream(
+        Array.from({ length: commandIndex + 1 }, () => 'echo test'),
+        commandIndex,
+        type,
+      );
+      const response = await stream.finalResponse();
+      const output = response.output[1];
+      expect(output?.type).toBe('shell_call_output');
+      if (output?.type === 'shell_call_output') {
+        expect(output.output).toHaveLength(commandIndex + 1);
+        expect(output.output[commandIndex]?.stdout).toBe('result');
+      }
+    });
   });
 
   it('replays hosted shell events, dispatches typed listeners, and preserves each command output', async () => {
@@ -513,7 +660,7 @@ describe('.stream()', () => {
       (['message', 'reasoning', 'shell_call_output'] as const).map((itemType) => ({ type, itemType })),
     ),
   )('rejects public $type targeting $itemType before any emission', async ({ type, itemType }) => {
-    const outputByType: Record<typeof itemType, Response['output'][number]> = {
+    const outputByType: Record<typeof itemType, APIResponse['output'][number]> = {
       message: {
         id: 'msg_123',
         type: 'message',
@@ -1093,7 +1240,7 @@ function readableStreamFromEvents(events: ResponseStreamEvent[]) {
   return ReadableStreamFrom(events.map((event) => encoder.encode(JSON.stringify(event) + '\n')));
 }
 
-function makeResponse(overrides: Partial<Response> = {}): Response {
+function makeResponse(overrides: Partial<APIResponse> = {}): APIResponse {
   return {
     id: 'resp_123',
     object: 'response',
@@ -1121,5 +1268,5 @@ function makeResponse(overrides: Partial<Response> = {}): Response {
     usage: null,
     user: null,
     ...overrides,
-  } as Response;
+  } as APIResponse;
 }

@@ -10,7 +10,7 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 function steady_is_running() {
-  curl --silent "http://127.0.0.1:4010/_x-steady/health" >/dev/null 2>&1
+  curl --silent --fail "http://127.0.0.1:4010/_x-steady/health" >/dev/null 2>&1
 }
 
 kill_server_on_port() {

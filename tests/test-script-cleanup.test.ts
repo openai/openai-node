@@ -57,6 +57,7 @@ describeBash('scripts/test mock-server cleanup', () => {
       STARTUP_EXIT: '0',
       PAUSE_STARTUP: 'false',
       REUSE_HEALTHY: 'false',
+      HEALTH_STATUS: '200',
       JEST_EXIT: '0',
     };
     for (const directory of ['scripts', 'bin', 'node_modules/.bin']) {
@@ -72,11 +73,23 @@ describeBash('scripts/test mock-server cleanup', () => {
       'server.cjs',
       'node',
       `const fs = require('node:fs');
+const http = require('node:http');
 const root = process.env.FIXTURE_ROOT;
-process.on('SIGTERM', () => { fs.writeFileSync(root + '/server.stopped', 'SIGTERM'); process.exit(0); });
 fs.writeFileSync(root + '/server.pid', String(process.pid));
-setInterval(() => {}, 1000);
-process.send('ready');`,
+const server = http.createServer((request, response) => {
+  fs.appendFileSync(root + '/health.requests', request.url + '\\n');
+  response.writeHead(Number(process.env.HEALTH_STATUS));
+  response.end();
+});
+process.on('SIGTERM', () => {
+  fs.writeFileSync(root + '/server.stopped', 'SIGTERM');
+  server.close(() => process.exit(0));
+});
+server.listen(0, '127.0.0.1', () => {
+  const address = server.address();
+  fs.writeFileSync(root + '/health.url', 'http://127.0.0.1:' + address.port + '/_x-steady/health');
+  process.send('ready');
+});`,
     );
     writeExecutable(
       'scripts/mock',
@@ -123,6 +136,20 @@ child.once('message', () => {
     await once(existingProcess, 'message');
   }
 
+  function useNativeHealthProbe(): void {
+    const curl = spawnSync('bash', ['-c', 'command -v curl'], { encoding: 'utf-8' });
+    expect(curl.error).toBeUndefined();
+    expect(curl.status).toBe(0);
+    env['NATIVE_CURL'] = curl.stdout.trim();
+    env['HEALTH_PORT'] = new URL(readFileSync(path.join(fixture, 'health.url'), 'utf-8')).port;
+    // Keep the wrapper and its curl options intact, redirecting only the connection to our isolated server.
+    writeExecutable(
+      'bin/curl',
+      'bash',
+      `exec "$NATIVE_CURL" --disable --noproxy '*' --max-time 5 --connect-to "127.0.0.1:4010:127.0.0.1:$HEALTH_PORT" "$@"`,
+    );
+  }
+
   function runTests(expectedExit: number): void {
     const result = spawnSync('bash', [path.join(fixture, 'scripts/test'), '--showConfig'], {
       cwd: fixture,
@@ -143,6 +170,25 @@ child.once('message', () => {
 
     expect(existsSync(path.join(fixture, 'mock.called'))).toBe(true);
     expect(existsSync(path.join(fixture, 'jest.called'))).toBe(false);
+    expect(existsSync(path.join(fixture, 'lsof.called'))).toBe(false);
+    expect(isRunning(fixturePid())).toBe(true);
+  });
+
+  test.each([
+    { status: 200, exitCode: 0, startsMock: false, runsJest: true },
+    { status: 404, exitCode: 23, startsMock: true, runsJest: false },
+    { status: 503, exitCode: 23, startsMock: true, runsJest: false },
+  ])('handles a real HTTP $status health response', async ({ status, exitCode, startsMock, runsJest }) => {
+    env['HEALTH_STATUS'] = String(status);
+    await startExistingProcess();
+    useNativeHealthProbe();
+    env['STARTUP_EXIT'] = '23';
+
+    runTests(exitCode);
+
+    expect(readFileSync(path.join(fixture, 'health.requests'), 'utf-8')).toContain('/_x-steady/health\n');
+    expect(existsSync(path.join(fixture, 'mock.called'))).toBe(startsMock);
+    expect(existsSync(path.join(fixture, 'jest.called'))).toBe(runsJest);
     expect(existsSync(path.join(fixture, 'lsof.called'))).toBe(false);
     expect(isRunning(fixturePid())).toBe(true);
   });

@@ -1,15 +1,21 @@
 import type { Dirent } from 'node:fs';
+import type { promisify } from 'node:util';
+import type pAll from 'p-all';
 
 const packedPackageAcorn: {
   parse: (source: string, options: { ecmaVersion: 2020; sourceType: 'module' }) => unknown;
 } = require(require.resolve('acorn', { paths: [require.resolve('ts-node/package.json')] }));
 const packedPackageAssert = require('node:assert/strict');
 const packedPackageChildProcess = require('node:child_process');
+const { promisify: packedPackagePromisify }: { promisify: typeof promisify } = require('node:util');
+
+const packedPackageExecFile = packedPackagePromisify(packedPackageChildProcess.execFile);
+const packedPackageAll: typeof pAll = require('p-all');
 const packedPackageFs = require('node:fs');
 const packedPackageOs = require('node:os');
 const packedPackagePath = require('node:path');
 
-(() => {
+(async () => {
   const assert = packedPackageAssert;
   const childProcess = packedPackageChildProcess;
   const fs = packedPackageFs;
@@ -44,6 +50,13 @@ const packedPackagePath = require('node:path');
     'OAuthError',
     'SubjectTokenProviderError',
   ];
+  const paginationExportNames = [
+    'ConversationCursorPage',
+    'CursorPage',
+    'NextCursorPage',
+    'Page',
+    'TokenPage',
+  ];
   const run = (command: string, args: string[], options: RunOptions = {}): string =>
     childProcess.execFileSync(command, args, {
       cwd: temporaryDirectory,
@@ -51,6 +64,14 @@ const packedPackagePath = require('node:path');
       stdio: 'pipe',
       ...options,
     });
+  const runAsync = async (command: string, args: string[], options: RunOptions = {}): Promise<string> => {
+    const { stdout } = await packedPackageExecFile(command, args, {
+      cwd: temporaryDirectory,
+      encoding: 'utf-8',
+      ...options,
+    });
+    return stdout;
+  };
   const readPackage = (file: string): PackageMetadata =>
     JSON.parse(fs.readFileSync(file, 'utf-8')) as PackageMetadata;
   const findSourceMaps = (directory: string): string[] => {
@@ -105,6 +126,7 @@ const packedPackagePath = require('node:path');
       path.join(temporaryDirectory, 'consumer.cjs'),
       [
         "const OpenAI = require('openai');",
+        "const pagination = require('openai/core/pagination');",
         "const { bedrock } = require('openai/providers/bedrock');",
         "const auth = require('openai/auth');",
         "if (typeof OpenAI !== 'function') throw new Error('CommonJS default export is not constructable');",
@@ -113,6 +135,10 @@ const packedPackagePath = require('node:path');
           (name) =>
             `if (typeof auth.${name} !== 'function') throw new Error('CommonJS auth export ${name} is unavailable');`,
         ),
+        ...paginationExportNames.map(
+          (name) =>
+            `if (typeof OpenAI.${name} !== 'function' || OpenAI.${name} !== pagination.${name}) throw new Error('CommonJS pagination static ${name} does not match its public export');`,
+        ),
         "new OpenAI({ apiKey: 'test' });",
       ].join('\n'),
     );
@@ -120,6 +146,7 @@ const packedPackagePath = require('node:path');
       path.join(temporaryDirectory, 'consumer.mjs'),
       [
         "import OpenAI from 'openai';",
+        "import * as pagination from 'openai/core/pagination';",
         "import { bedrock } from 'openai/providers/bedrock';",
         `import { ${authExportNames.join(', ')} } from 'openai/auth';`,
         "if (typeof OpenAI !== 'function') throw new Error('ESM default export is not constructable');",
@@ -127,6 +154,10 @@ const packedPackagePath = require('node:path');
         ...authExportNames.map(
           (name) =>
             `if (typeof ${name} !== 'function') throw new Error('ESM auth export ${name} is unavailable');`,
+        ),
+        ...paginationExportNames.map(
+          (name) =>
+            `if (typeof OpenAI.${name} !== 'function' || OpenAI.${name} !== pagination.${name}) throw new Error('ESM pagination static ${name} does not match its public export');`,
         ),
         "new OpenAI({ apiKey: 'test' });",
       ].join('\n'),
@@ -375,30 +406,38 @@ const packedPackagePath = require('node:path');
       ),
     ) as { certificateChain: string; privateKey: string };
 
-    for (const [undiciVersion, transportAssertions] of [
-      ['5.1.1', unsupportedDispatcher],
-      ['5.2.0', unsupportedProxy],
-      ['5.5.0', unsupportedProxy],
-      ['5.5.1', supportedTransports],
-      ['6.28.0', supportedTransports],
-      ['7.0.0', supportedTransports],
-    ] as const) {
+    const legacyConsumers = await packedPackageAll(
+      (
+        [
+          ['5.1.1', unsupportedDispatcher],
+          ['5.2.0', unsupportedProxy],
+          ['5.5.0', unsupportedProxy],
+          ['5.5.1', supportedTransports],
+          ['6.28.0', supportedTransports],
+          ['7.0.0', supportedTransports],
+        ] as const
+      ).map(([undiciVersion, transportAssertions]) => async () => {
+        const legacyPackOutput = await runAsync('npm', [
+          'pack',
+          '--silent',
+          '--ignore-scripts',
+          '--cache',
+          npmCache,
+          '--pack-destination',
+          temporaryDirectory,
+          `undici@${undiciVersion}`,
+        ]);
+        const packedUndici = legacyPackOutput.trim().split(/\r?\n/).pop();
+        assert(packedUndici, `npm pack did not report the genuine Undici ${undiciVersion} release`);
+        return { undiciVersion, transportAssertions, packedUndici };
+      }),
+      // Complete every child before the temporary directory is removed, including on failure.
+      { concurrency: 3, stopOnError: false },
+    );
+
+    for (const { undiciVersion, transportAssertions, packedUndici } of legacyConsumers) {
       const consumer = path.join(temporaryDirectory, `legacy-undici-${undiciVersion}`);
       fs.mkdirSync(consumer);
-      const packedUndici = run('npm', [
-        'pack',
-        '--silent',
-        '--ignore-scripts',
-        '--cache',
-        npmCache,
-        '--pack-destination',
-        temporaryDirectory,
-        `undici@${undiciVersion}`,
-      ])
-        .trim()
-        .split(/\r?\n/)
-        .pop();
-      assert(packedUndici, `npm pack did not report the genuine Undici ${undiciVersion} release`);
       fs.writeFileSync(
         path.join(consumer, 'package.json'),
         JSON.stringify({ name: `legacy-undici-${undiciVersion}-consumer`, private: true }),
@@ -552,23 +591,30 @@ const packedPackagePath = require('node:path');
       }),
     );
 
-    for (const compiler of [
-      path.join(root, 'node_modules/typescript-4-9/bin/tsc'),
-      path.join(root, 'node_modules/typescript/bin/tsc'),
-    ]) {
-      run(process.execPath, [compiler, '--project', path.join(temporaryDirectory, 'tsconfig.json')], {
-        env: isolatedEnvironment,
-      });
-      run(process.execPath, [compiler, '--project', installedSourceConfig, '--noEmit'], {
-        env: isolatedEnvironment,
-      });
-      run(process.execPath, [compiler, '--project', sourceNavigationConfig], {
-        env: isolatedEnvironment,
-      });
-    }
-    run(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'), '--project', bundlerConfig], {
-      env: isolatedEnvironment,
-    });
+    await packedPackageAll(
+      [
+        ...[
+          path.join(root, 'node_modules/typescript-4-9/bin/tsc'),
+          path.join(root, 'node_modules/typescript/bin/tsc'),
+        ].flatMap((compiler) =>
+          [path.join(temporaryDirectory, 'tsconfig.json'), installedSourceConfig, sourceNavigationConfig].map(
+            (config) => () =>
+              runAsync(process.execPath, [compiler, '--project', config, '--noEmit'], {
+                env: isolatedEnvironment,
+              }),
+          ),
+        ),
+        () =>
+          runAsync(
+            process.execPath,
+            [path.join(root, 'node_modules/typescript/bin/tsc'), '--project', bundlerConfig],
+            {
+              env: isolatedEnvironment,
+            },
+          ),
+      ],
+      { concurrency: 2, stopOnError: false },
+    );
 
     run(process.execPath, ['consumer.cjs']);
     run(process.execPath, ['consumer.mjs']);
@@ -628,6 +674,9 @@ const packedPackagePath = require('node:path');
     console.log(
       `Packed npm artifact passed CommonJS, ESM, ES2020 browser bundling, and ${browserSafeSources.length}/${mappedSources.size} source checks across ${sourceMaps.length} source maps on ${process.version}.`,
     );
+  } catch (error) {
+    console.error(error);
+    process.exitCode = 1;
   } finally {
     fs.rmSync(temporaryDirectory, { recursive: true, force: true });
   }

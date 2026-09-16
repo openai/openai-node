@@ -1,3 +1,4 @@
+import { compiledFixture, compiledFixtureConfig } from '../utils/compiled-fixtures';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
@@ -155,7 +156,8 @@ test.each(cases)('$source: $status $name', async ({ chunks, resumed, partial, st
   const events = responseEvents(chunks, status, background);
   const nonterminal = status === 'queued' || status === 'in_progress';
   const body = `${events.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\n${nonterminal ? '' : 'data: [DONE]\n\n'}`;
-  const partialEvents = nonterminal ? events : events.slice(0, -1);
+  // Disconnect before the final delta as well as the terminal event.
+  const partialEvents = nonterminal ? events : events.slice(0, -2);
   const partialBody = `${partialEvents.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\n`;
   const requests: {
     method: string | undefined;
@@ -190,12 +192,12 @@ test.each(cases)('$source: $status $name', async ({ chunks, resumed, partial, st
   const child = spawn(
     process.execPath,
     [
-      path.join(root, 'node_modules/ts-node/dist/bin.js'),
-      '--swc',
       '-r',
       path.join(root, 'node_modules/tsconfig-paths/register.js'),
       ...(source === 'guide'
         ? [
+            path.join(root, 'node_modules/ts-node/dist/bin.js'),
+            '--swc',
             '--eval',
             `import OpenAI from 'openai';
 const client = new OpenAI();
@@ -205,8 +207,7 @@ ${guideSnippet}
 main();`,
           ]
         : [
-            path.join(
-              root,
+            compiledFixture(
               'examples/responses',
               source === 'example' ? 'stream_background.ts' : `${source}.ts`,
             ),
@@ -220,7 +221,9 @@ main();`,
         OPENAI_BASE_URL: `http://127.0.0.1:${address.port}/v1`,
         OPENAI_CUSTOM_HEADERS: undefined,
         OPENAI_LOG: undefined,
-        TS_NODE_PROJECT: path.join(root, 'tsconfig.json'),
+        // Keep console-inspected event numbers plain for the sequence assertions.
+        FORCE_COLOR: undefined,
+        TS_NODE_PROJECT: compiledFixtureConfig(),
         DISABLE_V8_COMPILE_CACHE: '1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -270,6 +273,10 @@ main();`,
     }
     if (source === 'example') {
       expect(stdout.includes('Interrupted. Continuing...')).toBe(resumed);
+      const seenSequences = [...stdout.matchAll(/sequence_number:\s*(?<sequence>\d+)/gu)].map((match) =>
+        Number(match.groups?.['sequence']),
+      );
+      expect(seenSequences).toEqual(events.map((event) => event.sequence_number));
     } else if (source === 'guide') {
       expect(stdout + stderr).not.toContain(privateErrorDetail);
     }

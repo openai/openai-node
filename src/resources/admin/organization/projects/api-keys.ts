@@ -130,6 +130,12 @@ export interface ProjectAPIKey {
    * The redacted value of the API key
    */
   redacted_value: string;
+
+  /**
+   * The Unix timestamp (in seconds) when the API key expires, or null if it does not
+   * expire.
+   */
+  expires_at?: number | null;
 }
 
 export namespace ProjectAPIKey {
