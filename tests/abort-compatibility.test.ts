@@ -16,6 +16,7 @@ async function collect<T>(stream: AsyncIterable<T>): Promise<T[]> {
   return values;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- The default response parser handles arbitrary bodies; these regressions inspect its rejection behavior.
 function parseResponse(response: Response, controller: AbortController): Promise<unknown> {
   return defaultParseResponse(new OpenAI({ apiKey: 'test-key' }), {
     response,
@@ -181,6 +182,7 @@ describe('fallback caller abort subscriptions', () => {
           ? new Proxy(caller.signal, {
               getPrototypeOf: () => null,
               get(target, property) {
+                // oxlint-disable-next-line anti-slop/no-reflect-get -- The compatibility proxy must preserve native AbortSignal accessors with the signal as receiver.
                 const value = Reflect.get(target, property, target);
                 return typeof value === 'function' ? value.bind(target) : value;
               },
@@ -305,6 +307,7 @@ describe('fallback caller abort subscriptions', () => {
       expect(response.body?.locked).toBe(false);
 
       if (mode === 'sse') {
+        // SAFETY: The sse branch requests stream mode, so this pending operation resolves to the async Stream consumed below.
         const stream = (await pending) as Stream<unknown>;
         const reading = stream[Symbol.asyncIterator]().next();
         caller.abort(new Error('caller cancellation'));

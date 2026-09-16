@@ -7,6 +7,7 @@ import { setImmediate as nextTurn } from 'node:timers/promises';
 import { playAudio } from 'openai/helpers/audio';
 
 // Keep native child-process pipes without invoking ffplay or accessing audio hardware.
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace only the ffplay executable with a controlled real child process to test pipe and exit ordering without audio hardware.
 vi.mock('node:child_process', async (importOriginal) => {
   const original = await importOriginal<typeof ChildProcessModule>();
   return {

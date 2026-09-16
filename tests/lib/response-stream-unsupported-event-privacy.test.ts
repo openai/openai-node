@@ -30,7 +30,7 @@ function makeResponse(): APIResponse {
     tool_choice: 'auto',
     tools: [],
     top_p: null,
-  } as APIResponse;
+  };
 }
 
 function createdEvent(): ResponseStreamEvent {
@@ -38,10 +38,10 @@ function createdEvent(): ResponseStreamEvent {
     type: 'response.created',
     sequence_number: 0,
     response: makeResponse(),
-  } as ResponseStreamEvent;
+  };
 }
 
-function unsupportedEvent(type: unknown = futureEventType): Record<string, unknown> {
+function unsupportedEvent(type: unknown = futureEventType) {
   return {
     type,
     sequence_number: 1,
@@ -68,21 +68,25 @@ function createSnapshot(): APIResponse {
 
 function expectPrivateFailure(error: unknown, expectedType: string): asserts error is OpenAIError {
   expect(error).toBeInstanceOf(OpenAIError);
-  expect((error as OpenAIError).constructor).toBe(OpenAIError);
-  expect((error as OpenAIError).message).toBe(unsupportedPrefix + expectedType);
-  expect((error as OpenAIError).message).not.toContain(syntheticCredential);
-  expect((error as OpenAIError).message).not.toContain(syntheticPatient);
-  expect((error as OpenAIError).message).not.toContain(syntheticPrompt);
-  expect((error as OpenAIError).message).not.toContain(syntheticPassword);
-  expect((error as OpenAIError).message).not.toContain('{');
-  expect((error as OpenAIError).stack).not.toContain(syntheticCredential);
-  expect((error as OpenAIError).stack).not.toContain(syntheticPatient);
-  expect((error as OpenAIError).stack).not.toContain(syntheticPrompt);
-  expect((error as OpenAIError).stack).not.toContain(syntheticPassword);
+  // SAFETY: The preceding instance assertion verifies the captured rejection is an OpenAIError.
+  const failure = error as OpenAIError;
+  expect(failure.constructor).toBe(OpenAIError);
+  expect(failure.message).toBe(unsupportedPrefix + expectedType);
+  expect(failure.message).not.toContain(syntheticCredential);
+  expect(failure.message).not.toContain(syntheticPatient);
+  expect(failure.message).not.toContain(syntheticPrompt);
+  expect(failure.message).not.toContain(syntheticPassword);
+  expect(failure.message).not.toContain('{');
+  expect(failure.stack).not.toContain(syntheticCredential);
+  expect(failure.stack).not.toContain(syntheticPatient);
+  expect(failure.stack).not.toContain(syntheticPrompt);
+  expect(failure.stack).not.toContain(syntheticPassword);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure. The regression intentionally feeds unsupported or malformed event values through the public parsing boundary.
 function applyUnsupported(event: unknown, snapshot?: APIResponse): unknown {
   try {
+    // SAFETY: This fixture deliberately injects unsupported or minimal event records so runtime dispatch and privacy checks remain under test.
     accumulateResponse(event as ResponseStreamEvent, snapshot);
   } catch (error) {
     return error;
@@ -137,8 +141,8 @@ describe('unsupported Responses event diagnostic privacy', () => {
         const failure = applyUnsupported(unsupportedEvent(type), snapshot);
 
         expectPrivateFailure(failure, 'unknown');
-        expect((failure as OpenAIError).message).not.toContain('ssn123456789');
-        expect((failure as OpenAIError).stack).not.toContain('ssn123456789');
+        expect(failure.message).not.toContain('ssn123456789');
+        expect(failure.stack).not.toContain('ssn123456789');
       }
     },
   );
@@ -175,6 +179,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
           if (property === 'type') {
             return getter();
           }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
           return Reflect.get(target, property, receiver);
         },
       });
@@ -222,6 +227,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
           if (property === 'type') {
             return getter();
           }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
           return Reflect.get(target, property, receiver);
         },
       });
@@ -296,6 +302,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
     'continues dispatching the generated %s discriminator',
     (type) => {
       const itemScoped = type === 'response.mcp_list_tools.failed';
+      // SAFETY: This fixture deliberately injects unsupported or minimal event records so runtime dispatch and privacy checks remain under test.
       const snapshot = itemScoped
         ? accumulateResponse({
             ...createdEvent(),
@@ -305,6 +312,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
             },
           } as ResponseStreamEvent)
         : createSnapshot();
+      // SAFETY: This fixture deliberately injects unsupported or minimal event records so runtime dispatch and privacy checks remain under test.
       const event = {
         type,
         sequence_number: 1,
@@ -396,6 +404,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
 
   test('does not trust an inherited discriminator for diagnostic output', () => {
     const snapshot = createSnapshot();
+    // SAFETY: The inherited discriminator fixture must preserve its prototype to test own-property validation.
     const event = Object.create({ type: futureEventType }) as Record<string, unknown>;
     event['sequence_number'] = 1;
     event['private_data'] = syntheticCredential;
@@ -459,7 +468,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
       );
 
       expectPrivateFailure(failure, 'unknown');
-      expect((failure as OpenAIError).message).not.toContain('ssn123456789');
+      expect(failure.message).not.toContain('ssn123456789');
       expect(events).not.toHaveBeenCalled();
       expect(errors).toHaveBeenCalledWith(failure);
     },
@@ -471,6 +480,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
       const created = createdEvent();
       const event = unsupportedEvent();
       const stream = ResponseStream.fromReadableStream(
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The mixed wire-event fixture serializes protocol events and unsupported records through one test stream.
         readableStream([created as unknown as Record<string, unknown>, event]),
       );
       const events = vi.fn();
@@ -568,6 +578,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
     };
     const stream = ResponseStream.fromReadableStream(
       readableStream([
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The mixed wire-event fixture serializes protocol events and unsupported records through one test stream.
         createdEvent() as unknown as Record<string, unknown>,
         { type: 'error', sequence_number: 1, error: payload },
       ]),

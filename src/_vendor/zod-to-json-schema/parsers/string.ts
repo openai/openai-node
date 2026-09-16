@@ -222,6 +222,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
         case 'base64': {
           switch (refs.base64Strategy) {
             case 'format:binary': {
+              // SAFETY: The explicit OpenAPI binary strategy uses format: binary, an extension to the vendored JSON Schema string-format type.
               addFormat(res, 'binary' as any, check.message, refs);
               break;
             }

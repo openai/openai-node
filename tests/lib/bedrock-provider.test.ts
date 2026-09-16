@@ -212,12 +212,13 @@ describe('bedrock provider', () => {
         const request = {
           method: 'post',
           headers: originalHeaders,
-          redirect: 'follow',
-        } as any;
+          redirect: 'follow' as const,
+        };
 
         await expect(
           runtime.prepareRequest!(request, {
             url: 'https://attacker.example/exfiltrate?credential=private',
+            // SAFETY: These direct prepareRequest tests exercise the supplied URL and finalized request; this provider path does not read the inert request-options fixture.
             options: {} as any,
           }),
         ).rejects.toThrow('Bedrock request origin');
@@ -249,13 +250,19 @@ describe('bedrock provider', () => {
         );
 
       expect(requestError).toBeInstanceOf(Error);
-      expect((requestError as Error).message).toContain('https://attacker.example');
-      expect((requestError as Error).message).toContain('https://bedrock.example.com');
+      expect(requestError).toHaveProperty('message', expect.stringContaining('https://attacker.example'));
+      expect(requestError).toHaveProperty('message', expect.stringContaining('https://bedrock.example.com'));
+      // SAFETY: The preceding instance assertion verifies Error before its message is checked for URL credential and path disclosure.
       expect((requestError as Error).message).not.toContain('embedded-user');
+      // SAFETY: The preceding instance assertion verifies Error before its message is checked for URL credential and path disclosure.
       expect((requestError as Error).message).not.toContain('embedded-password');
+      // SAFETY: The preceding instance assertion verifies Error before its message is checked for URL credential and path disclosure.
       expect((requestError as Error).message).not.toContain('/exfiltrate/private');
+      // SAFETY: The preceding instance assertion verifies Error before its message is checked for URL credential and path disclosure.
       expect((requestError as Error).message).not.toContain('secret-query');
+      // SAFETY: The preceding instance assertion verifies Error before its message is checked for URL credential and path disclosure.
       expect((requestError as Error).message).not.toContain('secret-fragment');
+      // SAFETY: The preceding instance assertion verifies Error before its message is checked for URL credential and path disclosure.
       expect((requestError as Error).message).not.toContain('/openai/v1');
       expect(fetch).not.toHaveBeenCalled();
     });
@@ -285,6 +292,7 @@ describe('bedrock provider', () => {
           ) {
             credentialEnvironmentReads(property);
           }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
           return Reflect.get(target, property, receiver);
         },
       });
@@ -791,6 +799,7 @@ describe('bedrock provider', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The undefined provider result intentionally violates its declared type to test runtime credential rejection.
   test.each([[''], ['   '], [undefined as unknown as string]])(
     'rejects an invalid value returned by a bearer credential provider',
     async (token) => {
@@ -832,6 +841,7 @@ describe('bedrock provider', () => {
     const client = new OpenAI({
       provider: bedrock({
         region: 'us-east-1',
+        // SAFETY: The fixture deliberately returns incomplete or invalid AWS credentials so the provider boundary must reject them before fetch.
         credentialProvider: async () => credentials as any,
       }),
       fetch,
@@ -873,10 +883,14 @@ describe('bedrock provider', () => {
 
     let thrown: unknown;
     try {
-      await runtime.prepareRequest!({ headers: new Headers(), method: 'GET' } as any, {
-        url: 'https://bedrock-mantle.us-east-1.api.aws/openai/v1/models',
-        options: {} as any,
-      });
+      await runtime.prepareRequest!(
+        { headers: new Headers(), method: 'GET' },
+        {
+          url: 'https://bedrock-mantle.us-east-1.api.aws/openai/v1/models',
+          // SAFETY: These direct prepareRequest tests exercise the supplied URL and finalized request; this provider path does not read the inert request-options fixture.
+          options: {} as any,
+        },
+      );
     } catch (error) {
       thrown = error;
     } finally {
@@ -909,15 +923,16 @@ describe('bedrock provider', () => {
       }),
       method: 'post',
       body: new ArrayBuffer(2),
-    } as any;
+    };
 
     await runtime.prepareRequest!(firstRequest, {
       url: 'https://localhost:8443/openai/v1/models?tag=one&tag=two&tag=three',
+      // SAFETY: These direct prepareRequest tests exercise the supplied URL and finalized request; this provider path does not read the inert request-options fixture.
       options: {} as any,
     });
 
     expect(firstRequest.method).toBe('POST');
-    expect(firstRequest.redirect).toBe('manual');
+    expect(firstRequest).toHaveProperty('redirect', 'manual');
     expect(firstRequest.headers.get('host')).toBe('localhost:8443');
     expect(firstRequest.headers.get('authorization')).toContain('AWS4-HMAC-SHA256');
     expect(firstRequest.headers.get('x-amz-date')).not.toBe('stale-date');
@@ -931,21 +946,23 @@ describe('bedrock provider', () => {
       body: firstRequest.body,
     });
 
-    const secondRequest = { headers: new Headers(), method: 'post', body: new Uint8Array([1]) } as any;
+    const secondRequest = { headers: new Headers(), method: 'post', body: new Uint8Array([1]) };
     await runtime.prepareRequest!(secondRequest, {
       url: 'https://localhost:8443/openai/v1/responses',
+      // SAFETY: These direct prepareRequest tests exercise the supplied URL and finalized request; this provider path does not read the inert request-options fixture.
       options: {} as any,
     });
     expect(secondRequest.method).toBe('POST');
     expect(secondRequest.headers.get('authorization')).toContain('AWS4-HMAC-SHA256');
     expect(sign.mock.calls[1]?.[0]).toMatchObject({ method: 'POST', body: secondRequest.body });
 
-    const thirdRequest = { headers: new Headers() } as any;
+    const thirdRequest = { headers: new Headers() };
     await runtime.prepareRequest!(thirdRequest, {
       url: 'https://localhost:8443/openai/v1/models',
+      // SAFETY: These direct prepareRequest tests exercise the supplied URL and finalized request; this provider path does not read the inert request-options fixture.
       options: {} as any,
     });
-    expect(thirdRequest.method).toBe('GET');
+    expect(thirdRequest).toHaveProperty('method', 'GET');
     expect(sign.mock.calls[2]?.[0]).toMatchObject({ method: 'GET' });
   });
 
@@ -1060,6 +1077,7 @@ describe('bedrock provider', () => {
   });
 
   test.each(['', ' ', 'invalid', 'Runtime', null, 123])('rejects invalid endpoint mode %j', (endpoint) => {
+    // SAFETY: The table intentionally contains invalid endpoint modes, including non-strings, to exercise public option validation.
     const invalidEndpoint = endpoint as BedrockProviderOptions['endpoint'];
 
     expect(() =>
@@ -1088,6 +1106,7 @@ describe('bedrock provider', () => {
       'multiple AWS credential modes',
       { accessKeyId: 'access-key', secretAccessKey: 'secret-key', profile: 'profile' },
     ],
+    // SAFETY: Conflicting credential sources must be rejected before this deliberately incomplete credential provider is invoked.
     ['profile and credential provider', { profile: 'profile', credentialProvider: async () => ({}) as any }],
     ['bearer and AWS credentials', { apiKey: 'token', profile: 'profile' }],
     ['static bearer and token provider', { apiKey: 'token', tokenProvider: async () => 'token' }],

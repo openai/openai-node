@@ -3,6 +3,7 @@ import type { ZodSchema, ZodTypeDef } from 'zod/v3';
 export const zodDef = (zodSchema: ZodSchema | ZodTypeDef): ZodTypeDef =>
   '_def' in zodSchema ? zodSchema._def : zodSchema;
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Preserve the upstream utility contract: any object can have enumerable own or inherited keys.
 export function isEmptyObj(obj: object | null | undefined): boolean {
   if (!obj) {
     return true;

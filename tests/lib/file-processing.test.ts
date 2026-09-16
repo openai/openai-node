@@ -3,6 +3,7 @@ import OpenAI, { APIConnectionTimeoutError } from 'openai';
 import type { Fetch } from 'openai/internal/builtin-types';
 import { sleep } from 'openai/internal/utils/sleep';
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Control elapsed-time transitions and exact sleep arguments, including NaN, before native timer normalization.
 vi.mock('openai/internal/utils/sleep', () => ({
   sleep: vi.fn(async () => {}),
 }));

@@ -54,6 +54,7 @@ export type BedrockAuthFactory = () => BedrockRequestAuth;
 
 /** Wraps a provider failure in an SDK error while preserving its original cause. */
 export function errorWithCause(message: string, cause: unknown): Errors.OpenAIError {
+  // SAFETY: This SDK error is created locally and receives its optional cause immediately below; no existing error shape is trusted.
   const error = new Errors.OpenAIError(message) as Errors.OpenAIError & { cause?: unknown };
   error.cause = cause;
   return error;
@@ -61,6 +62,7 @@ export function errorWithCause(message: string, cause: unknown): Errors.OpenAIEr
 
 /** Trims a configuration string, treating missing and whitespace-only values as absent. */
 export function normalizeOptionalString(value: string | null | undefined): string | undefined {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
   const normalized = typeof value === 'string' ? value.trim() : undefined;
   return normalized || undefined;
 }
@@ -207,6 +209,7 @@ export function resolveBedrockEndpoint(options: BedrockEndpointOptions): {
     const endpoint =
       options.endpoint ?? parseBedrockEndpointHostname(new URL(baseURL).hostname)?.endpoint ?? 'mantle';
     validateCanonicalBedrockEndpoint(baseURL, endpoint, region);
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Preserve the declared endpoint resolver contract across configured URLs and inferred regions.
     return { endpoint, region, baseURL };
   }
   const endpoint = options.endpoint ?? 'mantle';
@@ -220,6 +223,7 @@ export function resolveBedrockEndpoint(options: BedrockEndpointOptions): {
     endpoint === 'runtime'
       ? `bedrock-runtime.${region}.${resolveRuntimeDnsSuffixes(region)[0]}`
       : `bedrock-mantle.${region}.api.aws`;
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The resolver intentionally returns its declared endpoint contract across all configuration paths.
   return { endpoint, region, baseURL: `https://${hostname}/openai/v1` };
 }
 
@@ -245,7 +249,9 @@ export function assertBedrockRequestOrigin(baseURL: string, requestURL: string):
 }
 
 /** Validates a final WebSocket URL before a legacy Bedrock client resolves or attaches credentials. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The WebSocket authentication boundary verifies the caller client at runtime before trusting provider metadata.
 export function assertBedrockWebSocketOrigin(client: unknown, requestURL: URL): void {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
   if (typeof client !== 'object' || client === null || !(brand_privateBedrockClient in client)) {
     return;
   }
@@ -257,7 +263,9 @@ export function assertBedrockWebSocketOrigin(client: unknown, requestURL: URL): 
     normalizedRequestURL.protocol = 'http:';
   }
 
+  // SAFETY: The private Bedrock brand checked above identifies the client whose baseURL is validated against the finalized request origin.
   assertBedrockRequestOrigin(
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The private Bedrock client brand checked above identifies the client baseURL contract.
     (client as unknown as { baseURL: string }).baseURL,
     normalizedRequestURL.toString(),
   );
@@ -346,6 +354,7 @@ function resolveAbortableBedrockAuth<T>(
       }
     };
 
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const rejectSignalFailure = (error: unknown) => {
       if (failure.error) {
         return;
@@ -483,6 +492,7 @@ class BedrockBearerAuth implements BedrockRequestAuth {
       resolve: () => this.tokenProvider(),
       failureMessage: 'Failed to resolve a bearer credential for Bedrock.',
       apply: (token) => {
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
         if (typeof token !== 'string' || !token.trim()) {
           throw new Errors.OpenAIError(
             'The Bedrock bearer credential provider must return a non-empty string.',
@@ -533,6 +543,7 @@ export function resolveBedrockBearerAuth(
   if (
     options.apiKey !== undefined &&
     options.apiKey !== null &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
     (typeof options.apiKey !== 'string' || !options.apiKey.trim())
   ) {
     throw new Errors.OpenAIError('The Bedrock bearer credential must not be empty.');
@@ -545,13 +556,16 @@ export function resolveBedrockBearerAuth(
 
   if (options.tokenProvider) {
     const tokenProvider = options.tokenProvider;
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared bearer-auth contract hides concrete authenticator implementations behind their factory.
     return { factory: () => new BedrockBearerAuth(tokenProvider), explicit: true };
   }
   if (options.apiKey != null) {
     const apiKey = options.apiKey;
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Explicit API keys use the same declared auth-factory contract as token providers.
     return { factory: () => new BedrockBearerAuth(async () => apiKey), explicit: true };
   }
   if (allowEnvironment && options.apiKey !== null && readEnv('AWS_BEARER_TOKEN_BEDROCK')) {
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Environment credentials must preserve the same declared auth-factory contract as explicit options.
     return {
       explicit: false,
       factory: () =>
@@ -567,5 +581,6 @@ export function resolveBedrockBearerAuth(
     };
   }
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared optional factory contract also represents the absence of bearer credentials.
   return { factory: undefined, explicit: false };
 }

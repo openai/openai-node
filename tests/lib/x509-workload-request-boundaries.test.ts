@@ -214,7 +214,7 @@ describe('X.509 request ownership boundaries', () => {
       const original = client.buildRequest.bind(client);
       const builds = vi.fn(async (...args: Parameters<OpenAI['buildRequest']>) => {
         const built = await original(...args);
-        let body: unknown;
+        let body: ReadableStream<Uint8Array> | AsyncIterable<Uint8Array> | typeof chunks;
         if (kind === 'ReadableStream') {
           body = new ReadableStream({
             start(controller) {

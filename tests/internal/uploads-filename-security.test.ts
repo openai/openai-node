@@ -17,7 +17,9 @@ describe('streaming upload filename security', () => {
     ['boxed string', new Object('upload.txt')],
     ['symbol', Symbol('upload.txt')],
   ] as const)('rejects %s filenames during construction', (_, name) => {
+    // SAFETY: This upload fixture intentionally exercises unsupported or legacy runtime inputs; only the validator/serializer under test consumes the value.
     expect(() => toStreamingFile(chunks(), name as any)).toThrow(TypeError);
+    // SAFETY: This upload fixture intentionally exercises unsupported or legacy runtime inputs; only the validator/serializer under test consumes the value.
     expect(() => toStreamingFile(chunks(), name as any)).toThrow(/file.?name/iu);
   });
 
@@ -25,6 +27,7 @@ describe('streaming upload filename security', () => {
     const coerce = vi.fn(() => 'attack.txt"\r\nInjected: yes');
     const name = { toString: coerce, valueOf: coerce, [Symbol.toPrimitive]: coerce };
 
+    // SAFETY: This upload fixture intentionally exercises unsupported or legacy runtime inputs; only the validator/serializer under test consumes the value.
     expect(() => toStreamingFile(chunks(), name as any)).toThrow(TypeError);
     expect(coerce).not.toHaveBeenCalled();
   });
@@ -40,6 +43,7 @@ describe('streaming upload filename security', () => {
     Object.defineProperty(upload, 'name', { value: name });
     const options = await multipartFormRequestOptions({ body: { upload } }, fetch);
 
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     await expect((options.body as ReadableStream).getReader().read()).rejects.toThrow(/file.?name/iu);
   });
 
@@ -48,6 +52,7 @@ describe('streaming upload filename security', () => {
     const upload = toStreamingFile(chunks(), 'upload.txt');
     const options = await multipartFormRequestOptions({ body: { purpose: 'assistants', upload } }, fetch);
     Object.defineProperty(upload, 'name', { value: { toString: coerce, [Symbol.toPrimitive]: coerce } });
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const reader = (options.body as ReadableStream).getReader();
     let emitted = '';
 
@@ -78,6 +83,7 @@ describe('streaming upload filename security', () => {
       { body: { [`field-${unsafe}`]: toStreamingFile(chunks(), `résumé-${unsafe}.txt`) } },
       fetch,
     );
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const body = await new Response(options.body as ReadableStream).text();
 
     expect(body).toContain(`name="field-${escaped}"; filename="%0D%0AInjected: yes.txt"`);
@@ -91,6 +97,7 @@ describe('streaming upload filename security', () => {
       fetch,
     );
 
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     await expect(new Response(options.body as ReadableStream).text()).resolves.toContain(
       `name="添付-📎"; filename="${filename}"`,
     );
@@ -113,6 +120,7 @@ describe('streaming upload filename security', () => {
         fetch,
         formOptions,
       );
+      // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
       const body = await new Response(options.body as ReadableStream).text();
 
       expect(body).toContain(`filename="${streaming}"`);
@@ -130,6 +138,7 @@ describe('streaming upload filename security', () => {
     const options = await multipartFormRequestOptions({ body: { upload } }, fetch);
 
     expect(iterate).not.toHaveBeenCalled();
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     await expect(new Response(options.body as ReadableStream).text()).resolves.toContain('firstsecond');
     expect(iterate).toHaveBeenCalledTimes(1);
   });

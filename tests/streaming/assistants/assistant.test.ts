@@ -141,6 +141,7 @@ describe('assistant tests', () => {
       value: { event: 'thread.message.delta' },
     });
     expect(failure).toBeInstanceOf(OpenAIError);
+    // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
     expect((failure as OpenAIError).message).toBe('assistant boom');
     await expect(iterator.next()).rejects.toBe(failure);
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });

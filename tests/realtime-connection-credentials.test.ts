@@ -9,7 +9,7 @@ const { MockSocket, sockets } = vi.hoisted(() => {
   const instances: Socket[] = [];
   class Socket {
     readonly url: string | URL;
-    readonly headers: Record<string, string>;
+    declare readonly headers: Record<string, string>;
     readonly protocols: string[];
 
     constructor(
@@ -17,7 +17,13 @@ const { MockSocket, sockets } = vi.hoisted(() => {
       options: string[] | { headers: Record<string, string>; protocols?: string[] },
     ) {
       this.url = url;
-      this.headers = Array.isArray(options) ? {} : options.headers;
+      // Capture transport options without invoking the inherited setters under test.
+      Object.defineProperty(this, 'headers', {
+        value: Array.isArray(options) ? {} : options.headers,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
       this.protocols = Array.isArray(options) ? options : (options.protocols ?? []);
       instances.push(this);
     }
@@ -32,6 +38,7 @@ const { MockSocket, sockets } = vi.hoisted(() => {
   return { MockSocket: Socket, sockets: instances };
 });
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Capture constructor headers and protocols across public adapters to verify credential precedence before network I/O.
 vi.mock('ws', () => ({ WebSocket: MockSocket }));
 
 const surfaces = [
@@ -42,6 +49,7 @@ const surfaces = [
 ] as const;
 
 function credential(connection: { socket: unknown }): string | undefined {
+  // SAFETY: The case selects the matching Azure/client constructor and injected MockSocket; the helper reads only the recorded credential options.
   const socket = connection.socket as InstanceType<typeof MockSocket>;
   return (
     socket.headers['Authorization']?.replace(/^Bearer /u, '') ??
@@ -75,9 +83,124 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+async function withInheritedSetter<T>(property: string, action: () => T) {
+  const original = Object.getOwnPropertyDescriptor(Object.prototype, property);
+  const setter = vi.fn();
+  try {
+    // oxlint-disable-next-line no-extend-native, accessor-pairs -- Simulate a setter-only polluted prototype at the public SDK boundary, then restore it in finally.
+    Object.defineProperty(Object.prototype, property, { configurable: true, set: setter });
+    return { result: await action(), setter };
+  } finally {
+    if (original) {
+      // oxlint-disable-next-line no-extend-native -- Restore the exact prototype descriptor after the isolated pollution fixture.
+      Object.defineProperty(Object.prototype, property, original);
+    } else {
+      Reflect.deleteProperty(Object.prototype, property);
+    }
+  }
+}
+
+describe.each([
+  { name: 'stable', Realtime: StableNodeRealtime },
+  { name: 'beta', Realtime: BetaNodeRealtime },
+])('$name Node own credential headers', ({ Realtime }) => {
+  test.each(['public key', 'Azure key', 'Azure token'] as const)(
+    'bypasses inherited setters for a %s',
+    async (source) => {
+      const apiKey = 'synthetic-own-header-key';
+      const header = source === 'Azure key' ? 'api-key' : 'Authorization';
+      const client =
+        source === 'public key'
+          ? new OpenAI({ apiKey })
+          : new AzureOpenAI({
+              ...(source === 'Azure token' ? { azureADTokenProvider: async () => apiKey } : { apiKey }),
+              apiVersion: '2024-10-01-preview',
+              baseURL: 'https://azure.example/openai/',
+              deployment: 'synthetic-deployment',
+            });
+
+      const { setter } = await withInheritedSetter(header, () =>
+        client instanceof AzureOpenAI
+          ? Realtime.azure(client)
+          : Realtime.create(client, { model: 'gpt-realtime' }),
+      );
+
+      expect(setter).not.toHaveBeenCalled();
+      const [socket] = sockets;
+      if (!socket) {
+        throw new Error('Expected a Realtime connection');
+      }
+      expect(Object.getOwnPropertyDescriptor(socket.headers, header)).toEqual({
+        value: source === 'Azure key' ? apiKey : `Bearer ${apiKey}`,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+    },
+  );
+
+  test('bypasses inherited setters for Azure header options', async () => {
+    const client = new AzureOpenAI({
+      apiKey: 'synthetic-own-options-key',
+      apiVersion: '2024-10-01-preview',
+      baseURL: 'https://azure.example/openai/',
+      deployment: 'synthetic-deployment',
+    });
+
+    const { result: connection, setter } = await withInheritedSetter('headers', () => Realtime.azure(client));
+
+    expect(setter).not.toHaveBeenCalled();
+    expect(credential(connection)).toBe('synthetic-own-options-key');
+  });
+});
+
+test('bypasses inherited setters for the beta protocol header', async () => {
+  const client = new OpenAI({ apiKey: 'synthetic-beta-protocol-key' });
+
+  const { setter } = await withInheritedSetter('OpenAI-Beta', () =>
+    BetaNodeRealtime.create(client, { model: 'gpt-realtime' }),
+  );
+
+  expect(setter).not.toHaveBeenCalled();
+  expect(sockets[0]?.headers['OpenAI-Beta']).toBe('realtime=v1');
+});
+
+describe.each([
+  { name: 'stable', Realtime: StableNativeRealtime },
+  { name: 'beta', Realtime: BetaNativeRealtime },
+])('$name native Azure browser consent', ({ Realtime }) => {
+  test.each([false, true])('preserves explicit %s under an inherited setter', async (allowBrowser) => {
+    const client = new AzureOpenAI({
+      apiKey: 'synthetic-browser-consent-key',
+      apiVersion: '2024-10-01-preview',
+      baseURL: 'https://azure.example/openai/',
+      deployment: 'synthetic-deployment',
+      dangerouslyAllowBrowser: !allowBrowser,
+    });
+    vi.stubGlobal('window', { document: {} });
+    vi.stubGlobal('navigator', {});
+
+    const { result, setter } = await withInheritedSetter('dangerouslyAllowBrowser', () =>
+      Promise.allSettled([Realtime.azure(client, { dangerouslyAllowBrowser: allowBrowser })]),
+    );
+
+    expect(setter).not.toHaveBeenCalled();
+    expect(result[0]).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({
+        message: expect.stringContaining(
+          allowBrowser ? 'credentials require a WebSocket transport' : 'browser-like environment',
+        ),
+      }),
+    });
+    expect(sockets).toHaveLength(0);
+  });
+});
+
 describe.each(surfaces)('$name connection credentials', ({ Realtime }) => {
   describe.each([false, true])('Azure: %s', (azure) => {
     const connect = (client: OpenAI) =>
+      // SAFETY: The case selects the matching Azure/client constructor and injected MockSocket; the helper reads only the recorded credential options.
       azure ? Realtime.azure(client as AzureOpenAI) : Realtime.create(client, { model: 'gpt-realtime' });
 
     test('keeps simultaneously resolved provider credentials with their initiating connections', async () => {

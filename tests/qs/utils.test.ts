@@ -1,5 +1,9 @@
 import { combine, merge, is_buffer, assign_single_source, has } from 'openai/internal/qs/utils';
 
+interface LinkedRecord {
+  next?: LinkedRecord;
+}
+
 describe('merge()', () => {
   // t.deepEqual(merge(null, true), [null, true], 'merges true into null');
   expect(merge(null, true)).toEqual([null, true]);
@@ -122,7 +126,7 @@ describe('prototype-pollution safety', () => {
     expect(has(target, '__proto__')).toBe(false);
     expect(has(target, 'constructor')).toBe(false);
     expect(has(target, 'prototype')).toBe(false);
-    expect(Reflect.get(Object.prototype, 'polluted')).toBeUndefined();
+    expect(Object.prototype).not.toHaveProperty('polluted');
   });
 
   test('merge ignores unsafe keys in nested objects', () => {
@@ -134,7 +138,7 @@ describe('prototype-pollution safety', () => {
     expect(merge(target, source)).toBe(target);
     expect(Object.getPrototypeOf(target.nested)).toBe(Object.prototype);
     expect(target.nested).toEqual({ safe: true });
-    expect(Reflect.get(Object.prototype, 'polluted')).toBeUndefined();
+    expect(Object.prototype).not.toHaveProperty('polluted');
   });
 
   test('sanitizes newly adopted nested records without changing the source', () => {
@@ -233,7 +237,7 @@ describe('prototype-pollution safety', () => {
   });
 
   test('revalidates and replaces every alias after a source getter mutates a safe record', () => {
-    const shared: Record<string, unknown> = { safe: true };
+    const shared = { safe: true };
     let getterCalls = 0;
     const source = {
       first: shared,
@@ -302,7 +306,7 @@ describe('prototype-pollution safety', () => {
   );
 
   test('iteratively snapshots adopted records deeper than the JavaScript call stack', () => {
-    const root: Record<string, any> = {};
+    const root: LinkedRecord = {};
     let current = root;
     for (let index = 0; index < 6000; index += 1) {
       current['next'] = {};
@@ -315,7 +319,7 @@ describe('prototype-pollution safety', () => {
   });
 
   test('fails closed when adopted records exceed the bounded traversal budget', () => {
-    const root: Record<string, any> = {};
+    const root: LinkedRecord = {};
     let current = root;
     for (let index = 0; index < 10_001; index += 1) {
       current['next'] = {};
@@ -326,7 +330,7 @@ describe('prototype-pollution safety', () => {
   });
 
   test('detaches earlier aliases before later proxy descriptor traps can mutate source records', () => {
-    const shared: Record<string, unknown> = { safe: true };
+    const shared = { safe: true };
     let inspections = 0;
     const later = new Proxy(
       { value: true },
@@ -354,7 +358,7 @@ describe('prototype-pollution safety', () => {
   });
 
   test('keeps unpublished snapshots safe when a later proxy mutates the original alias', () => {
-    const shared: Record<string, unknown> = { safe: true };
+    const shared = { safe: true };
     const later = new Proxy(
       { value: true },
       {
@@ -377,7 +381,7 @@ describe('prototype-pollution safety', () => {
 
   test('snapshots two thousand aliases to a shared two-thousand-record graph only once', () => {
     let inspections = 0;
-    const root: Record<string, any> = new Proxy(
+    const root: LinkedRecord = new Proxy(
       {},
       {
         ownKeys(value) {
@@ -394,7 +398,7 @@ describe('prototype-pollution safety', () => {
       current['next'] = {};
       current = current['next'];
     }
-    const source: Record<string, unknown> = {};
+    const source: Record<string, LinkedRecord> = {};
     for (let index = 0; index < 2000; index += 1) {
       source[`alias-${index}`] = root;
     }
@@ -461,6 +465,7 @@ describe('prototype-pollution safety', () => {
   test.each(graphOperations)(
     '$name rejects unsupported unsafe keys even when a proxy changes their enumerability',
     ({ apply }) => {
+      // SAFETY: This local fixture intentionally controls its own keys and prototype; the dictionary view leaves values untrusted while testing prototype safety.
       const unsupported = Object.create({ inherited: true }) as Record<string, unknown>;
       Object.defineProperty(unsupported, '__proto__', {
         configurable: true,
@@ -577,7 +582,7 @@ describe('prototype-pollution safety', () => {
   test.each(graphOperations)(
     '$name leaves the caller target untouched when the traversal budget is exceeded',
     ({ apply }) => {
-      const oversized: Record<string, unknown> = {};
+      const oversized: Record<string, number> = {};
       for (let index = 0; index <= 10_000; index += 1) {
         oversized[`value-${index}`] = index;
       }
@@ -631,6 +636,7 @@ describe('prototype-pollution safety', () => {
   test.each(graphOperations)('$name preserves sealed, non-extensible, and frozen integrity', ({ apply }) => {
     const sealed = Object.seal({ value: true });
     const nonExtensible = Object.preventExtensions({ value: true });
+    // SAFETY: This local fixture intentionally controls its own keys and prototype; the dictionary view leaves values untrusted while testing prototype safety.
     const unsafe = JSON.parse('{"__proto__":{"polluted":true},"safe":true}') as Record<string, unknown>;
     const frozen = Object.freeze({ child: unsafe });
     const result = apply({}, { sealed, nonExtensible, frozen });
@@ -649,6 +655,7 @@ describe('prototype-pollution safety', () => {
   test.each(graphOperations)(
     '$name rejects retained inherited parents polluted by a later child Proxy trap',
     ({ apply }) => {
+      // SAFETY: This local fixture intentionally controls its own keys and prototype; the dictionary view leaves values untrusted while testing prototype safety.
       const parent = Object.create({ inherited: true }) as Record<string, unknown>;
       let inspections = 0;
       parent['child'] = new Proxy(
@@ -679,7 +686,7 @@ describe('prototype-pollution safety', () => {
     '$name rejects an oversized root or adopted record before inspecting any descriptors',
     ({ apply }) => {
       for (const position of ['root', 'adopted']) {
-        const wide: Record<string, unknown> = {};
+        const wide: Record<string, number> = {};
         for (let index = 0; index <= 10_000; index += 1) {
           wide[`value-${index}`] = index;
         }
@@ -715,7 +722,7 @@ describe('prototype-pollution safety', () => {
         return coercions === 1 ? 'safe' : 'constructor';
       },
     });
-    const target: Record<string, unknown> = {};
+    const target: Record<string, boolean> = {};
 
     expect(merge(target, callable)).toBe(target);
     expect(coercions).toBe(1);
@@ -735,7 +742,7 @@ describe('prototype-pollution safety', () => {
           return unsafeKey;
         },
       });
-      const target: Record<string, unknown> = {};
+      const target: Record<string, boolean> = {};
 
       expect(merge(target, callable, { allowPrototypes: true })).toBe(target);
       expect(coercions).toBe(1);
@@ -754,7 +761,7 @@ describe('prototype-pollution safety', () => {
         return safe;
       },
     });
-    const target: Record<PropertyKey, unknown> = {};
+    const target: Record<PropertyKey, boolean> = {};
 
     expect(merge(target, callable, { allowPrototypes: true })).toBe(target);
     expect(coercions).toBe(1);

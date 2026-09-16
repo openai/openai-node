@@ -54,7 +54,9 @@ export interface ProviderDefinition {
  * provider configurations.
  */
 const providerDefinitionsKey = Symbol.for('openai.node.providerDefinitions.v1');
+// SAFETY: This versioned global symbol is the SDK-owned cross-copy WeakMap registry; no provider object fields are trusted through it.
 const providerGlobal = globalThis as any;
+// SAFETY: This versioned global symbol is the SDK-owned cross-copy WeakMap registry; no provider object fields are trusted through it.
 const existingProviderDefinitions = providerGlobal[providerDefinitionsKey] as
   | WeakMap<Provider, ProviderDefinition>
   | undefined;
@@ -70,6 +72,7 @@ if (!existingProviderDefinitions) {
  * installed copy of the SDK in the same JavaScript realm.
  */
 export function createProvider(definition: ProviderDefinition): Provider {
+  // SAFETY: This function creates the opaque handle and immediately registers its identity in the private WeakMap, which is the runtime brand check.
   const provider = Object.freeze({}) as Provider;
   providerDefinitions.set(provider, definition);
   return provider;

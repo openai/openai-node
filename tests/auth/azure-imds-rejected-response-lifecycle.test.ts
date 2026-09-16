@@ -34,6 +34,7 @@ const metadataFailures = [
   },
 ] as const;
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- This failure-only harness accepts different SDK result types and validates their rejection instead.
 async function expectPrivateAzureFailure(operation: () => Promise<unknown>, status: number): Promise<void> {
   let failure: unknown;
 
@@ -260,6 +261,7 @@ describe('Azure IMDS rejected-response lifecycle', () => {
   it.each([null, undefined])('preserves the original failure when the rejected body is %s', async (body) => {
     vi.useFakeTimers();
 
+    // SAFETY: The rejected-response fixture supplies only status and body lifecycle methods; the provider must cancel it without parsing a success payload.
     const response = { ok: false, status: 503, body } as Response;
     const provider = azureManagedIdentityTokenProvider(undefined, {
       timeout: 1234,

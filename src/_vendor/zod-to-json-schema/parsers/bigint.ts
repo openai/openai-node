@@ -35,6 +35,7 @@ export function parseBigintDef(def: ZodBigIntDef, refs: Refs): JsonSchema7Bigint
           }
         } else {
           if (!check.inclusive) {
+            // SAFETY: This target uses the draft's boolean exclusive-bound keyword instead of the numeric keyword represented by the shared schema type.
             res.exclusiveMinimum = true as any;
           }
           setResponseValueAndErrors(res, 'minimum', check.value, check.message, refs);
@@ -50,6 +51,7 @@ export function parseBigintDef(def: ZodBigIntDef, refs: Refs): JsonSchema7Bigint
           }
         } else {
           if (!check.inclusive) {
+            // SAFETY: This target uses the draft's boolean exclusive-bound keyword instead of the numeric keyword represented by the shared schema type.
             res.exclusiveMaximum = true as any;
           }
           setResponseValueAndErrors(res, 'maximum', check.value, check.message, refs);

@@ -55,13 +55,15 @@ export function createEmbedding(
       // Preserve the original iteration length and skip sparse-array holes.
       for (let index = 0; index < length; index += 1) {
         if (index in embeddings) {
+          // SAFETY: This indexed entry belongs to the API embedding data array; sparse entries are skipped by the preceding membership check.
           const embeddingBase64Obj = embeddings[index] as Embedding;
           const { embedding } = embeddingBase64Obj;
           // Request hooks and serialization can also select float embeddings.
           if (Array.isArray(embedding)) {
             continue;
           }
-          embeddingBase64Obj.embedding = toFloat32Array(embedding as unknown as string);
+          // SAFETY: The Array.isArray branch already handled decoded vectors; this request explicitly asked the server for base64 encoding.
+          embeddingBase64Obj.embedding = toFloat32Array(embedding as string);
         }
       }
     }

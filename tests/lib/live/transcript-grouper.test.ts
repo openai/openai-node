@@ -464,6 +464,7 @@ describe('public Live transcript grouping', () => {
       'session.delegation.created',
       'session.output_audio.delta',
     ]) {
+      // SAFETY: This grouping test needs only the event discriminator; omit unrelated server payload fields to isolate flush behavior.
       grouper.push({ type } as ServerEvent);
     }
     expect(updates).toHaveLength(1);
@@ -543,6 +544,7 @@ describe('public Live transcript grouping', () => {
     const { grouper, contents, closed } = recording();
     grouper.push(text('user', 'Question', 0));
     grouper.push(text('assistant', 'Answer', 200));
+    // SAFETY: This grouping test needs only the event discriminator; omit unrelated server payload fields to isolate flush behavior.
     grouper.push({ type: 'session.closed' } as ServerEvent);
     grouper.close();
     expect(contents()).toEqual([

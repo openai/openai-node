@@ -33,6 +33,7 @@ export async function makeSnapshotRequest<T>(
   const testName = expect.getState().currentTestName?.replace(/ > /g, ' ');
   const qualifiedSnapshotName = [testName, snapshotIndex].join(' ');
   const snapshotState = expect.getState()['snapshotState'];
+  // SAFETY: Vitest snapshot state owns the unchecked snapshot-name Set; deleting this known name marks the externally checked snapshot as used.
   (snapshotState._uncheckedKeys as Set<string>).delete(qualifiedSnapshotName);
 
   const data = snapshotState._snapshotData[qualifiedSnapshotName];
@@ -96,6 +97,7 @@ export async function makeStreamSnapshotRequest<T extends AsyncIterable<any>>(
   const testName = expect.getState().currentTestName?.replace(/ > /g, ' ');
   const qualifiedSnapshotName = `${testName} 1`;
   const snapshotState = expect.getState()['snapshotState'];
+  // SAFETY: Vitest snapshot state owns the unchecked snapshot-name Set; deleting this known name marks the externally checked snapshot as used.
   (snapshotState._uncheckedKeys as Set<string>).delete(qualifiedSnapshotName);
 
   const data = snapshotState._snapshotData[qualifiedSnapshotName];

@@ -17,6 +17,7 @@ import { compareType, expectType } from '../utils/typing';
 
 describe.each([
   { version: 'v3', z: z3 },
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Run shared schema-factory cases across Zod versions whose nominal class types differ.
   { version: 'v4', z: z4 as any as typeof z3 },
 ])('.parse()', ({ z, version }) => {
   describe('zod', () => {
@@ -1468,6 +1469,7 @@ describe('custom tool calls', () => {
 
     let requestBody: unknown;
     await handleRequest(async (_url, init) => {
+      // SAFETY: This intercepted SDK request serializes the test completion parameters as a JSON string body.
       requestBody = JSON.parse(init?.body as string);
       return Response.json(response, {
         status: 200,
@@ -1552,6 +1554,7 @@ describe('custom tool calls', () => {
 
   it('still rejects unknown tool types', () => {
     const client = new OpenAI({ apiKey: 'My API Key', fetch: mockFetch().fetch });
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: An unsupported tool discriminator must reach the runtime parser and be rejected.
     const unsupportedTool = {
       type: 'unsupported_tool',
       custom: { name: 'unsupported' },

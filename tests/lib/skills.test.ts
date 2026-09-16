@@ -12,7 +12,7 @@ async function* skillAssetChunks(): AsyncGenerator<string> {
   yield 'streamed asset';
 }
 
-function createClient(): { client: OpenAI; requests: RecordedRequest[] } {
+function createClient() {
   const requests: RecordedRequest[] = [];
   const client = new OpenAI({
     apiKey: 'test-key',
@@ -40,10 +40,12 @@ async function parseUploadedFiles(request: RecordedRequest | undefined): Promise
     throw new Error('Expected a recorded skill upload request');
   }
 
+  // SAFETY: This captured upload request is expected to contain the multipart body produced from the fixture files; the test checks its form or stream behavior below.
   const form = await new Response(request.body as FormData | ReadableStream, {
     headers: request.headers,
   }).formData();
 
+  // SAFETY: This upload fixture supplies File objects for these multipart fields; inspect their names and contents after SDK serialization.
   return form.getAll('files[]') as File[];
 }
 
@@ -73,8 +75,10 @@ describe.each(skillEndpoints)('$name', ({ path, create }) => {
     expect(requests[0]?.url).toBe(`https://api.openai.com${path}`);
     expect(requests[0]?.authorization).toBe('Bearer test-key');
 
+    // SAFETY: This captured upload request is expected to contain the multipart body produced from the fixture files; the test checks its form or stream behavior below.
     const form = requests[0]?.body as FormData;
     expect(form).toBeInstanceOf(FormData);
+    // SAFETY: This upload fixture supplies File objects for these multipart fields; inspect their names and contents after SDK serialization.
     expect(form.getAll('files[]').map((file) => (file as File).name)).toEqual([
       'my-skill/SKILL.md',
       'my-skill/assets/data.txt',
@@ -104,7 +108,9 @@ describe.each(skillEndpoints)('$name', ({ path, create }) => {
 
     await create(client, [await toFile(selectedFile, selectedFile.webkitRelativePath)]);
 
+    // SAFETY: This captured upload request is expected to contain the multipart body produced from the fixture files; the test checks its form or stream behavior below.
     const form = requests[0]?.body as FormData;
+    // SAFETY: This upload fixture supplies File objects for these multipart fields; inspect their names and contents after SDK serialization.
     const uploaded = form.get('files[]') as File;
     expect(uploaded.name).toBe('my-skill/SKILL.md');
     expect(uploaded.type).toBe('text/markdown');
@@ -121,6 +127,7 @@ describe.each(skillEndpoints)('$name', ({ path, create }) => {
     expect(requests).toHaveLength(1);
     expect(requests[0]?.authorization).toBe('Bearer test-key');
 
+    // SAFETY: This captured upload request is expected to contain the multipart body produced from the fixture files; the test checks its form or stream behavior below.
     const body = await new Response(requests[0]?.body as ReadableStream).text();
     expect(body).toContain('filename="my-skill/SKILL.md"');
     expect(body).toContain('filename="my-skill/assets/data.txt"');
@@ -155,7 +162,9 @@ test.each(['private-directory/input.jsonl', 'private-directory\\input.jsonl'])(
     });
 
     expect(requests).toHaveLength(1);
+    // SAFETY: This captured upload request is expected to contain the multipart body produced from the fixture files; the test checks its form or stream behavior below.
     const form = requests[0]?.body as FormData;
+    // SAFETY: This upload fixture supplies File objects for these multipart fields; inspect their names and contents after SDK serialization.
     expect((form.get('file') as File).name).toBe('input.jsonl');
   },
 );

@@ -27,10 +27,11 @@ function makeResponse(output: OutputItem[] = []): Response {
     tool_choice: 'auto',
     tools: [],
     top_p: null,
-  } as Response;
+  };
 }
 
 function makeOutput(type: string, id = 'item_123'): OutputItem {
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- This fixture builder adds the fields appropriate to each output-item variant after initialization.
   const item: EventFields = { id, type };
 
   switch (type) {
@@ -89,6 +90,7 @@ function makeOutput(type: string, id = 'item_123'): OutputItem {
     }
   }
 
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The synthetic output builder selects the protocol fields for each item discriminator at runtime.
   return item as unknown as OutputItem;
 }
 
@@ -101,6 +103,7 @@ function createSnapshot(...output: OutputItem[]): Response {
 }
 
 function applyEvent(snapshot: Response, event: EventFields): Response {
+  // SAFETY: Deliberately preserve malformed, inherited, or accessor-based identity fields so the accumulator must validate them at runtime.
   return accumulateResponse({ sequence_number: 1, ...event } as ResponseStreamEvent, snapshot);
 }
 
@@ -264,6 +267,7 @@ describe('ResponseAccumulator output item identity', () => {
   test('rejects an item ID inherited from the event prototype', () => {
     const snapshot = createSnapshot(makeOutput('message'));
     const original = structuredClone(snapshot);
+    // SAFETY: Deliberately preserve malformed, inherited, or accessor-based identity fields so the accumulator must validate them at runtime.
     const event = Object.assign(Object.create({ item_id: 'item_123' }) as ResponseStreamEvent, {
       type: 'response.output_text.delta',
       sequence_number: 1,
@@ -292,6 +296,7 @@ describe('ResponseAccumulator output item identity', () => {
         return reads === 1 ? 0 : 1;
       },
     });
+    // SAFETY: The inherited identity fixture must retain its prototype properties so own-property validation can be tested.
     const event = Object.assign(Object.create(prototype) as EventFields, {
       type: 'response.output_text.delta',
       sequence_number: 1,
@@ -300,7 +305,8 @@ describe('ResponseAccumulator output item identity', () => {
       delta: ' injected',
     });
 
-    expect(() => accumulateResponse(event as unknown as ResponseStreamEvent, snapshot)).toThrow(
+    // SAFETY: Deliberately preserve malformed, inherited, or accessor-based identity fields so the accumulator must validate them at runtime.
+    expect(() => accumulateResponse(event as ResponseStreamEvent, snapshot)).toThrow(
       'missing output at index undefined',
     );
     expect(reads).toBe(0);
@@ -314,7 +320,8 @@ describe('ResponseAccumulator output item identity', () => {
       const original = structuredClone(snapshot);
       const readInheritedValue = vi.fn(() => (field === 'item_id' ? 'item_123' : 0));
       const prototype = Object.defineProperty({}, field, { get: readInheritedValue });
-      const event: EventFields = Object.assign(Object.create(prototype) as EventFields, {
+      // SAFETY: The inherited identity fixture must retain its prototype properties so own-property validation can be tested.
+      const event = Object.assign(Object.create(prototype) as EventFields, {
         type: 'response.output_text.delta',
         sequence_number: 1,
         output_index: 0,
@@ -322,6 +329,7 @@ describe('ResponseAccumulator output item identity', () => {
         ...(field === 'item_id' ? { content_index: 0 } : { item_id: 'item_123' }),
       });
 
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: This synthetic event uses getters or inherited fields to test identity validation at the accumulator boundary.
       expect(() => accumulateResponse(event as unknown as ResponseStreamEvent, snapshot)).toThrow();
       expect(readInheritedValue).not.toHaveBeenCalled();
       expect(snapshot).toEqual(original);
@@ -333,7 +341,7 @@ describe('ResponseAccumulator output item identity', () => {
       makeOutput('message', 'first_item'),
       makeOutput('message', 'second_item'),
     );
-    const event: EventFields = {
+    const event = {
       type: 'response.output_text.delta',
       sequence_number: 1,
       item_id: 'first_item',
@@ -349,6 +357,7 @@ describe('ResponseAccumulator output item identity', () => {
       },
     });
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: This synthetic event uses getters or inherited fields to test identity validation at the accumulator boundary.
     expect(accumulateResponse(event as unknown as ResponseStreamEvent, snapshot)).toBe(snapshot);
 
     const [first, second] = snapshot.output;
@@ -362,7 +371,7 @@ describe('ResponseAccumulator output item identity', () => {
 
   test('snapshots item-scoped identity and content-index accessors once', () => {
     const snapshot = createSnapshot(makeOutput('message', 'item_123'));
-    const event: EventFields = {
+    const event = {
       type: 'response.output_text.delta',
       sequence_number: 1,
       output_index: 0,
@@ -385,6 +394,7 @@ describe('ResponseAccumulator output item identity', () => {
       },
     });
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: This synthetic event uses getters or inherited fields to test identity validation at the accumulator boundary.
     expect(accumulateResponse(event as unknown as ResponseStreamEvent, snapshot)).toBe(snapshot);
     expect(identityReads).toBe(1);
     expect(indexReads).toBe(1);
@@ -409,7 +419,7 @@ describe('ResponseAccumulator output item identity', () => {
           sequence_number: 1,
           output_index: 0,
           item: replacement,
-        } as ResponseStreamEvent,
+        },
         snapshot,
       ),
     ).toBe(snapshot);
@@ -432,6 +442,7 @@ describe('ResponseAccumulator output item identity', () => {
 
     expect(
       accumulateResponse(
+        // SAFETY: Deliberately preserve malformed, inherited, or accessor-based identity fields so the accumulator must validate them at runtime.
         {
           type: 'response.content_part.added',
           sequence_number: 1,
@@ -504,6 +515,7 @@ describe('ResponseAccumulator output item identity', () => {
     (itemID) => {
       const snapshot = createSnapshot();
       const item = makeOutput('message');
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       (item as unknown as EventFields)['id'] = itemID;
 
       expect(() =>
@@ -520,6 +532,7 @@ describe('ResponseAccumulator output item identity', () => {
 
   test('rejects an added output item whose required ID is inherited', () => {
     const snapshot = createSnapshot();
+    // SAFETY: The inherited identity fixture must retain its prototype properties so own-property validation can be tested.
     const item = Object.assign(Object.create({ id: 'item_123' }) as EventFields, {
       type: 'message',
       role: 'assistant',
@@ -621,9 +634,11 @@ describe('ResponseAccumulator output item identity', () => {
     (type) => {
       const first = makeOutput(type, 'first_item');
       const duplicate = makeOutput(type, 'second_item');
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       (duplicate as unknown as EventFields)['call_id'] = (first as unknown as EventFields)['call_id'];
       const snapshot = createSnapshot(first);
       const original = structuredClone(snapshot);
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       const callID = (first as unknown as EventFields)['call_id'];
 
       expect(() =>
@@ -643,6 +658,7 @@ describe('ResponseAccumulator output item identity', () => {
     (type) => {
       const first = makeOutput(type, 'first_item');
       const duplicate = makeOutput(type, 'second_item');
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       (duplicate as unknown as EventFields)['call_id'] = (first as unknown as EventFields)['call_id'];
 
       expect(() => createSnapshot(first, duplicate)).toThrow(`duplicate output item identity 'call:${type}:`);
@@ -656,6 +672,7 @@ describe('ResponseAccumulator output item identity', () => {
       const original = structuredClone(snapshot);
       const first = makeOutput(type, 'first_item');
       const duplicate = makeOutput(type, 'second_item');
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       (duplicate as unknown as EventFields)['call_id'] = (first as unknown as EventFields)['call_id'];
 
       expect(() =>
@@ -708,7 +725,9 @@ describe('ResponseAccumulator output item identity', () => {
       const snapshot = createSnapshot(item);
       const original = structuredClone(snapshot);
       const replacement = structuredClone(item);
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       (replacement as unknown as EventFields)['call_id'] = 'foreign_call';
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       const originalCallID = (item as unknown as EventFields)['call_id'];
 
       expect(() =>
@@ -726,6 +745,7 @@ describe('ResponseAccumulator output item identity', () => {
   test('preserves a valid shell call and matching output under namespaced routing identities', () => {
     const shell = makeOutput('shell_call', 'shell_item');
     const output = makeOutput('shell_call_output', 'output_item');
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
     (output as unknown as EventFields)['call_id'] = (shell as unknown as EventFields)['call_id'];
     const snapshot = createSnapshot(shell, output);
 
@@ -813,7 +833,7 @@ describe('ResponseAccumulator output item identity', () => {
           sequence_number: 1,
           output_index: 1,
           item: duplicate,
-        } as ResponseStreamEvent,
+        },
         snapshot,
       ),
     ).toThrow("duplicate output item identity 'call:function_call:call_mutated'");
@@ -828,6 +848,7 @@ describe('ResponseAccumulator output item identity', () => {
       undefined,
       context,
     );
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The uncloneable method is intentionally outside the wire type to test transactional clone failure.
     const uncloneable = {
       ...makeOutput('message'),
       uncloneable() {
@@ -937,6 +958,7 @@ describe('ResponseAccumulator output item identity', () => {
       const snapshot = createSnapshot(item);
       const original = structuredClone(snapshot);
       const replacement = structuredClone(item);
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Inspect or corrupt synthetic item identity fields across protocol variants to test duplicate/foreign-call rejection.
       (replacement as unknown as EventFields)['call_id'] = 'foreign_call';
 
       expect(() =>
@@ -1050,6 +1072,7 @@ describe('ResponseAccumulator output item identity', () => {
   test('rejects an output-item completion with an inherited item ID', () => {
     const snapshot = createSnapshot(makeOutput('message'));
     const original = structuredClone(snapshot);
+    // SAFETY: The inherited identity fixture must retain its prototype properties so own-property validation can be tested.
     const replacement = Object.assign(Object.create({ id: 'item_123' }) as EventFields, {
       type: 'message',
       role: 'assistant',

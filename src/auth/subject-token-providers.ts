@@ -16,15 +16,18 @@ const errorFunctionToString = Function.prototype.toString;
 const nativeErrorSource = errorFunctionToString.call(Error);
 const nativeSyntaxErrorSource = errorFunctionToString.call(SyntaxError);
 const nativeErrorBrandDescriptor = getOwnErrorDescriptor(Error, 'isError');
+// SAFETY: The captured Error.isError data property was checked to be callable and follows the native error-brand predicate contract.
 const nativeErrorBrand =
   nativeErrorBrandDescriptor &&
   'value' in nativeErrorBrandDescriptor &&
   typeof nativeErrorBrandDescriptor.value === 'function'
-    ? (nativeErrorBrandDescriptor.value as (error: object) => boolean)
+    ? // oxlint-disable-next-line anti-slop/no-object-parameters -- The native error-brand predicate inspects arbitrary objects without trusting their properties.
+      (nativeErrorBrandDescriptor.value as (error: object) => boolean)
     : undefined;
 
 type AzureJSONErrorKind = 'error' | 'syntax' | 'tagged-wrapper' | 'unknown' | 'unsafe';
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Cross-realm prototypes are inspected through descriptors before any error contract is trusted.
 function hasNativeErrorPrototype(prototype: object, kind: 'Error' | 'SyntaxError'): boolean {
   const name = getOwnErrorDescriptor(prototype, 'name');
   const constructor = getOwnErrorDescriptor(prototype, 'constructor');
@@ -49,10 +52,12 @@ function hasNativeErrorPrototype(prototype: object, kind: 'Error' | 'SyntaxError
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Untrusted thrown objects, including proxies, must be classified before treating them as errors.
 function classifyCrossRealmAzureError(error: object): AzureJSONErrorKind {
   try {
     const prototypes: object[] = [];
     let tagged = false;
+    // SAFETY: Object.getPrototypeOf returns an object or null; the traversal never treats the prototype as a more specific instance.
     for (
       let prototype: object | null = error;
       prototype !== null;

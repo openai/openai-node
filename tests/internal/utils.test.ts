@@ -118,6 +118,7 @@ describe('environment and request utilities', () => {
               throw new Error('listener cleanup failed');
             };
           }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- The compatibility proxy must preserve native AbortSignal accessors with the signal as receiver.
           return Reflect.get(target, property, target);
         },
       });
@@ -153,6 +154,7 @@ describe('environment and request utilities', () => {
           if (property === 'addEventListener') {
             return () => controller.abort(new Error('aborted during registration'));
           }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- The compatibility proxy must preserve native AbortSignal accessors with the signal as receiver.
           return Reflect.get(target, property, target);
         },
       });
@@ -207,6 +209,7 @@ describe('value utilities', () => {
   });
 
   test('checks own properties without trusting an overwritten hasOwnProperty method', () => {
+    // SAFETY: This local fixture intentionally controls its own keys and prototype; the dictionary view leaves values untrusted while testing prototype safety.
     const object = Object.create({ inherited: true }) as Record<string, unknown>;
     object['own'] = true;
     object['hasOwnProperty'] = undefined;

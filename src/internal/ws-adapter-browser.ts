@@ -166,6 +166,7 @@ export class BrowserWebSocket implements WebSocketLike {
           const message = ev?.message || ev?.error?.message || 'WebSocket error';
           const err = new Error(message);
           if (ev?.error) {
+            // SAFETY: The locally created Error receives the browser error event's cause; the cast avoids requiring newer Error ambient declarations.
             (err as any).cause = ev.error;
           }
           listener(err);
@@ -173,6 +174,7 @@ export class BrowserWebSocket implements WebSocketLike {
       }
 
       default: {
+        // SAFETY: Non-special events use the native DOM handler contract directly; the adapter only wraps message, close, and error variants above.
         return listener as DOMEventHandler;
       }
     }

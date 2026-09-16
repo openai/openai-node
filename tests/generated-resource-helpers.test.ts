@@ -6,17 +6,20 @@ import { AssistantStream } from 'openai/lib/AssistantStream';
 import { sleep } from 'openai/internal/utils/sleep';
 import type { NullableHeaders } from 'openai/internal/headers';
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Observe polling interval selection at the shared sleep boundary without changing generated helper APIs.
 vi.mock('openai/internal/utils/sleep', () => ({
   sleep: vi.fn(async () => {}),
 }));
 
+// SAFETY: The module mock replaces this import with a Vitest spy before this binding is read.
 const mockedSleep = sleep as MockedFunction<typeof sleep>;
 
 function createClient(): OpenAI {
   return new OpenAI({ apiKey: 'test-key', baseURL: 'https://example.com/v1/' });
 }
 
-function withResponse(data: object, headers: Record<string, string> = {}) {
+function withResponse(data: { id: string; status: string }, headers: Record<string, string> = {}) {
+  // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
   return {
     withResponse: async () => ({ data, response: new Response(null, { headers }) }),
   } as any;
@@ -35,7 +38,9 @@ describe('vector store file helpers', () => {
     const files = createClient().vectorStores.files;
     const created = { id: 'file_created', status: 'in_progress' };
     const completed = { id: 'file_created', status: 'completed' };
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const create = vi.spyOn(files, 'create').mockImplementation(() => Promise.resolve(created) as any);
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const poll = vi.spyOn(files, 'poll').mockResolvedValue(completed as any);
     const options = { pollIntervalMs: 12, headers: { 'X-Test': 'yes' } };
 
@@ -67,6 +72,7 @@ describe('vector store file helpers', () => {
     ).resolves.toEqual(completed);
     expect(mockedSleep).toHaveBeenCalledWith(expected);
 
+    // SAFETY: The polling helper passes its normalized header collection at this recorded call position; the test checks only that collection when present.
     const headers = (retrieve.mock.calls[0]?.[2]?.headers as NullableHeaders | undefined)?.values;
     expect(headers?.get('X-Stainless-Poll-Helper')).toBe('true');
     expect(headers?.get('X-Stainless-Custom-Poll-Interval')).toBe(interval ? String(interval) : null);
@@ -87,9 +93,11 @@ describe('vector store file helpers', () => {
     const file = new File(['contents'], 'sample.txt');
     const uploaded = { id: 'file_uploaded' };
     const attached = { id: 'file_attached', status: 'completed' };
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const upload = vi
       .spyOn(client.files, 'create')
       .mockImplementation(() => Promise.resolve(uploaded) as any);
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const create = vi.spyOn(resource, 'create').mockImplementation(() => Promise.resolve(attached) as any);
 
     await expect(resource.upload('vs_123', file)).resolves.toBe(attached);
@@ -103,7 +111,9 @@ describe('vector store file helpers', () => {
     const attached = { id: 'file_attached', status: 'in_progress' };
     const completed = { ...attached, status: 'completed' };
     const options = { pollIntervalMs: 5 };
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const upload = vi.spyOn(files, 'upload').mockResolvedValue(attached as any);
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const poll = vi.spyOn(files, 'poll').mockResolvedValue(completed as any);
 
     await expect(files.uploadAndPoll('vs_123', file, options)).resolves.toBe(completed);
@@ -117,7 +127,9 @@ describe('vector store file batch helpers', () => {
     const batches = createClient().vectorStores.fileBatches;
     const created = { id: 'batch_123', status: 'in_progress' };
     const completed = { ...created, status: 'completed' };
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const create = vi.spyOn(batches, 'create').mockImplementation(() => Promise.resolve(created) as any);
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const poll = vi.spyOn(batches, 'poll').mockResolvedValue(completed as any);
     const options = { pollIntervalMs: 5, headers: { 'X-Test': 'yes' } };
 
@@ -146,6 +158,7 @@ describe('vector store file batch helpers', () => {
       batches.poll('vs_123', 'batch_123', interval ? { pollIntervalMs: interval } : {}),
     ).resolves.toEqual(completed);
     expect(mockedSleep).toHaveBeenCalledWith(expected);
+    // SAFETY: The polling helper passes its normalized header collection at this recorded call position; the test checks only that collection when present.
     const headers = (retrieve.mock.calls[0]?.[2]?.headers as NullableHeaders | undefined)?.values;
     expect(headers?.get('X-Stainless-Poll-Helper')).toBe('true');
   });
@@ -173,10 +186,12 @@ describe('vector store file batch helpers', () => {
     const batches = client.vectorStores.fileBatches;
     const files = [new File(['a'], 'a.txt'), new File(['b'], 'b.txt'), new File(['c'], 'c.txt')];
     let nextIdentifier = 0;
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const upload = vi
       .spyOn(client.files, 'create')
       .mockImplementation((async () => ({ id: `file_${++nextIdentifier}` })) as any);
     const result = { id: 'batch_123', status: 'completed' };
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const createAndPoll = vi.spyOn(batches, 'createAndPoll').mockResolvedValue(result as any);
     const options = { maxConcurrency: 2, pollIntervalMs: 7, headers: { 'X-Test': 'yes' } };
 
@@ -244,6 +259,7 @@ describe('vector store file batch helpers', () => {
     const client = createClient();
     const batches = client.vectorStores.fileBatches;
     vi.spyOn(client.files, 'create').mockImplementation(
+      // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
       () => Promise.reject(new Error('upload failed')) as any,
     );
     const createAndPoll = vi.spyOn(batches, 'createAndPoll');
@@ -297,7 +313,9 @@ describe('assistant run helpers', () => {
     const runs = createClient().beta.threads.runs;
     const run = { id: 'run_123', status: 'queued' };
     const completed = { ...run, status: 'completed' };
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const create = vi.spyOn(runs, 'create').mockImplementation(() => Promise.resolve(run) as any);
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const poll = vi.spyOn(runs, 'poll').mockResolvedValue(completed as any);
     const options = { pollIntervalMs: 3 };
 
@@ -320,6 +338,7 @@ describe('assistant run helpers', () => {
 
       await expect(runs.poll('run_123', { thread_id: 'thread_123' })).resolves.toEqual(completed);
       expect(mockedSleep).toHaveBeenCalledWith(9);
+      // SAFETY: The polling helper passes its normalized header collection at this recorded call position; the test checks only that collection when present.
       const headers = (retrieve.mock.calls[0]?.[2]?.headers as NullableHeaders | undefined)?.values;
       expect(headers?.get('X-Stainless-Poll-Helper')).toBe('true');
     },
@@ -364,7 +383,9 @@ describe('assistant run helpers', () => {
     const run = { id: 'run_123', status: 'in_progress' };
     const completed = { ...run, status: 'completed' };
     const params = { thread_id: 'thread_123', tool_outputs: [{ tool_call_id: 'tool_123', output: 'done' }] };
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const submit = vi.spyOn(runs, 'submitToolOutputs').mockImplementation(() => Promise.resolve(run) as any);
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const poll = vi.spyOn(runs, 'poll').mockResolvedValue(completed as any);
     const options = { pollIntervalMs: 3 };
 
@@ -375,6 +396,7 @@ describe('assistant run helpers', () => {
 
   test('routes deprecated and current run streams through the same stream helper', () => {
     const runs = createClient().beta.threads.runs;
+    // SAFETY: This opaque fixture is returned unchanged by the mocked stream factory; this delegation test never calls stream methods.
     const stream = {} as AssistantStream;
     const createStream = vi.spyOn(AssistantStream, 'createAssistantStream').mockReturnValue(stream);
     const body = { assistant_id: 'assistant_123' };
@@ -388,6 +410,7 @@ describe('assistant run helpers', () => {
 
   test('creates a streaming tool-output runner', () => {
     const runs = createClient().beta.threads.runs;
+    // SAFETY: This opaque fixture is returned unchanged by the mocked stream factory; this delegation test never calls stream methods.
     const stream = {} as AssistantStream;
     const createStream = vi.spyOn(AssistantStream, 'createToolAssistantStream').mockReturnValue(stream);
     const params = { thread_id: 'thread_123', tool_outputs: [{ tool_call_id: 'tool_123', output: 'done' }] };
@@ -402,9 +425,11 @@ describe('assistant thread helpers', () => {
     const threads = createClient().beta.threads;
     const run = { id: 'run_123', thread_id: 'thread_123', status: 'queued' };
     const completed = { ...run, status: 'completed' };
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const createAndRun = vi
       .spyOn(threads, 'createAndRun')
       .mockImplementation(() => Promise.resolve(run) as any);
+    // SAFETY: The stub supplies only IDs, statuses, promises, or response metadata consumed by this helper path; the assertions verify delegation and polling behavior.
     const poll = vi.spyOn(threads.runs, 'poll').mockResolvedValue(completed as any);
     const body = { assistant_id: 'assistant_123' };
     const options = { pollIntervalMs: 2 };
@@ -416,6 +441,7 @@ describe('assistant thread helpers', () => {
 
   test('creates a streamed thread and assistant run', () => {
     const threads = createClient().beta.threads;
+    // SAFETY: This opaque fixture is returned unchanged by the mocked stream factory; this delegation test never calls stream methods.
     const stream = {} as AssistantStream;
     const createStream = vi.spyOn(AssistantStream, 'createThreadAssistantStream').mockReturnValue(stream);
     const body = { assistant_id: 'assistant_123' };

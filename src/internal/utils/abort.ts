@@ -4,16 +4,18 @@ interface WeakReference<T> {
 }
 type WeakAbortCallback = WeakReference<AbortCallback>;
 interface AbortFinalizer {
-  register: (target: AbortCallback, cleanup: AbortCallback, token: object) => void;
-  unregister: (token: object) => boolean;
+  register: (target: AbortCallback, cleanup: AbortCallback, token: WeakAbortCallback) => void;
+  unregister: (token: WeakAbortCallback) => boolean;
 }
 
 // Keep these optional runtime features out of the SDK's ES2020 type requirements.
+// SAFETY: These host features are optional and checked before use; the structural view avoids requiring newer ambient library declarations.
 const weakGlobals = globalThis as typeof globalThis & {
   WeakRef?: new <T extends object>(target: T) => WeakReference<T>;
   FinalizationRegistry?: new (cleanup: (value: AbortCallback) => void) => AbortFinalizer;
 };
 const finalizer =
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Weak references and finalizers are optional host capabilities, so probe them before constructing either.
   typeof weakGlobals.FinalizationRegistry === 'function'
     ? new weakGlobals.FinalizationRegistry((cleanup) => {
         try {
@@ -68,10 +70,12 @@ function releaseOnAbort(
 
 /** Keep cancellation alive until abort or collection of the response body or bodyless custom response. */
 export function retainRequestAbortCallback(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Abort callbacks are retained by any response-body or custom-response owner identity.
   owner: object,
   abort: AbortCallback,
   requestSignal: AbortSignal,
 ): void {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Weak references and finalizers are optional host capabilities, so probe them before constructing either.
   if (typeof weakGlobals.WeakRef === 'function' && finalizer && !requestSignal.aborted) {
     let callbacks = callbackOwners.get(owner);
     if (!callbacks) {
@@ -99,6 +103,7 @@ export function addRequestAbortListener(
       // No listener was installed for an already aborted signal.
     };
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Weak references and finalizers are optional host capabilities, so probe them before constructing either.
   if (typeof weakGlobals.WeakRef !== 'function' || !finalizer) {
     signal.addEventListener('abort', abort, { once: true });
     return () => signal.removeEventListener('abort', abort);

@@ -5,8 +5,10 @@ import { EventEmitter, getEventListeners, once } from 'node:events';
 import { PassThrough, Readable, Writable } from 'node:stream';
 import { playAudio, recordAudio } from 'openai/helpers/audio';
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Control ffmpeg/ffplay process failures and pipe events without requiring executables or audio hardware.
 vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
 
+// SAFETY: The module mock replaces this import with a Vitest spy before this binding is read.
 const spawnMock = spawn as MockedFunction<typeof spawn>;
 const devicePrefix = ['darwin', 'win32', 'cygwin'].includes(process.platform) ? '' : 'hw';
 
@@ -17,6 +19,7 @@ function mockFfmpeg(started = true) {
     stderr: new PassThrough(),
     kill: vi.fn().mockReturnValue(true),
   });
+  // SAFETY: The subprocess/audio fixture implements the stream and event methods this path uses; the test observes those operations without spawning a real player.
   spawnMock.mockReturnValue(ffmpeg as any);
   return ffmpeg;
 }
@@ -36,6 +39,7 @@ function mockFfplay(exitCode = 0) {
     kill: vi.fn(),
   });
   stdin.on('finish', () => ffplay.emit('close', exitCode));
+  // SAFETY: The subprocess/audio fixture implements the stream and event methods this path uses; the test observes those operations without spawning a real player.
   spawnMock.mockReturnValue(ffplay as any);
   return { chunks, ffplay };
 }

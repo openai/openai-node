@@ -81,6 +81,7 @@ describe('debug()', () => {
 
     // Verify that the original headers weren't mutated
     expect(authorizationTest.authorization).toEqual('fakeValue');
+    // SAFETY: The SDK normalizes request headers to Headers before invoking this mock transport; this assertion checks that normalized value.
     expect((req.headers as Headers).get('authorization')).toEqual('fakeValue');
 
     expect(spy).toHaveBeenCalledWith(
@@ -110,6 +111,7 @@ describe('debug()', () => {
 
     // Verify that the original headers weren't mutated
     expect(authorizationTest.authorization).toEqual('fakeValue');
+    // SAFETY: The SDK normalizes request headers to Headers before invoking this mock transport; this assertion checks that normalized value.
     expect((req.headers as Headers).get('authorization')).toEqual('fakeValue');
 
     expect(spy).toHaveBeenCalledWith(

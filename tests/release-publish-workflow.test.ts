@@ -343,6 +343,7 @@ describe('trusted npm release publication', () => {
           .split('\n')
           .map(
             (line) =>
+              // SAFETY: The local command stub writes these exact JSON fields; parsing only recovers the recorded invocation for assertions.
               JSON.parse(line) as {
                 args: string[];
                 cwd: string;

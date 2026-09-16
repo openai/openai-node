@@ -55,6 +55,7 @@ async function collect<T>(source: AsyncIterable<T>): Promise<T[]> {
 
 function assertSafeSyntaxError(value: unknown): asserts value is SyntaxError & { cause?: unknown } {
   expect(value).toBeInstanceOf(SyntaxError);
+  // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
   const failure = value as SyntaxError & { cause?: unknown };
 
   expect(failure.message).toBe(safeErrorMessage);
@@ -69,7 +70,11 @@ function assertSafeSyntaxError(value: unknown): asserts value is SyntaxError & {
 interface WrapperHandle {
   controller: AbortController;
   done: () => Promise<void>;
-  final: () => Promise<unknown>;
+  final: () => ReturnType<
+    | ChatCompletionStream['finalChatCompletion']
+    | AssistantStream['finalRun']
+    | ResponseStream['finalResponse']
+  >;
   onError: (listener: (error: OpenAIError) => void) => void;
 }
 
@@ -158,6 +163,7 @@ describe('newline-delimited stream diagnostic privacy', () => {
       }
 
       expect(failure).toBeInstanceOf(OpenAIError);
+      // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
       const wrapped = failure as OpenAIError & { cause?: unknown };
       expect(wrapped.message).toBe(safeErrorMessage);
       assertSafeSyntaxError(wrapped.cause);
@@ -335,9 +341,11 @@ describe('newline-delimited stream diagnostic privacy', () => {
       }
 
       expect(failure).toBeInstanceOf(SyntaxError);
+      // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
       expect((failure as SyntaxError).message).toBe(
         'Error reading response: malformed server-sent event JSON.',
       );
+      // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
       expect((failure as SyntaxError & { cause?: unknown }).cause).toBeUndefined();
       expect(consoleError).toHaveBeenCalledTimes(2);
     } finally {

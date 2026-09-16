@@ -7,6 +7,7 @@ describe('Zod v3 tuple positions', () => {
     // `minItems`/`maxItems` come from the declared element count, so dropping an
     // entry leaves the array claiming an arity it no longer describes and moves
     // every later element onto the wrong index.
+    // SAFETY: These tuple fixtures produce positional items; the assertions verify their count and contents, including unsupported void positions.
     const schema = zodToJsonSchema(zv3.tuple([zv3.void(), zv3.string()])) as {
       items: unknown[];
       minItems: number;
@@ -19,6 +20,7 @@ describe('Zod v3 tuple positions', () => {
   });
 
   it('keeps those positions alongside a rest element', () => {
+    // SAFETY: These tuple fixtures produce positional items; the assertions verify their count and contents, including unsupported void positions.
     const schema = zodToJsonSchema(zv3.tuple([zv3.void(), zv3.string()]).rest(zv3.number())) as {
       items: unknown[];
       minItems: number;
@@ -31,7 +33,9 @@ describe('Zod v3 tuple positions', () => {
   });
 
   it('agrees with Zod v4 on the number of described positions', () => {
+    // SAFETY: These tuple fixtures produce positional items; the assertions verify their count and contents, including unsupported void positions.
     const v3 = zodToJsonSchema(zv3.tuple([zv3.void(), zv3.string()])) as { items: unknown[] };
+    // SAFETY: These tuple fixtures produce positional items; the assertions verify their count and contents, including unsupported void positions.
     const v4 = zv4.toJSONSchema(zv4.tuple([zv4.void(), zv4.string()]), {
       io: 'input',
       unrepresentable: 'any',

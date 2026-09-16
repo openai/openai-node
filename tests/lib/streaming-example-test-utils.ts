@@ -55,6 +55,7 @@ export function createResponse() {
     statusCode: 200,
     writableEnded: false,
     writeResult: true,
+    // SAFETY: This mutable callback slot starts empty; individual tests install a write hook before triggering the fake HTTP response.
     onWrite: null as (() => void) | null,
   });
 
@@ -65,7 +66,7 @@ export function createResponse() {
       return response;
     }),
 
-    write: vi.fn((chunk: unknown) => {
+    write: vi.fn((chunk: string | Uint8Array) => {
       if (response.destroyed) {
         throw new Error('Attempted to write to a destroyed socket');
       }
@@ -198,7 +199,10 @@ export function loadExample(
 
     readonly chat = {
       completions: {
-        stream: (_body: unknown, providerOptions?: { signal?: AbortSignal }) => {
+        stream: (
+          _body: OpenAI.Chat.ChatCompletionCreateParams,
+          providerOptions?: { signal?: AbortSignal },
+        ) => {
           configureProvider(providerOptions);
           runtime.onProvider?.();
           return {
@@ -206,8 +210,12 @@ export function loadExample(
           };
         },
 
-        create: (_body: unknown, providerOptions?: { signal?: AbortSignal }) => {
+        create: (
+          _body: OpenAI.Chat.ChatCompletionCreateParams,
+          providerOptions?: { signal?: AbortSignal },
+        ) => {
           configureProvider(providerOptions);
+          // SAFETY: completionChunks with false yields Completion objects; its shared implementation also supports the encoded-stream branch.
           const chunks = completionChunks(runtime, false) as AsyncIterable<Completion>;
 
           if (runtime.pendingCreate) {
@@ -248,7 +256,7 @@ export function loadExample(
     fileName: filename,
   }).outputText;
 
-  function requireExampleModule(specifier: string): unknown {
+  function requireExampleModule(specifier: string) {
     if (specifier === 'openai') {
       return { __esModule: true, default: options.client ?? MockOpenAI };
     }
@@ -272,6 +280,7 @@ export function loadExample(
   }
 
   const commonJS = { exports: {} };
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The VM installs heterogeneous globals and conditionally adds AbortController to simulate runtimes with and without it.
   const globals: Record<string, unknown> = {
     Buffer,
     console: { error: runtime.consoleError, log: vi.fn() },

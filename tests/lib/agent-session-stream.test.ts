@@ -74,6 +74,7 @@ function transport(
       const request = new Request(url, init);
       const entry: RecordedRequest = {
         request,
+        // SAFETY: The intercepted request is produced by this test client; the recorded body is inspected against its expected session-event wire fields.
         body: request.method === 'POST' ? ((await request.json()) as RecordedRequest['body']) : {},
       };
       requests.push(entry);
@@ -187,6 +188,7 @@ describe('agents sessions.stream public transport', () => {
       order.push('handler');
       await Promise.resolve();
       if (args['nested']) {
+        // SAFETY: The only handler call with nested arguments comes from call(a, { nested: { value: 1 } }) above; this mutation tests argument isolation.
         (args['nested'] as Record<string, unknown>)['value'] = 2;
       }
       return { answer: 'ok' };
@@ -222,6 +224,7 @@ describe('agents sessions.stream public transport', () => {
         value.item.name = 'redirected';
         value.item.turn_id = 'wrong_turn';
         value.item.call_id = 'wrong_call';
+        // SAFETY: The synthetic function-call event above contains { nested: { value: 1 } }; changing the yielded copy tests dispatch isolation.
         (value.item.arguments as { nested: { value: number } }).nested.value = 99;
       }
     }

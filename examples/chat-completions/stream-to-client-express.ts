@@ -129,6 +129,7 @@ function rethrowUnlessClientAbort(
   error: unknown,
   disconnect: ReturnType<typeof watchClientDisconnect>,
 ): void {
+  // SAFETY: openai is constructed by this example from the OpenAI class; its constructor supplies the static stream helpers used below.
   const clientConstructor = openai.constructor as typeof OpenAI;
 
   if (!disconnect?.signal.aborted || !(error instanceof clientConstructor.APIUserAbortError)) {
@@ -183,7 +184,7 @@ const handleRequest = async (req: Request, res: Response) => {
 };
 
 app.post('/', (req: Request, res: Response) =>
-  // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Express 4 does not await async handlers; consume rejections in this synchronous route.
+  // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Express 4 does not await async handlers; consume their arbitrary rejection values in this synchronous route.
   handleRequest(req, res).catch((error: unknown) => {
     console.error(error);
     if (res.destroyed || res.writableEnded) {

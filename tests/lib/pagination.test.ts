@@ -20,6 +20,7 @@ const options: FinalRequestOptions = {
 
 describe('Page', () => {
   test('exposes its items without claiming that another page exists', async () => {
+    // SAFETY: These page tests call only requestAPIList; the controlled client fake records pagination dispatch without supplying unrelated SDK methods.
     const client = { requestAPIList: vi.fn() } as any;
     const page = new Page<Item>(client, response, { object: 'list', data: [{ id: 'first' }] }, options);
 
@@ -33,8 +34,10 @@ describe('Page', () => {
 
   test('tolerates an absent data array', () => {
     const page = new Page<Item>(
+      // SAFETY: This page-metadata test never dispatches a request, so the client fixture intentionally has no transport methods.
       {} as any,
       response,
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The undefined page data deliberately tests malformed-response fallback behavior.
       { object: 'list', data: undefined as unknown as Item[] },
       options,
     );
@@ -45,6 +48,7 @@ describe('Page', () => {
 
 describe('PagePromise', () => {
   test('parses and asynchronously iterates over the resolved page', async () => {
+    // SAFETY: These page tests call only requestAPIList; the controlled client fake records pagination dispatch without supplying unrelated SDK methods.
     const client = { requestAPIList: vi.fn() } as any;
     const pageResponse = Response.json(
       { object: 'list', data: [{ id: 'first' }] },
@@ -62,6 +66,7 @@ describe('PagePromise', () => {
         retryOfRequestLogID: undefined,
         startTime: Date.now(),
       }),
+      // SAFETY: The concrete Page class handles the Item list body produced above; the generic constructor type loses that fixture-specific binding.
       Page as any,
     );
 
@@ -85,6 +90,7 @@ describe('CursorPage', () => {
     (id) => {
       const item: { id?: string | null } = id === undefined ? {} : { id };
       const page = new CursorPage<{ id?: string | null }>(
+        // SAFETY: This page-metadata test never dispatches a request, so the client fixture intentionally has no transport methods.
         {} as any,
         response,
         { data: [item], has_more: true },
@@ -99,6 +105,7 @@ describe('CursorPage', () => {
 
   test('uses the last item ID as the cursor while preserving request options', () => {
     const page = new CursorPage<Item>(
+      // SAFETY: This page-metadata test never dispatches a request, so the client fixture intentionally has no transport methods.
       {} as any,
       response,
       { data: [{ id: 'first' }, { id: 'second' }], has_more: true },
@@ -117,12 +124,14 @@ describe('CursorPage', () => {
     ['terminal pages', { data: [{ id: 'first' }], has_more: false }],
     ['items without usable IDs', { data: [{ id: '' }], has_more: true }],
   ] as const)('does not paginate %s', (_description, body) => {
+    // SAFETY: This page-metadata test never dispatches a request, so the client fixture intentionally has no transport methods.
     const page = new CursorPage<Item>({} as any, response, { ...body, data: [...body.data] }, options);
 
     expect(page.hasNextPage()).toBe(false);
   });
 
   test('requests and iterates subsequent pages through the owning client', async () => {
+    // SAFETY: These page tests call only requestAPIList; the controlled client fake records pagination dispatch without supplying unrelated SDK methods.
     const client = { requestAPIList: vi.fn() } as any;
     const first = new CursorPage<Item>(
       client,
@@ -161,6 +170,7 @@ describe('CursorPage', () => {
 describe('ConversationCursorPage', () => {
   test('uses the server-provided last ID rather than an item ID', () => {
     const page = new ConversationCursorPage(
+      // SAFETY: This page-metadata test never dispatches a request, so the client fixture intentionally has no transport methods.
       {} as any,
       response,
       { data: [{ value: 'first' }], has_more: true, last_id: 'cursor_123' },
@@ -176,12 +186,14 @@ describe('ConversationCursorPage', () => {
 
   test('stops when the server omits a cursor or declares the final page', () => {
     const withoutCursor = new ConversationCursorPage(
+      // SAFETY: This page-metadata test never dispatches a request, so the client fixture intentionally has no transport methods.
       {} as any,
       response,
       { data: [{ value: 'first' }], has_more: true, last_id: '' },
       options,
     );
     const terminal = new ConversationCursorPage(
+      // SAFETY: This page-metadata test never dispatches a request, so the client fixture intentionally has no transport methods.
       {} as any,
       response,
       { data: [{ value: 'first' }], has_more: false, last_id: 'cursor_123' },
@@ -197,6 +209,7 @@ describe('ConversationCursorPage', () => {
 describe('NextCursorPage', () => {
   test('uses the explicit next cursor while preserving existing query parameters', () => {
     const page = new NextCursorPage(
+      // SAFETY: This page-metadata test never dispatches a request, so the client fixture intentionally has no transport methods.
       {} as any,
       response,
       { data: [{ id: 'first' }], has_more: true, next: 'cursor_456' },
@@ -212,12 +225,14 @@ describe('NextCursorPage', () => {
 
   test('stops when the next cursor is absent or there are no more pages', () => {
     const withoutCursor = new NextCursorPage(
+      // SAFETY: This page-metadata test never dispatches a request, so the client fixture intentionally has no transport methods.
       {} as any,
       response,
       { data: [{ id: 'first' }], has_more: true, next: null },
       options,
     );
     const terminal = new NextCursorPage(
+      // SAFETY: This page-metadata test never dispatches a request, so the client fixture intentionally has no transport methods.
       {} as any,
       response,
       { data: [{ id: 'first' }], has_more: false, next: 'cursor_456' },

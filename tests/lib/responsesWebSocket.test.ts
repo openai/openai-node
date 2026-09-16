@@ -77,6 +77,7 @@ test('public WebSocket error types preserve flat and nested server events', () =
 });
 
 describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketError) => {
+  // SAFETY: The stable and beta base constructors expose the same methods exercised by this shared test subclass.
   const BaseClass = Base as typeof StableResponsesWSBase;
 
   class TestResponsesWebSocket extends BaseClass<FakeResponseSocket> {
@@ -175,8 +176,10 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
 
   test('rejects operations before its socket has been initialized', () => {
     const websocket = createWebSocket();
+    // SAFETY: Deliberately clear the initialized socket to verify send and close reject this invalid lifecycle state.
     (websocket as any).socket = undefined;
 
+    // SAFETY: These send/queue tests intentionally use minimal or synthetic event discriminators; they verify transport state rather than server request validation.
     expect(() => websocket.send({ type: 'response.create' } as any)).toThrow('failed to initialize socket');
     expect(() => websocket.sendRaw('message')).toThrow('failed to initialize socket');
     expect(() => websocket.close()).toThrow('failed to initialize socket');
@@ -188,6 +191,7 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
     const socket = websocket.socket;
     socket.open();
 
+    // SAFETY: These send/queue tests intentionally use minimal or synthetic event discriminators; they verify transport state rather than server request validation.
     websocket.send({ type: 'response.create' } as any);
     websocket.sendRaw([new Uint8Array([1]), new Uint8Array([2])]);
 
@@ -198,6 +202,7 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
   test('queues JSON and raw messages while the connection opens', () => {
     const websocket = createWebSocket();
 
+    // SAFETY: These send/queue tests intentionally use minimal or synthetic event discriminators; they verify transport state rather than server request validation.
     websocket.send({ type: 'response.create' } as any);
     websocket.sendRaw('raw-message');
     expect(websocket.socket.send).not.toHaveBeenCalled();
@@ -213,10 +218,13 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
     const listener = vi.fn();
     websocket.on('error', listener);
 
+    // SAFETY: These send/queue tests intentionally use minimal or synthetic event discriminators; they verify transport state rather than server request validation.
     websocket.send({ type: 'first' } as any);
+    // SAFETY: These send/queue tests intentionally use minimal or synthetic event discriminators; they verify transport state rather than server request validation.
     websocket.send({ type: 'second' } as any);
     websocket.sendRaw('third');
     websocket.socket.readyState = ReadyState.CLOSED;
+    // SAFETY: These send/queue tests intentionally use minimal or synthetic event discriminators; they verify transport state rather than server request validation.
     websocket.send({ type: 'closed' } as any);
     websocket.sendRaw('closed');
 
@@ -239,6 +247,7 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
       throw new Error('send failed');
     });
 
+    // SAFETY: These send/queue tests intentionally use minimal or synthetic event discriminators; they verify transport state rather than server request validation.
     websocket.send({ type: 'response.create' } as any);
     websocket.sendRaw('raw-message');
 
@@ -262,7 +271,7 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
     const raw = vi.fn();
     const errors = vi.fn();
     websocket.on('event', events);
-    websocket.on('response.created', typed as any);
+    websocket.on('response.created', typed);
     websocket.on('raw', raw);
     websocket.on('error', errors);
     const event = { type: 'response.created', response: { id: 'resp_123' } };
@@ -282,7 +291,7 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
     expect(errors.mock.calls.map(([error]) => error.message)).toEqual(['request failed', 'socket failed']);
   });
 
-  test.each(websocketAPIErrorCases)('dispatches %s API errors', (_shape, apiError, expectedMessage) => {
+  test.each(websocketAPIErrorCases)('dispatches %s API errors', (_errorCase, apiError, expectedMessage) => {
     const websocket = createWebSocket();
     const events = vi.fn();
     const errors = vi.fn();
@@ -401,6 +410,7 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
 
     original.readyState = ReadyState.CLOSED;
     original.emit('close', 1006, 'network interrupted');
+    // SAFETY: These send/queue tests intentionally use minimal or synthetic event discriminators; they verify transport state rather than server request validation.
     websocket.send({ type: 'queued-during-reconnect' } as any);
 
     const replacement = await waitForConnection(websocket, 2);

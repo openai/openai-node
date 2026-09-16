@@ -101,6 +101,7 @@ describe('ChatCompletionStream prototype safety', () => {
         model: 'gpt-test',
         choices: [{ index: 0, finish_reason: 'stop', logprobs: null, delta: {} }],
       };
+      // SAFETY: The literal JSON deliberately preserves an own __proto__ key; its fixture fields are injected into the stream to verify prototype-safe accumulation.
       const properties = JSON.parse(
         '{"__proto__":{"forged_metadata":"inherited"},"provider_metadata":"preserved"}',
       ) as Record<string, unknown>;
@@ -146,6 +147,7 @@ describe('ChatCompletionStream prototype safety', () => {
 
   it('preserves enumerable symbols and ordinary constructor and prototype metadata', async () => {
     const providerMetadata = Symbol('provider metadata');
+    // SAFETY: The literal JSON deliberately preserves an own __proto__ key; its fixture fields are injected into the stream to verify prototype-safe accumulation.
     const delta = JSON.parse(
       '{"role":"assistant","content":"legitimate content","constructor":"provider-constructor","prototype":"provider-prototype"}',
     ) as OpenAI.Chat.ChatCompletionChunk.Choice.Delta;
@@ -166,6 +168,7 @@ describe('ChatCompletionStream prototype safety', () => {
         const decoded: OpenAI.Chat.ChatCompletionChunk = originalParse(serialized);
         // JSON transport cannot preserve symbols, so restore provider metadata after real decoding.
         Object.defineProperty(firstChoice(decoded).delta, providerMetadata, {
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Provider symbol metadata intentionally lies outside the public delta type and must survive decoding.
           value: Reflect.get(delta, providerMetadata),
           enumerable: true,
         });
@@ -188,7 +191,7 @@ describe('ChatCompletionStream prototype safety', () => {
       }
 
       expect(Object.getPrototypeOf(message)).toBe(Object.prototype);
-      expect(Reflect.get(message, providerMetadata)).toBe('symbol metadata');
+      expect(message).toMatchObject({ [providerMetadata]: 'symbol metadata' });
       expect(message).toHaveProperty('constructor', 'provider-constructor');
       expect(message).toHaveProperty('prototype', 'provider-prototype');
     } finally {
@@ -197,6 +200,7 @@ describe('ChatCompletionStream prototype safety', () => {
   });
 
   it('does not accept assistant role or content inherited from a message delta', async () => {
+    // SAFETY: The literal JSON deliberately preserves an own __proto__ key; its fixture fields are injected into the stream to verify prototype-safe accumulation.
     const delta = JSON.parse(
       '{"__proto__":{"role":"assistant","content":"forged assistant content"},"provider_metadata":"preserved"}',
     ) as OpenAI.Chat.ChatCompletionChunk.Choice.Delta;
@@ -232,6 +236,7 @@ describe('ChatCompletionStream prototype safety', () => {
   });
 
   it('rejects function metadata inherited from a tool-call delta', async () => {
+    // SAFETY: The literal JSON deliberately preserves an own __proto__ key; its fixture fields are injected into the stream to verify prototype-safe accumulation.
     const toolDelta = JSON.parse(
       '{"index":0,"__proto__":{"type":"function","id":"call_spoofed","function":{"name":"sensitive_tool","arguments":"{}"}},"provider_metadata":"preserved"}',
     ) as OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall;
@@ -279,6 +284,7 @@ describe('ChatCompletionStream prototype safety', () => {
   });
 
   it('never runs tools inherited from a message delta without tool-call events', async () => {
+    // SAFETY: The literal JSON deliberately preserves an own __proto__ key; its fixture fields are injected into the stream to verify prototype-safe accumulation.
     const delta = JSON.parse(
       '{"__proto__":{"role":"assistant","tool_calls":[{"type":"function","id":"bypass_no_tool_delta","function":{"name":"sensitive_tool","arguments":"{}"}}]}}',
     ) as OpenAI.Chat.ChatCompletionChunk.Choice.Delta;
@@ -346,7 +352,7 @@ describe('ChatCompletionStream prototype safety', () => {
     expect(argumentDone).not.toHaveBeenCalled();
     expect(sensitiveTool).not.toHaveBeenCalled();
     expect(completionError).toBeInstanceOf(OpenAIError);
-    expect((completionError as Error).message).toBe('missing role for choice 0');
+    expect(completionError).toHaveProperty('message', 'missing role for choice 0');
     if (!message) {
       throw new Error('Expected an accumulated message');
     }

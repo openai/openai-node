@@ -28,6 +28,7 @@ function createClient(base64Embedding = encodedVector): OpenAI {
   return new OpenAI({
     apiKey: 'test-key',
     fetch: async (_url, init) => {
+      // SAFETY: This fetch mock reads the SDK serialized embedding request and checks the encoding_format selected by the local call.
       const body = JSON.parse(String(init?.body)) as { encoding_format: 'float' | 'base64' };
 
       return Response.json({
@@ -51,6 +52,7 @@ function makeFixtureClient(): OpenAI {
     apiKey: 'My API Key',
     baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
     fetch: async (_, init) => {
+      // SAFETY: This fetch mock reads the SDK serialized embedding request and checks the encoding_format selected by the local call.
       const format = (JSON.parse(String(init?.body)) as OpenAI.EmbeddingCreateParams).encoding_format;
       // These existing responses were taken from the live API with:
       // model: 'text-embedding-3-large', input: 'h', dimensions: 256.

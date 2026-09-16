@@ -42,10 +42,12 @@ function mockControlledUploads(client: OpenAI, uploads: ReturnType<typeof create
     if (!upload) {
       throw new Error('Unexpected upload');
     }
+    // SAFETY: The upload orchestrator only awaits this controlled promise for its file id; the fake deliberately omits unrelated APIPromise methods.
     return upload.promise as UploadPromise;
   });
 }
 
+// SAFETY: The batch result is a synthetic identity/status sentinel returned by the mocked poller; no other batch fields are consumed.
 const completed = { id: 'batch_123', status: 'completed' } as VectorStoreFileBatch;
 
 afterEach(() => {
@@ -70,6 +72,7 @@ describe('vector-store batch upload orchestration', () => {
       peak = Math.max(peak, active);
       nextID += 1;
       const id = `file_${nextID}`;
+      // SAFETY: The upload orchestrator only awaits this controlled promise for its file id; the fake deliberately omits unrelated APIPromise methods.
       return gate.promise.then(() => {
         active -= 1;
         return { id };
@@ -78,6 +81,7 @@ describe('vector-store batch upload orchestration', () => {
     const createAndPoll = vi
       .spyOn(client.vectorStores.fileBatches, 'createAndPoll')
       .mockResolvedValue(completed);
+    // SAFETY: Deliberately pass JavaScript null alongside numeric concurrency limits to test the existing defaulting behavior.
     const options = maxConcurrency === undefined ? undefined : { maxConcurrency: maxConcurrency as number };
 
     const result = client.vectorStores.fileBatches.uploadAndPoll('vs_123', { files }, options);
@@ -139,7 +143,8 @@ describe('vector-store batch upload orchestration', () => {
 
     await expect(
       client.vectorStores.fileBatches.uploadAndPoll('vs_123', {
-        files: files as unknown as Uploadable[],
+        // SAFETY: Deliberately supply invalid upload inputs to verify validation rejects them before any network request.
+        files: files as Uploadable[],
         fileIds: ['existing'],
       }),
     ).rejects.toThrow(
@@ -235,6 +240,7 @@ describe('vector-store batch upload orchestration', () => {
 
   test('propagates the batch creation error unchanged', async () => {
     const client = createClient();
+    // SAFETY: The upload orchestrator only awaits this controlled promise for its file id; the fake deliberately omits unrelated APIPromise methods.
     vi.spyOn(client.files, 'create').mockReturnValue(Promise.resolve({ id: 'file_123' }) as UploadPromise);
     const error = new Error('batch creation failed');
     vi.spyOn(client.vectorStores.fileBatches, 'createAndPoll').mockRejectedValue(error);

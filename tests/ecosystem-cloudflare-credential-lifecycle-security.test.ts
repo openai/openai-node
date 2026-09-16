@@ -261,6 +261,7 @@ function observations(fixture: Fixture): Observation[] {
     return [];
   }
 
+  // SAFETY: Each JSON line is emitted by the controlled credential-command fixture using the Observation fields asserted by this test.
   return readFileSync(fixture.observations, 'utf-8')
     .trim()
     .split('\n')
@@ -360,6 +361,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
   test('never exposes a staged key through a pre-opened readable original inode', () => {
     withFixture((fixture) => {
+      // SAFETY: credentialStates is the fixed fixture table above; this literal index selects its configured credential case.
       const state = credentialStates[1] as CredentialState;
       setExistingCredentials(fixture, state);
       const preload = holdOriginalCredentialDescriptor(fixture);
@@ -382,6 +384,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
   test('preserves concurrent edits and mode changes through the original held inode', () => {
     withFixture((fixture) => {
+      // SAFETY: credentialStates is the fixed fixture table above; this literal index selects its configured credential case.
       const state = credentialStates[1] as CredentialState;
       setExistingCredentials(fixture, state);
       const preload = holdOriginalCredentialDescriptor(fixture);
@@ -402,6 +405,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
 
   test('does not retry a replaced credential path even when retries are enabled', () => {
     withFixture((fixture) => {
+      // SAFETY: credentialStates is the fixed fixture table above; this literal index selects its configured credential case.
       const state = credentialStates[1] as CredentialState;
       setExistingCredentials(fixture, state);
 
@@ -429,6 +433,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
     { failure: 'chmod-staged', contents: originalContents, mode: 0o640 },
   ])('preserves concurrent visible credential changes after $failure', ({ failure, contents, mode }) => {
     withFixture((fixture) => {
+      // SAFETY: credentialStates is the fixed fixture table above; this literal index selects its configured credential case.
       const state = credentialStates[1] as CredentialState;
       setExistingCredentials(fixture, state);
 
@@ -886,6 +891,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
     'serializes $signal cleanup with in-flight staging when noCleanup=$noCleanup',
     ({ signal, noCleanup }) => {
       withFixture((fixture) => {
+        // SAFETY: credentialStates is the fixed fixture table above; this literal index selects its configured credential case.
         const state = credentialStates[1] as CredentialState;
         setExistingCredentials(fixture, state);
         const preload = path.join(fixture.directory, 'interrupt-during-staging.cjs');
@@ -1081,6 +1087,7 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
         'run test:smoke',
         'run test:ci',
       ]);
+      // SAFETY: credentialStates is the fixed fixture table above; this literal index selects its configured credential case.
       expectScopedObservations(records, credentialStates[0] as CredentialState);
       expect(existsSync(fixture.vars)).toBe(false);
     });

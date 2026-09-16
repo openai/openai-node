@@ -65,7 +65,7 @@ function createClient(
   create: ProviderFactory = dependencyFreeProvider,
   endpoint: Endpoint = 'mantle',
   requestSignal?: AbortSignal,
-): { client: OpenAI; fetch: FetchMock } {
+) {
   const fetch = vi.fn<Fetch>(async () => Response.json({ object: 'list', data: [], has_more: false }));
   const options = { provider: create(endpoint, tokenProvider), fetch, maxRetries: 0 };
   return {
@@ -74,6 +74,7 @@ function createClient(
   };
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function observe(promise: Promise<unknown>): Promise<unknown> {
   try {
     return { completed: await promise };
@@ -823,16 +824,18 @@ describe('hostile Bedrock bearer AbortSignal lifecycle', () => {
       const controller = new AbortController();
       const failure = new Error('signal registration failed');
       const original = controller.signal.addEventListener.bind(controller.signal);
-      vi.spyOn(controller.signal, 'addEventListener').mockImplementation(((
-        type: string,
-        listener: Parameters<AbortSignal['addEventListener']>[1],
-        options?: Parameters<AbortSignal['addEventListener']>[2],
-      ) => {
-        if (timing === 'after install') {
-          original(type, listener, options);
-        }
-        throw failure;
-      }) as typeof controller.signal.addEventListener);
+      vi.spyOn(controller.signal, 'addEventListener').mockImplementation(
+        (
+          type: string,
+          listener: Parameters<AbortSignal['addEventListener']>[1],
+          options?: Parameters<AbortSignal['addEventListener']>[2],
+        ) => {
+          if (timing === 'after install') {
+            original(type, listener, options);
+          }
+          throw failure;
+        },
+      );
       const tokenProvider = vi.fn<TokenProvider>(() => Promise.race([]));
       const { client, fetch } = createClient(tokenProvider);
 
@@ -850,17 +853,19 @@ describe('hostile Bedrock bearer AbortSignal lifecycle', () => {
     const controller = new AbortController();
     const reason = new Error('registration raced with cancellation');
     const original = controller.signal.addEventListener.bind(controller.signal);
-    vi.spyOn(controller.signal, 'addEventListener').mockImplementation(((
-      type: string,
-      listener: Parameters<AbortSignal['addEventListener']>[1],
-      options?: Parameters<AbortSignal['addEventListener']>[2],
-    ) => {
-      controller.abort(reason);
-      if (deliver && typeof listener === 'function') {
-        listener.call(controller.signal, new Event('abort'));
-      }
-      original(type, listener, options);
-    }) as typeof controller.signal.addEventListener);
+    vi.spyOn(controller.signal, 'addEventListener').mockImplementation(
+      (
+        type: string,
+        listener: Parameters<AbortSignal['addEventListener']>[1],
+        options?: Parameters<AbortSignal['addEventListener']>[2],
+      ) => {
+        controller.abort(reason);
+        if (deliver && typeof listener === 'function') {
+          listener.call(controller.signal, new Event('abort'));
+        }
+        original(type, listener, options);
+      },
+    );
     const tokenProvider = vi.fn<TokenProvider>(() => Promise.race([]));
     const { client, fetch } = createClient(tokenProvider);
 

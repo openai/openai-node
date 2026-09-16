@@ -41,10 +41,7 @@ function tokenExchangeResponse(accessToken: string, expiresIn: number): Response
   });
 }
 
-function pendingTokenExchange(): {
-  response: Promise<Response>;
-  resolve: (response: Response) => void;
-} {
+function pendingTokenExchange() {
   let resolveResponse!: (response: Response) => void;
   const response = new Promise<Response>((resolve) => {
     resolveResponse = resolve;
@@ -89,7 +86,7 @@ describe('WorkloadIdentityAuth', () => {
         },
         { status: 200 },
       );
-    }) as typeof fetch;
+    });
 
     const auth = new WorkloadIdentityAuth(config);
 
@@ -189,6 +186,7 @@ describe('WorkloadIdentityAuth', () => {
       provider: { tokenType: 'jwt', getToken: originalProvider },
     };
     const auth = new WorkloadIdentityAuth(config, async (_url, init) => {
+      // SAFETY: The SDK builds this token-exchange JSON from the string identifiers and tokens in the fixture; assertions verify the serialized fields.
       observedBodies.push(JSON.parse(String(init?.body)) as Record<string, string>);
       return tokenExchangeResponse('synthetic-original-access-token', 3600);
     });
@@ -253,6 +251,7 @@ describe('WorkloadIdentityAuth', () => {
 
     const observedBodies: Record<string, string>[] = [];
     const auth = new WorkloadIdentityAuth(new InheritedWorkloadIdentity(), async (_url, init) => {
+      // SAFETY: The SDK builds this token-exchange JSON from the string identifiers and tokens in the fixture; assertions verify the serialized fields.
       observedBodies.push(JSON.parse(String(init?.body)) as Record<string, string>);
       return tokenExchangeResponse('synthetic-inherited-access-token', 60);
     });
@@ -302,7 +301,7 @@ describe('WorkloadIdentityAuth', () => {
         },
         { status: 200 },
       );
-    }) as typeof fetch;
+    });
 
     const auth = new WorkloadIdentityAuth(config);
 
@@ -346,7 +345,7 @@ describe('WorkloadIdentityAuth', () => {
         },
         { status: 200 },
       );
-    }) as typeof fetch;
+    });
 
     const auth = new WorkloadIdentityAuth(config);
 
@@ -406,6 +405,7 @@ describe('WorkloadIdentityAuth', () => {
 
     let capturedRequest: { url: string; body: string; headers: Headers } | null = null;
 
+    // SAFETY: The token provider calls this fixture with a URL string; the mock returns a native Response for that request.
     global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const body = init?.body?.toString() || '';
       const headers = new Headers(init?.headers);
@@ -499,6 +499,7 @@ describe('WorkloadIdentityAuth', () => {
 
     let capturedBody: string | null = null;
 
+    // SAFETY: The token provider calls this fixture with a URL string; the mock returns a native Response for that request.
     global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       capturedBody = init?.body?.toString() || '';
 
@@ -537,6 +538,7 @@ describe('WorkloadIdentityAuth', () => {
 
     let capturedBody: string | null = null;
 
+    // SAFETY: The token provider calls this fixture with a URL string; the mock returns a native Response for that request.
     global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       capturedBody = init?.body?.toString() || '';
 
@@ -576,7 +578,7 @@ describe('WorkloadIdentityAuth', () => {
         },
         { status: 400 },
       ),
-    ) as typeof fetch;
+    );
 
     const auth = new WorkloadIdentityAuth(config);
 
@@ -603,7 +605,7 @@ describe('WorkloadIdentityAuth', () => {
         },
         { status: 200 },
       ),
-    ) as typeof fetch;
+    );
 
     const auth = new WorkloadIdentityAuth(config);
 
@@ -649,7 +651,7 @@ describe('WorkloadIdentityAuth', () => {
       },
     };
 
-    global.fetch = vi.fn(async () => Response.json(body, { status: 200 })) as typeof fetch;
+    global.fetch = vi.fn(async () => Response.json(body, { status: 200 }));
 
     const auth = new WorkloadIdentityAuth(config);
     const tokenPromise = auth.getToken();
@@ -681,7 +683,7 @@ describe('WorkloadIdentityAuth', () => {
         },
         { status: 200 },
       );
-    }) as typeof fetch;
+    });
 
     const auth = new WorkloadIdentityAuth(config);
 
@@ -797,7 +799,7 @@ describe('WorkloadIdentityAuth', () => {
         },
         { status: 200 },
       ),
-    ) as typeof fetch;
+    );
 
     const auth = new WorkloadIdentityAuth(config, customFetch);
     await auth.getToken();

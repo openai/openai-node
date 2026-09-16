@@ -96,11 +96,12 @@ function validateStaticCredentials(options: BedrockProviderOptions): AwsCredenti
   return {
     accessKeyId: options.accessKeyId,
     secretAccessKey: options.secretAccessKey,
+    // Spread creates an own data property without invoking inherited setters or changing the object prototype.
     ...(options.sessionToken ? { sessionToken: options.sessionToken } : {}),
   };
 }
 
-function requestTarget(parsedURL: URL): { path: string; query: Record<string, string | string[]> } {
+function requestTarget(parsedURL: URL) {
   const query: Record<string, string | string[]> = Object.create(null);
   for (const [name, value] of parsedURL.searchParams) {
     if (name === '__proto__') {
@@ -195,6 +196,7 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
   }
 
   async prepareRequest(request: FinalizedRequestInit, context: ProviderRequestContext): Promise<void> {
+    // SAFETY: process is optional outside Node; the native process tag is checked before using Node-specific signing and credential behavior.
     if (Object.prototype.toString.call((globalThis as any).process) !== '[object process]') {
       throw new Errors.OpenAIError(
         'Bedrock AWS credential authentication is only supported in Node.js and compatible server runtimes. Use bearer authentication in this runtime.',
@@ -230,10 +232,12 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
         this.signatureV4().sign({
           protocol: parsedURL.protocol,
           hostname: parsedURL.hostname,
+          // Spread creates an own data property without invoking inherited setters or changing the object prototype.
           ...(parsedURL.port ? { port: Number(parsedURL.port) } : {}),
           method,
           ...target,
           headers: Object.fromEntries(headers.entries()),
+          // Spread creates an own data property without invoking inherited setters or changing the object prototype.
           ...(body === undefined ? {} : { body }),
         }),
       failureMessage: this.options.usesDefaultChain

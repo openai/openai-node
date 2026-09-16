@@ -48,7 +48,7 @@ const failureCases: FailureCase[] = [
   },
 ];
 
-function sensitiveToolCall(kind: FailureKind): Record<string, unknown> {
+function sensitiveToolCall(kind: FailureKind) {
   const providerMetadata = {
     authorization: `Bearer ${syntheticCredential}`,
     patient: syntheticPatient,
@@ -95,6 +95,7 @@ function sensitiveToolCall(kind: FailureKind): Record<string, unknown> {
 }
 
 function makeSensitiveChunk(kind: FailureKind): OpenAI.Chat.ChatCompletionChunk {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: This fixture intentionally omits required tool fields to exercise finalization rejection and redaction.
   return {
     id: 'chatcmpl_synthetic_private',
     object: 'chat.completion.chunk',
@@ -157,10 +158,8 @@ function createPublicStream(chunk: OpenAI.Chat.ChatCompletionChunk, logLevel: 'o
   return { stream, logger, fetch };
 }
 
-function attachSnapshot(
-  stream: ChatCompletionStream<null>,
-  kind: FailureKind,
-): { snapshot?: ChatCompletionSnapshot; original?: ChatCompletionSnapshot } {
+function attachSnapshot(stream: ChatCompletionStream<null>, kind: FailureKind) {
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The listener populates both optional snapshots after the capture object has been returned.
   const captured: { snapshot?: ChatCompletionSnapshot; original?: ChatCompletionSnapshot } = {};
 
   stream.on('chunk', (_chunk, snapshot) => {
@@ -170,7 +169,9 @@ function attachSnapshot(
     }
 
     if (kind === 'missing-function-name' || kind === 'missing-function-arguments') {
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Finalization fixtures deliberately corrupt tool-call and snapshot fields to verify safe validation failures.
       const record = tool as unknown as Record<string, unknown>;
+      // SAFETY: This tool fixture was constructed with a function object; the dictionary view permits the malformed field mutations under test.
       const fn = record['function'] as Record<string, unknown>;
       const key = kind === 'missing-function-name' ? 'name' : 'arguments';
       Reflect.deleteProperty(fn, key);
@@ -185,13 +186,18 @@ function attachSnapshot(
 
 function expectPrivateError(error: unknown, expectedMessage: string): asserts error is OpenAIError {
   expect(error).toBeInstanceOf(OpenAIError);
+  // SAFETY: The preceding OpenAIError assertion verifies the class; these reads check exact constructor identity and redacted message/stack text.
   expect((error as OpenAIError).constructor).toBe(OpenAIError);
-  expect((error as OpenAIError).message).toBe(expectedMessage);
+  expect(error).toHaveProperty('message', expectedMessage);
+  // SAFETY: The preceding OpenAIError assertion verifies the class; these reads check exact constructor identity and redacted message/stack text.
   expect((error as OpenAIError).message).not.toContain('\n');
+  // SAFETY: The preceding OpenAIError assertion verifies the class; these reads check exact constructor identity and redacted message/stack text.
   expect((error as OpenAIError).message).not.toContain('{');
 
   for (const secret of [syntheticCredential, syntheticPatient, syntheticPrompt]) {
+    // SAFETY: The preceding OpenAIError assertion verifies the class; these reads check exact constructor identity and redacted message/stack text.
     expect((error as OpenAIError).message).not.toContain(secret);
+    // SAFETY: The preceding OpenAIError assertion verifies the class; these reads check exact constructor identity and redacted message/stack text.
     expect((error as OpenAIError).stack).not.toContain(secret);
   }
 }
@@ -281,6 +287,7 @@ describe('chat completion tool-finalization diagnostic privacy', () => {
       makeReadableStream(makeSensitiveChunk('missing-type')),
     );
     stream.on('chunk', (_chunk, snapshot) => {
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Finalization fixtures deliberately corrupt tool-call and snapshot fields to verify safe validation failures.
       mutateSnapshot(snapshot as unknown as Record<string, unknown>);
     });
 
@@ -313,6 +320,7 @@ describe('chat completion tool-finalization diagnostic privacy', () => {
     'preserves valid completed $name tool calls and confidential content',
     async (type) => {
       const chunk = makeSensitiveChunk(type === 'function' ? 'missing-function-name' : 'missing-custom-name');
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Finalization fixtures deliberately corrupt tool-call and snapshot fields to verify safe validation failures.
       const toolCall = chunk.choices[0]?.delta.tool_calls?.[0] as unknown as Record<string, unknown>;
       if (type === 'custom') {
         toolCall['custom'] = { name: 'trusted_custom_tool', input: syntheticToolArguments };

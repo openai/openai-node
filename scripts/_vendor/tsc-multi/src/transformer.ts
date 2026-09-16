@@ -114,6 +114,7 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
 
     const visitor: ts.Visitor = (node) => {
       if (resolvedShareHelpers && isSourceFile(node)) {
+        // SAFETY: TypeScript attaches internal emit metadata to these compiler nodes; the transformer checks optional metadata before using the helper or generated-name fields.
         for (const helper of ((node as any).emitNode?.helpers as any[]) ?? []) {
           if (!helper.scoped) {
             options.helpersNeeded.add(helper.importName);
@@ -138,6 +139,7 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
         if (isVariableStatement(node)) {
           const requireCall = node.declarationList.declarations[0]?.initializer;
           let original: ts.Node;
+          // SAFETY: The guarded condition establishes a non-null original compiler node before inspecting its kind.
           if (
             requireCall &&
             isCallExpression(requireCall) &&
@@ -254,11 +256,13 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
               options.ts.isIdentifier(expression.left) &&
               options.ts.isIdentifier(expression.right) &&
               classes[expression.right.text] &&
+              // SAFETY: TypeScript attaches internal emit metadata to these compiler nodes; the transformer checks optional metadata before using the helper or generated-name fields.
               (expression.left as any)?.emitNode?.autoGenerate
             ) {
               return expression.right.text;
             } else if (options.ts.isIdentifier(expression.left)) {
               // _BaseCloudflare_encoder = new WeakMap();
+              // SAFETY: TypeScript attaches internal emit metadata to these compiler nodes; the transformer checks optional metadata before using the helper or generated-name fields.
               const cls = (expression.left as any)?.emitNode?.autoGenerate?.prefix?.node?.text;
               if (classes[cls]) {
                 return cls;
@@ -271,6 +275,7 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
       };
       for (const statement of sourceFile.statements) {
         if (options.ts.isClassDeclaration(statement) && statement.name && !classes[statement.name.text]) {
+          // SAFETY: The enclosing named-class check establishes the Identifier stored on this class declaration.
           newStatements.push(
             (classes[statement.name.text] = [statement as typeof statement & { name: ts.Identifier }]),
           );
@@ -335,11 +340,14 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
     return (file) => {
       if (options.ts.isSourceFile(file)) {
         sourceFile = file;
+        // SAFETY: This visitor transforms a SourceFile without replacing its root kind; the result remains a SourceFile for the class-assignment pass.
         return pureClassAssignment(visitNode(file, visitor) as ts.SourceFile);
       } else if (options.ts.isBundle(file)) {
+        // SAFETY: The bundle branch rebuilds a compiler Bundle from visited SourceFiles; the generic transformer return type omits this supported compiler output.
         return ctx.factory.createBundle(
           file.sourceFiles.map((file) => {
             sourceFile = file;
+            // SAFETY: This visitor transforms a SourceFile without replacing its root kind; the result remains a SourceFile for the class-assignment pass.
             return pureClassAssignment(visitNode(file, visitor) as ts.SourceFile);
           }),
         ) as any;

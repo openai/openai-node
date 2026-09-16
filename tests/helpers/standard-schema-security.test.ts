@@ -33,6 +33,7 @@ function strictSchemasForAllHelpers(jsonSchema: Record<string, unknown>) {
 }
 
 function makePrototypeManipulationSchema(): Record<string, unknown> {
+  // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
   return JSON.parse(
     '{"type":"object","properties":{"safe":{"type":"string"}},"required":["safe"],' +
       '"__proto__":{"additionalProperties":false,"polluted":"YES"}}',
@@ -48,7 +49,7 @@ function expectPrototypeSafeClosedSchema(schema: Record<string, unknown>) {
   expect(hasOwn(schema, prototypePropertyName)).toBe(true);
   expect(schema[prototypePropertyName]).toEqual({ additionalProperties: false, polluted: 'YES' });
   expect(schema['polluted']).toBeUndefined();
-  expect((Object.prototype as Record<string, unknown>)['polluted']).toBeUndefined();
+  expect(Object.prototype).not.toHaveProperty('polluted');
   expect(JSON.parse(serializedSchema)).toMatchObject({ additionalProperties: false });
 }
 
@@ -65,6 +66,7 @@ describe('Standard Schema prototype security', () => {
       };
 
       for (const schema of strictSchemasForAllHelpers(rootSchemas[keyword])) {
+        // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
         expectPrototypeSafeClosedSchema(schema as Record<string, unknown>);
         expect(schema).toMatchObject({
           ...metadata,
@@ -89,6 +91,7 @@ describe('Standard Schema prototype security', () => {
     });
 
     for (const schema of schemas) {
+      // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
       const properties = (schema as Record<string, unknown>)['properties'] as Record<
         string,
         Record<string, unknown>
@@ -98,7 +101,7 @@ describe('Standard Schema prototype security', () => {
 
       expectPrototypeSafeClosedSchema(nested);
       expect(nested['description']).toBe('Ordinary nested annotation');
-      expect(hasOwn(schema as Record<string, unknown>, 'additionalProperties')).toBe(true);
+      expect(Object.getOwnPropertyDescriptor(schema, 'additionalProperties')).toBeDefined();
       expect(JSON.parse(serializedSchema)).toMatchObject({
         additionalProperties: false,
         properties: { nested: { additionalProperties: false } },
@@ -107,25 +110,28 @@ describe('Standard Schema prototype security', () => {
   });
 
   it('preserves legitimate __proto__ property names across all helper surfaces', () => {
+    // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
     const jsonSchema = JSON.parse(
       '{"type":"object","properties":{"__proto__":{"type":"string"},"safe":{"type":"number"}},' +
         '"required":["__proto__","safe"]}',
     ) as Record<string, unknown>;
 
     for (const schema of strictSchemasForAllHelpers(jsonSchema)) {
+      // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
       const properties = (schema as Record<string, unknown>)['properties'] as Record<string, unknown>;
 
       expect(Object.getPrototypeOf(properties)).toBe(Object.prototype);
       expect(hasOwn(properties, prototypePropertyName)).toBe(true);
       expect(properties[prototypePropertyName]).toEqual({ type: 'string' });
       expect(properties['safe']).toEqual({ type: 'number' });
-      expect(hasOwn(schema as Record<string, unknown>, 'additionalProperties')).toBe(true);
+      expect(Object.getOwnPropertyDescriptor(schema, 'additionalProperties')).toBeDefined();
     }
   });
 
   it.each(['$defs', 'definitions'] as const)(
     'preserves own __proto__ entries in promoted root anyOf %s maps across all helper surfaces',
     (keyword) => {
+      // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
       const branchDefinitions = JSON.parse(
         '{"__proto__":{"type":"string"},"constructor":{"type":"number"},' +
           '"toString":{"type":"boolean"},"BranchOnly":{"type":"integer"}}',
@@ -150,9 +156,12 @@ describe('Standard Schema prototype security', () => {
       });
 
       for (const schema of schemas) {
+        // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
         const definitions = (schema as Record<string, unknown>)[keyword] as Record<string, unknown>;
         const serializedSchema = JSON.stringify(schema);
+        // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
         const serialized = JSON.parse(serializedSchema) as Record<string, unknown>;
+        // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
         const serializedDefinitions = serialized[keyword] as Record<string, unknown>;
 
         expect(Object.getPrototypeOf(definitions)).toBe(Object.prototype);
@@ -180,6 +189,7 @@ describe('Standard Schema prototype security', () => {
   it.each(['$defs', 'definitions'] as const)(
     'keeps refs to promoted own __proto__ %s definitions across all helper surfaces',
     (keyword) => {
+      // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
       const branchDefinitions = JSON.parse('{"__proto__":{"type":"string"}}') as Record<string, unknown>;
       const schemas = strictSchemasForAllHelpers({
         type: 'object',
@@ -197,6 +207,7 @@ describe('Standard Schema prototype security', () => {
       });
 
       for (const schema of schemas) {
+        // SAFETY: This regression constructs the exact schema dictionaries here, including hostile property names, and checks their own fields after conversion.
         const definitions = (schema as Record<string, unknown>)[keyword] as Record<string, unknown>;
 
         expect(Object.getPrototypeOf(definitions)).toBe(Object.prototype);

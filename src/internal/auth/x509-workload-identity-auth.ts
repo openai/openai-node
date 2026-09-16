@@ -43,10 +43,7 @@ function assertSafeHeaders(headers: Headers): void {
   }
 }
 
-function exchangeDeadline(
-  timeout: number | undefined,
-  callerSignal: AbortSignal | null | undefined,
-): { signal: AbortSignal; dispose: () => void } {
+function exchangeDeadline(timeout: number | undefined, callerSignal: AbortSignal | null | undefined) {
   const deadline = new AbortController();
   const timer =
     timeout === undefined
@@ -104,10 +101,7 @@ interface X509TokenRequestContext {
   fetchOptions: MergedRequestInit;
 }
 
-function waitForRefresh(
-  attempt: X509RefreshAttempt,
-  signal: AbortSignal,
-): { result: Promise<X509ExchangedToken>; dispose: () => void } {
+function waitForRefresh(attempt: X509RefreshAttempt, signal: AbortSignal) {
   let abort: (() => void) | undefined;
   // AbortSignal remains callback-only on supported TypeScript/runtime combinations.
   // oxlint-disable-next-line promise/avoid-new -- A callback-only AbortSignal must race a shared refresh.
@@ -145,6 +139,7 @@ export function isX509WorkloadIdentity(
       }
       break;
     }
+    // SAFETY: Object.getPrototypeOf returns an object or null; the traversal checks descriptors rather than assuming a credential-provider subtype.
     providerOwner = Object.getPrototypeOf(providerOwner) as object | null;
   }
 
@@ -157,6 +152,7 @@ export function isX509WorkloadIdentity(
       }
       return discriminator.value === 'x509';
     }
+    // SAFETY: Object.getPrototypeOf returns an object or null; the traversal checks descriptors rather than assuming a credential-provider subtype.
     current = Object.getPrototypeOf(current) as object | null;
   }
   return false;
@@ -267,9 +263,11 @@ export class X509WorkloadIdentityAuth {
       type: 'x509',
       identityProviderId: this.#identityProviderId,
       serviceAccountId: this.#serviceAccountId,
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(this.#configuredRefreshBufferMs === undefined
         ? {}
         : { refreshBufferMs: this.#configuredRefreshBufferMs }),
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(this.#configuredRefreshBufferSeconds === undefined
         ? {}
         : { refreshBufferSeconds: this.#configuredRefreshBufferSeconds }),
@@ -302,6 +300,7 @@ export class X509WorkloadIdentityAuth {
     if (!defaultHeaders || !requestHeaders) {
       throw new OpenAIError('X.509 workload identity requires snapshotted request headers.');
     }
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The exposed snapshot contract deliberately hides the private request-scope representation.
     return { defaultHeaders, requestHeaders };
   }
 
@@ -495,6 +494,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Establishes an independent scope even when concurrent requests share caller options. */
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Logical request owners are opaque identity tokens; their properties are never read.
   runRequest<T>(operation: () => Promise<T>, requestOwner: object): Promise<T> {
     return this.#transport.run(async () => {
       const scope = this.#transport.current();
@@ -515,6 +515,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Reports whether a public request-building call already belongs to an active logical operation. */
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Request scope membership compares the opaque caller token by identity only.
   inRequest(requestOwner: object): boolean {
     const scope = this.#transport.current();
     return scope?.owner === this && scope.requestOwner === requestOwner && scope.phase !== 'authorizing';
@@ -540,9 +541,13 @@ export class X509WorkloadIdentityAuth {
       wallStartedAt,
       monotonicStartedAt,
       owner: this,
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(deadlineArmed ? { deadlineArmed } : {}),
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(request ? { request } : {}),
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(effectiveSignal ? { effectiveSignal } : {}),
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(requestOwner ? { requestOwner } : {}),
     };
     return (operation) =>

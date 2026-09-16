@@ -43,6 +43,7 @@ function clientWithCompletions(completions: ChatCompletionChunk[]) {
 }
 
 function toolMessages(wire: string) {
+  // SAFETY: Lines come from the SDK chunk serializer; the checked prefix identifies the embedded tool-message JSON written by that same serializer.
   return wire
     .trim()
     .split('\n')

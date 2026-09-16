@@ -47,11 +47,13 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
     try {
       let source: NodeJS.ReadableStream;
       if (isResponse(stream)) {
+        // SAFETY: Fetch implementations may expose a web or Node response body; the following pipe check selects the matching stream adapter.
         const body = stream.body as NodeReadableStream | NodeJS.ReadableStream | null;
         if (!body) {
           throw new Error('Cannot play audio from a response without a body');
         }
 
+        // SAFETY: The preceding branch handled Node pipe streams; the remaining response body follows the web ReadableStream contract consumed by fromWeb.
         source =
           'pipe' in body && typeof body.pipe === 'function'
             ? body

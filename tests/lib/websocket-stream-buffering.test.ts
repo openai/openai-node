@@ -9,7 +9,7 @@ import {
 
 const BACKLOG_SIZE = 4096;
 
-function measureElementMovement<T>(operation: () => T): { result: T; elementMoves: number } {
+function measureElementMovement<T>(operation: () => T) {
   const originalShift = Array.prototype.shift;
   const originalSplice = Array.prototype.splice;
   const originalSlice = Array.prototype.slice;
@@ -26,6 +26,7 @@ function measureElementMovement<T>(operation: () => T): { result: T; elementMove
       elementMoves += this.length;
     }
     if (deleteCount === undefined) {
+      // oxlint-disable-next-line anti-slop/no-reflect-apply -- Preserve native splice's one-argument overload and omitted deleteCount in this instrumentation.
       return Reflect.apply(originalSplice, this, [start]);
     }
     return originalSplice.call(this, start, deleteCount, ...items);
@@ -129,9 +130,10 @@ describe.each(websocketVariants)('$name public stream buffering', ({ create, eve
       const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }));
       const on = vi.spyOn(connection, 'on');
       try {
-        expect(() => Reflect.apply(connection.stream, connection, [{ maxBufferedEvents }])).toThrow(
-          'positive safe integer',
-        );
+        expect(() => {
+          // @ts-expect-error Exercise invalid JavaScript options rejected by the runtime boundary.
+          connection.stream({ maxBufferedEvents });
+        }).toThrow('positive safe integer');
         expect(on).not.toHaveBeenCalled();
       } finally {
         connection.close();

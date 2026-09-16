@@ -1,5 +1,4 @@
 import { vi } from 'vitest';
-import type { Mock } from 'vitest';
 
 import OpenAI, { AzureOpenAI, OpenAIError } from 'openai';
 import { OpenAIRealtimeWebSocket as StableNativeRealtime } from 'openai/realtime/websocket';
@@ -34,11 +33,12 @@ function createNodeSocket(url: URL, options: WS.ClientOptions) {
   return { url, options, on: vi.fn(), send: vi.fn(), close: vi.fn() };
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Capture constructor options to verify credential and browser checks before a transport can send secrets.
 vi.mock('ws', () => ({
   WebSocket: vi.fn(createNodeSocket),
 }));
 
-const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
+const nodeSocketConstructor = vi.mocked(WS.WebSocket);
 const nativeRealtimeSurfaces = [
   { name: 'stable', Realtime: StableNativeRealtime, beta: false },
   { name: 'beta', Realtime: BetaNativeRealtime, beta: true },
@@ -85,7 +85,7 @@ function withBrowserWorker<T>(
     value: (value: unknown) => value === navigator,
   });
 
-  const globals: Record<string, unknown> = {
+  const globals = {
     WorkerGlobalScope: browserWorkerGlobalScope,
     WorkerNavigator: browserWorkerNavigator,
     [workerType]: browserWorkerGlobalScope,
@@ -199,6 +199,8 @@ describe('beta realtime WebSocket destination security', () => {
       'wss://trusted.example.com:444/collect',
     ]) {
       const realtime = new Realtime(
+        // SAFETY: This fixture deliberately violates the public connection options so the runtime validator, rather than TypeScript, must reject it.
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- The security fixture deliberately injects an unsupported __url field past the typed public API.
         { model: 'gpt-realtime', __url: new URL(destination) } as { model: string },
         client,
       );
@@ -214,6 +216,8 @@ describe('beta realtime WebSocket destination security', () => {
     expect(
       () =>
         new Realtime(
+          // SAFETY: This fixture deliberately violates the public connection options so the runtime validator, rather than TypeScript, must reject it.
+          // oxlint-disable-next-line anti-slop/no-known-value-widening, anti-slop/no-chained-type-assertions -- The regression intentionally omits required options while injecting an unsupported destination override.
           { __url: new URL('wss://trusted.example.com/v1/realtime') } as unknown as { model: string },
           createClient(),
         ),

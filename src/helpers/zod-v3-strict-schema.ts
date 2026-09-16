@@ -10,6 +10,7 @@ interface SchemaDefinition {
   typeName: string;
   checks?: readonly { kind: string; value?: unknown }[];
   coerce?: boolean;
+  // oxlint-disable-next-line anti-slop/no-shape-in-symbol-names -- Zod v3 defines this property name on object schemas.
   shape: () => Record<string, SchemaNode>;
   type: SchemaNode;
   innerType: SchemaNode;
@@ -32,6 +33,7 @@ interface SchemaChild {
   path: string;
 }
 
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- Runtime Zod type names index this dictionary, including unsupported names outside the known entries.
 const simpleJSONDomains: Readonly<Record<string, JSONDomain['type']>> = {
   ZodString: 'string',
   ZodNumber: 'number',
@@ -109,6 +111,7 @@ function nativeEnumDomains(def: SchemaDefinition): JSONDomain[] {
   if (!definitionValues || Array.isArray(definitionValues)) {
     return [];
   }
+  // SAFETY: The preceding guard accepts a non-array object; its values remain unknown until individual definition checks.
   const object = definitionValues as Record<string, unknown>;
   const values = Object.keys(object)
     .filter((key) => {
@@ -429,12 +432,15 @@ export function assertSupportedZodV3Schema(
   definitions: Record<string, ZodV3Schema> | undefined,
 ): void {
   const visited = new Set<SchemaDefinition>();
-  visit(schema as unknown as SchemaNode, '$', visited);
+  // SAFETY: The public Zod v3 input is viewed through the validator's minimal schema-node contract; visit checks its definition and rejects unsupported kinds.
+  visit(schema as SchemaNode, '$', visited);
   for (const [name, definition] of Object.entries(definitions ?? {})) {
-    visit(definition as unknown as SchemaNode, `$.definitions.${name}`, visited);
+    // SAFETY: The public Zod v3 input is viewed through the validator's minimal schema-node contract; visit checks its definition and rejects unsupported kinds.
+    visit(definition as SchemaNode, `$.definitions.${name}`, visited);
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Serialization validation must inspect any object, including arrays and foreign prototypes, without trusting fields.
 function assertNoJSONSerializationHook(value: object, path: string): void {
   for (let current: object | null = value; current !== null; current = Object.getPrototypeOf(current)) {
     const descriptor = Object.getOwnPropertyDescriptor(current, 'toJSON');

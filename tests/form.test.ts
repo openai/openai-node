@@ -116,6 +116,7 @@ describe('form data validation', () => {
     const contentType = headers.get('content-type');
     expect(contentType).toMatch(/^multipart\/form-data; boundary=openai-/);
 
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const encoded = await new Response(options.body as ReadableStream).text();
     expect(pulls).toBe(4);
     expect(encoded).toContain('name="file"; filename="audio.webm"');
@@ -138,6 +139,7 @@ describe('form data validation', () => {
       fetch,
     );
 
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const encoded = await new Response(options.body as ReadableStream).text();
     expect(encoded).toContain('blob-content');
   });
@@ -150,6 +152,7 @@ describe('form data validation', () => {
       fetch,
     );
 
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((form.get('file') as File).name).toBe('SKILL.md');
   });
 
@@ -162,6 +165,7 @@ describe('form data validation', () => {
       { stripFilenames: false },
     );
 
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((form.get('files[]') as File).name).toBe('my-skill/SKILL.md');
   });
 
@@ -177,6 +181,7 @@ describe('form data validation', () => {
       { stripFilenames: false },
     );
 
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((form.get('files[]') as File).name).toBe('SKILL.md');
   });
 
@@ -189,6 +194,7 @@ describe('form data validation', () => {
       { stripFilenames: false },
     );
 
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((form.get('files[]') as File).name).toBe('uploads.test.ts');
   });
 });

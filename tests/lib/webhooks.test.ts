@@ -189,6 +189,7 @@ describe('webhook documentation', () => {
           super({ ...options, apiKey: 'synthetic-test-key', fetch });
         }
       }
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- Evaluating the compiled example populates this initially empty CommonJS exports object.
       const exported: { webhook?: (request: Request) => Promise<Response> } = {};
       const compiled = ts.transpileModule(source, {
         compilerOptions: {

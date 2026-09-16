@@ -86,14 +86,14 @@ describe.each(schemaHelpers)('$name object property security', ({ getSchema }) =
   });
 
   it('rejects __proto__ properties from frozen, composed object shapes', () => {
-    const frozenShape = Object.freeze(
+    const frozenProperties = Object.freeze(
       Object.fromEntries([
         ['__proto__', zv3.string()],
         ['safe', zv3.number()],
       ]),
     );
     const schema = zv3
-      .object(frozenShape)
+      .object(frozenProperties)
       .merge(zv3.object({ neighbor: zv3.boolean() }))
       .readonly();
 
@@ -102,12 +102,14 @@ describe.each(schemaHelpers)('$name object property security', ({ getSchema }) =
 
   it('preserves safe properties and valid Object.prototype-like property names', () => {
     const fieldNames = ['safe', 'constructor', 'toString', 'prototype', 'hasOwnProperty'];
-    const shape = Object.fromEntries(fieldNames.map((name) => [name, zv3.string()]));
-    const jsonSchema = getSchema(zv3.object(shape)) as {
+    const properties = Object.fromEntries(fieldNames.map((name) => [name, zv3.string()]));
+    // SAFETY: The Zod fixture explicitly declares the tested property names; JSON serialization preserves this generated schema for the wire-format assertions.
+    const jsonSchema = getSchema(zv3.object(properties)) as {
       properties: Record<string, unknown>;
       required: string[];
     };
     const serializedSchema = JSON.stringify(jsonSchema);
+    // SAFETY: The Zod fixture explicitly declares the tested property names; JSON serialization preserves this generated schema for the wire-format assertions.
     const wireSchema = JSON.parse(serializedSchema) as typeof jsonSchema;
 
     expect(Object.getPrototypeOf(jsonSchema.properties)).toBe(Object.prototype);

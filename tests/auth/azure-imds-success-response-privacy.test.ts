@@ -31,6 +31,7 @@ function createCauseFreeJSONFailure(privateValue: string): Error {
   });
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Cross-realm thrown values must stay unknown so privacy assertions validate their actual shape.
 function createCrossRealmJSONFailure(privateValue: string, wrapped = false): unknown {
   return runInNewContext(
     [
@@ -62,6 +63,7 @@ function createWorkloadClient(provider: AzureProvider, apiFetch: typeof fetch): 
 }
 
 async function expectPrivateParseFailure(
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- This failure-only harness accepts different SDK result types and validates their rejection instead.
   operation: () => Promise<unknown>,
   privateValue: string,
 ): Promise<void> {
@@ -228,16 +230,16 @@ describe('Azure IMDS successful-response JSON privacy', () => {
   it.each(
     PRIVATE_VALUES.flatMap((privateValue) =>
       (['provider', 'workload'] as const).flatMap((boundary) =>
-        (['direct', 'nested'] as const).map((shape) => ({ privateValue, boundary, shape })),
+        (['direct', 'nested'] as const).map((failureKind) => ({ privateValue, boundary, failureKind })),
       ),
     ),
   )(
-    'sanitizes a $shape cause-free invalid-json fetch error containing $privateValue through $boundary',
-    async ({ privateValue, boundary, shape }) => {
+    'sanitizes a $failureKind cause-free invalid-json fetch error containing $privateValue through $boundary',
+    async ({ privateValue, boundary, failureKind }) => {
       const parserFailure = createCauseFreeJSONFailure(privateValue);
       expect(Object.getOwnPropertyDescriptor(parserFailure, 'cause')).toBeUndefined();
       const original =
-        shape === 'direct'
+        failureKind === 'direct'
           ? parserFailure
           : withParserCause(new Error(`${privateValue} outer metadata parser wrapper`), parserFailure);
       const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
@@ -257,27 +259,27 @@ describe('Azure IMDS successful-response JSON privacy', () => {
   it.each(
     PRIVATE_VALUES.flatMap((privateValue) =>
       (['provider', 'workload'] as const).flatMap((boundary) =>
-        (['direct', 'local wrapper', 'foreign wrapper', 'nested wrapper'] as const).map((shape) => ({
+        (['direct', 'local wrapper', 'foreign wrapper', 'nested wrapper'] as const).map((failureKind) => ({
           privateValue,
           boundary,
-          shape,
+          failureKind,
         })),
       ),
     ),
   )(
-    'sanitizes genuine $shape cross-realm parser errors containing $privateValue through $boundary',
-    async ({ privateValue, boundary, shape }) => {
+    'sanitizes genuine $failureKind cross-realm parser errors containing $privateValue through $boundary',
+    async ({ privateValue, boundary, failureKind }) => {
       const foreignParserError = createCrossRealmJSONFailure(privateValue);
       const foreignWrapper = createCrossRealmJSONFailure(privateValue, true);
       expect(foreignParserError).not.toBeInstanceOf(SyntaxError);
       expect(foreignParserError).not.toBeInstanceOf(Error);
       expect(foreignWrapper).not.toBeInstanceOf(Error);
       let original: unknown;
-      if (shape === 'direct') {
+      if (failureKind === 'direct') {
         original = foreignParserError;
-      } else if (shape === 'local wrapper') {
+      } else if (failureKind === 'local wrapper') {
         original = withParserCause(new Error('local metadata parser wrapper'), foreignParserError);
-      } else if (shape === 'foreign wrapper') {
+      } else if (failureKind === 'foreign wrapper') {
         original = foreignWrapper;
       } else {
         original = withParserCause(new TypeError('outer local metadata parser wrapper'), foreignWrapper);
@@ -300,14 +302,21 @@ describe('Azure IMDS successful-response JSON privacy', () => {
     PRIVATE_VALUES.flatMap((privateValue) =>
       (['provider', 'workload'] as const).flatMap((boundary) =>
         (['own data', 'own accessor', 'inherited data', 'inherited accessor'] as const).flatMap((tag) =>
-          (['direct', 'wrapped'] as const).map((shape) => ({ privateValue, boundary, tag, shape })),
+          (['direct', 'wrapped'] as const).map((failureKind) => ({
+            privateValue,
+            boundary,
+            tag,
+            failureKind,
+          })),
         ),
       ),
     ),
   )(
-    'sanitizes a $shape foreign syntax error with $tag containing $privateValue through $boundary',
-    async ({ privateValue, boundary, tag, shape }) => {
+    'sanitizes a $failureKind foreign syntax error with $tag containing $privateValue through $boundary',
+    async ({ privateValue, boundary, tag, failureKind }) => {
+      // SAFETY: The controlled VM expression constructs this cross-realm fixture; the test keeps its foreign prototype while inspecting the declared value.
       const parserFailure = createCrossRealmJSONFailure(privateValue) as object;
+      // SAFETY: The cross-realm Error fixture has an object prototype; this test adds a hostile descriptor to that prototype.
       const tagged = tag.startsWith('own') ? parserFailure : (Object.getPrototypeOf(parserFailure) as object);
       const readTag = vi.fn(() => {
         throw new Error(`${privateValue} escaped through an untrusted parser tag`);
@@ -317,7 +326,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
         ...(tag.endsWith('accessor') ? { get: readTag } : { value: 'DecoratedSyntaxError' }),
       });
       const original =
-        shape === 'direct'
+        failureKind === 'direct'
           ? parserFailure
           : withParserCause(new Error(`${privateValue} outer metadata parser wrapper`), parserFailure);
       const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
@@ -340,20 +349,21 @@ describe('Azure IMDS successful-response JSON privacy', () => {
       (['provider', 'workload'] as const).flatMap((boundary) =>
         (['own data', 'own accessor', 'inherited data', 'inherited accessor'] as const).flatMap((tag) =>
           (['foreign syntax', 'marked fetch'] as const).flatMap((parser) =>
-            (['direct', 'wrapped'] as const).map((shape) => ({
+            (['direct', 'wrapped'] as const).map((failureKind) => ({
               privateValue,
               boundary,
               tag,
               parser,
-              shape,
+              failureKind,
             })),
           ),
         ),
       ),
     ),
   )(
-    'follows a $shape $tag foreign wrapper to its $parser containing $privateValue through $boundary',
-    async ({ privateValue, boundary, tag, parser, shape }) => {
+    'follows a $failureKind $tag foreign wrapper to its $parser containing $privateValue through $boundary',
+    async ({ privateValue, boundary, tag, parser, failureKind }) => {
+      // SAFETY: The controlled VM expression constructs this cross-realm fixture; the test keeps its foreign prototype while inspecting the declared value.
       const foreign = createCrossRealmJSONFailure(privateValue, true) as object;
       if (parser === 'marked fetch') {
         Object.defineProperty(foreign, 'cause', {
@@ -361,6 +371,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
           value: createCauseFreeJSONFailure(privateValue),
         });
       }
+      // SAFETY: The cross-realm Error fixture has an object prototype; this test adds a hostile descriptor to that prototype.
       const tagged = tag.startsWith('own') ? foreign : (Object.getPrototypeOf(foreign) as object);
       const readTag = vi.fn(() => {
         throw new Error(`${privateValue} escaped through an untrusted foreign wrapper tag`);
@@ -370,7 +381,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
         ...(tag.endsWith('accessor') ? { get: readTag } : { value: 'DecoratedParserWrapper' }),
       });
       const original =
-        shape === 'direct'
+        failureKind === 'direct'
           ? foreign
           : withParserCause(new Error(`${privateValue} outer metadata parser wrapper`), foreign);
       const response = Response.json({ access_token: VALID_SUBJECT_TOKEN });
@@ -392,16 +403,16 @@ describe('Azure IMDS successful-response JSON privacy', () => {
     PRIVATE_VALUES.flatMap((privateValue) =>
       (['provider', 'workload'] as const).flatMap((boundary) =>
         (['throwing prototype', 'nested throwing prototype', 'revoked', 'nested revoked'] as const).map(
-          (shape) => ({ privateValue, boundary, shape }),
+          (failureKind) => ({ privateValue, boundary, failureKind }),
         ),
       ),
     ),
   )(
-    'fails closed for a $shape parser rejection containing $privateValue through $boundary',
-    async ({ privateValue, boundary, shape }) => {
+    'fails closed for a $failureKind parser rejection containing $privateValue through $boundary',
+    async ({ privateValue, boundary, failureKind }) => {
       const target = new Error(`${privateValue} appeared in the malformed metadata preview`);
-      let rejected: object;
-      if (shape === 'revoked' || shape === 'nested revoked') {
+      let rejected: Error;
+      if (failureKind === 'revoked' || failureKind === 'nested revoked') {
         const temporary = Proxy.revocable(target, {});
         temporary.revoke();
         rejected = temporary.proxy;
@@ -412,7 +423,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
           },
         });
       }
-      if (shape === 'nested throwing prototype' || shape === 'nested revoked') {
+      if (failureKind === 'nested throwing prototype' || failureKind === 'nested revoked') {
         rejected = withParserCause(
           new Error(`${privateValue} appeared in the outer metadata parser wrapper`),
           rejected,
@@ -456,13 +467,13 @@ describe('Azure IMDS successful-response JSON privacy', () => {
 
   it.each(['own name', 'prototype name', 'native prototype', 'foreign type'] as const)(
     'preserves a spoofed or non-syntax cross-realm parser cause: %s',
-    async (shape) => {
+    async (failureKind) => {
       let foreign: unknown;
-      if (shape === 'own name') {
+      if (failureKind === 'own name') {
         foreign = runInNewContext(
           "Object.defineProperty(new Error('safe custom failure'), 'name', { value: 'SyntaxError' })",
         );
-      } else if (shape === 'prototype name') {
+      } else if (failureKind === 'prototype name') {
         foreign = runInNewContext(
           [
             'class CustomParserFailure extends Error {}',
@@ -470,7 +481,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
             "new CustomParserFailure('safe custom failure')",
           ].join('\n'),
         );
-      } else if (shape === 'native prototype') {
+      } else if (failureKind === 'native prototype') {
         foreign = runInNewContext('Object.create(SyntaxError.prototype)');
       } else {
         foreign = runInNewContext("new TypeError('safe custom parser type failure')");
@@ -497,9 +508,10 @@ describe('Azure IMDS successful-response JSON privacy', () => {
 
   it.each(['safe foreign cause', 'fake native marker', 'cause accessor'] as const)(
     'preserves a tagged foreign parser wrapper with a $0 without invoking untrusted getters',
-    async (shape) => {
+    async (failureKind) => {
+      // SAFETY: Both controlled VM expressions construct foreign Error objects or their deliberately forged prototype carriers.
       const foreign =
-        shape === 'fake native marker'
+        failureKind === 'fake native marker'
           ? (runInNewContext('Object.create(Error.prototype)') as object)
           : (runInNewContext("new Error('safe foreign metadata parser wrapper')") as object);
       const readTag = vi.fn(() => {
@@ -507,7 +519,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
       });
       const readCause = vi.fn(() => new SyntaxError('an untrusted foreign wrapper cause was invoked'));
       Object.defineProperty(foreign, Symbol.toStringTag, { configurable: true, get: readTag });
-      if (shape === 'cause accessor') {
+      if (failureKind === 'cause accessor') {
         Object.defineProperty(foreign, 'cause', { configurable: true, get: readCause });
       } else {
         Object.defineProperty(foreign, 'cause', {
@@ -515,7 +527,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
           value: new TypeError('the metadata response body became unavailable'),
         });
       }
-      if (shape === 'fake native marker') {
+      if (failureKind === 'fake native marker') {
         Object.defineProperty(foreign, 'type', { configurable: true, value: 'invalid-json' });
       }
       const original = withParserCause(new Error('safe custom metadata parser wrapper'), foreign);
@@ -541,6 +553,7 @@ describe('Azure IMDS successful-response JSON privacy', () => {
   );
 
   it('never invokes cross-realm name, message, tag, toString, or cause getters', async () => {
+    // SAFETY: The controlled VM expression constructs this cross-realm fixture; the test keeps its foreign prototype while inspecting the declared value.
     const foreign = runInNewContext("new Error('safe foreign parser failure')") as object;
     const reads = vi.fn(() => {
       throw new Error('an untrusted cross-realm diagnostic getter was invoked');
@@ -570,10 +583,10 @@ describe('Azure IMDS successful-response JSON privacy', () => {
 
   it.each(['cyclic', 'over-budget'] as const)(
     'fails closed for a $0 ambiguous wrapped parser failure without disclosing its diagnostic',
-    async (shape) => {
+    async (failureKind) => {
       const [privateValue] = PRIVATE_VALUES;
       let original: Error = new SyntaxError(`${privateValue} appeared in the malformed metadata preview`);
-      if (shape === 'cyclic') {
+      if (failureKind === 'cyclic') {
         original = new Error(`${privateValue} appeared in a cyclic metadata parser wrapper`);
         Object.defineProperty(original, 'cause', { value: original });
       } else {
@@ -625,12 +638,13 @@ describe('Azure IMDS successful-response JSON privacy', () => {
 
   it.each(['non-parser marker', 'inherited marker', 'accessor marker'] as const)(
     'preserves the exact safe custom parser error with an untrusted $0',
-    async (shape) => {
+    async (failureKind) => {
       const original = new Error('the custom metadata parser could not read its body');
       const readType = vi.fn(() => 'invalid-json');
-      if (shape === 'non-parser marker') {
+      if (failureKind === 'non-parser marker') {
         Object.defineProperty(original, 'type', { configurable: true, value: 'system' });
-      } else if (shape === 'inherited marker') {
+      } else if (failureKind === 'inherited marker') {
+        // SAFETY: Object.create constructs the deliberate prototype fixture; only object identity or explicitly defined properties are used here.
         const prototype = Object.create(Error.prototype) as object;
         Object.defineProperty(prototype, 'type', { configurable: true, value: 'invalid-json' });
         Object.setPrototypeOf(original, prototype);
@@ -882,7 +896,10 @@ describe('Azure IMDS successful-response JSON privacy', () => {
   );
 
   it('reads an own custom parsed token only once', async () => {
-    const readToken = vi.fn<() => unknown>().mockReturnValueOnce(VALID_SUBJECT_TOKEN).mockReturnValue(42);
+    const readToken = vi
+      .fn<() => string | number>()
+      .mockReturnValueOnce(VALID_SUBJECT_TOKEN)
+      .mockReturnValue(42);
     const data = Object.defineProperty({}, 'access_token', { get: readToken });
     const response = new Response(null);
     vi.spyOn(response, 'json').mockResolvedValue(data);
@@ -892,32 +909,35 @@ describe('Azure IMDS successful-response JSON privacy', () => {
     expect(readToken).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['data', 'accessor'] as const)('rejects inherited token %s before exchange', async (shape) => {
-    vi.useFakeTimers();
-    const readToken = vi.fn(() => VALID_SUBJECT_TOKEN);
-    const prototype = Object.defineProperty(
-      {},
-      'access_token',
-      shape === 'data' ? { value: VALID_SUBJECT_TOKEN } : { get: readToken },
-    );
-    const response = new Response(null);
-    vi.spyOn(response, 'json').mockResolvedValue(Object.create(prototype));
-    const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
-    const client = createWorkloadClient(
-      azureManagedIdentityTokenProvider(undefined, { fetch: async () => response }),
-      apiFetch,
-    );
+  it.each(['data', 'accessor'] as const)(
+    'rejects inherited token %s before exchange',
+    async (descriptorKind) => {
+      vi.useFakeTimers();
+      const readToken = vi.fn(() => VALID_SUBJECT_TOKEN);
+      const prototype = Object.defineProperty(
+        {},
+        'access_token',
+        descriptorKind === 'data' ? { value: VALID_SUBJECT_TOKEN } : { get: readToken },
+      );
+      const response = new Response(null);
+      vi.spyOn(response, 'json').mockResolvedValue(Object.create(prototype));
+      const apiFetch = vi.fn(async () => new Response(null, { status: 204 }));
+      const client = createWorkloadClient(
+        azureManagedIdentityTokenProvider(undefined, { fetch: async () => response }),
+        apiFetch,
+      );
 
-    const result = client.models.list();
-    await expect(result).rejects.toBeInstanceOf(SubjectTokenProviderError);
-    await expect(result).rejects.toMatchObject({
-      message: "IMDS response missing 'access_token' field",
-      provider: 'azure-imds',
-    });
-    expect(readToken).not.toHaveBeenCalled();
-    expect(apiFetch).not.toHaveBeenCalled();
-    expect(vi.getTimerCount()).toBe(0);
-  });
+      const result = client.models.list();
+      await expect(result).rejects.toBeInstanceOf(SubjectTokenProviderError);
+      await expect(result).rejects.toMatchObject({
+        message: "IMDS response missing 'access_token' field",
+        provider: 'azure-imds',
+      });
+      expect(readToken).not.toHaveBeenCalled();
+      expect(apiFetch).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
 
   it('rejects malformed token values before exchange and allows a subsequent valid request', async () => {
     const [privateValue] = PRIVATE_VALUES;

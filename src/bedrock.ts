@@ -112,6 +112,7 @@ function addBedrockOutputText<ResponseT extends ResponsesAPI.Response>(response:
 function restoreBedrockStreamOutputText(responses: API.Responses): API.Responses {
   const stream = responses.stream.bind(responses);
 
+  // SAFETY: The wrapper forwards the original stream parameters and preserves its generic result, only repairing the final response's output_text property.
   responses.stream = ((body: ResponseStreamParams, options?: RequestOptions) => {
     const responseStream = stream(body, options);
     const finalResponse = responseStream.finalResponse.bind(responseStream);
@@ -162,6 +163,8 @@ export class BedrockOpenAI extends OpenAI {
       apiKey = readEnv('AWS_BEARER_TOKEN_BEDROCK') ?? null;
     }
 
+    // SAFETY: The widening keeps a runtime guard for JavaScript callers that supply an API-key function despite the declared string contract.
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject a JavaScript function supplied as a static Bedrock API key before it can become a credential.
     if (typeof (apiKey as unknown) === 'function') {
       throw new Errors.OpenAIError(
         'Pass refreshable Bedrock credentials via `bedrockTokenProvider`, not `apiKey`.',
@@ -281,8 +284,10 @@ export class BedrockOpenAI extends OpenAI {
     const bedrockTokenProvider =
       options.apiKey === undefined ? (options.bedrockTokenProvider ?? this.bedrockTokenProvider) : undefined;
 
+    // SAFETY: Bedrock options extend the base client options; forwarding them preserves the subclass's existing withOptions construction behavior.
     return super.withOptions({
       ...options,
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(bedrockTokenProvider ? { apiKey: undefined, bedrockTokenProvider } : {}),
     } as Partial<ClientOptions>);
   }

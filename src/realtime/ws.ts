@@ -55,6 +55,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     super();
     client ??= new OpenAI();
     const apiKey = props.__apiKey === undefined ? client.apiKey : props.__apiKey;
+    // SAFETY: The supplied OpenAI client owns _options; this read detects its existing API-key provider without changing its public surface.
     const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
     if (hasProvider && !props.__resolvedApiKey) {
       throw new Error(
@@ -69,6 +70,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     const headers = {
       'User-Agent': `${client.constructor.name}/JS ${VERSION}`,
       ...props.options?.headers,
+      // A credential must be an own data property without invoking an inherited setter.
       ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${apiKey}` }),
     };
 
@@ -178,6 +180,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
           ...props.options,
           headers: {
             ...props.options?.headers,
+            // A credential must be an own data property without invoking an inherited setter.
             ...(isApiKeyProvider ? {} : { 'api-key': apiKey }),
           },
         },

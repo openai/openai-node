@@ -107,7 +107,10 @@ function mockResponse(endpoint: 'chat' | 'responses', stream: boolean, code: str
     );
   }
 
-  const chunk = (delta: unknown, finish_reason: string | null = null) => ({
+  const chunk = (
+    delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta,
+    finish_reason: string | null = null,
+  ) => ({
     ...chat,
     object: 'chat.completion.chunk',
     choices: [{ index: 0, delta, finish_reason, logprobs: null }],

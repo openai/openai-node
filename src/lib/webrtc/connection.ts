@@ -36,6 +36,7 @@ export class WebRTCConnection<ClientEvent, ServerEvent extends { type: string }>
 
   /** Creates native resources, but does not request media, contact a server, or begin negotiation. */
   constructor(configuration?: WebRTCConfiguration) {
+    // SAFETY: RTCPeerConnection is an optional runtime constructor checked before resource creation; the view keeps browser ambient types optional.
     const host = globalThis as typeof globalThis & {
       RTCPeerConnection?: new (configuration?: WebRTCConfiguration) => WebRTCPeerConnection;
     };
@@ -59,7 +60,7 @@ export class WebRTCConnection<ClientEvent, ServerEvent extends { type: string }>
       );
     }
     this.peer = peer;
-    this.peerConnection = peer as BrowserPeerConnection;
+    this.peerConnection = peer;
     this.dataChannel = this.adapter.dataChannel;
     peer.addEventListener('connectionstatechange', this.onPeerState);
     this.adapter.onConnectionEvent(this.onChannelEvent);
@@ -73,17 +74,20 @@ export class WebRTCConnection<ClientEvent, ServerEvent extends { type: string }>
   /** Subscribes to one server event type with its generated payload; returns an independent unsubscribe function. */
   on<Type extends ServerEvent['type']>(
     type: Type,
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- The existing public listener contract accepts any callback result; subscriptions discard it.
     handler: (event: Extract<ServerEvent, { type: Type }>) => unknown,
   ): () => void {
     return this.adapter.on(type, handler);
   }
 
   /** Subscribes before connecting so initial server events are observable. API errors remain protocol data. */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The existing public listener contract accepts any callback result; subscriptions discard it.
   onEvent(handler: (event: ServerEvent) => unknown): () => void {
     return this.adapter.onEvent(handler);
   }
 
   /** Subscribes to local diagnostics and lifecycle. Setup failures reject connect() instead of emitting errors here. */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The existing public listener contract accepts any callback result; subscriptions discard it.
   onConnectionEvent(handler: (event: WebRTCConnectionEvent) => unknown): () => void {
     if (this.currentState === 'closed') {
       throw new WebRTCError('invalid_state', 'transport', 'The WebRTC connection is closed.');

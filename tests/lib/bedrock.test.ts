@@ -220,6 +220,7 @@ describe('instantiate bedrock client', () => {
       () =>
         new BedrockOpenAI({
           baseURL: 'https://example.com/openai/v1',
+          // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: A function apiKey deliberately violates the legacy constructor type to test its provider guidance.
           apiKey: (async () => 'provider token') as unknown as string,
         }),
     ).toThrow(/bedrockTokenProvider/);
@@ -463,6 +464,7 @@ describe('instantiate bedrock client', () => {
         .catch((error: unknown) => error);
 
       expect(rejection).toBeInstanceOf(OpenAIError);
+      // SAFETY: The preceding OpenAIError assertion establishes the error object before the test checks canonical-origin diagnostics.
       const message = (rejection as Error).message;
       expect(message).toContain('https://attacker.example');
       expect(message).toContain('https://bedrock.example.com');
@@ -632,6 +634,7 @@ describe('instantiate bedrock client', () => {
       ['the request path', 'path'],
       ['the request default base URL', 'defaultBaseURL'],
     ] as const)('rejects cross-origin mutations to %s during token resolution', async (_case, mutation) => {
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- The credential callback deliberately adds or mutates request destinations after preparation.
       const options: { method: 'get'; path: string; defaultBaseURL?: string } = {
         method: 'get',
         path: '/models',
@@ -658,7 +661,7 @@ describe('instantiate bedrock client', () => {
     });
 
     test('rejects a path getter that changes the final request origin after preparation', async () => {
-      const options: { method: 'get'; path: string } = { method: 'get', path: '/models' };
+      const options = { method: 'get' as const, path: '/models' };
       let pathReads = 0;
       Object.defineProperty(options, 'path', {
         enumerable: true,
@@ -676,7 +679,7 @@ describe('instantiate bedrock client', () => {
     });
 
     test('rejects a request path mutated in a later token-provider microtask', async () => {
-      const options: { method: 'get'; path: string } = { method: 'get', path: '/models' };
+      const options = { method: 'get' as const, path: '/models' };
       let pendingMicrotasks = 4;
       const mutateAfterPendingMicrotasks = (): void => {
         pendingMicrotasks -= 1;
@@ -813,7 +816,11 @@ describe('instantiate bedrock client', () => {
       const requestURL = new URL(url.toString());
       requests.push(`${init?.method} ${requestURL.pathname}`);
 
-      let body: unknown = RESPONSE_BODY;
+      let body:
+        | typeof RESPONSE_BODY
+        | typeof COMPACTED_RESPONSE_BODY
+        | typeof INPUT_TOKENS_BODY
+        | typeof INPUT_ITEMS_BODY = RESPONSE_BODY;
       if (requestURL.pathname === '/openai/v1/responses/compact') {
         body = COMPACTED_RESPONSE_BODY;
       } else if (requestURL.pathname === '/openai/v1/responses/input_tokens') {

@@ -119,6 +119,7 @@ export function forEachJSONSchemaChild(
   path: string[],
   visit: JSONSchemaChildVisitor,
 ): void {
+  // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
   const record = schema as Record<string, unknown>;
 
   for (const keyword of JSON_SCHEMA_SINGLE_SCHEMA_KEYWORDS) {
@@ -204,11 +205,12 @@ export function toStrictJsonSchema(schema: JSONSchema): JSONSchema {
 }
 
 function stripUndefinedSchemaKeywords(schema: JSONSchemaDefinition, visited = new Set<JSONSchema>()): void {
-  if (typeof schema === 'boolean' || !isObject(schema) || visited.has(schema)) {
+  if (!isObject(schema) || visited.has(schema)) {
     return;
   }
   visited.add(schema);
 
+  // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
   const schemaRecord = schema as Record<string, unknown>;
   for (const keyword of Object.keys(schemaRecord)) {
     if (schemaRecord[keyword] === undefined) {
@@ -217,6 +219,7 @@ function stripUndefinedSchemaKeywords(schema: JSONSchemaDefinition, visited = ne
   }
 
   forEachJSONSchemaChild(schema, [], (child) => {
+    // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
     stripUndefinedSchemaKeywords(child as JSONSchemaDefinition, visited);
   });
 }
@@ -308,6 +311,7 @@ function inlineRootRefObject(schema: JSONSchema): void {
     }
     for (const keyword of JSON_SCHEMA_ANNOTATION_KEYWORDS) {
       if (!(keyword in inheritedAnnotations) && keyword in target) {
+        // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
         inheritedAnnotations[keyword] = (target as Record<string, unknown>)[keyword];
       }
     }
@@ -332,6 +336,7 @@ function inlineRootRefObject(schema: JSONSchema): void {
       delete inlined[keyword];
     }
   }
+  // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
   const schemaRecord = schema as Record<string, unknown>;
 
   for (const keyword of Object.keys(schema)) {
@@ -375,13 +380,14 @@ function normalizeRootAllOf(schema: JSONSchema): void {
     }
 
     const branch = allOf[0];
-    if (typeof branch === 'boolean' || !isObject(branch)) {
+    if (!isObject(branch)) {
       return;
     }
 
     const rootMetadata = { ...schema };
     delete rootMetadata.allOf;
     const normalized = structuredClone(branch);
+    // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
     const schemaRecord = schema as Record<string, unknown>;
 
     for (const keyword of Object.keys(schema)) {
@@ -414,7 +420,7 @@ function normalizeRootAnyOf(schema: JSONSchema): boolean {
   }
 
   const { branch, index: branchIndex } = realBranches[0]!;
-  if (typeof branch === 'boolean' || !isObject(branch) || !isObjectOnlySchema(branch, schema)) {
+  if (!isObject(branch) || !isObjectOnlySchema(branch, schema)) {
     return false;
   }
 
@@ -432,7 +438,7 @@ function normalizeRootAnyOf(schema: JSONSchema): boolean {
     }
 
     const renames = definitionRenames.get(keyword);
-    const mergedDefinitions: Record<string, JSONSchemaDefinition> = { ...rootDefinitions };
+    const mergedDefinitions = { ...rootDefinitions };
     for (const [name, definition] of Object.entries(branchDefinitions)) {
       Object.defineProperty(mergedDefinitions, renames?.get(name) ?? name, {
         value: definition,
@@ -445,6 +451,7 @@ function normalizeRootAnyOf(schema: JSONSchema): boolean {
     delete rootMetadata[keyword];
   }
 
+  // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
   const schemaRecord = schema as Record<string, unknown>;
 
   for (const keyword of Object.keys(schema)) {
@@ -531,7 +538,7 @@ function rewriteLocalRefsIntoPromotedRootAnyOfBranch(
   };
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
@@ -540,6 +547,7 @@ function rewriteLocalRefsIntoPromotedRootAnyOfBranch(
     }
 
     forEachJSONSchemaChild(value, [], (child) => {
+      // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
       rewriteRefs(child as JSONSchemaDefinition);
     });
   };
@@ -576,7 +584,7 @@ function hasOnlyRootRefAndDefinitions(schema: JSONSchema): boolean {
  * Multi-type arrays carry real union semantics and must remain unchanged.
  */
 function normalizeSingletonTypeArrays(schema: JSONSchemaDefinition): void {
-  if (typeof schema === 'boolean' || !isObject(schema)) {
+  if (!isObject(schema)) {
     return;
   }
 
@@ -585,6 +593,7 @@ function normalizeSingletonTypeArrays(schema: JSONSchemaDefinition): void {
   }
 
   forEachJSONSchemaChild(schema, [], (child) => {
+    // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
     normalizeSingletonTypeArrays(child as JSONSchemaDefinition);
   });
 }
@@ -707,7 +716,7 @@ function ensureStrictJsonSchema(
   // keywords without an explicit type, so those implicit object shapes need
   // the same strict handling as type: 'object'. Explicitly open object schemas
   // cannot be represented in Structured Outputs strict mode.
-  if (hasObjectShape(jsonSchema)) {
+  if (hasObjectConstraints(jsonSchema)) {
     if (!hasOwn(jsonSchema, 'additionalProperties')) {
       jsonSchema.additionalProperties = false;
     } else if (jsonSchema.additionalProperties !== false) {
@@ -728,7 +737,7 @@ function ensureStrictJsonSchema(
 
   // Handle object properties
   const properties = jsonSchema.properties;
-  if (hasObjectShape(jsonSchema)) {
+  if (hasObjectConstraints(jsonSchema)) {
     for (const key of required) {
       if (!isObject(properties) || !hasOwn(properties, key)) {
         throw new Error(
@@ -798,6 +807,7 @@ function ensureStrictJsonSchema(
 
   normalizeArrayUnionWrapper(jsonSchema, root);
 
+  // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
   const schemaRecord = jsonSchema as Record<string, unknown>;
   for (const keyword of JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS) {
     // Optional converter output often keeps undefined placeholders on the
@@ -832,6 +842,7 @@ function ensureStrictJsonSchema(
       return;
     }
 
+    // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
     ensureStrictJsonSchema(child as JSONSchemaDefinition, childPath, root);
   });
 
@@ -878,6 +889,7 @@ function parseLocalRef(ref: string): string[] | undefined {
   return parts;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Resolving untrusted schema references may produce any value; callers perform the schema checks. JSON Schema traversal accepts arbitrary keyword values and validates each node before interpreting it.
 function resolvePointerPart(resolved: unknown, part: string): unknown | undefined {
   if (Array.isArray(resolved)) {
     if (!/^(?:0|[1-9]\d*)$/.test(part)) {
@@ -974,7 +986,7 @@ function isObjectOnlySchema(
   root: JSONSchema,
   seenRefs = new Set<string>(),
 ): boolean {
-  if (typeof schema === 'boolean' || !isObject(schema)) {
+  if (!isObject(schema)) {
     return false;
   }
 
@@ -1017,7 +1029,7 @@ function isArrayOnlySchema(
   root: JSONSchema,
   seenRefs = new Set<string>(),
 ): boolean {
-  if (typeof schema === 'boolean' || !isObject(schema)) {
+  if (!isObject(schema)) {
     return false;
   }
 
@@ -1069,6 +1081,7 @@ export function hasOnlyRefAndAnnotations(schema: JSONSchema): boolean {
 }
 
 function hasOnlyAnnotationSiblings(schema: JSONSchema, keyword: string): boolean {
+  // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
   const schemaRecord = schema as Record<string, unknown>;
   return Object.keys(schema).every(
     // Definition maps do not add sibling validation constraints. Keep them
@@ -1109,7 +1122,7 @@ function hasObjectKeywords(schema: JSONSchema): boolean {
   return Object.keys(schema).some((keyword) => JSON_SCHEMA_OBJECT_KEYWORDS.has(keyword));
 }
 
-function hasObjectShape(schema: JSONSchema): boolean {
+function hasObjectConstraints(schema: JSONSchema): boolean {
   const typ = schema.type;
   return (
     typ === 'object' ||
@@ -1140,7 +1153,7 @@ function normalizeObjectUnionWrapper(jsonSchema: JSONSchema, path: string[], roo
     delete jsonSchema.required;
   }
 
-  if (!hasObjectShape(jsonSchema)) {
+  if (!hasObjectConstraints(jsonSchema)) {
     return;
   }
 
@@ -1199,7 +1212,7 @@ function normalizeAnyOfFalseBranches(jsonSchema: JSONSchema): void {
  */
 export function assertNoNestedSchemaIds(schema: JSONSchema): void {
   const visit = (value: JSONSchemaDefinition, path: string[]): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
@@ -1212,6 +1225,7 @@ export function assertNoNestedSchemaIds(schema: JSONSchema): void {
     }
 
     forEachJSONSchemaChild(value, path, (child, childPath) => {
+      // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
       visit(child as JSONSchemaDefinition, childPath);
     });
   };
@@ -1293,7 +1307,7 @@ export function rewriteLocalRefsIntoMovedOneOfBranches(root: JSONSchema): void {
   };
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
@@ -1302,6 +1316,7 @@ export function rewriteLocalRefsIntoMovedOneOfBranches(root: JSONSchema): void {
     }
 
     forEachJSONSchemaChild(value, [], (child) => {
+      // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
       rewriteRefs(child as JSONSchemaDefinition);
     });
   };
@@ -1326,10 +1341,8 @@ function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
     let changed = false;
 
     for (const [index, part] of originalParts.entries()) {
-      const resolvedRecord =
-        typeof resolved === 'object' && resolved !== null && !Array.isArray(resolved)
-          ? (resolved as Record<string, unknown>)
-          : undefined;
+      // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
+      const resolvedRecord = isObject(resolved) ? (resolved as Record<string, unknown>) : undefined;
       if (
         part === 'anyOf' &&
         index < originalParts.length - 1 &&
@@ -1375,7 +1388,7 @@ function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
   };
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
@@ -1384,6 +1397,7 @@ function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
     }
 
     forEachJSONSchemaChild(value, [], (child) => {
+      // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
       rewriteRefs(child as JSONSchemaDefinition);
     });
   };
@@ -1399,7 +1413,7 @@ function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
 function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
   const refsToPreserve = new Set<string>();
   const collectRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
@@ -1411,6 +1425,7 @@ function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
     }
 
     forEachJSONSchemaChild(value, [], (child) => {
+      // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
       collectRefs(child as JSONSchemaDefinition);
     });
   };
@@ -1429,6 +1444,7 @@ function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
 
   for (const ref of refsToPreserve) {
     const target = resolveLocalRef(root, ref);
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Local references require runtime schema validation even when the static return type is narrower.
     if (!isSchemaDefinition(target)) {
       if (rootOnly) {
         continue;
@@ -1445,7 +1461,7 @@ function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
   }
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
@@ -1454,6 +1470,7 @@ function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
     }
 
     forEachJSONSchemaChild(value, [], (child) => {
+      // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
       rewriteRefs(child as JSONSchemaDefinition);
     });
   };
@@ -1472,7 +1489,7 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
 
   const refsToPreserve = new Set<string>();
   const collectRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
@@ -1491,6 +1508,7 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
     }
 
     forEachJSONSchemaChild(value, [], (child) => {
+      // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
       collectRefs(child as JSONSchemaDefinition);
     });
   };
@@ -1509,6 +1527,7 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
 
   for (const ref of refsToPreserve) {
     const target = resolveLocalRef(root, ref);
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Validate referenced schema values at runtime before preserving them under generated definitions.
     if (!isSchemaDefinition(target)) {
       throw new Error('Local $ref cannot be preserved before allOf property removal: ' + JSON.stringify(ref));
     }
@@ -1522,7 +1541,7 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
   }
 
   const rewriteRefs = (value: JSONSchemaDefinition): void => {
-    if (typeof value === 'boolean' || !isObject(value)) {
+    if (!isObject(value)) {
       return;
     }
 
@@ -1531,6 +1550,7 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
     }
 
     forEachJSONSchemaChild(value, [], (child) => {
+      // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
       rewriteRefs(child as JSONSchemaDefinition);
     });
   };
@@ -1538,7 +1558,7 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
 }
 
 function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: JSONSchema): void {
-  if (typeof schema === 'boolean' || !isObject(schema)) {
+  if (!isObject(schema)) {
     return;
   }
 
@@ -1555,6 +1575,7 @@ function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: 
       );
     }
     const resolved = resolveLocalRef(root, ref);
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Untrusted local references must pass the runtime schema predicate before normalization.
     if (resolved === undefined || !isSchemaDefinition(resolved)) {
       throw new Error(
         `Local $ref at \`${
@@ -1575,6 +1596,7 @@ function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: 
   }
 
   forEachJSONSchemaChild(schema, path, (child, childPath) => {
+    // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
     validateRefSchemas(child as JSONSchemaDefinition, childPath, root);
   });
 }
@@ -1609,7 +1631,7 @@ function resolveObjectAllOfBranch(
       seenRefs.add(ref);
 
       const target = resolveLocalRef(root, ref);
-      if (typeof target === 'boolean' || !isObject(target)) {
+      if (!isObject(target)) {
         return undefined;
       }
       const targetPath = parseLocalRef(ref);
@@ -1646,7 +1668,7 @@ function normalizeObjectAllOfBranches(
   root: JSONSchema,
   normalizing = new Set<JSONSchema>(),
 ): void {
-  if (typeof schema === 'boolean' || !isObject(schema)) {
+  if (!isObject(schema)) {
     return;
   }
   if (normalizing.has(schema)) {
@@ -1657,6 +1679,7 @@ function normalizeObjectAllOfBranches(
   try {
     while (true) {
       forEachJSONSchemaChild(schema, path, (child, childPath) => {
+        // SAFETY: The schema-child visitor supplies only recognized object or boolean schema positions; the recursive helper validates their contents.
         normalizeObjectAllOfBranches(child as JSONSchemaDefinition, childPath, root, normalizing);
       });
 
@@ -1703,7 +1726,7 @@ export function normalizeObjectAllOfForExclusivity(
       }
 
       const branch = allOf[0];
-      if (typeof branch === 'boolean' || !isObject(branch)) {
+      if (!isObject(branch)) {
         return undefined;
       }
 
@@ -1711,6 +1734,7 @@ export function normalizeObjectAllOfForExclusivity(
       delete siblings.allOf;
       const flattened = structuredClone(branch);
       for (const keyword of Object.keys(normalized)) {
+        // SAFETY: Only an enumerated own keyword is deleted from this mutable schema object before installing its normalized replacement.
         delete (normalized as Record<string, unknown>)[keyword];
       }
       assignSchema(normalized, flattened, siblings);
@@ -1757,19 +1781,19 @@ function mergeObjectAllOf(
     return true;
   }
 
-  const parentHasObjectShape = hasObjectShapeWithoutAllOf(jsonSchema);
+  const parentIsMergeableObject = isMergeableObjectSchema(jsonSchema);
   const resolvedEntries = allOf.map((entry) =>
     isObject(entry) ? resolveObjectAllOfBranch(entry, root, normalizing) : undefined,
   );
   const objectBranches = resolvedEntries
     .map((entry) => entry?.schema)
-    .filter((entry): entry is JSONSchema => entry !== undefined && hasObjectShapeWithoutAllOf(entry));
-  if (!parentHasObjectShape && objectBranches.length === 0) {
+    .filter((entry): entry is JSONSchema => entry !== undefined && isMergeableObjectSchema(entry));
+  if (!parentIsMergeableObject && objectBranches.length === 0) {
     return false;
   }
   // A lone object branch with no object-valued parent is handled by the
   // existing safe single-allOf flattening path below.
-  if (!parentHasObjectShape && allOf.length === 1) {
+  if (!parentIsMergeableObject && allOf.length === 1) {
     return false;
   }
 
@@ -1782,7 +1806,7 @@ function mergeObjectAllOf(
   };
 
   if (
-    !parentHasObjectShape &&
+    !parentIsMergeableObject &&
     ['additionalProperties', 'properties', 'required', 'type'].some((keyword) => keyword in jsonSchema)
   ) {
     fail();
@@ -1801,7 +1825,7 @@ function mergeObjectAllOf(
   }
 
   const branches: { schema: JSONSchema; sourcePath: string[] | undefined }[] = [];
-  if (parentHasObjectShape) {
+  if (parentIsMergeableObject) {
     branches.push({ schema: jsonSchema, sourcePath: path });
   }
   for (const [index, entry] of allOf.entries()) {
@@ -1817,7 +1841,7 @@ function mergeObjectAllOf(
     // branch were preserved under stable root definitions before this merge,
     // so a valid definitions-only branch can now be discarded like an
     // annotation-only branch.
-    if (hasObjectShapeWithoutAllOf(branch)) {
+    if (isMergeableObjectSchema(branch)) {
       branches.push({
         schema: branch,
         sourcePath: branch === entry ? [...path, 'allOf', String(index)] : undefined,
@@ -1828,6 +1852,7 @@ function mergeObjectAllOf(
   }
 
   const merged: JSONSchema = {};
+  // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
   for (const keyword of ['$defs', 'definitions'] as const) {
     if (jsonSchema[keyword] !== undefined) {
       merged[keyword] = jsonSchema[keyword];
@@ -1836,11 +1861,14 @@ function mergeObjectAllOf(
   if (path.length === 0) {
     for (const keyword of JSON_SCHEMA_ROOT_METADATA_KEYWORDS) {
       if (keyword in jsonSchema) {
+        // SAFETY: Root annotation keywords are copied unchanged between schema objects; the record views preserve their unknown values.
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Root annotation keywords are copied dynamically; JSONSchema has no index signature for extension fields. Metadata merging preserves arbitrary annotation/default values under the selected schema keywords.
         (merged as Record<string, unknown>)[keyword] = (jsonSchema as Record<string, unknown>)[keyword];
       }
     }
   }
 
+  // SAFETY: This fresh null-prototype dictionary receives only JSON schema definitions while merging the validated property maps.
   const mergedProperties = Object.create(null) as Record<string, JSONSchemaDefinition>;
   const mergedRequired = new Set<string>();
   const closedPropertySets: Set<string>[] = [];
@@ -1863,6 +1891,7 @@ function mergeObjectAllOf(
       // first value (the outer schema, then earlier branches) instead of
       // rejecting an otherwise exactly mergeable intersection.
       if (!(keyword in merged)) {
+        // SAFETY: These annotation keywords are copied unchanged from the validated branch; arbitrary values are preserved without narrowing.
         (merged as any)[keyword] = (schema as any)[keyword];
       }
     }
@@ -1883,6 +1912,7 @@ function mergeObjectAllOf(
       if (keyword === 'allOf' && branch === jsonSchema) {
         continue;
       }
+      // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
       if (
         (keyword === '$defs' || keyword === 'definitions') &&
         isObject((branch as Record<string, unknown>)[keyword])
@@ -1978,6 +2008,7 @@ function mergeObjectAllOf(
     if (collapsesToNull) {
       merged.type = 'null';
       for (const keyword of Object.keys(jsonSchema)) {
+        // SAFETY: Only an enumerated own keyword is deleted from this mutable schema object before installing its normalized replacement.
         delete (jsonSchema as any)[keyword];
       }
       assignSchema(jsonSchema, merged);
@@ -2010,13 +2041,14 @@ function mergeObjectAllOf(
   }
 
   for (const keyword of Object.keys(jsonSchema)) {
+    // SAFETY: Only an enumerated own keyword is deleted from this mutable schema object before installing its normalized replacement.
     delete (jsonSchema as any)[keyword];
   }
   assignSchema(jsonSchema, merged);
   return true;
 }
 
-function hasObjectShapeWithoutAllOf(schema: JSONSchema): boolean {
+function isMergeableObjectSchema(schema: JSONSchema): boolean {
   if (schema.type !== undefined) {
     return isMergeableObjectType(schema.type);
   }
@@ -2024,6 +2056,7 @@ function hasObjectShapeWithoutAllOf(schema: JSONSchema): boolean {
 }
 
 function hasOnlyNeutralAllOfBranchKeywords(schema: JSONSchema): boolean {
+  // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
   const schemaRecord = schema as Record<string, unknown>;
   return Object.keys(schema).every(
     (keyword) =>
@@ -2056,7 +2089,9 @@ function schemasEqual(left: unknown, right: unknown): boolean {
     return false;
   }
 
+  // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
   const leftRecord = left as Record<string, unknown>;
+  // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
   const rightRecord = right as Record<string, unknown>;
   const leftKeys = Object.keys(leftRecord);
   const rightKeys = Object.keys(rightRecord);

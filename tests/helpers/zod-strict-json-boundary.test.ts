@@ -138,6 +138,7 @@ describe.each(strictHelpers)('$name strict JSON boundary', ({ create, schema }) 
     { name: 'unsafe nested object field', inner: () => z3.object({ value: z3.unknown() }) },
   ])('rejects an unsafe $name default factory before invoking it', ({ inner }) => {
     const factory = vi.fn(() => 1n);
+    // SAFETY: This fixture deliberately alters schema metadata or array prototypes to verify runtime JSON validation; it is not treated as valid application input.
     const unsafe = inner() as z3.ZodTypeAny;
 
     expect(() => create(z3.object({ value: unsafe.default(factory) }))).toThrow(/ZodDefault.*JSON-native/u);
@@ -313,6 +314,7 @@ describe.each(strictHelpers)('$name strict JSON boundary', ({ create, schema }) 
     const getter = vi.fn(() => {
       throw new Error('must never run');
     });
+    // SAFETY: Object.create constructs the deliberate prototype fixture; only object identity or explicitly defined properties are used here.
     const inherited = Object.defineProperty(Object.create(null) as object, '0', {
       enumerable: true,
       get: getter,

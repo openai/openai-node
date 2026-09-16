@@ -17,6 +17,7 @@ export function setMockSocketReadyState(readyState: number): void {
   mockSocketState.readyState = readyState;
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- The public adapters do not inject socket constructors; this event-emitting transport controls close, reconnect, and frame ordering.
 vi.mock('ws', async () => {
   const { EventEmitter } = await import('node:events');
   return {
@@ -88,7 +89,7 @@ type CommonWebSocketEvent = 'event' | 'raw' | 'error' | 'close' | 'reconnecting'
 
 export function onWebSocketEvent(
   connection: {
-    on: (event: CommonWebSocketEvent, listener: (...args: unknown[]) => void) => unknown;
+    on: (event: CommonWebSocketEvent, listener: (...args: unknown[]) => void) => void;
   },
   event: CommonWebSocketEvent,
   listener: (...args: unknown[]) => void,

@@ -42,6 +42,7 @@ import type {
 } from './ChatCompletionStreamingRunner';
 import type { BaseFunctionsArgs } from './RunnableFunction';
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Partial JSON may have any shape; callers validate or parse it against their response schema.
 function parseStructuredStreamingJSON(content: string): unknown {
   try {
     return partialParse(content);
@@ -223,6 +224,7 @@ export function makeChatCompletionReadableStreamMessageChunk(
   const payload: ChatCompletionReadableStreamMessage = {
     type: 'message',
     message,
+    // Spread creates an own data property without invoking inherited setters or changing the object prototype.
     ...(toolCallIds ? { tool_call_ids: toolCallIds } : {}),
   };
 
@@ -253,6 +255,7 @@ function getChatCompletionReadableStreamMessage(
     return item;
   }
 
+  // SAFETY: This decoder reads the SDK's tagged readable-stream envelope; JSON parsing restores its serialized message fields for the stream accumulator.
   return JSON.parse(
     item.object.slice(CHAT_COMPLETION_READABLE_STREAM_MESSAGE_PREFIX.length),
   ) as ChatCompletionReadableStreamMessage;
@@ -470,16 +473,18 @@ function reservePartialJSONParse(state: PartialJSONParseState, budget: PartialJS
 }
 
 function captureStructuredJSONSnapshot(
-  snapshot: object,
+  snapshot: ChatCompletionSnapshot.Choice.Message | ChatCompletionSnapshot.Choice.Message.ToolCall.Function,
   property: 'content' | 'arguments' | 'refusal',
 ): string | null | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(snapshot, property);
   if (!descriptor) {
+    // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
     let prototype = Object.getPrototypeOf(snapshot) as object | null;
     for (let depth = 0; prototype !== null; depth += 1) {
       if (depth >= MAX_PARTIAL_JSON_DEPTH || Object.getOwnPropertyDescriptor(prototype, property)) {
         throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
       }
+      // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
       prototype = Object.getPrototypeOf(prototype) as object | null;
     }
     return undefined;
@@ -491,6 +496,7 @@ function captureStructuredJSONSnapshot(
     throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
   }
 
+  // SAFETY: The own data descriptor was explicitly checked to contain only a string, null, or undefined.
   return descriptor.value as string | null | undefined;
 }
 
@@ -507,22 +513,25 @@ function captureStructuredMessageSnapshot(
     throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
   }
 
+  // SAFETY: The choice contract supplies a message; the own data descriptor check prevents getters from changing which object is captured.
   return descriptor.value as ChatCompletionSnapshot.Choice.Message;
 }
 
 function captureSnapshotArray<Item>(
-  snapshot: object,
+  snapshot: ChatCompletionSnapshot | ChatCompletionSnapshot.Choice.Message,
   property: 'choices' | 'tool_calls',
   maximum: number,
   kind: 'choice' | 'tool-call',
 ): Item[] | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(snapshot, property);
   if (!descriptor) {
+    // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
     let prototype = Object.getPrototypeOf(snapshot) as object | null;
     for (let depth = 0; prototype !== null; depth += 1) {
       if (depth >= MAX_PARTIAL_JSON_DEPTH || Object.getOwnPropertyDescriptor(prototype, property)) {
         throw new OpenAIError(`Chat completion stream contains an unsafe snapshot ${kind} collection`);
       }
+      // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
       prototype = Object.getPrototypeOf(prototype) as object | null;
     }
     return undefined;
@@ -536,6 +545,7 @@ function captureSnapshotArray<Item>(
     throw new OpenAIError(`Chat completion stream exceeded its snapshot ${kind} limit`);
   }
 
+  // SAFETY: The captured data property is an array with a checked bounded length; Item comes from the owning snapshot collection's contract.
   return descriptor.value as Item[];
 }
 
@@ -548,6 +558,7 @@ function captureSnapshotArrayItem<Item>(array: Item[], index: number): Item | un
     throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
   }
 
+  // SAFETY: The descriptor is a data property of the typed Item array, so its value retains that array's element contract.
   return descriptor.value as Item;
 }
 
@@ -573,6 +584,7 @@ function mapCapturedSnapshotArray<Item, Mapped>(
     if (!('value' in item)) {
       throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
     }
+    // SAFETY: The descriptor is a data property of the typed Item array, so its value retains that array's element contract.
     mapped[index] = map(item.value as Item, index);
   }
 
@@ -621,6 +633,7 @@ function assertBoundToolCallIdentity(toolCall: PartialToolCallSnapshot, identity
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- This assignment primitive copies own properties from heterogeneous snapshot and delta objects.
 function assignOwnProperties<T extends object>(target: T, source: object): T {
   if (Object.prototype.propertyIsEnumerable.call(source, '__proto__') && !hasOwn(target, '__proto__')) {
     Object.defineProperty(target, '__proto__', {
@@ -646,6 +659,7 @@ function cloneParserConfigObject<Value extends object>(
     }
 
     descriptors[field] = {
+      // oxlint-disable-next-line anti-slop/no-reflect-get -- Generic config cloning must resolve inherited/accessor keys outside the declared config shape.
       value: descriptor && 'value' in descriptor ? descriptor.value : Reflect.get(value, field, value),
       enumerable: descriptor?.enumerable ?? false,
       configurable: descriptor?.configurable ?? true,
@@ -653,6 +667,7 @@ function cloneParserConfigObject<Value extends object>(
     };
   }
 
+  // SAFETY: The clone preserves the original prototype and descriptors, replacing only the parser metadata captured from that same value.
   return Object.create(Object.getPrototypeOf(value), descriptors) as Value;
 }
 
@@ -675,6 +690,7 @@ function snapshotChatCompletionParserParams(params: ChatCompletionCreateParams):
         continue;
       }
 
+      // SAFETY: This own data descriptor comes from the request's typed tools array; the following code captures its parser metadata.
       const tool = item.value as NonNullable<ChatCompletionCreateParams['tools']>[number];
       const stableTool = cloneParserConfigObject(tool, [
         'type',
@@ -695,6 +711,7 @@ function snapshotChatCompletionParserParams(params: ChatCompletionCreateParams):
         };
       }
 
+      // SAFETY: The cloned tool retains the original prototype and descriptors while substituting its captured parser configuration.
       stableTools[index] = Object.create(Object.getPrototypeOf(tool), descriptors) as typeof tool;
     }
     snapshot.tools = stableTools;
@@ -768,6 +785,7 @@ function canonicalSerializedParserSchema(
     return true;
   };
 
+  // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
   const visit = (current: unknown, depth: number): CanonicalSerializedParserValue => {
     if (depth > MAX_SERIALIZED_PARSER_SCHEMA_DEPTH || budget.nodes >= MAX_SERIALIZED_PARSER_SCHEMA_NODES) {
       return UNSAFE_SERIALIZED_PARSER_VALUE;
@@ -797,6 +815,7 @@ function canonicalSerializedParserSchema(
     }
 
     const array = Array.isArray(current);
+    // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
     const prototype = Object.getPrototypeOf(current) as object | null;
     if (
       (array && prototype !== Array.prototype) ||
@@ -928,7 +947,9 @@ function canonicalSerializedParserSchema(
 
 function rememberSerializedParserSchema(
   signatures: WeakMap<object, string>,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Parser owners are tracked by identity before their metadata descriptors are validated.
   source: object,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Serialized schema holders may be arbitrary objects with hostile accessors or prototypes.
   holder: object,
   key: string,
 ): void {
@@ -952,7 +973,9 @@ function rememberSerializedParserSchema(
 
 function hasMatchingSerializedParserSchema(
   signatures: WeakMap<object, string>,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Parser signatures belong to the original object identity, independent of its fields.
   source: object | undefined,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- The schema holder is inspected through own descriptors before its contents are trusted.
   holder: object,
   key: string,
   value: unknown,
@@ -978,7 +1001,7 @@ function serializedParserDescriptor(
 
 function shadowSerializedParserMetadata(
   descriptors: PropertyDescriptorMap,
-  source: object,
+  source: ChatCompletionInputTool | ChatCompletionResponseFormat,
   fields: readonly string[],
 ): void {
   for (const field of fields) {
@@ -999,6 +1022,7 @@ function shadowSerializedParserMetadata(
 }
 
 function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): ChatCompletionInputTool {
+  // SAFETY: The fallback is a serialization scaffold: the code below installs the captured wire fields before the tool is returned.
   const source =
     serialized.source ??
     ({
@@ -1013,10 +1037,12 @@ function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): C
       descriptors.function = serializedParserDescriptor(descriptors.function, undefined);
     }
     shadowSerializedParserMetadata(descriptors, source, ['$brand', '$parseRaw', '$callback']);
+    // SAFETY: The descriptors reconstruct the tool's captured serialized fields and shadow parser metadata while retaining its original prototype.
     return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionInputTool;
   }
 
   const descriptor = descriptors.function;
+  // SAFETY: The preceding guard proves this data descriptor contains a non-null object; no more specific type is assumed.
   const original =
     descriptor && 'value' in descriptor && typeof descriptor.value === 'object' && descriptor.value !== null
       ? (descriptor.value as object)
@@ -1038,21 +1064,25 @@ function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): C
     shadowSerializedParserMetadata(descriptors, source, ['$brand', '$parseRaw', '$callback']);
   }
 
+  // SAFETY: The descriptors reconstruct the tool's captured serialized fields and shadow parser metadata while retaining its original prototype.
   return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionInputTool;
 }
 
 function snapshotSerializedResponseFormat(
   serialized: SerializedResponseParserConfig,
 ): ChatCompletionResponseFormat {
+  // SAFETY: The fallback seeds only the discriminator; the captured response-format fields are installed below before returning it.
   const source = serialized.source ?? ({ type: serialized.type } as ChatCompletionResponseFormat);
   const descriptors = Object.getOwnPropertyDescriptors(source);
   descriptors.type = serializedParserDescriptor(descriptors.type, serialized.type);
   if (serialized.type !== 'json_schema' || !serialized.source || !serialized.schemaMatches) {
     shadowSerializedParserMetadata(descriptors, source, ['$brand', '$parseRaw']);
   }
+  // SAFETY: The descriptors restore the captured response-format fields and parser metadata on the original prototype.
   return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionResponseFormat;
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The serialization visitor accepts arbitrary object and array holders, inspecting own descriptors only.
 function ownSerializedParserObject(holder: object, key: string): object | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(holder, key);
   if (!descriptor || !('value' in descriptor)) {
@@ -1131,6 +1161,8 @@ function observeSerializedChatCompletionParserParams(
         if (Array.isArray(value)) {
           tools = new Proxy(value, {
             get(target, property) {
+              // SAFETY: Proxy property values may be arbitrary; unknown preserves that uncertainty before the property-specific checks below.
+              // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys with the original target as accessor receiver.
               const actual = Reflect.get(target, property, target) as unknown;
               if (typeof property === 'string') {
                 const index = Number(property);
@@ -1282,6 +1314,7 @@ export class ChatCompletionStream<ParsedT = null>
         if (!descriptor || !('value' in descriptor)) {
           continue;
         }
+        // SAFETY: The descriptor is read from the typed request tools array and checked as an own data property before accessing the tool.
         const tool = descriptor.value as ChatCompletionInputTool;
         if (
           isChatCompletionFunctionTool(tool) &&
@@ -1319,6 +1352,7 @@ export class ChatCompletionStream<ParsedT = null>
     params: ChatCompletionStreamParams,
     options?: RequestOptions,
   ): ChatCompletionStream<ParsedT> {
+    // SAFETY: The runner forces stream: true when sending this request; the same parameters retain the caller's parsing configuration.
     const runner = new ChatCompletionStream<ParsedT>(params as ChatCompletionCreateParamsStreaming);
     runner._run(() =>
       runner._runChatCompletion(
@@ -1496,10 +1530,12 @@ export class ChatCompletionStream<ParsedT = null>
     }
 
     if (toolCallSnapshot.type === 'function') {
+      // SAFETY: The find predicate verifies the function-tool discriminator before matching its name; the cast carries that refinement through find.
       const inputTool = this.#params?.tools?.find(
         (tool) => isChatCompletionFunctionTool(tool) && tool.function.name === toolCallSnapshot.function.name,
       ) as ChatCompletionFunctionTool | undefined; // TS doesn't narrow based on isChatCompletionTool
 
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- The initial null is replaced with an arbitrary tool-parser result after snapshot validation.
       let parsedArguments: unknown = null;
       const parseable = isAutoParsableTool(inputTool) || inputTool?.function.strict === true;
       let argumentsSnapshot: string;
@@ -1686,6 +1722,7 @@ export class ChatCompletionStream<ParsedT = null>
         if (!descriptor || !('value' in descriptor)) {
           throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
         }
+        // SAFETY: The tool-call function is captured through an own data descriptor; its fields are subsequently checked by the structured snapshot reader.
         const fn = descriptor.value as ChatCompletionSnapshot.Choice.Message.ToolCall.Function;
         const argumentsSnapshot = captureStructuredJSONSnapshot(fn, 'arguments');
         if (typeof argumentsSnapshot !== 'string') {
@@ -1936,6 +1973,7 @@ export class ChatCompletionStream<ParsedT = null>
       } // Shouldn't happen; just in case.
 
       this.#audioDoneChoiceIndexes.delete(index);
+      // SAFETY: Streaming audio fields arrive incrementally even though the generated delta type omits them; each present field is merged below.
       const { audio, content, refusal, function_call, role, ...capturedDeltaFields } =
         delta as typeof delta & {
           audio?: Partial<ChatCompletionAudio> | null;
@@ -2022,6 +2060,7 @@ export class ChatCompletionStream<ParsedT = null>
         // Tool calls are built up across chunks, so while the stream is in progress the
         // entries are only partially filled in; they match `ChatCompletionSnapshot.Choice.Message.ToolCall`
         // once every delta for them has been accumulated.
+        // SAFETY: This SDK-owned collection holds partial tool calls during accumulation; finalization checks required fields before exposing completed calls.
         const toolCallSnapshots = (choice.message.tool_calls ??= []) as PartialToolCallSnapshot[];
 
         for (const toolCallDelta of tool_calls) {
@@ -2180,6 +2219,7 @@ function finalizeChatCompletion<ParsedT>(
         }
         const stableChoice = new Proxy(choice, {
           get(target, property, receiver) {
+            // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
             return property === 'message' ? validated.message : Reflect.get(target, property, receiver);
           },
         });
@@ -2195,6 +2235,7 @@ function finalizeChatCompletion<ParsedT>(
             if (property === 'tool_calls') {
               return validated.toolCallCollection;
             }
+            // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
             return Reflect.get(target, property, receiver);
           },
         });
@@ -2207,7 +2248,9 @@ function finalizeChatCompletion<ParsedT>(
           throw new OpenAIError(`missing finish_reason for choice ${index}`);
         }
 
+        // SAFETY: The completed API response contract supplies the audio fields; this preserves the existing pass-through behavior at finalization.
         const audioResponse = audio ? { audio: audio as ChatCompletionAudio } : {};
+        // SAFETY: The API completion contract uses assistant role; retaining the wire role preserves existing behavior without adding runtime rejection.
         const role = message.role as 'assistant'; // this is what we expect; in theory it could be different which would make our types a slight lie but would be fine.
         if (!role) {
           throw new OpenAIError(`missing role for choice ${index}`);
@@ -2283,6 +2326,7 @@ function finalizeChatCompletion<ParsedT>(
                         if (property === 'name') {
                           return captured.name;
                         }
+                        // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
                         return Reflect.get(target, property, receiver);
                       },
                     });
@@ -2296,6 +2340,7 @@ function finalizeChatCompletion<ParsedT>(
                             if (property === 'function') {
                               return stableFunction;
                             }
+                            // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
                             return Reflect.get(target, property, receiver);
                           },
                         })
@@ -2350,6 +2395,7 @@ function finalizeChatCompletion<ParsedT>(
     created,
     model,
     object: 'chat.completion',
+    // Spread creates an own data property without invoking inherited setters or changing the object prototype.
     ...(system_fingerprint ? { system_fingerprint } : {}),
   };
 

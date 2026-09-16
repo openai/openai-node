@@ -55,6 +55,7 @@ export class LineDecoder {
     let binaryChunk: Uint8Array;
     if (chunk instanceof ArrayBuffer) {
       binaryChunk = new Uint8Array(chunk);
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The line decoder accepts both text and binary chunks and must select the matching decoding path.
     } else if (typeof chunk === 'string') {
       binaryChunk = encodeUTF8(chunk);
     } else {

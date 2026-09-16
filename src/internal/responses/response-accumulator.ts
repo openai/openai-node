@@ -199,6 +199,7 @@ function hasRoutedOutputCallIdentity(
 }
 
 function getOutputItemIdentityKeys(output: Response['output'][number], eventType: string): string[] {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
   if (!hasOwn(output, 'type') || typeof output.type !== 'string') {
     throw new OpenAIError(`expected an own output item type for ${eventType}`);
   }
@@ -207,6 +208,7 @@ function getOutputItemIdentityKeys(output: Response['output'][number], eventType
   const identities: string[] = [];
 
   if (hasOwn(output, 'id')) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
     if (typeof output.id !== 'string' || output.id.length === 0) {
       throw new OpenAIError(`expected a non-empty output item id for ${eventType}`);
     }
@@ -216,6 +218,7 @@ function getOutputItemIdentityKeys(output: Response['output'][number], eventType
   }
 
   if (hasRoutedOutputCallIdentity(output)) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
     if (!hasOwn(output, 'call_id') || typeof output.call_id !== 'string' || output.call_id.length === 0) {
       throw new OpenAIError(`expected a non-empty output item call_id for ${eventType}`);
     }
@@ -402,7 +405,9 @@ function validateOutputItemIdentity(
     return;
   }
 
+  // SAFETY: The event type was classified as item-scoped; the following checks validate its own item_id before use.
   const itemEvent = event as ResponseItemScopedEvent;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
   if (!hasOwn(event, 'item_id') || typeof itemEvent.item_id !== 'string' || itemEvent.item_id.length === 0) {
     throw new OpenAIError(`expected a non-empty item_id for ${event.type}`);
   }
@@ -538,19 +543,37 @@ const responseEventRoutingFields = [
   'summary_index',
 ] as const;
 
-function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumulatorEvent {
+// These fields are snapshotted before the event-specific validators inspect them.
+interface ResponseEventPayload {
+  item_id?: unknown;
+  output_index?: unknown;
+  content_index?: unknown;
+  annotation_index?: unknown;
+  command_index?: unknown;
+  summary_index?: unknown;
+  item?: unknown;
+  part?: unknown;
+}
+
+function sanitizeResponseEvent(
+  event: ResponseAccumulatorEvent & ResponseEventPayload,
+): ResponseAccumulatorEvent {
   let descriptor: PropertyDescriptor | undefined;
   try {
     descriptor = Object.getOwnPropertyDescriptor(event, 'type');
   } catch {
+    // SAFETY: assertNever always throws; the cast routes invalid runtime events through the existing unsupported-event error path.
     return assertNever(event as never);
   }
 
   const type: unknown = descriptor?.value;
+  // SAFETY: The string is used only as a Set lookup key; membership performs the supported-event check.
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
     typeof type !== 'string' ||
     !supportedResponseEventTypes.has(type as ResponseAccumulatorEvent['type'])
   ) {
+    // SAFETY: assertNever always throws; the cast routes invalid runtime events through the existing unsupported-event error path.
     return assertNever(event as never);
   }
 
@@ -569,21 +592,23 @@ function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumul
     try {
       for (const field of responseEventRoutingFields) {
         const routingDescriptor = Object.getOwnPropertyDescriptor(event, field);
-        stableValues.set(field, routingDescriptor ? Reflect.get(event, field, event) : undefined);
+        stableValues.set(field, routingDescriptor ? event[field] : undefined);
       }
 
       if (type === 'response.output_item.done') {
-        stableValues.set('item', structuredClone(Reflect.get(event, 'item', event)));
+        stableValues.set('item', structuredClone(event.item));
       } else if (type === 'response.content_part.added' || type === 'response.content_part.done') {
-        stableValues.set('part', structuredClone(Reflect.get(event, 'part', event)));
+        stableValues.set('part', structuredClone(event.part));
       }
     } catch {
+      // SAFETY: assertNever always throws; the cast routes invalid runtime events through the existing unsupported-event error path.
       return assertNever(event as never);
     }
   }
 
   return new Proxy(event, {
     get(target, property) {
+      // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys with the original target as accessor receiver.
       return stableValues.has(property) ? stableValues.get(property) : Reflect.get(target, property, target);
     },
   });
@@ -775,6 +800,7 @@ function accumulateOutputTextEvent(
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
         validateArrayIndex(content.annotations, event.annotation_index, 'annotation', true);
+        // SAFETY: The output_text discriminator and annotation index were checked; the annotation is cloned from the corresponding API event contract.
         content.annotations[event.annotation_index] = structuredClone(
           event.annotation,
         ) as ResponseOutputText['annotations'][number];

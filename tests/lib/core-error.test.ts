@@ -28,6 +28,7 @@ describe('transport error causes', () => {
   test.each([0, false, '', null, undefined, 'synthetic detail', { code: 'E_SYNTHETIC' }])(
     'preserves a cross-realm Error cause of %s',
     async (cause) => {
+      // SAFETY: The fixed VM program constructs an Error with the supplied cause options; using a foreign realm is the behavior under test.
       const failure = runInNewContext('new TypeError("synthetic transport failure", { cause })', {
         cause,
       }) as Error;
@@ -39,6 +40,7 @@ describe('transport error causes', () => {
       expect(failure).not.toBeInstanceOf(Error);
       const requestError = await client.models.list().catch((error: unknown) => error);
       expect(requestError).toBeInstanceOf(APIConnectionError);
+      // SAFETY: The preceding assertion verifies APIConnectionError; this fixture throws a native or VM Error, and the following checks inspect its normalized cause.
       const normalized = (requestError as APIConnectionError & { cause: Error }).cause;
       expect(normalized).toBeInstanceOf(Error);
       expect(normalized).not.toBe(failure);
@@ -57,6 +59,7 @@ describe('transport error causes', () => {
   );
 
   test.each([false, true])('preserves omitted causes (cross-realm: %s)', async (crossRealm) => {
+    // SAFETY: The fixed VM expression constructs an Error; retaining the foreign instance is the behavior under test.
     const failure = crossRealm
       ? (runInNewContext('new Error("synthetic transport failure")') as Error)
       : new Error('synthetic transport failure');
@@ -67,6 +70,7 @@ describe('transport error causes', () => {
     const requestError = await client.models.list().catch((error: unknown) => error);
 
     expect(requestError).toBeInstanceOf(APIConnectionError);
+    // SAFETY: The preceding assertion verifies APIConnectionError; this fixture throws a native or VM Error, and the following checks inspect its normalized cause.
     const normalized = (requestError as APIConnectionError & { cause: Error }).cause;
     expect(Object.getOwnPropertyDescriptor(normalized, 'cause')).toBeUndefined();
     if (!crossRealm) {
@@ -90,6 +94,7 @@ describe('transport error causes', () => {
     ];
     const failures = options.map(
       (causeOptions) =>
+        // SAFETY: The fixed VM program constructs an Error with the supplied cause options; using a foreign realm is the behavior under test.
         runInNewContext('new Error("synthetic transport failure", options)', {
           options: causeOptions,
         }) as Error,
@@ -111,6 +116,7 @@ describe('transport error causes', () => {
     for (const [index, expected] of options.entries()) {
       const result = results[index];
       expect(result).toBeInstanceOf(APIConnectionError);
+      // SAFETY: The preceding assertion verifies APIConnectionError; this fixture throws a native or VM Error, and the following checks inspect its normalized cause.
       const normalized = (result as APIConnectionError & { cause: Error }).cause;
       expect(Object.getOwnPropertyDescriptor(normalized, 'cause') !== undefined).toBe(
         Object.getOwnPropertyDescriptor(expected, 'cause') !== undefined,

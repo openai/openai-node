@@ -69,6 +69,7 @@ describe('embedding request compatibility', () => {
   ])('preserves $name encoding and response accessors', async ({ present, format, explicit }) => {
     const debug = vi.fn();
     const fetch = vi.fn<Fetch>(async (_url, init) => {
+      // SAFETY: This fetch mock reads the SDK serialized embedding request and checks the encoding_format selected by the local call.
       const body = JSON.parse(String(init?.body)) as { encoding_format: string };
       return embeddingResponse(body.encoding_format === 'base64' ? encodedVector : vector);
     });
@@ -250,6 +251,7 @@ describe('embedding request compatibility', () => {
       object: 'embedding' as const,
       index: 1,
       // The existing raw parser types the wire value as numeric before decoding.
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The raw wire parser exposes base64 embeddings under the numeric-array API type before decoding.
       embedding: encodedVector as unknown as number[],
     };
     entries[1] = entry;
@@ -283,8 +285,10 @@ describe('embedding request compatibility', () => {
     const appended: OpenAI.Embedding = {
       object: 'embedding',
       index: 1,
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The raw wire parser exposes base64 embeddings under the numeric-array API type before decoding.
       embedding: encodedVector as unknown as number[],
     };
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The raw wire parser exposes base64 embeddings under the numeric-array API type before decoding.
     let value = encodedVector as unknown as number[];
     entries.push({
       object: 'embedding',

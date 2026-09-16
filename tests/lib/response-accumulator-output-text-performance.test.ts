@@ -64,10 +64,11 @@ function response(output: Output[] = [], outputText?: string): Response {
     tool_choice: 'auto',
     tools: [],
     top_p: null,
-  } as Response;
+  };
 }
 
 function frame(type: ResponseStreamEvent['type'], fields: Record<string, unknown> = {}): ResponseStreamEvent {
+  // SAFETY: Each caller supplies the fields for its named synthetic event; keep the event factory shared across protocol variants.
   return { type, sequence_number: 0, ...fields } as ResponseStreamEvent;
 }
 const created = (output: Output[] = [], outputText?: string): ResponseStreamEvent =>
@@ -108,13 +109,14 @@ async function stream(events: ResponseStreamEvent[]): Promise<Response> {
   return ResponseStream.fromReadableStream(ReadableStreamFrom(chunks)).finalResponse();
 }
 
-function measureWork(kind: 'text' | 'output'): { count: number } {
+function measureWork(kind: 'text' | 'output') {
   const work = { count: 0 };
   const clone = globalThis.structuredClone;
   const instrument = <T extends object>(target: T, matches: (property: PropertyKey) => boolean) =>
     new Proxy(target, {
       get(current, property, receiver) {
         work.count += Number(matches(property));
+        // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
         return Reflect.get(current, property, receiver);
       },
     });
@@ -127,6 +129,7 @@ function measureWork(kind: 'text' | 'output'): { count: number } {
       return instrument(cloned, (property) => property === 'text');
     }
     if (kind === 'output' && 'object' in cloned && cloned.object === 'response') {
+      // SAFETY: The structuredClone spy receives the synthetic response and checks its discriminator above; instrument that cloned response's output collection.
       const snapshot = cloned as Response;
       snapshot.output = instrument(
         snapshot.output,
@@ -383,21 +386,18 @@ describe('canonical streamed response output text', () => {
       textFrame('delta', 0, 0, '🙂'),
       '😀🙂🚀',
     ],
-  ] as [string, Output[], ResponseStreamEvent, string][])(
-    'preserves canonical order and detached payloads for %s',
-    async (_label, outputs, update, expected) => {
-      const events = [created(), ...outputs.map((item, index) => outputFrame('added', index, item)), update];
-      const original = structuredClone(events);
-      let direct: Response | undefined;
-      for (const event of events) {
-        direct = accumulateResponse(event, direct);
-      }
-      expect(direct?.output_text).toBe(expected);
-      const final = await stream(events);
-      expect(final.output_text).toBe(expected);
-      expect(events).toEqual(original);
-    },
-  );
+  ])('preserves canonical order and detached payloads for %s', async (_label, outputs, update, expected) => {
+    const events = [created(), ...outputs.map((item, index) => outputFrame('added', index, item)), update];
+    const original = structuredClone(events);
+    let direct: Response | undefined;
+    for (const event of events) {
+      direct = accumulateResponse(event, direct);
+    }
+    expect(direct?.output_text).toBe(expected);
+    const final = await stream(events);
+    expect(final.output_text).toBe(expected);
+    expect(events).toEqual(original);
+  });
 
   test('keeps lifecycle replacements and parallel stream contexts independent', async () => {
     const replaced = stream([

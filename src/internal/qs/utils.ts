@@ -2,16 +2,20 @@ import { RFC1738 } from './formats';
 import type { DefaultEncoder, Format } from './types';
 import { isArray } from '../utils/values';
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The cached own-property predicate accepts arrays, callable objects, and records.
 let cachedHas: ((obj: object, key: PropertyKey) => boolean) | undefined;
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Own-property lookup is a generic object primitive and must preserve array and callable inputs.
 export const has = (obj: object, key: PropertyKey): boolean => {
+  // SAFETY: Object.hasOwn is an optional native capability; older runtimes use the bound hasOwnProperty fallback with the same own-key semantics.
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- The native or compatibility own-property predicate has the same generic object contract.
   const resolvedHas: (obj: object, key: PropertyKey) => boolean =
     cachedHas ?? (Object as any).hasOwn ?? Function.prototype.call.bind(Object.prototype.hasOwnProperty);
   cachedHas = resolvedHas;
   return resolvedHas(obj, key);
 };
 
-function isUnsafePropertyKey(key: unknown): boolean {
+function isUnsafePropertyKey(key: PropertyKey): boolean {
   return key === '__proto__' || key === 'constructor' || key === 'prototype';
 }
 
@@ -39,6 +43,7 @@ interface MergeState {
 const maxAdoptedRecords = 10_000;
 
 function isIntrinsicFunctionPrototype(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Prototype descriptors are inspected before deciding whether an arbitrary adopted value is callable.
   value: object,
   key: PropertyKey,
   descriptor: PropertyDescriptor,
@@ -52,6 +57,7 @@ function isObjectLike(value: unknown): value is object {
   return value !== null && (typeof value === 'object' || typeof value === 'function');
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Adoption records retain arbitrary merge-target identities for later descriptor validation.
 function rememberAdoption(state: MergeState, target: object, key: PropertyKey, value: any): void {
   if (!isObjectLike(value)) {
     return;
@@ -77,6 +83,7 @@ function sanitizeAdoptions(state: MergeState): void {
   }[] = [];
   let inspectedProperties = 0;
 
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Adoption validation inspects arbitrary objects, including arrays and functions, before trusting their structure.
   function inspect(value: object): AdoptedRecord {
     const known = records.get(value);
     if (known) {
@@ -131,7 +138,7 @@ function sanitizeAdoptions(state: MergeState): void {
   const detached: AdoptedRecord[] = [];
   for (const record of visited) {
     for (const key of record.keys) {
-      const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor | undefined;
+      const descriptor = record.descriptors[key];
       if (!descriptor) {
         continue;
       }
@@ -204,7 +211,7 @@ function sanitizeAdoptions(state: MergeState): void {
       if (isUnsafePropertyKey(key)) {
         continue;
       }
-      const descriptor = Reflect.get(record.descriptors, key) as PropertyDescriptor | undefined;
+      const descriptor = record.descriptors[key];
       if (!descriptor) {
         continue;
       }
@@ -239,12 +246,14 @@ function readPreparedTarget(state: MergeState, target: any, key: PropertyKey): a
   return target[key];
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Merge targets may contain accessors or custom prototypes, so the preview preserves the generic object boundary.
 function previewTarget(state: MergeState, target: object, key: PropertyKey): any {
   const descriptor = Object.getOwnPropertyDescriptor(target, key);
   if (descriptor && 'value' in descriptor) {
     return descriptor.value;
   }
 
+  // oxlint-disable-next-line anti-slop/no-reflect-get -- Generic query merging snapshots arbitrary inherited/accessor keys before mutation.
   const value = Reflect.get(target, key, target);
   let prepared = state.preparedTargets.get(target);
   if (!prepared) {
@@ -280,11 +289,13 @@ function prepareMergeSource(target: any, source: any, state: MergeState, assign 
   }
   state.inspectedSourceProperties += sourceKeys.length;
   const sourceIsArray = isArray(source);
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The query merge graph preserves heterogeneous scalar, array, and object values under its existing merge contract.
   const prepared: Record<string, any> = sourceIsArray ? [] : Object.create(null);
   preparedTargets.set(target, prepared);
 
   if (isArray(target) && sourceIsArray && !assign) {
     const sourceLength = source.length;
+    // SAFETY: prepared was constructed as an array when sourceIsArray is true, which this branch requires.
     (prepared as any[]).length = sourceLength;
     for (let index = 0; index < sourceLength; index += 1) {
       if (!(index in source)) {

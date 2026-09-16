@@ -21,8 +21,11 @@ interface FakeNodeSocket {
   close: Mock;
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Assert unsafe redirect options fail before the public adapter constructs any transport.
 vi.mock('ws', () => ({ WebSocket: vi.fn() }));
 
+// SAFETY: The module mock replaces this import with a Vitest spy before this binding is read. The hoisted ws module mock replaces this constructor with the FakeNodeSocket spy used by the test.
+// oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The module mock accepts capturing and real constructor implementations with intentionally different overloads.
 const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
 let actualWebSocketConstructor: typeof WS.WebSocket | undefined;
 
@@ -45,6 +48,7 @@ function ActualWebSocket(url: URL, options: WS.ClientOptions): WS.WebSocket {
 
 function lastNodeSocket(): FakeNodeSocket {
   const [result] = nodeSocketConstructor.mock.results.slice(-1);
+  // SAFETY: The injected ws constructor records only FakeNodeSocket results; the following check rejects a missing construction.
   const socket = result?.value as FakeNodeSocket | undefined;
   if (!socket) {
     throw new Error('Expected a WebSocket instance');
@@ -52,8 +56,13 @@ function lastNodeSocket(): FakeNodeSocket {
   return socket;
 }
 
-function onRealtimeEvent(realtime: unknown, event: string, listener: Listener): void {
-  (realtime as { on: (event: string, listener: Listener) => unknown }).on(event, listener);
+function onRealtimeEvent(
+  realtime: StableResponsesWS | BetaResponsesWS | StableNodeRealtime | BetaNodeRealtime,
+  event: string,
+  listener: Listener,
+): void {
+  // SAFETY: Each listed realtime wrapper implements on; this helper registers only the shared event listener contract and discards the return value.
+  (realtime as { on: (event: string, listener: Listener) => void }).on(event, listener);
 }
 
 function createClient(apiKey = 'test-key', baseURL = 'https://example.com/v1/'): OpenAI {
@@ -295,6 +304,7 @@ describe.each([
         const realtime = await Realtime.azure(client, {
           options: {
             followRedirects: true,
+            // SAFETY: The local redirect fixture supplies a TCP connection for its controlled HTTP server; the WebSocket test does not perform TLS handshakes.
             createConnection: createPlainConnection as typeof connect,
           },
         });
@@ -362,6 +372,7 @@ describe.each([
           model: 'gpt-realtime',
           options: {
             followRedirects: true,
+            // SAFETY: The local redirect fixture supplies a TCP connection for its controlled HTTP server; the WebSocket test does not perform TLS handshakes.
             createConnection: createPlainConnection as typeof connect,
           },
         },
@@ -434,12 +445,14 @@ describe.each([
 
       const destination = createServer((request, response) => {
         request.resume();
+        // SAFETY: The fixture sends this credential header once; Node exposes that single header as a string or omits it.
         destinationRequests.push(request.headers[header] as string | undefined);
         response.writeHead(200);
         response.end();
       });
       const source = createServer((request, response) => {
         request.resume();
+        // SAFETY: The fixture sends this credential header once; Node exposes that single header as a string or omits it.
         sourceCredentials.push(request.headers[header] as string | undefined);
         response.writeHead(302, { location: redirectURL });
         response.end();
@@ -471,6 +484,7 @@ describe.each([
         const responses = new Responses(openAI, {
           ...options,
           followRedirects: true,
+          // SAFETY: The local redirect fixture supplies a TCP connection for its controlled HTTP server; the WebSocket test does not perform TLS handshakes.
           createConnection: createPlainConnection as typeof connect,
         });
         const redirects = vi.fn();

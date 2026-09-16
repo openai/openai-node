@@ -15,6 +15,67 @@ const repoRoot = process.cwd();
 const oxlint = path.join(repoRoot, 'node_modules/oxlint/bin/oxlint');
 const oxfmt = path.join(repoRoot, 'node_modules/oxfmt/bin/oxfmt');
 
+function checkBoundaryRule(rule: string, source: string): void {
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'openai-node-boundary-lint-'));
+  const files = [
+    'src/helpers/standard-schema.ts',
+    'tests/boundary.test.ts',
+    'examples/boundary.ts',
+    'ecosystem-tests/boundary.ts',
+    'src/_vendor/boundary.ts',
+    'src/lib/Util.ts',
+  ];
+
+  try {
+    copyFileSync(path.join(repoRoot, 'oxlint.config.ts'), path.join(fixtureRoot, 'oxlint.config.ts'));
+    mkdirSync(path.join(fixtureRoot, 'scripts'));
+    copyFileSync(
+      path.join(repoRoot, 'scripts/generated-files.cjs'),
+      path.join(fixtureRoot, 'scripts/generated-files.cjs'),
+    );
+    symlinkSync(path.join(repoRoot, 'node_modules'), path.join(fixtureRoot, 'node_modules'), 'junction');
+    for (const file of files) {
+      mkdirSync(path.dirname(path.join(fixtureRoot, file)), { recursive: true });
+      writeFileSync(path.join(fixtureRoot, file), source);
+    }
+
+    const linted = spawnSync(process.execPath, [oxlint, '--format', 'json', ...files], {
+      cwd: fixtureRoot,
+      encoding: 'utf-8',
+    });
+    expect(linted.status).toBe(1);
+    // SAFETY: These diagnostics come from the controlled linter invocation; assertions below verify enforcement in each fixture.
+    const { diagnostics } = JSON.parse(linted.stdout) as {
+      diagnostics: { code: string; filename: string }[];
+    };
+    expect(
+      diagnostics
+        .filter(({ code }) => code === `anti-slop(${rule})`)
+        .map(({ filename }) => filename.split(path.sep).join('/')),
+    ).toEqual(['src/lib/Util.ts']);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+}
+
+test('permits boundary typeof validation while checking typed internal modules', () => {
+  checkBoundaryRule(
+    'no-runtime-typeof',
+    "export function validate(value: unknown): boolean { return typeof value === 'string'; }\n",
+  );
+});
+
+test('permits unknown validator inputs while checking typed internal signatures', () => {
+  checkBoundaryRule(
+    'no-unknown-parameters',
+    "export function validate(value: unknown): boolean { return value === 'accepted'; }\n",
+  );
+});
+
+test('permits open schema dictionaries while checking typed internal data', () => {
+  checkBoundaryRule('no-unsafe-dictionary-type', 'export type Input = Record<string, unknown>;\n');
+});
+
 function spawnPnpm(args: string[], cwd: string) {
   const command = process.platform === 'win32' ? (process.env['ComSpec'] ?? 'cmd.exe') : 'pnpm';
   const commandArgs = process.platform === 'win32' ? ['/d', '/s', '/c', `pnpm ${args.join(' ')}`] : args;
@@ -90,7 +151,7 @@ test('formats an existing CRLF checkout after the LF policy is pulled', () => {
   }
 });
 
-test('inherits Ultracite native plugins and enforces their rules', () => {
+test('inherits Ultracite native and anti-slop plugins and enforces their rules', () => {
   const printed = spawnSync(process.execPath, [oxlint, '--print-config', 'src/internal/uploads.ts'], {
     cwd: repoRoot,
     encoding: 'utf-8',
@@ -98,10 +159,12 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
 
   expect(printed.status).toBe(0);
 
+  // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
   const configuration = JSON.parse(printed.stdout) as {
     plugins: string[];
     rules: Record<string, string>;
   };
+  // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
   // oxlint-disable-next-line node/global-require -- This test verifies the CommonJS config dependency used by oxlint.config.ts.
   const preset = require('ultracite/oxlint/core').default as { plugins: string[] };
 
@@ -114,7 +177,18 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
 
   try {
     const fixturePath = path.join(fixtureRoot, 'native-plugin.ts');
-    writeFileSync(fixturePath, 'const values = [];\nconsole.log(values instanceof Array);\n');
+    writeFileSync(
+      fixturePath,
+      [
+        'const values = [];',
+        'console.log(values instanceof Array);',
+        "console.log(Reflect.get({ value: 1 }, 'value'));",
+        "const validate = (value: unknown): boolean => typeof value === 'string';",
+        'const payload: Record<string, unknown> = { value: 1 };',
+        "console.log({ ...(validate(payload['value']) ? payload : {}) });",
+        '',
+      ].join('\n'),
+    );
 
     const linted = spawnSync(
       process.execPath,
@@ -124,8 +198,15 @@ test('inherits Ultracite native plugins and enforces their rules', () => {
 
     expect(linted.status).toBe(1);
 
+    // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
     const { diagnostics } = JSON.parse(linted.stdout) as { diagnostics: { code: string }[] };
-    expect(diagnostics.map(({ code }) => code)).toContain('unicorn(no-instanceof-array)');
+    const codes = diagnostics.map(({ code }) => code);
+    expect(codes).toContain('unicorn(no-instanceof-array)');
+    expect(codes).toContain('anti-slop(no-reflect-get)');
+    expect(codes).toContain('anti-slop(no-runtime-typeof)');
+    expect(codes).toContain('anti-slop(no-unknown-parameters)');
+    expect(codes).toContain('anti-slop(no-unsafe-dictionary-type)');
+    expect(codes).not.toContain('anti-slop(no-conditional-empty-object-spread)');
 
     const formatted = spawnSync(
       process.execPath,
@@ -159,6 +240,7 @@ test('recognizes generated SDK files and explicitly listed legacy files', () => 
     mkdirSync(legacyDirectory, { recursive: true });
     writeFileSync(path.join(legacyDirectory, 'env.ts'), 'export const legacy = true;\n');
 
+    // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
     // oxlint-disable-next-line node/global-require -- The fixture module path is created dynamically for this test.
     const generatedFiles = require(generatedFilesScript) as string[];
     expect(generatedFiles).toEqual(['castiron.ts', 'src/internal/utils/env.ts']);
@@ -193,6 +275,7 @@ test('formats generated SDK files without linting them', () => {
 
   expect(linted.status).toBe(0);
 
+  // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
   const result = JSON.parse(linted.stdout) as { number_of_files: number };
   expect(result.number_of_files).toBe(0);
 });
@@ -209,6 +292,7 @@ test('keeps explicitly listed legacy SDK files under the generated lint profile'
   );
 
   expect(linted.status).toBe(0);
+  // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
   expect((JSON.parse(linted.stdout) as { number_of_files: number }).number_of_files).toBe(0);
 
   const generatedLinted = spawnSync(

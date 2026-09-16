@@ -24,6 +24,7 @@ const openai = vi.hoisted(() => {
   return { constructor, createStream, toReadableStream };
 });
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- The regression asserts that rejected requests never construct the billed SDK client; the example exposes no constructor seam.
 vi.mock('openai', () => ({ default: openai.constructor }));
 
 const token = '0123456789abcdef0123456789abcdef';
@@ -71,7 +72,8 @@ function invoke(input: Request): Promise<Response> {
     response: { send: (stream: ReadableStream<Uint8Array>) => Response },
   ) => Promise<Response>;
 
-  return (handler as unknown as EdgeHandler)(input, {
+  // SAFETY: The imported edge example uses Request and response.send; this fixture provides those Web API values and returns a Response from send.
+  return (handler as EdgeHandler)(input, {
     send: (stream) => new Response(stream),
   });
 }

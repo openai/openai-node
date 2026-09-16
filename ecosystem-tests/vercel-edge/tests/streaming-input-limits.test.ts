@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
 import handler from '../src/pages/api/vercel-ai-streaming';
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- The CJS Jest fixture cannot load the ESM-only AI SDK; this adapter keeps request-boundary coverage on the real OpenAI client.
 jest.mock('ai', () => ({
   createUIMessageStream: jest.fn(),
   createUIMessageStreamResponse: jest.fn(),
@@ -46,7 +47,7 @@ function requestWithBodyChunks(
   chunks: string[],
   headers: Record<string, string> = {},
   cancel = jest.fn(),
-): { request: NextRequest; cancel: jest.Mock } {
+) {
   let index = 0;
   const body = new ReadableStream<Uint8Array>({
     pull(controller) {

@@ -54,12 +54,14 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
       return this;
     }
 
+    // SAFETY: Listener functions are object identities used as WeakMap keys; registration and removal use the same function instance.
     const emittedRegistration = this.#emittedListenerRegistrations.get(listener as object);
     if (
       emittedRegistration?.event === event &&
       !emittedRegistration.registration.removed &&
       !emittedRegistration.registration.detached
     ) {
+      // SAFETY: The stored registration event was compared with this event above, preserving the event/listener type correlation.
       this.#removeEmittedListener(
         event,
         emittedRegistration.registration as EventListeners<EventTypes, Event>[number],
@@ -101,6 +103,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
       registration?.listener === listener &&
       registration.once
     ) {
+      // SAFETY: Listener functions are object identities used as WeakMap keys; registration and removal use the same function instance.
       this.#emittedListenerRegistrations.set(listener as object, { event, registration });
     }
   }
@@ -114,6 +117,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
     }
 
     registration.removed = true;
+    // SAFETY: Listener functions are object identities used as WeakMap keys; registration and removal use the same function instance.
     this.#emittedListenerRegistrations.delete(registration.listener as object);
     this.#pendingListenerCleanup.add(event);
     if (this.#listenerDispatchDepth === 0) {
@@ -123,9 +127,11 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
 
   #cleanupEmittedListeners(): void {
     for (const event of this.#pendingListenerCleanup) {
+      // SAFETY: Pending cleanup keys are added only from registered EventTypes events; the key retains its event-map membership.
       const eventType = event as keyof EventTypes;
       const listeners = this.#listeners[eventType];
       if (listeners) {
+        // SAFETY: Filtering only removes registrations from the same event bucket and preserves the listener signatures for that event.
         this.#listeners[eventType] = listeners.filter((listener) => !listener.removed) as any;
       }
     }
@@ -150,21 +156,27 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
   ): Promise<EmittedEventResult<EventParameters<EventTypes, Event>>> {
     return new Promise((resolve, reject) => {
       const listeners = {
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         onError: (error: unknown) => {
+          // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
           this.off(event, listeners.onEvent as any);
           reject(error);
         },
         onEvent: (...values: unknown[]) => {
           if (event !== 'error') {
+            // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
             this.off('error', listeners.onError as any);
           }
+          // SAFETY: The emitted API returns the sole argument or the full tuple according to its existing EventTypes-dependent result contract.
           resolve((values.length > 1 ? values : values[0]) as any);
         },
       };
 
       if (event !== 'error') {
+        // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
         this.#onceForEmitted('error', listeners.onError as any);
       }
+      // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
       this.#onceForEmitted(event, listeners.onEvent as any);
     });
   }
@@ -176,6 +188,7 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
   ) {
     const listeners: EventListeners<EventTypes, Event> | undefined = this.#listeners[event];
     if (listeners) {
+      // SAFETY: Filtering only removes registrations from the same event bucket and preserves the listener signatures for that event.
       this.#listeners[event] = listeners.filter((listener) => {
         if (listener.once) {
           listener.detached = true;
@@ -186,10 +199,12 @@ export class EventEmitter<EventTypes extends Record<string, (...args: any) => an
       let firstListenerError: unknown;
       this.#listenerDispatchDepth += 1;
       try {
+        // SAFETY: The listener bucket and argument tuple come from the same EventTypes key; this bridges TypeScript generic indexed-access correlation.
         for (const registration of listeners as any) {
           if (!registration.removed) {
             try {
               const { listener } = registration;
+              // SAFETY: The listener bucket and argument tuple come from the same EventTypes key; this bridges TypeScript generic indexed-access correlation.
               listener(...(args as any));
             } catch (error) {
               if (!listenerThrew) {

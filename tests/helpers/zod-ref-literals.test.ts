@@ -12,12 +12,17 @@ import { z as zv4Mini } from 'zod/v4-mini';
 type JSONSchemaRecord = Record<string, unknown>;
 
 function schemaProperties(schema: unknown): Record<string, JSONSchemaRecord> {
+  // SAFETY: The explicit Zod fixture defines these object properties, arrays, or defaults; the assertions check their serialized reference/literal representation.
   return (schema as { properties: Record<string, JSONSchemaRecord> }).properties;
 }
 
 describe.each([
   { version: 'v3', z: zv3 },
+  // SAFETY: The version matrix uses only the listed shared Zod constructors; the test exercises each real v3/v4 implementation despite incompatible library declarations.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Run shared schema-factory cases across Zod versions whose nominal class types differ.
   { version: 'v4', z: zv4 as unknown as typeof zv3 },
+  // SAFETY: The version matrix uses only the listed shared Zod constructors; the test exercises each real v3/v4 implementation despite incompatible library declarations.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Run shared schema-factory cases across Zod versions whose nominal class types differ.
   { version: 'v4 Mini', z: zv4Mini as unknown as typeof zv3 },
 ])('Zod $version definition names', ({ z }) => {
   it('keeps raw, pointer-escaped, and percent-escaped definition names distinct on the wire', () => {
@@ -34,6 +39,7 @@ describe.each([
       'escaped_definitions',
       { schemaDefinitions: definitions },
     );
+    // SAFETY: The explicit Zod fixture defines these object properties, arrays, or defaults; the assertions check their serialized reference/literal representation.
     // oxlint-disable-next-line unicorn/prefer-structured-clone -- Check the JSON wire representation.
     const wireSchema = JSON.parse(JSON.stringify(format.json_schema.schema)) as {
       properties: Record<string, { $ref: string }>;
@@ -55,6 +61,8 @@ describe.each([
 
 describe.each([
   { version: 'v3', z: zv3 },
+  // SAFETY: The version matrix uses only the listed shared Zod constructors; the test exercises each real v3/v4 implementation despite incompatible library declarations.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Run shared schema-factory cases across Zod versions whose nominal class types differ.
   { version: 'v4', z: zv4 as unknown as typeof zv3 },
 ])('Zod $version schema reference literals', ({ version, z }) => {
   const referenceLiteral = () => z.object({ $ref: z.string() });
@@ -115,6 +123,7 @@ describe.each([
     const escapedRef = '#/definitions/account~1admin~0team%252Fowner%20%23';
     expect(properties['account']?.['$ref']).toBe(escapedRef);
     const nestedProperties = schemaProperties(properties['nested']);
+    // SAFETY: The explicit Zod fixture defines these object properties, arrays, or defaults; the assertions check their serialized reference/literal representation.
     const nestedArray = nestedProperties['accounts'] as { items: { $ref: string } };
     expect(nestedArray.items.$ref).toBe(escapedRef);
   });
@@ -125,7 +134,7 @@ describe.each([
       nested: Object.freeze({ $ref: '#/definitions/account/admin' }),
     });
     const Root = z.object({ payload: nestedReferenceLiteral().default(payload) });
-    const helpers: (() => unknown)[] = [
+    const helpers = [
       () => zodResponseFormat(Root, 'account').json_schema.schema,
       () => zodTextFormat(Root, 'account').schema,
       () => zodFunction({ name: 'account', parameters: Root }).function.parameters,
@@ -163,6 +172,7 @@ describe.each([
     it('preserves shared literal defaults and rejects cyclic JSON values', () => {
       const Account = z.object({ id: z.string() });
       const shared = { $ref: '#/definitions/account/admin' };
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- The optional self field is assigned after creation to form the cyclic JSON regression fixture.
       const cyclic: { $ref: string; self?: unknown } = { $ref: '#/definitions/account/admin' };
       cyclic.self = cyclic;
       const Root = z.object({
@@ -175,13 +185,17 @@ describe.each([
         schemaDefinitions: { 'account/admin': Account },
       }).json_schema;
       const properties = schemaProperties(schema);
+      // SAFETY: The explicit Zod fixture defines these object properties, arrays, or defaults; the assertions check their serialized reference/literal representation.
       const firstDefault = properties['first']?.['default'] as typeof shared;
+      // SAFETY: The explicit Zod fixture defines these object properties, arrays, or defaults; the assertions check their serialized reference/literal representation.
       const secondDefault = properties['second']?.['default'] as typeof shared;
 
       expect(properties['account']?.['$ref']).toBe('#/definitions/account~1admin');
       expect(firstDefault.$ref).toBe('#/definitions/account/admin');
       expect(secondDefault.$ref).toBe('#/definitions/account/admin');
       expect(() =>
+        // SAFETY: The fixture intentionally supplies nonstandard literal/default values to test serialization, reference escaping, or circular-value rejection.
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The cyclic default is intentionally outside the string schema type to test serialization rejection.
         zodResponseFormat(z.object({ value: z.string().default(cyclic as unknown as string) }), 'cyclic'),
       ).toThrow(/circular JSON value/u);
       expect(cyclic.self).toBe(cyclic);
@@ -219,7 +233,11 @@ describe('Zod v4 schema reference literals', () => {
     const alternateLiteral = { $ref: '#/definitions/account/admin', tag: 'ALSO KEEP' };
     const Root = zv4.object({
       account: Account,
+      // SAFETY: The fixture intentionally supplies nonstandard literal/default values to test serialization, reference escaping, or circular-value rejection.
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Preserve object-valued literal fixtures used to verify ref-looking data is never rewritten as a schema ref.
       constant: zv4.literal(literal as unknown as string),
+      // SAFETY: The fixture intentionally supplies nonstandard literal/default values to test serialization, reference escaping, or circular-value rejection.
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Preserve object-valued literal fixtures used to verify ref-looking data is never rewritten as a schema ref.
       enumeration: zv4.literal([literal, alternateLiteral] as unknown as readonly string[]),
     });
 

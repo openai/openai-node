@@ -16,6 +16,7 @@ import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 import { expectType } from '../utils/typing';
 
 function mockStreamingClient(chunks: OpenAI.Chat.ChatCompletionChunk[]): OpenAI {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The stream fixture implements only completions.create and drives deterministic chunks.
   return {
     chat: {
       completions: {
@@ -196,6 +197,7 @@ describe('.stream()', () => {
       ],
     };
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The stream fixture implements only completions.create and drives deterministic chunks.
     const client = {
       chat: {
         completions: {
@@ -245,6 +247,7 @@ describe('.stream()', () => {
       ],
     };
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The stream fixture implements only completions.create and drives deterministic chunks.
     const client = {
       chat: {
         completions: {
@@ -305,6 +308,7 @@ describe('.stream()', () => {
           },
         ],
       },
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The Azure filter-only chunk intentionally lacks a delta to exercise provider compatibility.
       {
         id: '',
         object: '',
@@ -336,6 +340,7 @@ describe('.stream()', () => {
   });
 
   it('finalizes audio streams that end with an expires_at-only chunk', async () => {
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Audio delta fields are intentionally ahead of the generated chunk type and exercise supported runtime accumulation.
     const chunks = [
       {
         id: 'chatcmpl-test',
@@ -424,6 +429,7 @@ describe('.stream()', () => {
   });
 
   it('does not infer a finish_reason if audio continues after expires_at', async () => {
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Audio delta fields are intentionally ahead of the generated chunk type and exercise supported runtime accumulation.
     const chunks = [
       {
         id: 'chatcmpl-test',
@@ -1086,7 +1092,7 @@ describe('.stream()', () => {
         model: 'gpt-4',
         choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ] satisfies OpenAI.Chat.ChatCompletionChunk[];
     // Yield valid chunks, then throw to error the stream after they have been
     // delivered (mimics a connection drop mid-response).
     const readable = new Stream(async function* failingChunks() {
@@ -1107,6 +1113,7 @@ describe('.stream()', () => {
     await stream.done().catch(() => {});
 
     const collected: OpenAI.Chat.ChatCompletionChunk[] = [];
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The null sentinel is replaced with any thrown iterator value, which must remain uncoerced.
     let caught: unknown = null;
     try {
       for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
@@ -1118,7 +1125,7 @@ describe('.stream()', () => {
 
     expect(collected).toHaveLength(chunks.length);
     expect(caught).toBeInstanceOf(OpenAIError);
-    expect((caught as OpenAIError).message).toBe('network boom');
+    expect(caught).toHaveProperty('message', 'network boom');
   });
 
   it('surfaces a server error frame from a readable stream as an APIError', async () => {
@@ -1177,6 +1184,7 @@ describe('.stream()', () => {
       const stream = ChatCompletionStream.fromReadableStream(readable);
       await expect(stream.finalContent()).resolves.toBe('ok');
     } finally {
+      // SAFETY: The test installed this configurable synthetic error property; the dictionary view is used only to remove it during cleanup.
       delete (Object.prototype as Record<string, unknown>)['error'];
     }
   });
@@ -1197,7 +1205,7 @@ describe('.stream()', () => {
         model: 'gpt-4',
         choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ] satisfies OpenAI.Chat.ChatCompletionChunk[];
     const readable = new Stream(async function* failingChunks() {
       for (const chunk of chunks) {
         yield chunk;
@@ -1218,7 +1226,7 @@ describe('.stream()', () => {
       (error) => error,
     );
     expect(caught).toBeInstanceOf(OpenAIError);
-    expect((caught as OpenAIError).message).toBe('network boom');
+    expect(caught).toHaveProperty('message', 'network boom');
     // The failure is delivered exactly once; iteration then ends cleanly.
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
@@ -1232,7 +1240,7 @@ describe('.stream()', () => {
           created: 1,
           model: 'gpt-4',
           choices: [{ index: 0, delta: { role: 'assistant', content: 'hel' }, finish_reason: null }],
-        } as unknown as OpenAI.Chat.ChatCompletionChunk;
+        } satisfies OpenAI.Chat.ChatCompletionChunk;
         // Hang so the only way the consumer stops is by breaking out.
         await Promise.race([]);
       },
@@ -1258,7 +1266,7 @@ describe('.stream()', () => {
         model: 'gpt-4',
         choices: [{ index: 0, delta: { role: 'assistant', content: 'hello' }, finish_reason: 'stop' }],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ] satisfies OpenAI.Chat.ChatCompletionChunk[];
     const readable = new Stream(async function* completeChunks() {
       for (const chunk of chunks) {
         yield chunk;
@@ -1288,7 +1296,7 @@ describe('.stream()', () => {
         model: 'gpt-4',
         choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ] satisfies OpenAI.Chat.ChatCompletionChunk[];
     const readable = new Stream(async function* failingChunks() {
       for (const chunk of chunks) {
         yield chunk;
@@ -1308,6 +1316,7 @@ describe('.stream()', () => {
     await runner.done().catch(() => {});
 
     const collected: OpenAI.Chat.ChatCompletionChunk[] = [];
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The fixture records an arbitrary thrown value while separately preserving successfully delivered chunks.
     let caught: unknown = null;
     try {
       for await (const chunk of proxied) {
@@ -1319,7 +1328,7 @@ describe('.stream()', () => {
 
     expect(collected).toHaveLength(chunks.length);
     expect(caught).toBeInstanceOf(OpenAIError);
-    expect((caught as OpenAIError).message).toBe('network boom');
+    expect(caught).toHaveProperty('message', 'network boom');
   });
 
   it('preserves the existing streamed function-call detail type', () => {

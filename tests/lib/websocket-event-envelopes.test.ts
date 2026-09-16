@@ -174,6 +174,7 @@ describe.each(websocketVariants.filter(({ name }) => name.endsWith('Responses'))
 
     test('preserves asynchronous rejection without an error listener', () => {
       const websocket = create(new OpenAI({ apiKey: 'test-key' }));
+      // SAFETY: Replace Promise.reject with a fulfilled sentinel solely to record the requested rejection without creating an unhandled test rejection.
       const reject = vi.spyOn(Promise, 'reject').mockReturnValue(Promise.resolve() as Promise<never>);
       const event = { type: 'error', message: { toString: null } };
 

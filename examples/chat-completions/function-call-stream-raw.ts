@@ -96,6 +96,7 @@ async function main() {
     // `lineRewriter()` allows us to rewrite the last output with new text, which is one
     // way of forwarding the streamed output to a visual interface.
     const writeLine = lineRewriter();
+    // SAFETY: This is a partial streaming accumulator; fields are inspected optionally while deltas arrive and it is submitted only after stream completion.
     let message = {} as ChatCompletionMessage;
     for await (const chunk of stream) {
       message = messageReducer(message, chunk);
@@ -135,7 +136,7 @@ function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChu
       if (acc[key] === undefined || acc[key] === null) {
         acc[key] = value;
       } else if (typeof acc[key] === 'string' && typeof value === 'string') {
-        (acc[key] as string) += value;
+        acc[key] += value;
       } else if (typeof acc[key] === 'object' && !Array.isArray(acc[key])) {
         acc[key] = reduce(acc[key], value);
       }
@@ -143,6 +144,7 @@ function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChu
     return acc;
   };
 
+  // SAFETY: The reducer retains prior message fields and merges the next delta; the caller waits for stream completion before submitting the accumulated message.
   return reduce(previous, item.choices[0]!.delta) as ChatCompletionMessage;
 }
 

@@ -51,6 +51,7 @@ async function loadBedrockModules(): Promise<{
 describe('Bedrock provider optional dependencies', () => {
   test('keeps the root and bearer entrypoints independent from AWS packages', async () => {
     for (const dependency of optionalDependencies) {
+      // oxlint-disable-next-line anti-slop/no-module-mocking -- Import failure is the fixture: verify root and bearer entrypoints never evaluate optional AWS modules.
       vi.doMock(dependency, () => {
         throw new Error(`unexpected AWS import: ${dependency}`);
       });
@@ -107,6 +108,7 @@ describe('Bedrock provider optional dependencies', () => {
         sessionToken: 'profile-session-token',
       }));
       const defaultProvider = vi.fn(() => credentialsProvider);
+      // oxlint-disable-next-line anti-slop/no-module-mocking -- Verify the optional AWS module receives the configured profile while the real signer signs the resulting request.
       vi.doMock('@aws-sdk/credential-provider-node', () => ({ defaultProvider }));
 
       const { OpenAI, bedrock } = await loadBedrockModules();
@@ -140,6 +142,7 @@ describe('Bedrock provider optional dependencies', () => {
       secretAccessKey: 'default-secret-key',
     }));
     const defaultProvider = vi.fn(() => credentialsProvider);
+    // oxlint-disable-next-line anti-slop/no-module-mocking -- Verify the optional AWS module is initialized with exactly the default credential-chain options.
     vi.doMock('@aws-sdk/credential-provider-node', () => ({ defaultProvider }));
 
     const { OpenAI, bedrock } = await loadBedrockModules();
@@ -164,6 +167,7 @@ describe('Bedrock provider optional dependencies', () => {
       const identity = { secretAccessKey: 'secret-key' };
       const credentialsProvider = vi.fn(async () => identity);
       const defaultProvider = vi.fn(() => credentialsProvider);
+      // oxlint-disable-next-line anti-slop/no-module-mocking -- Return an invalid identity from the optional AWS module to exercise provider-boundary validation.
       vi.doMock('@aws-sdk/credential-provider-node', () => ({ defaultProvider }));
 
       const { OpenAI, bedrock } = await loadBedrockModules();
@@ -183,6 +187,7 @@ describe('Bedrock provider optional dependencies', () => {
 
   test('surfaces the runtime module error when an AWS dependency is missing', async () => {
     const missingDependency = new Error('Cannot find module @aws-sdk/credential-provider-node');
+    // oxlint-disable-next-line anti-slop/no-module-mocking -- A missing optional module is the regression fixture; injecting credentials would skip the failing import.
     vi.doMock('@aws-sdk/credential-provider-node', () => {
       throw missingDependency;
     });
@@ -197,6 +202,7 @@ describe('Bedrock provider optional dependencies', () => {
       const defaultProvider = vi.fn(() => async () => {
         throw cause;
       });
+      // oxlint-disable-next-line anti-slop/no-module-mocking -- Verify a failure originating inside the optional AWS default chain preserves its original cause.
       vi.doMock('@aws-sdk/credential-provider-node', () => ({ defaultProvider }));
 
       const { OpenAI, bedrock } = await loadBedrockModules();

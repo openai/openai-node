@@ -7,6 +7,8 @@ interface WeakReference {
   deref: () => object | undefined;
 }
 
+// SAFETY: The test runs on supported Node versions with native WeakRef; the local declaration supplies the API absent from the project TypeScript library target.
+// oxlint-disable-next-line anti-slop/no-object-parameters -- WeakRef tracks event identity without imposing fields on the retained object.
 const WeakReference = (globalThis as typeof globalThis & { WeakRef: new (target: object) => WeakReference })
   .WeakRef;
 

@@ -17,6 +17,7 @@ const dispatcher = new Agent({
   connect: {
     cert,
     key,
+    // Spread creates an own data property without invoking inherited setters or changing the object prototype.
     ...(passphrase === undefined ? {} : { passphrase }),
   },
 });

@@ -55,6 +55,7 @@ export type BrowserDataChannel = typeof globalThis extends {
 
 /** Standard RTCConfiguration in a browser project; no runtime polyfill is installed. */
 export type WebRTCConfiguration = typeof globalThis extends {
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- This public conditional type extracts browser constructor parameters without constraining the instance type.
   RTCPeerConnection: new (configuration?: infer Configuration) => unknown;
 }
   ? Configuration

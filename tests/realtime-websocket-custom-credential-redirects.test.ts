@@ -97,8 +97,12 @@ async function closeServers(...servers: Server[]): Promise<void> {
   );
 }
 
-function onConnectionError(connection: unknown, listener: (error: Error) => void): void {
-  (connection as { on: (event: 'error', callback: (error: Error) => void) => unknown }).on('error', listener);
+function onConnectionError(
+  connection: StableResponsesWS | BetaResponsesWS,
+  listener: (error: Error) => void,
+): void {
+  // SAFETY: Each listed realtime wrapper implements on; this helper registers only the shared event listener contract and discards the return value.
+  (connection as { on: (event: 'error', callback: (error: Error) => void) => void }).on('error', listener);
 }
 
 async function inspectRedirect({
@@ -114,6 +118,7 @@ async function inspectRedirect({
 
   const destination = createServer((request, response) => {
     request.resume();
+    // SAFETY: The fixture sends this credential header once; Node exposes that single header as a string or omits it.
     destinationCredentials.push(request.headers[header.toLowerCase()] as string | undefined);
     response.writeHead(200);
     response.end();
@@ -122,12 +127,14 @@ async function inspectRedirect({
   const source = createServer((request, response) => {
     request.resume();
     if (request.url === '/same-origin-destination') {
+      // SAFETY: The fixture sends this credential header once; Node exposes that single header as a string or omits it.
       destinationCredentials.push(request.headers[header.toLowerCase()] as string | undefined);
       response.writeHead(200);
       response.end();
       return;
     }
 
+    // SAFETY: The fixture sends this credential header once; Node exposes that single header as a string or omits it.
     sourceCredentials.push(request.headers[header.toLowerCase()] as string | undefined);
     response.writeHead(status, { location: redirectURL });
     response.end();
@@ -170,6 +177,7 @@ async function inspectRedirect({
     onConnectionError(connection, publicErrors.push.bind(publicErrors));
     connection.socket.platformSocket.on('redirect', redirects);
 
+    // SAFETY: The Node socket error event supplies an Error as its first argument; once returns that event argument tuple.
     const [error] = (await once(connection.socket.platformSocket, 'error')) as [Error];
     return {
       destinationCredentials,

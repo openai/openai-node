@@ -14,6 +14,7 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
   /** Attaches listeners without negotiating, opening, or taking ownership of the channel. */
   constructor(channel: WebRTCDataChannel) {
     this.channel = channel;
+    // SAFETY: Expose the supplied channel unchanged through the public alias, which uses native browser typings when DOM globals are present.
     this.dataChannel = channel as BrowserDataChannel;
     channel.addEventListener('message', this.onMessage);
     channel.addEventListener('error', this.onError);
@@ -24,20 +25,24 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
   /** Subscribes to one server event type with its generated payload; returns an independent unsubscribe function. */
   on<Type extends ServerEvent['type']>(
     type: Type,
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- The existing public listener contract accepts any callback result; subscriptions discard it.
     handler: (event: Extract<ServerEvent, { type: Type }>) => unknown,
   ): () => void {
     this.assertActive();
     // The shared dispatcher matches the original discriminator before invoking this callback.
+    // SAFETY: The dispatcher checks the event discriminator against type before invoking this handler, preserving the corresponding union member.
     return this.events.add((event) => handler(event as Extract<ServerEvent, { type: Type }>), type);
   }
 
   /** Subscribes to future server events, including raw API errors; returns an unsubscribe function. */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The existing public listener contract accepts any callback result; subscriptions discard it.
   onEvent(handler: (event: ServerEvent) => unknown): () => void {
     this.assertActive();
     return this.events.add(handler);
   }
 
   /** Observes only this channel's local errors and lifecycle, not its owning peer connection. */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- The existing public listener contract accepts any callback result; subscriptions discard it.
   onConnectionEvent(handler: (event: WebRTCConnectionEvent) => unknown): () => void {
     this.assertActive();
     return this.connectionEvents.add(handler);
@@ -86,6 +91,7 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
     }
     let event: unknown;
     try {
+      // SAFETY: The message event boundary reads only optional data and then checks it is a string before parsing.
       const { data } = message as { data?: unknown };
       if (typeof data !== 'string') {
         throw new TypeError('Invalid protocol message.');
@@ -109,6 +115,7 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
       return;
     }
     // Like the generated SDK, accept future event types without a runtime schema registry.
+    // SAFETY: The parsed event passed the object and string-discriminator checks; future server event types remain intentionally accepted.
     this.events.emit(event as ServerEvent);
   };
 

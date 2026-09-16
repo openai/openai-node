@@ -60,9 +60,9 @@ function normalizedOutput(value: unknown): AgentFunctionCallOutputParam | null {
   throw new OpenAIError('Tool output must be text, content, a JSON object, or null');
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The public AgentToolOutput contract accepts arbitrary JSON-serializable object results.
 function toolResult(call: AgentFunctionCallItem, value: AgentToolOutput): ToolResult {
-  const output =
-    value !== null && typeof value === 'object' && !Array.isArray(value) ? JSON.stringify(value) : value;
+  const output = isObj(value) ? JSON.stringify(value) : value;
   // Detect unserializable callback results inside the redacted failure boundary.
   const serialized = JSON.stringify(output);
   if (serialized === undefined) {
@@ -188,6 +188,7 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
         this.#sessionID,
         {
           events: [this.#input],
+          // Spread creates an own data property without invoking inherited setters or changing the object prototype.
           ...(this.#inputKey === undefined ? {} : { 'Idempotency-Key': this.#inputKey }),
         },
         {
@@ -234,9 +235,10 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
   async #result(call: AgentFunctionCallItem, handler: AgentToolHandler): Promise<ToolResult> {
     try {
       const args: unknown = typeof call.arguments === 'string' ? JSON.parse(call.arguments) : call.arguments;
-      if (args === null || typeof args !== 'object' || Array.isArray(args)) {
+      if (!isObj(args)) {
         throw new OpenAIError('Function arguments must be a JSON object');
       }
+      // SAFETY: Arguments were parsed as JSON and checked to be a non-null non-array object before invoking the handler.
       return toolResult(call, await this.#wait(() => handler(args as Record<string, unknown>)));
     } catch {
       this.#checkAbort();

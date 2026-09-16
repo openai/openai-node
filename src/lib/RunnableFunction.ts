@@ -17,6 +17,7 @@ export type RunnableFunctionWithParse<Args extends object, ToolContext = unknown
     args: Args,
     runner: ChatCompletionRunner<unknown> | ChatCompletionStreamingRunner<unknown>,
     toolContext: ToolContext,
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Public tool callbacks may return arbitrary application values; preserve the published callback contract.
   ) => PromiseOrValue<unknown>;
   /**
    * @param input the raw args from the OpenAI function call.
@@ -51,6 +52,7 @@ export type RunnableFunctionWithoutParse<ToolContext = unknown> = {
     args: string,
     runner: ChatCompletionRunner<unknown> | ChatCompletionStreamingRunner<unknown>,
     toolContext: ToolContext,
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Public tool callbacks may return arbitrary application values; preserve the published callback contract.
   ) => PromiseOrValue<unknown>;
   /**
    * The parameters the function accepts, described as a JSON Schema object.
@@ -110,6 +112,7 @@ export type RunnableToolFunctionWithContext<ToolContext> = {
       args: any,
       runner: ChatCompletionRunner<unknown> | ChatCompletionStreamingRunner<unknown>,
       toolContext: ToolContext,
+      // oxlint-disable-next-line anti-slop/no-unknown-returns -- Public tool callbacks may return arbitrary application values; preserve the published callback contract.
     ) => PromiseOrValue<unknown>;
     /** Optionally converts raw JSON arguments into the callback's argument value. */
     parse?: (input: string) => PromiseOrValue<any>;
@@ -128,7 +131,7 @@ export type RunnableToolFunctionWithContext<ToolContext> = {
 export function isRunnableFunctionWithParse<Args extends object, ToolContext = unknown>(
   fn: any,
 ): fn is RunnableFunctionWithParse<Args, ToolContext> {
-  return typeof (fn as any).parse === 'function';
+  return typeof fn.parse === 'function';
 }
 
 /** The ordered raw-string or parsed-object argument types accepted by runnable functions. */

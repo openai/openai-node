@@ -14,9 +14,9 @@ import type {
 } from 'openai/resources/chat/completions';
 
 type UnfinishedReason = 'length' | 'content_filter';
-type TurnShape = 'tool call' | 'content';
+type TurnKind = 'tool call' | 'content';
 interface Turn {
-  shape: TurnShape;
+  kind: TurnKind;
   finishReason: ChatCompletion.Choice['finish_reason'];
 }
 
@@ -38,7 +38,7 @@ function runnableLookup(lookup: (args: string) => string): RunnableToolFunction<
   return { type: 'function', function: { ...lookupDefinition, function: lookup } };
 }
 
-function completionTurn({ shape, finishReason }: Turn): ChatCompletion {
+function completionTurn({ kind, finishReason }: Turn): ChatCompletion {
   return {
     id: 'chatcmpl-truncated',
     object: 'chat.completion',
@@ -50,7 +50,7 @@ function completionTurn({ shape, finishReason }: Turn): ChatCompletion {
         finish_reason: finishReason,
         logprobs: null,
         message:
-          shape === 'tool call'
+          kind === 'tool call'
             ? {
                 role: 'assistant',
                 content: null,
@@ -82,8 +82,8 @@ function chunk(
   };
 }
 
-function streamedTurn({ shape, finishReason }: Turn): ChatCompletionChunk[] {
-  if (shape === 'tool call') {
+function streamedTurn({ kind, finishReason }: Turn): ChatCompletionChunk[] {
+  if (kind === 'tool call') {
     return [
       chunk(
         {
@@ -111,7 +111,7 @@ function mockClient(firstTurn: Turn) {
     const body = JSON.parse(init.body);
     requests.push(body);
     // Only the first turn is unfinished, so a runner that accepts it still terminates.
-    const turn: Turn = requests.length === 1 ? firstTurn : { shape: 'content', finishReason: 'stop' };
+    const turn: Turn = requests.length === 1 ? firstTurn : { kind: 'content', finishReason: 'stop' };
     if (body.stream === true) {
       const events = streamedTurn(turn).map((event) => `data: ${JSON.stringify(event)}\n\n`);
       return new Response(`${events.join('')}data: [DONE]\n\n`, {
@@ -142,10 +142,10 @@ it('preserves subclass-owned properties with noImplicitOverride enabled', () => 
 describe.each(['length', 'content_filter'] as const)(
   'runTools on a %s turn',
   (finishReason: UnfinishedReason) => {
-    describe.each(['tool call', 'content'] as const)('that stops mid %s', (shape) => {
+    describe.each(['tool call', 'content'] as const)('that stops mid %s', (kind) => {
       it.each([false, true])('rejects the turn instead of continuing (stream: %s)', async (stream) => {
         const lookup = vi.fn((args: string) => `Found ${args}`);
-        const { client, requests } = mockClient({ shape, finishReason });
+        const { client, requests } = mockClient({ kind, finishReason });
         const params = { model: 'gpt-test', messages, tools: [runnableLookup(lookup)] };
         const runner = stream
           ? client.chat.completions.runTools({ ...params, stream: true })
@@ -163,7 +163,7 @@ describe.each(['length', 'content_filter'] as const)(
     });
 
     it('leaves chat.completions.stream() reporting the finish reason', async () => {
-      const { client, requests } = mockClient({ shape: 'tool call', finishReason });
+      const { client, requests } = mockClient({ kind: 'tool call', finishReason });
 
       const stream = client.chat.completions.stream({ model: 'gpt-test', messages, tools: [lookupTool] });
       Object.assign(stream, { _rejectsUnfinishedTurns: true });
@@ -182,7 +182,7 @@ describe.each(['length', 'content_filter'] as const)(
       { name: 'tool runner', StreamClass: ChatCompletionStreamingRunner },
     ])('leaves replayed $name completions reporting the finish reason', async ({ StreamClass }) => {
       const readable = new Stream(async function* chunks() {
-        yield* streamedTurn({ shape: 'tool call', finishReason });
+        yield* streamedTurn({ kind: 'tool call', finishReason });
       }, new AbortController()).toReadableStream();
 
       const completion = await StreamClass.fromReadableStream(readable).finalChatCompletion();

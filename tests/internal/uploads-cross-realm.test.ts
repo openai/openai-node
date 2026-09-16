@@ -11,11 +11,13 @@ interface BufferCase {
 const cases: BufferCase[] = [
   {
     name: 'foreign ArrayBuffer',
+    // SAFETY: The controlled VM expression constructs this cross-realm fixture; the test keeps its foreign prototype while inspecting the declared value.
     make: () => runInNewContext('new Uint8Array([0, 1, 127, 255]).buffer') as ArrayBuffer,
     expected: [0, 1, 127, 255],
   },
   {
     name: 'empty foreign ArrayBuffer',
+    // SAFETY: The controlled VM expression constructs this cross-realm fixture; the test keeps its foreign prototype while inspecting the declared value.
     make: () => runInNewContext('new ArrayBuffer(0)') as ArrayBuffer,
     expected: [],
   },
@@ -27,11 +29,13 @@ const cases: BufferCase[] = [
   {
     name: 'foreign typed-array slice',
     make: () =>
+      // SAFETY: The controlled VM expression constructs this cross-realm fixture; the test keeps its foreign prototype while inspecting the declared value.
       runInNewContext('new Uint8Array(new Uint8Array([0, 1, 127, 255]).buffer, 1, 2)') as Uint8Array,
     expected: [1, 127],
   },
   {
     name: 'foreign DataView slice',
+    // SAFETY: The controlled VM expression constructs this cross-realm fixture; the test keeps its foreign prototype while inspecting the declared value.
     make: () => runInNewContext('new DataView(new Uint8Array([0, 1, 127, 255]).buffer, 1, 2)') as DataView,
     expected: [1, 127],
   },

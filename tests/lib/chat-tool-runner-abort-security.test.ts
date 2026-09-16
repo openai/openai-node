@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import OpenAI from 'openai';
 import { APIUserAbortError, OpenAIError } from 'openai/error';
+import type { RunnableFunctionWithoutParse } from 'openai/lib/RunnableFunction';
 import type {
   AbstractChatCompletionRunner,
   AbstractChatCompletionRunnerEvents,
@@ -555,7 +556,7 @@ describe.each([
     const responseReady = deferred<boolean>();
     const transferFunds = vi.fn(() => 'transferred');
     const calls = [toolCall('transferFunds')];
-    const fetch = vi.fn(async (_input: unknown, _init?: unknown) => {
+    const fetch = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => {
       fetchStarted.resolve(true);
       await responseReady.promise;
 
@@ -998,7 +999,11 @@ describe.each([
     const toolContext = { accountId: 'account_123' };
     const afterCompletion = vi.fn();
     const readBalance = vi.fn(
-      (_arguments: string, _runner: unknown, context: typeof toolContext) => context.accountId,
+      (
+        _arguments: string,
+        _runner: Parameters<RunnableFunctionWithoutParse<typeof toolContext>['function']>[1],
+        context: typeof toolContext,
+      ) => context.accountId,
     );
     const params = {
       model: 'gpt-4o-mini',

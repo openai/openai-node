@@ -88,6 +88,7 @@ export function maybeParseResponse<
     };
 
     if (needsOutputText(response, parsed)) {
+      // SAFETY: The copy retains every response field and only adds parsed metadata; addOutputText accepts that original response structure.
       addOutputText(parsed as Response);
     }
 
@@ -160,6 +161,7 @@ export function parseResponse<
     },
   });
 
+  // SAFETY: The output_parsed getter was installed immediately above and returns the first parsed content or null.
   return parsed as ParsedResponse<ParsedT>;
 }
 
@@ -203,6 +205,7 @@ type ToolOptions = {
 /** A Responses API function tool with an argument parser and optional executable callback. */
 export type AutoParseableResponseTool<
   OptionsT extends ToolOptions,
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- This public conditional type detects any callable callback without constraining its return type.
   HasFunction = OptionsT['function'] extends (...args: never[]) => unknown ? true : false,
 > = FunctionTool & {
   /** Type-only marker for parsed tool arguments; this property does not exist at runtime. */
@@ -248,6 +251,7 @@ export function makeParseableResponseTool<OptionsT extends ToolOptions>(
     },
   });
 
+  // SAFETY: The non-enumerable parser brand and callbacks were installed on this copied tool immediately above.
   return obj as AutoParseableResponseTool<OptionsT>;
 }
 
@@ -281,6 +285,7 @@ function parseToolCall<Params extends ResponseCreateParamsBase>(
 ): ParsedResponseFunctionToolCall {
   const inputTool = getInputToolByName(params.tools ?? [], toolCall.name, toolCall.namespace);
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- Parsing replaces the initial null with an arbitrary caller-parser result, so unknown is required.
   let parsedArguments: unknown = null;
   if (isAutoParsableTool(inputTool)) {
     parsedArguments = inputTool.$parseRaw(toolCall.arguments);

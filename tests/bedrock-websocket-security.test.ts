@@ -31,6 +31,7 @@ function CapturingWebSocket(url: URL, options: FakeNodeSocket['options']): FakeN
   };
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Verify credential and origin rejection before public WebSocket adapters construct their transports.
 vi.mock('ws', () => ({ WebSocket: vi.fn(CapturingWebSocket) }));
 
 class FakeBrowserSocket {
@@ -54,12 +55,15 @@ class FakeBrowserSocket {
 }
 
 const originalWebSocket = globalThis.WebSocket;
-const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
+const nodeSocketConstructor = vi.mocked(WS.WebSocket);
 
 function expectPrivateBedrockCredentialFailure(failure: unknown, credential: string): void {
   expect(failure).toBeInstanceOf(TypeError);
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   expect((failure as Error).message).toBe('Bedrock bearer credential contains an invalid HTTP header value.');
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   expect((failure as Error).stack).not.toContain(credential);
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   expect((failure as Error & { cause?: unknown }).cause).toBeUndefined();
   expect(nodeSocketConstructor).not.toHaveBeenCalled();
   expect(FakeBrowserSocket.instances).toHaveLength(0);
@@ -75,6 +79,7 @@ function lastBrowserSocket(): FakeBrowserSocket {
 
 function lastNodeSocket(): FakeNodeSocket {
   const [result] = nodeSocketConstructor.mock.results.slice(-1);
+  // SAFETY: The injected ws constructor records only FakeNodeSocket results; the following check rejects a missing construction.
   const socket = result?.value as FakeNodeSocket | undefined;
   if (!socket) {
     throw new Error('Expected a Node WebSocket instance');

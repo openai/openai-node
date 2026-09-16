@@ -63,6 +63,8 @@ export const getDefaultOptions = <Target extends Targets>(
   options: Partial<Options<Target>> | string | undefined,
 ): Options<Target> => {
   // We need to add `definitions` here as we may mutate it
+  // Preserve the public string-name overload alongside object options.
+  // SAFETY: Defaults and the supplied options are merged into the vendored converter's target-specific options contract, with fresh mutable definitions.
   const resolvedOptions = (
     typeof options === 'string'
       ? {

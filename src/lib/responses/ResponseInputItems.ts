@@ -70,13 +70,16 @@ export function toResponseInputItem(item: ResponseInputItemLike): ResponseInputI
       if (item.role !== 'developer') {
         return null;
       }
+      // SAFETY: The item discriminator selects its matching input type; removing output-only provenance fields preserves the remaining wire input fields.
       return stripCreatedBy(item) as ResponseAdditionalToolsInputItem;
     }
 
     case 'shell_call_output': {
+      // SAFETY: The item discriminator selects its matching input type; removing output-only provenance fields preserves the remaining wire input fields.
       const output: ResponseShellCallOutputInputItem['output'] = item.output.map(
         (chunk) => stripCreatedBy(chunk) as ResponseFunctionShellCallOutputContent,
       );
+      // SAFETY: The item discriminator selects its matching input type; removing output-only provenance fields preserves the remaining wire input fields.
       return {
         ...(stripCreatedBy(item) as ResponseShellCallOutputInputItem),
         output,
@@ -84,12 +87,14 @@ export function toResponseInputItem(item: ResponseInputItemLike): ResponseInputI
     }
 
     case 'computer_call_output': {
+      // SAFETY: Runtime API items may contain the output-only created_by field; this view permits removing it without changing the declared input type.
       const { created_by: _createdBy, ...withoutCreatedBy } = item as typeof item & {
         created_by?: string;
       };
       if (withoutCreatedBy.status === 'failed') {
         return null;
       }
+      // SAFETY: The item discriminator selects its matching input type; removing output-only provenance fields preserves the remaining wire input fields.
       return withoutCreatedBy as ResponseComputerCallOutputInputItem;
     }
 
@@ -97,11 +102,13 @@ export function toResponseInputItem(item: ResponseInputItemLike): ResponseInputI
       if ('status' in item && item.status !== 'completed') {
         return null;
       }
+      // SAFETY: Runtime API items may contain the output-only created_by field; this view permits removing it without changing the declared input type.
       const {
         created_by: _createdBy,
         status: _status,
         ...inputItem
       } = item as typeof item & { created_by?: string; status?: string };
+      // SAFETY: The item discriminator selects its matching input type; removing output-only provenance fields preserves the remaining wire input fields.
       return inputItem as ResponseCustomToolCallOutputInputItem;
     }
 
@@ -132,6 +139,7 @@ export function toResponseInputItem(item: ResponseInputItemLike): ResponseInputI
     case 'web_search_call':
     case null:
     case undefined: {
+      // SAFETY: The item discriminator selects its matching input type; removing output-only provenance fields preserves the remaining wire input fields.
       return stripCreatedBy(item) as ResponseInputItem;
     }
 
@@ -146,11 +154,14 @@ function stripCreatedBy<T extends object>(item: T): T {
     return item;
   }
 
+  // SAFETY: Runtime API items may contain the output-only created_by field; this view permits removing it without changing the declared input type.
   const { created_by: _createdBy, ...rest } = item as T & { created_by?: string };
+  // SAFETY: Only the optional output provenance property was removed; every field belonging to the generic input contract remains.
   return rest as T;
 }
 
 function assertNever(value: never): never {
+  // SAFETY: This always-throwing path reports a runtime discriminator outside the current TypeScript union without accepting it as a valid item.
   const type = (value as { type?: unknown }).type;
   throw new TypeError(`Unsupported response item type: ${String(type)}`);
 }

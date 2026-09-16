@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { playAudio } from 'openai/helpers/audio';
 import { createPCMPlayback } from '../../../examples/live/transcript-playback';
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Control player failure and stream lifetime without starting ffplay or accessing audio hardware.
 vi.mock('openai/helpers/audio', () => ({ playAudio: vi.fn() }));
 
 const chunks: Buffer[] = [];
@@ -13,6 +14,7 @@ beforeEach(() => {
   source = undefined;
   vi.mocked(playAudio).mockReset();
   vi.mocked(playAudio).mockImplementation(async (input) => {
+    // SAFETY: createPCMPlayback supplies its owned PassThrough to the mocked player; retain that stream to check playback completion and destruction.
     source = input as PassThrough;
     for await (const chunk of source) {
       chunks.push(chunk);

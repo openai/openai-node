@@ -39,12 +39,13 @@ describe('buffered multipart array ordering', () => {
     const requests: FormData[] = [];
     const transport = Object.assign(
       async (_request: Request | URL | string, options?: RequestInit): Promise<Response> => {
+        // SAFETY: This fixture uses buffered uploads; multipart construction produces the FormData whose fields are checked here.
         requests.push(options?.body as FormData);
         return Response.json({ created: 0, data: [] });
       },
       { Response },
     );
-    const client = new OpenAI({ apiKey: 'test-api-key', fetch: transport as typeof fetch });
+    const client = new OpenAI({ apiKey: 'test-api-key', fetch: transport });
     const base = imageResponse('base.png', 'intended base image');
     const overlay = new File(['overlay image'], 'overlay.png', { type: 'image/png' });
     const mask = new File(['mask for base'], 'mask.png', { type: 'image/png' });
@@ -63,6 +64,7 @@ describe('buffered multipart array ordering', () => {
     }
 
     expect(formValues(request, 'image[]')).toEqual(['base.png', 'overlay.png']);
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((request.get('mask') as File).name).toBe('mask.png');
   });
 
@@ -70,12 +72,13 @@ describe('buffered multipart array ordering', () => {
     const requests: FormData[] = [];
     const transport = Object.assign(
       async (_request: Request | URL | string, options?: RequestInit): Promise<Response> => {
+        // SAFETY: This fixture uses buffered uploads; multipart construction produces the FormData whose fields are checked here.
         requests.push(options?.body as FormData);
         return Response.json({ created: 0, data: [] });
       },
       { Response },
     );
-    const client = new OpenAI({ apiKey: 'test-api-key', fetch: transport as typeof fetch });
+    const client = new OpenAI({ apiKey: 'test-api-key', fetch: transport });
     const images: (File | Response)[] = [];
     images[1] = imageResponse('base.png');
     images[3] = new File(['overlay'], 'overlay.png', { type: 'image/png' });
@@ -95,6 +98,7 @@ describe('buffered multipart array ordering', () => {
     }
 
     expect(formValues(request, 'image[]')).toEqual(['base.png', 'overlay.png']);
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((request.get('mask') as File).name).toBe('mask.png');
     expect(images).toHaveLength(4);
     expect(0 in images).toBe(false);
@@ -108,7 +112,9 @@ describe('buffered multipart array ordering', () => {
     const form = await createForm({ images: [first, second] }, fetch);
 
     expect(formValues(form, 'images[]')).toEqual(['first.png', 'second.png']);
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     await expect((form.getAll('images[]')[0] as File).text()).resolves.toBe('first');
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     await expect((form.getAll('images[]')[1] as File).text()).resolves.toBe('second');
   });
 
@@ -196,6 +202,7 @@ describe('buffered multipart array ordering', () => {
     const input = [first, second];
 
     const form = await createForm({ images: input }, fetch, { stripFilenames: false });
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     const values = form.getAll('images[]') as File[];
 
     expect(values.map((value) => value.name)).toEqual(['first.png', 'folder/second.png']);
@@ -221,6 +228,7 @@ describe('buffered multipart array ordering', () => {
     );
 
     expect(options.body).toBeInstanceOf(ReadableStream);
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const encoded = await new Response(options.body as ReadableStream).text();
 
     expect(encoded.indexOf('filename="first.png"')).toBeGreaterThanOrEqual(0);

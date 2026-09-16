@@ -43,6 +43,7 @@ function isRunningInBrowserOrBrowserWorker(): boolean {
     return true;
   }
 
+  // SAFETY: RuntimeScope describes optional host capabilities; the following predicates verify their presence and value before use.
   const scope = globalThis as RuntimeScope;
   return (
     typeof scope.WorkerGlobalScope === 'function' &&
@@ -61,6 +62,7 @@ function isRunningInBrowserOrBrowserWorker(): boolean {
 
 /** Reports whether the runtime supports request headers in native WebSocket options. */
 function supportsWebSocketRequestHeaders(): boolean {
+  // SAFETY: RuntimeScope describes optional host capabilities; the following predicates verify their presence and value before use.
   const scope = globalThis as RuntimeScope;
   if (
     isRunningInBrowserOrBrowserWorker() ||
@@ -183,7 +185,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
   ) {
     super();
     let apiKey = getRealtimeAPIKey(client, props.__apiKey);
+    // SAFETY: The supplied OpenAI client owns _options; these compatibility reads preserve its provider and browser-consent settings.
     const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
+    // SAFETY: The supplied OpenAI client owns _options; these compatibility reads preserve its provider and browser-consent settings.
     const dangerouslyAllowBrowser =
       props.dangerouslyAllowBrowser ??
       (client as any)?._options?.dangerouslyAllowBrowser ??
@@ -322,6 +326,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     return new OpenAIRealtimeWebSocket(
       {
         ...connection,
+        // Preserve explicit browser consent as an own data property without invoking an inherited setter.
         ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
         __resolvedApiKey: isApiKeyProvider,
         __apiKey: apiKey,

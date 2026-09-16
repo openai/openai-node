@@ -100,6 +100,7 @@ export class ChatCompletionRunner<ParsedT = null> extends AbstractChatCompletion
   ) {
     super._addMessage(message, emit, normalizeContent);
     if (emit && isAssistantMessage(message) && message.content) {
+      // SAFETY: The runner's content event preserves the existing string-content contract for assistant messages supplied by the API or caller.
       this._emit('content', message.content as string);
     }
   }

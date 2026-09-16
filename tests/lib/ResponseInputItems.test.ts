@@ -303,6 +303,7 @@ describe('toResponseInputItems', () => {
     expect(toResponseInputItem(history[4]!)).toBeNull();
     expect(toResponseInputItem(history[5]!)).toBeNull();
     expect(() =>
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: An unsupported future discriminator must reach the runtime conversion boundary and be rejected.
       toResponseInputItem({ type: 'future_response_item' } as unknown as ResponseOutputItem),
     ).toThrow('Unsupported response item type: future_response_item');
   });

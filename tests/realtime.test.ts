@@ -86,10 +86,12 @@ describe.each([
   });
 
   test('rejects missing connection target', () => {
+    // SAFETY: This fixture deliberately violates the public connection options so the runtime validator, rather than TypeScript, must reject it.
     expect(() => buildRealtimeURL(openAIClient, {} as any)).toThrow('Pass exactly one of `model`');
   });
 
   test('rejects multiple connection targets', () => {
+    // SAFETY: This fixture deliberately violates the public connection options so the runtime validator, rather than TypeScript, must reject it.
     expect(() => buildRealtimeURL(openAIClient, { model: 'gpt-realtime', callID: 'rtc_123' } as any)).toThrow(
       'Pass exactly one of `model`',
     );
@@ -163,6 +165,8 @@ describe('stable realtime custom URL builder', () => {
   test.each([
     new URL('ws://sap.example.com/realtime'),
     new URL('https://sap.example.com/realtime'),
+    // SAFETY: This fixture deliberately violates the public connection options so the runtime validator, rather than TypeScript, must reject it.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Supply a malformed JavaScript URL value to exercise runtime URL validation.
     'not a valid URL' as unknown as URL,
   ])('rejects insecure or malformed custom URLs %#', (customURL) => {
     expect(() =>
@@ -179,6 +183,7 @@ describe('stable realtime custom URL builder', () => {
       const customBuilder = vi.fn(() => new URL('wss://sap.example.com/realtime'));
 
       expect(() =>
+        // SAFETY: This fixture deliberately violates the public connection options so the runtime validator, rather than TypeScript, must reject it.
         buildRealtimeURL(openAIClient, {
           ...target,
           buildRealtimeURL: customBuilder,
@@ -232,6 +237,7 @@ describe('stable realtime transcription', () => {
     { callID: 'rtc_123', intent: 'unsupported' },
     { intent: 'unsupported' },
   ])('rejects invalid or conflicting transcription targets %#', (connection) => {
+    // SAFETY: This fixture deliberately violates the public connection options so the runtime validator, rather than TypeScript, must reject it.
     expect(() => buildRealtimeURL(openAIClient, connection as any)).toThrow(
       'Pass exactly one of `model`, `callID`, or transcription `intent` when opening a Realtime WebSocket.',
     );
@@ -260,6 +266,7 @@ describe('stable realtime transcription', () => {
     { intent: 'unsupported' },
   ])('rejects invalid or conflicting Azure connection targets %#', (connection) => {
     expect(() =>
+      // SAFETY: This fixture deliberately violates the public connection options so the runtime validator, rather than TypeScript, must reject it.
       getAzureRealtimeConnection({ deploymentName: 'configured-deployment' }, connection as any),
     ).toThrow(
       'Pass exactly one of `deploymentName`, `callID`, or transcription `intent` when opening an Azure Realtime WebSocket.',

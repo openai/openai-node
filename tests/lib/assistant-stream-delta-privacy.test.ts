@@ -9,6 +9,7 @@ const syntheticPatient = 'synthetic-patient-123-45-6789';
 const missingIndexMessage = 'Expected array delta entry to have an `index` property';
 
 function sensitiveToolCall(): Record<string, unknown> {
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- Callers add malformed or missing-index fields to this open-ended wire fixture before accumulation.
   return {
     type: 'function',
     id: 'call_sensitive',
@@ -88,8 +89,9 @@ function expectStaticFailure(accumulator: Record<string, unknown>, delta: Record
 
   expect(failure).toBeInstanceOf(Error);
   expect(failure).not.toBeInstanceOf(OpenAIError);
+  // SAFETY: The preceding instance assertion verifies this captured error; optional cause values are checked separately before their fields are inspected.
   expect((failure as Error).constructor).toBe(Error);
-  expect((failure as Error).message).toBe(missingIndexMessage);
+  expect(failure).toHaveProperty('message', missingIndexMessage);
 }
 
 async function expectStreamFailure(stream: AssistantStream) {
@@ -102,12 +104,14 @@ async function expectStreamFailure(stream: AssistantStream) {
   }
 
   expect(failure).toBeInstanceOf(OpenAIError);
-  expect((failure as OpenAIError).message).toBe(missingIndexMessage);
+  expect(failure).toHaveProperty('message', missingIndexMessage);
 
+  // SAFETY: The preceding instance assertion verifies this captured error; optional cause values are checked separately before their fields are inspected.
   const { cause } = failure as OpenAIError & { cause?: unknown };
   expect(cause).toBeInstanceOf(Error);
+  // SAFETY: The preceding instance assertion verifies this captured error; optional cause values are checked separately before their fields are inspected.
   expect((cause as Error).constructor).toBe(Error);
-  expect((cause as Error).message).toBe(missingIndexMessage);
+  expect(cause).toHaveProperty('message', missingIndexMessage);
 
   expect(stream.ended).toBe(true);
   expect(stream.errored).toBe(true);

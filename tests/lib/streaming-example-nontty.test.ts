@@ -29,6 +29,7 @@ test.each(cases)('$filename (tool=$hasToolCall, empty=$emptyToolCalls)', async (
       body += chunk;
     });
     request.on('end', () => {
+      // SAFETY: The intercepted example serializes its known streaming chat-completion request; decode that fixture body to choose the synthetic response.
       requests.push(JSON.parse(body) as ChatCompletionCreateParamsStreaming);
       if (requests.length > expectedRequests) {
         // Bound unintended extra rounds without relying on the child timeout.

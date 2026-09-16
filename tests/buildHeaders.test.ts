@@ -141,6 +141,8 @@ describe('buildHeaders', () => {
       return normalized;
     };
 
+    // SAFETY: This Headers subclass deliberately changes locale-sensitive iteration while preserving the methods used by header normalization.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Install a deliberately locale-sensitive Headers implementation to verify ASCII-only name normalization.
     globalThis.Headers = LocaleSensitiveHeaders as unknown as typeof Headers;
     try {
       const result = buildHeaders([

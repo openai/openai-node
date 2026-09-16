@@ -7,7 +7,7 @@ interface CapturedRequest {
   body: string;
 }
 
-function createClient(): { client: OpenAI; requests: CapturedRequest[] } {
+function createClient() {
   const requests: CapturedRequest[] = [];
   const transport = Object.assign(
     async (url: Request | URL | string, options?: RequestInit): Promise<Response> => {
@@ -22,7 +22,7 @@ function createClient(): { client: OpenAI; requests: CapturedRequest[] } {
   );
 
   return {
-    client: new OpenAI({ apiKey: 'test-api-key', fetch: transport as typeof fetch }),
+    client: new OpenAI({ apiKey: 'test-api-key', fetch: transport }),
     requests,
   };
 }
@@ -275,6 +275,7 @@ describe('streaming upload filename privacy', () => {
     );
 
     expect(reads).toBe(0);
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const body = await new Response(request.body as ReadableStream).text();
     expect(reads).toBe(1);
     expect(uploadedFilenames(body)).toEqual(['report.txt']);
@@ -329,6 +330,7 @@ describe('streaming upload filename privacy', () => {
     Object.assign(upload, { name: '' });
     const request = await multipartFormRequestOptions({ body: { upload } }, fetch);
 
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     await expect(new Response(request.body as ReadableStream).text()).rejects.toThrow(
       'Streaming upload file name must be a non-empty string',
     );

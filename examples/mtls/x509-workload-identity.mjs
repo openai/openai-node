@@ -30,7 +30,9 @@ const credential = workloadIdentity.fromX509({
   privateKey: key,
   identityProviderId,
   serviceAccountId,
+  // Spread creates an own data property without invoking inherited setters or changing the object prototype.
   ...(passphrase === undefined ? {} : { passphrase }),
+  // Spread creates an own data property without invoking inherited setters or changing the object prototype.
   ...(proxyURL ? { proxy: { url: proxyURL, mode: proxy } } : {}),
 });
 try {

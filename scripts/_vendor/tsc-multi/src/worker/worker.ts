@@ -15,6 +15,7 @@ const JS_MAP_EXT = `${JS_EXT}${MAP_EXT}`;
 const DTS_EXT = '.d.ts';
 const DTS_MAP_EXT = `${DTS_EXT}${MAP_EXT}`;
 
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- Preserve the vendored extension lookup contract, which accepts runtime file extensions.
 const extnameDeclMap: Record<string, string> = {
   '.js': '.d.ts',
   '.mjs': '.d.mts',
@@ -290,6 +291,7 @@ export class Worker {
       }
 
       if (this.data.shareHelpers) {
+        // SAFETY: The selected TypeScript compiler exposes getCommonSourceDirectoryOfConfig internally; this vendored build adapter uses that compiler API despite its omitted public declaration.
         const root = (this.ts as any).getCommonSourceDirectoryOfConfig(config);
         config.options.importHelpers = true;
         resolvedShareHelpers = nodePath.resolve(root, this.data.shareHelpers);
@@ -402,6 +404,7 @@ export class Worker {
 
     let resolvedShareHelpers: string | undefined;
     if (this.data.shareHelpers) {
+      // SAFETY: The selected TypeScript compiler exposes getCommonSourceDirectoryOfConfig internally; this vendored build adapter uses that compiler API despite its omitted public declaration.
       const root = (this.ts as any).getCommonSourceDirectoryOfConfig(config);
       config.options.importHelpers = true;
       resolvedShareHelpers = nodePath.resolve(root, this.data.shareHelpers);

@@ -71,6 +71,7 @@ describe.each([
 
   test('preserves the existing unknown result for a union of event names', async () => {
     const emitter = create();
+    // SAFETY: The value is a member of this union; preventing literal narrowing is essential to the compile-time regression for union event results.
     const event: 'single' | 'pair' = 'single' as 'single' | 'pair';
     const pending = emitter.emitted(event);
     compareType<typeof pending, Promise<unknown>>(true);

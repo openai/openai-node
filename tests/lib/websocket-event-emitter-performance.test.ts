@@ -32,8 +32,9 @@ interface FakeBrowserSocket {
 }
 
 interface PublicWebSocket {
-  on: (event: string, listener: Listener) => unknown;
-  once: (event: string, listener: Listener) => unknown;
+  on: (event: string, listener: Listener) => void;
+  once: (event: string, listener: Listener) => void;
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- This shared emitter fixture includes arbitrary error payloads and validates each emitted result in its test.
   emitted: (event: string) => Promise<unknown>;
   socket: unknown;
 }
@@ -60,9 +61,11 @@ interface AuditedEmitter {
   on: (event: keyof AuditedEvents, listener: Listener) => AuditedEmitter;
   once: (event: keyof AuditedEvents, listener: Listener) => AuditedEmitter;
   off: (event: keyof AuditedEvents, listener: Listener) => AuditedEmitter;
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- This shared emitter fixture includes arbitrary error payloads and validates each emitted result in its test.
   emitted: (event: keyof AuditedEvents) => Promise<unknown>;
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Exercise deterministic event dispatch across the public WebSocket adapters without network scheduling.
 vi.mock('ws', () => {
   function WebSocket(): FakeNodeSocket {
     const listeners = new Map<string, Listener[]>();
@@ -118,14 +121,17 @@ function installBrowserSocket(): void {
 }
 
 function dispatchBrowser(connection: PublicWebSocket, event: Record<string, unknown>): void {
+  // SAFETY: The matching variant installs this controlled browser or Node socket fake before dispatch; inspect its test-only event delivery method.
   (connection.socket as { dispatch: (value: Record<string, unknown>) => void }).dispatch(event);
 }
 
 function dispatchNodeRealtime(connection: PublicWebSocket, event: Record<string, unknown>): void {
+  // SAFETY: The matching variant installs this controlled browser or Node socket fake before dispatch; inspect its test-only event delivery method.
   (connection.socket as FakeNodeSocket).emit('message', Buffer.from(JSON.stringify(event)));
 }
 
 function dispatchResponses(connection: PublicWebSocket, event: Record<string, unknown>): void {
+  // SAFETY: The matching variant installs this controlled browser or Node socket fake before dispatch; inspect its test-only event delivery method.
   (connection.socket as { platformSocket: FakeNodeSocket }).platformSocket.emit(
     'message',
     Buffer.from(JSON.stringify(event)),
@@ -137,40 +143,43 @@ const websocketVariants: WebSocketVariant[] = [
   {
     name: 'stable browser Realtime',
     event: 'response.done',
-    create: (client) =>
-      new StableBrowserRealtime({ model: 'gpt-realtime' }, client) as unknown as PublicWebSocket,
+    // SAFETY: The stable and beta adapters implement the on/once/emitted/socket surface used by this shared deterministic event harness.
+    create: (client) => new StableBrowserRealtime({ model: 'gpt-realtime' }, client) as PublicWebSocket,
     dispatch: dispatchBrowser,
   },
   {
     name: 'beta browser Realtime',
     event: 'response.done',
-    create: (client) =>
-      new BetaBrowserRealtime({ model: 'gpt-realtime' }, client) as unknown as PublicWebSocket,
+    // SAFETY: The stable and beta adapters implement the on/once/emitted/socket surface used by this shared deterministic event harness.
+    create: (client) => new BetaBrowserRealtime({ model: 'gpt-realtime' }, client) as PublicWebSocket,
     dispatch: dispatchBrowser,
   },
   {
     name: 'stable Node Realtime',
     event: 'response.done',
-    create: (client) =>
-      new StableNodeRealtime({ model: 'gpt-realtime' }, client) as unknown as PublicWebSocket,
+    // SAFETY: The stable and beta adapters implement the on/once/emitted/socket surface used by this shared deterministic event harness.
+    create: (client) => new StableNodeRealtime({ model: 'gpt-realtime' }, client) as PublicWebSocket,
     dispatch: dispatchNodeRealtime,
   },
   {
     name: 'beta Node Realtime',
     event: 'response.done',
-    create: (client) => new BetaNodeRealtime({ model: 'gpt-realtime' }, client) as unknown as PublicWebSocket,
+    // SAFETY: The stable and beta adapters implement the on/once/emitted/socket surface used by this shared deterministic event harness.
+    create: (client) => new BetaNodeRealtime({ model: 'gpt-realtime' }, client) as PublicWebSocket,
     dispatch: dispatchNodeRealtime,
   },
   {
     name: 'stable Responses WebSocket',
     event: 'response.completed',
-    create: (client) => new StableResponsesWS(client) as unknown as PublicWebSocket,
+    // SAFETY: The stable and beta adapters implement the on/once/emitted/socket surface used by this shared deterministic event harness.
+    create: (client) => new StableResponsesWS(client) as PublicWebSocket,
     dispatch: dispatchResponses,
   },
   {
     name: 'beta Responses WebSocket',
     event: 'response.completed',
-    create: (client) => new BetaResponsesWS(client) as unknown as PublicWebSocket,
+    // SAFETY: The stable and beta adapters implement the on/once/emitted/socket surface used by this shared deterministic event harness.
+    create: (client) => new BetaResponsesWS(client) as PublicWebSocket,
     dispatch: dispatchResponses,
   },
 ];
@@ -181,10 +190,7 @@ const emitterVariants = [
   { name: 'Responses internal emitter', create: () => new InternalEventEmitter<AuditedEventMap>() },
 ] as const;
 
-function measureListenerMovement(operation: () => void): {
-  elementMoves: number;
-  spliceCalls: number;
-} {
+function measureListenerMovement(operation: () => void) {
   const originalSplice = Array.prototype.splice;
   const originalFilter = Array.prototype.filter;
   let elementMoves = 0;
@@ -196,6 +202,7 @@ function measureListenerMovement(operation: () => void): {
       spliceCalls += 1;
     }
     if (deleteCount === undefined) {
+      // oxlint-disable-next-line anti-slop/no-reflect-apply -- Preserve native splice's one-argument overload and omitted deleteCount in this instrumentation.
       return Reflect.apply(originalSplice, this, [start]);
     }
     return originalSplice.call(this, start, deleteCount, ...items);
@@ -203,6 +210,7 @@ function measureListenerMovement(operation: () => void): {
 
   function trackedFilter(
     this: unknown[],
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Array.filter accepts any truthy callback result; instrumentation must preserve that native signature. The Array.filter instrumentation preserves the native callback contract for arbitrary elements and receivers.
     predicate: (value: unknown, index: number, values: unknown[]) => unknown,
     thisArg?: unknown,
   ) {
@@ -224,13 +232,16 @@ function measureListenerMovement(operation: () => void): {
 }
 
 function emit(emitter: AuditedEmitter, event: keyof AuditedEvents, ...values: unknown[]): void {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Exercise the shared protected emitter hook on each concrete emitter without changing its public API.
   (emitter as unknown as { _emit: (name: string, ...args: unknown[]) => void })._emit(event, ...values);
 }
 
 function hasListener(emitter: AuditedEmitter, event: keyof AuditedEvents): boolean | undefined {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Exercise the shared protected emitter hook on each concrete emitter without changing its public API.
   return (emitter as unknown as { _hasListener: (name: string) => boolean | undefined })._hasListener(event);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function captureOutcome(promise: Promise<unknown>): Promise<unknown> {
   try {
     return await promise;
@@ -341,9 +352,10 @@ test.each([
 ] as const)('%s Responses close settles after a listener throws', async (_version, WebSocket) => {
   const client = new OpenAI({ apiKey: 'synthetic-api-key', baseURL: 'https://example.test/v1' });
   const connection: {
-    on: (event: 'close', listener: () => void) => unknown;
-    emitted: (event: 'close') => Promise<unknown>;
+    on: (event: 'close', listener: () => void) => void;
+    emitted: (event: 'close') => Promise<[code: number, reason: string, unsent: unknown[]]>;
     socket: StableResponsesWS['socket'];
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- This common close-event interface allows one regression to exercise distinct public WebSocket classes.
   } = new WebSocket(client);
   const failure = new Error('synthetic close listener failure');
   const settled = vi.fn();
@@ -361,7 +373,7 @@ test.each([
 
 describe.each(emitterVariants)('$name listener compatibility', ({ create }) => {
   function createEmitter(): AuditedEmitter {
-    return create() as unknown as AuditedEmitter;
+    return create();
   }
 
   test.each([undefined, false, new Error('first listener failure')] as const)(
@@ -380,6 +392,7 @@ describe.each(emitterVariants)('$name listener compatibility', ({ create }) => {
       emitter.once('value', once);
       void emitter.emitted('value').then(settled, settled);
       let didThrow = false;
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- The sentinel is replaced by an arbitrary thrown value; the test must preserve that original value.
       let thrown: unknown = laterFailure;
 
       try {

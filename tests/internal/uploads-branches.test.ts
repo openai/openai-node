@@ -175,7 +175,9 @@ describe('buffered multipart forms', () => {
     );
 
     expect(options.body).toBeInstanceOf(FormData);
+    // SAFETY: This fixture uses buffered uploads; multipart construction produces the FormData whose fields are checked here.
     expect((options.body as FormData).get('upload')).toBeInstanceOf(File);
+    // SAFETY: This fixture uses buffered uploads; multipart construction produces the FormData whose fields are checked here.
     expect((options.body as FormData).get('stream')).toBeNull();
     expect(inheritedReads).toBe(0);
   });
@@ -188,6 +190,7 @@ describe('buffered multipart forms', () => {
     );
 
     expect(options.body).toBeInstanceOf(FormData);
+    // SAFETY: This fixture uses buffered uploads; multipart construction produces the FormData whose fields are checked here.
     const form = options.body as FormData;
     expect(form.get('count')).toBe('2');
     expect(form.get('enabled')).toBe('false');
@@ -201,7 +204,9 @@ describe('buffered multipart forms', () => {
       stripFilenames: false,
     });
 
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents. This fixture uses buffered uploads; multipart construction produces the FormData whose fields are checked here.
     expect(((defaultOptions.body as FormData).get('nested[upload]') as File).name).toBe('SKILL.md');
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents. This fixture uses buffered uploads; multipart construction produces the FormData whose fields are checked here.
     expect(((preservedOptions.body as FormData).get('nested[upload]') as File).name).toBe(
       'my-skill/SKILL.md',
     );
@@ -214,7 +219,9 @@ describe('buffered multipart forms', () => {
 
     const form = await createForm({ response: new Response('response contents'), stream: chunks() }, fetch);
 
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     const responseFile = form.get('response') as File;
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     const streamFile = form.get('stream') as File;
     await expect(responseFile.text()).resolves.toBe('response contents');
     await expect(streamFile.text()).resolves.toBe('stream contents');
@@ -253,9 +260,11 @@ describe('buffered multipart forms', () => {
     }
     const unsupportedFetch = Object.assign(vi.fn(), { Response: UnsupportedResponse });
 
+    // SAFETY: This upload fixture intentionally exercises unsupported or legacy runtime inputs; only the validator/serializer under test consumes the value.
     await expect(createForm({}, unsupportedFetch as any)).rejects.toThrow(
       'fetch function does not support file uploads',
     );
+    // SAFETY: This upload fixture intentionally exercises unsupported or legacy runtime inputs; only the validator/serializer under test consumes the value.
     await expect(createForm({}, unsupportedFetch as any)).rejects.toThrow(
       'fetch function does not support file uploads',
     );
@@ -278,7 +287,9 @@ describe('buffered multipart forms', () => {
     const failingFetch = vi.fn().mockRejectedValue(new Error('capability probe failed'));
     const client = { fetch: failingFetch };
 
+    // SAFETY: This upload fixture intentionally exercises unsupported or legacy runtime inputs; only the validator/serializer under test consumes the value.
     await expect(createForm({}, client as any)).resolves.toBeInstanceOf(FormData);
+    // SAFETY: This upload fixture intentionally exercises unsupported or legacy runtime inputs; only the validator/serializer under test consumes the value.
     await expect(createForm({}, client as any)).resolves.toBeInstanceOf(FormData);
     expect(failingFetch).toHaveBeenCalledTimes(1);
     expect(failingFetch).toHaveBeenCalledWith('data:,');
@@ -298,6 +309,7 @@ describe('lazy multipart stream encoding', () => {
 
     const options = await multipartFormRequestOptions({ body: { upload, purpose: 'assistants' } }, fetch);
     const contentType = buildHeaders([options.headers]).values.get('content-type')!;
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const outcome = await new Response(options.body as ReadableStream, {
       headers: { 'content-type': contentType },
     })
@@ -322,6 +334,7 @@ describe('lazy multipart stream encoding', () => {
     });
 
     const options = await multipartFormRequestOptions({ body: { upload } }, fetch);
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const reader = (options.body as ReadableStream).getReader();
 
     await expect(reader.read()).rejects.toThrow(/content.type/i);
@@ -342,6 +355,7 @@ describe('lazy multipart stream encoding', () => {
 
     const options = await multipartFormRequestOptions({ body: { upload, purpose: 'assistants' } }, fetch);
     const contentType = buildHeaders([options.headers]).values.get('content-type')!;
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const outcome = await new Response(options.body as ReadableStream, {
       headers: { 'content-type': contentType },
     })
@@ -375,6 +389,7 @@ describe('lazy multipart stream encoding', () => {
       },
       fetch,
     );
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const reader = (options.body as ReadableStream).getReader();
 
     await expect(reader.read()).rejects.toThrow(/content.type/i);
@@ -403,6 +418,7 @@ describe('lazy multipart stream encoding', () => {
       fetch,
     );
     const contentType = buildHeaders([options.headers]).values.get('content-type')!;
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const form = await new Response(options.body as ReadableStream, {
       headers: { 'content-type': contentType },
     }).formData();
@@ -426,6 +442,7 @@ describe('lazy multipart stream encoding', () => {
       fetch,
     );
 
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     await expect(new Response(options.body as ReadableStream).text()).resolves.toContain(
       'Content-Type: TEXT/PLAIN; charset=UTF-8',
     );
@@ -441,6 +458,7 @@ describe('lazy multipart stream encoding', () => {
       fetch,
     );
 
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     await expect(new Response(options.body as ReadableStream).text()).resolves.toContain(
       'Content-Type: application/octet-stream',
     );
@@ -459,6 +477,7 @@ describe('lazy multipart stream encoding', () => {
       },
       fetch,
     );
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const body = await new Response(options.body as ReadableStream).text();
 
     expect(body).toContain('filename="SKILL.md"');
@@ -494,6 +513,7 @@ describe('lazy multipart stream encoding', () => {
       fetch,
       { stripFilenames: false },
     );
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const body = await new Response(options.body as ReadableStream).text();
 
     expect(body).toContain('filename="my-skill/SKILL.md"');
@@ -514,6 +534,7 @@ describe('lazy multipart stream encoding', () => {
       yield new Uint8Array([66]);
       yield new DataView(new Uint8Array([67]).buffer);
       yield new Uint8Array([68]).buffer;
+      // SAFETY: This upload fixture intentionally exercises unsupported or legacy runtime inputs; only the validator/serializer under test consumes the value.
       yield nestedChunks() as any;
       yield new Response('F');
       yield new Response(null);
@@ -523,6 +544,7 @@ describe('lazy multipart stream encoding', () => {
     const options = await multipartFormRequestOptions(
       {
         body: {
+          // SAFETY: This upload fixture intentionally exercises unsupported or legacy runtime inputs; only the validator/serializer under test consumes the value.
           upload: toStreamingFile(chunks() as any, 'quote"\r\n.wav', { type: 'audio/custom' }),
           values: ['first', 2, false],
           metadata: { enabled: true, omitted: undefined },
@@ -531,6 +553,7 @@ describe('lazy multipart stream encoding', () => {
       fetch,
     );
 
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const body = await new Response(options.body as ReadableStream).text();
 
     expect(body).toContain('filename="quote%22%0D%0A.wav"');
@@ -566,6 +589,7 @@ describe('lazy multipart stream encoding', () => {
       fetch,
     );
 
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     const body = await new Response(options.body as ReadableStream).text();
     const headers = buildHeaders([options.headers]).values;
 
@@ -600,6 +624,7 @@ describe('lazy multipart stream encoding', () => {
       fetch,
     );
 
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     await expect(new Response(options.body as ReadableStream).text()).resolves.toContain('legacy blob');
   });
 
@@ -609,6 +634,7 @@ describe('lazy multipart stream encoding', () => {
     }
 
     async function* invalidChunks() {
+      // SAFETY: This upload fixture intentionally exercises unsupported or legacy runtime inputs; only the validator/serializer under test consumes the value.
       yield 42 as any;
     }
 
@@ -616,6 +642,7 @@ describe('lazy multipart stream encoding', () => {
       { body: { upload: toStreamingFile(validChunks(), 'valid.bin'), value: null } },
       fetch,
     );
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     await expect(new Response(invalidField.body as ReadableStream).text()).rejects.toThrow(
       'Received null for "value"',
     );
@@ -624,6 +651,7 @@ describe('lazy multipart stream encoding', () => {
       { body: { upload: toStreamingFile(invalidChunks(), 'invalid.bin') } },
       fetch,
     );
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     await expect(new Response(invalidChunk.body as ReadableStream).text()).rejects.toThrow(
       'Invalid streaming file chunk: 42',
     );
@@ -639,6 +667,7 @@ describe('lazy multipart stream encoding', () => {
       fetch,
     );
 
+    // SAFETY: This multipart fixture includes streaming content, so the constructed request body is the multipart encoder stream.
     await expect(new Response(options.body as ReadableStream).text()).rejects.toThrow(
       'Invalid value given to form',
     );
@@ -700,7 +729,9 @@ describe('toFile input normalization', () => {
   });
 
   test('describes invalid null and primitive file inputs', async () => {
+    // SAFETY: This upload fixture intentionally exercises unsupported or legacy runtime inputs; only the validator/serializer under test consumes the value.
     await expect(toFile(null as any)).rejects.toThrow('Unexpected data type: object');
+    // SAFETY: This upload fixture intentionally exercises unsupported or legacy runtime inputs; only the validator/serializer under test consumes the value.
     await expect(toFile(123 as any)).rejects.toThrow('Unexpected data type: number');
   });
 });

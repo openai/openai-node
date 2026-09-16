@@ -27,6 +27,7 @@ const helpers = [
 ];
 
 function expectValidSchema(value: unknown): void {
+  // SAFETY: Traversal first establishes an object or an existing reference segment; this view reads schema fields without trusting their values before the following checks.
   // oxlint-disable-next-line unicorn/prefer-structured-clone -- verify the actual serialized request schema
   const schema = JSON.parse(JSON.stringify(value)) as JSONSchema;
   expect(JSON.stringify(schema)).not.toContain('"not":');
@@ -36,6 +37,7 @@ function expectValidSchema(value: unknown): void {
     if (child === null || typeof child !== 'object') {
       return;
     }
+    // SAFETY: Traversal first establishes an object or an existing reference segment; this view reads schema fields without trusting their values before the following checks.
     const reference = (child as Record<string, unknown>)['$ref'];
     if (typeof reference === 'string') {
       expect(reference.startsWith('#/')).toBe(true);
@@ -44,6 +46,7 @@ function expectValidSchema(value: unknown): void {
         // oxlint-disable-next-line unicorn/prefer-string-replace-all -- the test tsconfig uses the ES2020 library
         const key = token.replace(/~[01]/gu, (escape) => (escape === '~1' ? '/' : '~'));
         expect(target).toHaveProperty([key]);
+        // SAFETY: Traversal first establishes an object or an existing reference segment; this view reads schema fields without trusting their values before the following checks.
         target = (target as Record<string, unknown>)[key];
       }
     }
