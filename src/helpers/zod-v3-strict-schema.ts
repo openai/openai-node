@@ -436,6 +436,7 @@ export function assertSupportedZodV3Schema(
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Serialization validation must inspect any object, including arrays and foreign prototypes, without trusting fields.
 function assertNoJSONSerializationHook(value: object, path: string): void {
   for (let current: object | null = value; current !== null; current = Object.getPrototypeOf(current)) {
     const descriptor = Object.getOwnPropertyDescriptor(current, 'toJSON');

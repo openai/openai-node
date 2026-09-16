@@ -6,6 +6,7 @@ import type { ServerEvent } from 'openai/resources/live/live';
 import { DataChannel } from '../../src/lib/webrtc/data-channel';
 import { WebRTCConnection } from '../../src/lib/webrtc/connection';
 import type {
+  WebRTCConfiguration,
   WebRTCConnectionEvent,
   WebRTCDataChannel,
   WebRTCPeerConnection,
@@ -70,8 +71,8 @@ class FakePeer extends NativeEvents implements WebRTCPeerConnection {
     this.channel.close();
     this.emit('connectionstatechange');
   });
-  readonly configuration: object | undefined;
-  constructor(configuration?: object) {
+  readonly configuration: WebRTCConfiguration | undefined;
+  constructor(configuration?: WebRTCConfiguration) {
     super();
     this.configuration = configuration;
     FakePeer.latest = this;

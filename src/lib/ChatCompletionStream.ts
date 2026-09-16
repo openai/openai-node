@@ -459,7 +459,7 @@ function reservePartialJSONParse(state: PartialJSONParseState, budget: PartialJS
 }
 
 function captureStructuredJSONSnapshot(
-  snapshot: object,
+  snapshot: ChatCompletionSnapshot.Choice.Message | ChatCompletionSnapshot.Choice.Message.ToolCall.Function,
   property: 'content' | 'arguments' | 'refusal',
 ): string | null | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(snapshot, property);
@@ -500,7 +500,7 @@ function captureStructuredMessageSnapshot(
 }
 
 function captureSnapshotArray<Item>(
-  snapshot: object,
+  snapshot: ChatCompletionSnapshot | ChatCompletionSnapshot.Choice.Message,
   property: 'choices' | 'tool_calls',
   maximum: number,
   kind: 'choice' | 'tool-call',
@@ -610,6 +610,7 @@ function assertBoundToolCallIdentity(toolCall: PartialToolCallSnapshot, identity
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- This assignment primitive copies own properties from heterogeneous snapshot and delta objects.
 function assignOwnProperties<T extends object>(target: T, source: object): T {
   if (Object.prototype.propertyIsEnumerable.call(source, '__proto__') && !hasOwn(target, '__proto__')) {
     Object.defineProperty(target, '__proto__', {
@@ -918,7 +919,9 @@ function canonicalSerializedParserSchema(
 
 function rememberSerializedParserSchema(
   signatures: WeakMap<object, string>,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Parser owners are tracked by identity before their metadata descriptors are validated.
   source: object,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Serialized schema holders may be arbitrary objects with hostile accessors or prototypes.
   holder: object,
   key: string,
 ): void {
@@ -942,7 +945,9 @@ function rememberSerializedParserSchema(
 
 function hasMatchingSerializedParserSchema(
   signatures: WeakMap<object, string>,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Parser signatures belong to the original object identity, independent of its fields.
   source: object | undefined,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- The schema holder is inspected through own descriptors before its contents are trusted.
   holder: object,
   key: string,
   value: unknown,
@@ -968,7 +973,7 @@ function serializedParserDescriptor(
 
 function shadowSerializedParserMetadata(
   descriptors: PropertyDescriptorMap,
-  source: object,
+  source: ChatCompletionInputTool | ChatCompletionResponseFormat,
   fields: readonly string[],
 ): void {
   for (const field of fields) {
@@ -1043,6 +1048,7 @@ function snapshotSerializedResponseFormat(
   return Object.create(Object.getPrototypeOf(source), descriptors) as ChatCompletionResponseFormat;
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The serialization visitor accepts arbitrary object and array holders, inspecting own descriptors only.
 function ownSerializedParserObject(holder: object, key: string): object | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(holder, key);
   if (!descriptor || !('value' in descriptor)) {

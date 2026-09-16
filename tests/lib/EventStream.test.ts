@@ -871,12 +871,17 @@ describe('EventStream iterator buffer limits', () => {
   );
 
   test.each([
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- This fixture must preserve an opaque proxy identity without inspecting its target.
     { name: 'root proxy', wrap: (proxy: object) => proxy },
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- This fixture embeds an opaque proxy without imposing properties on its target.
     { name: 'nested proxy', wrap: (proxy: object) => ({ nested: proxy }) },
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- The map fixture retains the proxy identity without requiring a structural value type.
     { name: 'Map-value proxy', wrap: (proxy: object) => new Map([['safe', proxy]]) },
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- The set fixture retains the proxy identity without requiring a structural value type.
     { name: 'Set-value proxy', wrap: (proxy: object) => new Set([proxy]) },
   ])('rejects a detached $name before invoking its hidden handler', async ({ wrap }) => {
     const retained = 'x'.repeat(9 * 1024 * 1024);
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- The hostile proxy handler must reflect arbitrary target properties without a trusted target schema.
     const read = vi.fn((target: object, property: PropertyKey, receiver: unknown) => {
       if (retained.length === 0) {
         throw new Error('Expected retained handler state');

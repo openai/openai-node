@@ -7,6 +7,7 @@ interface WeakReference {
   deref: () => object | undefined;
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- WeakRef tracks event identity without imposing fields on the retained object.
 const WeakReference = (globalThis as typeof globalThis & { WeakRef: new (target: object) => WeakReference })
   .WeakRef;
 

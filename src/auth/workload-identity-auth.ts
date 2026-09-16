@@ -53,6 +53,7 @@ function calculateRefreshAt(
 const NATIVE_RESPONSE_PROTOTYPE = Response.prototype;
 const READ_NATIVE_RESPONSE_BODY = NATIVE_RESPONSE_PROTOTYPE.arrayBuffer;
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Custom fetch response prototypes are verified through descriptors before trusting their native contract.
 function isResponsePrototype(response: Response, prototype: object): boolean {
   const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
   if (
@@ -73,6 +74,7 @@ function isResponsePrototype(response: Response, prototype: object): boolean {
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The prototype walk compares untrusted cross-realm objects by identity and descriptor metadata.
 function isResponseBodyPrototype(prototype: object, responsePrototype: object | null): boolean {
   if (prototype === responsePrototype) {
     return true;

@@ -449,6 +449,7 @@ function _typeTests() {
         type: 'function',
         function: {
           name: 'numProperties',
+          // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
           function: (obj: object) => String(Object.keys(obj).length),
           parameters: { type: 'object' },
           parse: (str: string): object => {
@@ -473,6 +474,7 @@ function _typeTests() {
         type: 'function',
         // @ts-expect-error function must accept string if parse is omitted
         function: {
+          // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
           function: (obj: object) => String(Object.keys(obj).length),
           parameters: { type: 'object' },
           description: 'gets the number of properties on an object',
@@ -509,6 +511,7 @@ function _typeTests() {
         name: 'numProperties',
         // @ts-expect-error parse and function don't match
         parse: (str: string) => str,
+        // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
         function: (obj: object) => String(Object.keys(obj).length),
         parameters: { type: 'object' },
         description: 'gets the number of properties on an object',
@@ -530,6 +533,7 @@ function _typeTests() {
           }
           return result;
         },
+        // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
         function: (obj: object) => String(Object.keys(obj).length),
         parameters: { type: 'object' },
         description: 'gets the number of properties on an object',
@@ -543,6 +547,7 @@ function _typeTests() {
           }
           return result;
         },
+        // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
         function: (obj: object) => Object.keys(obj).join(', '),
         parameters: { type: 'object' },
         description: 'gets the number of properties on an object',
@@ -551,6 +556,7 @@ function _typeTests() {
         name: 'len2',
         // @ts-expect-error parse and function don't match
         parse: (str: string) => str,
+        // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
         function: (obj: object) => String(Object.keys(obj).length),
         parameters: { type: 'object' },
         description: 'gets the number of properties on an object',
@@ -575,6 +581,7 @@ function _typeTests() {
             }
             return result;
           },
+          // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
           function: (obj: object) => String(Object.keys(obj).length),
           parameters: { type: 'object' },
           description: 'gets the number of properties on an object',
@@ -591,6 +598,7 @@ function _typeTests() {
             }
             return result;
           },
+          // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
           function: (obj: object) => Object.keys(obj).join(', '),
           parameters: { type: 'object' },
           description: 'gets the number of properties on an object',
@@ -603,6 +611,7 @@ function _typeTests() {
           parse: (str: string) => str,
           // @ts-ignore error occurs here in TS 5
           // function input doesn't match parse output
+          // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
           function: (obj: object) => String(Object.keys(obj).length),
           parameters: { type: 'object' },
           description: 'gets the number of properties on an object',
@@ -1430,6 +1439,7 @@ describe('resource completions', () => {
         tools: [
           new ParsingToolFunction({
             name: 'numProperties',
+            // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
             function: (obj: object) => String(Object.keys(obj).length),
             parameters: { type: 'object' },
             parse: (str: string): object => {
@@ -1587,6 +1597,7 @@ describe('resource completions', () => {
         tools: [
           new ParsingToolFunction({
             name: 'numProperties',
+            // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
             function: (obj: object) => String(Object.keys(obj).length),
             parameters: { type: 'object' },
             parse: (str: string): object => {
@@ -2854,6 +2865,7 @@ describe('resource completions', () => {
         tools: [
           new ParsingToolFunction({
             name: 'numProperties',
+            // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
             function: (obj: object) => String(Object.keys(obj).length),
             parameters: { type: 'object' },
             parse: (str: string): object => {
@@ -2994,6 +3006,7 @@ describe('resource completions', () => {
         tools: [
           new ParsingToolFunction({
             name: 'numProperties',
+            // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
             function: (obj: object) => String(Object.keys(obj).length),
             parameters: { type: 'object' },
             parse: (str: string): object => {

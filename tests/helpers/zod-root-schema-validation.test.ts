@@ -196,7 +196,7 @@ describe('canonical strict vendor-converter roots', () => {
 
   it('neutralizes synthesized Proxy hooks and keyword reads by owning descriptor values', () => {
     const target: Record<string, unknown> = { type: 'object', nullable: false, $ref: undefined };
-    const get = vi.fn((_subject: object, key: PropertyKey) =>
+    const get = vi.fn((_subject: typeof target, key: PropertyKey) =>
       key === 'toJSON' ? () => ({ type: 'string' }) : 'string',
     );
     const owned = convertStrictRoot(new Proxy(target, { get }));

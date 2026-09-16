@@ -495,6 +495,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Establishes an independent scope even when concurrent requests share caller options. */
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Logical request owners are opaque identity tokens; their properties are never read.
   runRequest<T>(operation: () => Promise<T>, requestOwner: object): Promise<T> {
     return this.#transport.run(async () => {
       const scope = this.#transport.current();
@@ -515,6 +516,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Reports whether a public request-building call already belongs to an active logical operation. */
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Request scope membership compares the opaque caller token by identity only.
   inRequest(requestOwner: object): boolean {
     const scope = this.#transport.current();
     return scope?.owner === this && scope.requestOwner === requestOwner && scope.phase !== 'authorizing';

@@ -1316,7 +1316,7 @@ it.each(['format', 'request'] as const)(
       messages: [{ role: 'user', content: 'Use only the response format sent on the wire' }],
       response_format: responseFormat,
     };
-    const serialize = vi.fn(function serializeTextFormat(this: object) {
+    const serialize = vi.fn(function serializeTextFormat(this: typeof responseFormat | typeof params) {
       return owner === 'format' ? { type: 'text' } : { ...this, response_format: { type: 'text' } };
     });
     Object.defineProperty(owner === 'format' ? responseFormat : params, 'toJSON', {
@@ -1368,7 +1368,7 @@ it('drops a branded response parser for an unrelated synthesized JSON schema', a
     messages: [{ role: 'user', content: 'Do not attach a parser to an unrelated wire schema' }],
     response_format: responseFormat,
   };
-  const serialize = vi.fn(function synthesizeResponseFormat(this: object) {
+  const serialize = vi.fn(function synthesizeResponseFormat(this: typeof params) {
     return { ...this, response_format: { type: 'json_schema', json_schema: { name: 'synth', schema: {} } } };
   });
   Object.defineProperty(params, 'toJSON', { configurable: true, enumerable: true, value: serialize });
@@ -1410,7 +1410,7 @@ it.each(['tools', 'request', 'tools-and-tool'] as const)(
       messages: [{ role: 'user', content: 'Keep callbacks attached to their actual tool owner' }],
       tools,
     };
-    const serialize = vi.fn(function reorderActualTools(this: object) {
+    const serialize = vi.fn(function reorderActualTools(this: typeof tools | typeof params) {
       return owner === 'request' ? { ...this, tools: [second, first] } : [second, first];
     });
     Object.defineProperty(owner === 'request' ? params : tools, 'toJSON', {

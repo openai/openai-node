@@ -17,7 +17,7 @@ function createClient(): OpenAI {
   return new OpenAI({ apiKey: 'test-key', baseURL: 'https://example.com/v1/' });
 }
 
-function withResponse(data: object, headers: Record<string, string> = {}) {
+function withResponse(data: { id: string; status: string }, headers: Record<string, string> = {}) {
   return {
     withResponse: async () => ({ data, response: new Response(null, { headers }) }),
   } as any;

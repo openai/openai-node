@@ -60,6 +60,7 @@ function normalizedOutput(value: unknown): AgentFunctionCallOutputParam | null {
   throw new OpenAIError('Tool output must be text, content, a JSON object, or null');
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The public AgentToolOutput contract accepts arbitrary JSON-serializable object results.
 function toolResult(call: AgentFunctionCallItem, value: AgentToolOutput): ToolResult {
   const output =
     value !== null && typeof value === 'object' && !Array.isArray(value) ? JSON.stringify(value) : value;

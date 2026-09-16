@@ -84,6 +84,7 @@ const foreignErrorStackDescriptors = new WeakMap<object, PropertyDescriptor>();
 
 type NativeErrorConstructor = (...args: never[]) => unknown;
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The native proxy predicate accepts arbitrary object identities without invoking their handlers.
 function captureNativeProxyDetector(): ((value: object) => boolean) | undefined {
   if (typeof process === 'undefined') {
     return undefined;
@@ -107,6 +108,7 @@ function captureNativeProxyDetector(): ((value: object) => boolean) | undefined 
     if (!detector || !('value' in detector) || typeof detector.value !== 'function') {
       return undefined;
     }
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- The captured native predicate is called only for objects, before their properties are inspected.
     return detector.value as (value: object) => boolean;
   } catch {
     return undefined;
@@ -253,6 +255,7 @@ interface TrustedForeignIntrinsic {
   functionPrototype: object;
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Foreign prototypes are untrusted objects until their constructor descriptors are verified.
 function getTrustedForeignIntrinsic(prototype: object): TrustedForeignIntrinsic | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
   if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') {
@@ -280,6 +283,7 @@ function getTrustedForeignIntrinsic(prototype: object): TrustedForeignIntrinsic 
   return { constructor, descriptors, functionPrototype: Object.getPrototypeOf(constructor) as object };
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Intrinsic trust is established by object identity or verified cross-realm descriptors.
 function isTrustedIntrinsicPrototype(prototype: object): boolean {
   return trustedIntrinsicPrototypes.has(prototype) || getTrustedForeignIntrinsic(prototype) !== undefined;
 }
@@ -287,6 +291,7 @@ function isTrustedIntrinsicPrototype(prototype: object): boolean {
 function isCanonicalIntrinsicFunction(
   value: unknown,
   canonical: unknown,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Cross-realm function prototypes are compared by identity without trusting a callable signature.
   functionPrototype: object,
 ): boolean {
   if (canonical === undefined) {
@@ -320,6 +325,7 @@ function isCanonicalIntrinsicFunction(
 function isCanonicalIntrinsicDescriptor(
   descriptor: PropertyDescriptor,
   canonical: PropertyDescriptor | undefined,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Descriptor validation compares the verified function-prototype identity without reading its fields.
   functionPrototype: object,
 ): boolean {
   if (
@@ -350,6 +356,7 @@ function isCanonicalIntrinsicDescriptor(
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Native error branding must inspect arbitrary objects before assuming an Error contract.
 function hasNativeErrorBrand(current: object): boolean {
   if (nativeErrorBrand) {
     return nativeErrorBrand.call(Error, current);
@@ -367,6 +374,7 @@ function hasNativeErrorBrand(current: object): boolean {
 }
 
 function getVerifiedForeignErrorConstructor(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Foreign error constructors are verified from descriptors of an otherwise untrusted object.
   current: object,
   stackDescriptor: PropertyDescriptor,
 ): { constructor: NativeErrorConstructor; prototype: object } | undefined {
@@ -399,6 +407,7 @@ function getVerifiedForeignErrorConstructor(
   return undefined;
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Stack accessors are trusted only after the object passes native error branding.
 function isTrustedNativeErrorStack(current: object, descriptor: PropertyDescriptor): boolean {
   if (!hasNativeErrorBrand(current)) {
     return false;
@@ -496,6 +505,7 @@ function createEventQueue<Value>(): EventQueue<Value> {
   };
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Retained storage branding walks arbitrary object prototypes without assuming their native type.
 function getRetainedStorageBrand(current: object): string | undefined {
   let prototype = Object.getPrototypeOf(current) as object | null;
 
@@ -532,6 +542,7 @@ function getRetainedStorageBrand(current: object): string | undefined {
 }
 
 function estimateRetainedBufferBytes(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Memory accounting inspects arbitrary retained objects and detects native backing storage at runtime.
   current: object,
   visit: (value: unknown, depth: number) => void,
   depth: number,
@@ -608,6 +619,7 @@ function estimateRetainedBufferBytes(
 }
 
 function visitHiddenEventValues(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Native collection contents are inspected only after storage branding, without trusting structural fields.
   current: object,
   kind: RetainedStorage['kind'] | undefined,
   visit: (value: unknown, overhead: number) => boolean,
@@ -643,6 +655,7 @@ function visitHiddenEventValues(
 }
 
 function getInspectableEventKeys(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Event key inspection must accept arbitrary retained objects, arrays, and native storage views.
   current: object,
   kind: RetainedStorage['kind'] | undefined,
   availableBytes: number,
@@ -685,6 +698,7 @@ function getInspectableEventKeys(
 }
 
 function visitInspectableEventProperties(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Retained event properties are inspected through descriptors on arbitrary object identities.
   current: object,
   kind: RetainedStorage['kind'] | undefined,
   depth: number,
@@ -722,6 +736,7 @@ function visitInspectableEventProperties(
 }
 
 function visitRetainedEventPrototypes(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Retention accounting follows arbitrary object prototypes without assuming their properties.
   current: object,
   depth: number,
   isBlobInternalHandle: boolean,
@@ -729,6 +744,7 @@ function visitRetainedEventPrototypes(
   availableBytes: () => number,
   charge: (bytes: number) => boolean,
   visit: (value: unknown, depth: number, isBlobInternalHandle?: boolean) => void,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- The retention callback records prototype identity before inspecting its descriptors.
   retainPrototype: (prototype: object, inspect: () => boolean) => boolean,
 ): boolean {
   let prototype = Object.getPrototypeOf(current) as object | null;
@@ -862,6 +878,7 @@ function inspectBufferedEventGraph(
     }
     return bytes <= remainingBytes;
   };
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- The ledger records object and symbol identities, which have no shared structural contract.
   const addIdentity = (identity: BufferedRetainedIdentity): void => {
     if (activeNode) {
       activeNode.edges.add(identity);
@@ -869,6 +886,7 @@ function inspectBufferedEventGraph(
       roots.add(identity);
     }
   };
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Retained graph nodes are identified by object or symbol identity independently of their fields.
   const retainIdentity = (identity: BufferedRetainedIdentity, inspect: () => boolean): boolean => {
     addIdentity(identity);
     const node: BufferedInspectedNode = { bytes: 0, edges: new Set() };
@@ -1066,6 +1084,7 @@ function collectBufferedLedgerIdentities(
 }
 
 function getBufferedLedgerChange(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Ledger changes are keyed by object or symbol identity, not a structural event type.
   identity: BufferedRetainedIdentity,
   graph: BufferedInspectedGraph,
   records: Map<BufferedRetainedIdentity, BufferedLedgerRecord>,

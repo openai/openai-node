@@ -64,7 +64,11 @@ function serverError(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function dispatchFrame(socket: FakeSocket, transport: 'native' | 'node', frame: object): void {
+function dispatchFrame(
+  socket: FakeSocket,
+  transport: 'native' | 'node',
+  frame: ReturnType<typeof serverError>,
+): void {
   const data = JSON.stringify(frame);
   socket.dispatch('message', transport === 'native' ? { data } : data);
 }

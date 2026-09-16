@@ -4,8 +4,8 @@ interface WeakReference<T> {
 }
 type WeakAbortCallback = WeakReference<AbortCallback>;
 interface AbortFinalizer {
-  register: (target: AbortCallback, cleanup: AbortCallback, token: object) => void;
-  unregister: (token: object) => boolean;
+  register: (target: AbortCallback, cleanup: AbortCallback, token: WeakAbortCallback) => void;
+  unregister: (token: WeakAbortCallback) => boolean;
 }
 
 // Keep these optional runtime features out of the SDK's ES2020 type requirements.
@@ -68,6 +68,7 @@ function releaseOnAbort(
 
 /** Keep cancellation alive until abort or collection of the response body or bodyless custom response. */
 export function retainRequestAbortCallback(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Abort callbacks are retained by any response-body or custom-response owner identity.
   owner: object,
   abort: AbortCallback,
   requestSignal: AbortSignal,

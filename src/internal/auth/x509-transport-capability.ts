@@ -44,7 +44,7 @@ class NodeX509Transport implements X509Transport {
     Object.freeze(this);
   }
 
-  static dispatcher(value: object): Agent | ProxyAgent | undefined {
+  static dispatcher(value: X509Transport): Agent | ProxyAgent | undefined {
     return #dispatcher in value ? value.#dispatcher : undefined;
   }
 }

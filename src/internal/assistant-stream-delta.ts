@@ -398,6 +398,7 @@ export function assertSafeAssistantStreamDelta(value: unknown): void {
 
 export function accumulateAssistantStreamDelta<Accumulator extends object>(
   accumulator: Accumulator,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- This exported accumulator accepts heterogeneous partial SDK deltas and validates their properties at runtime.
   delta: object,
   cacheArrays = false,
 ): Accumulator {
