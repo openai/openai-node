@@ -1,4 +1,3 @@
-import type { ChatCompletionToolRunnerParams } from 'openai/resources/chat/completions';
 import { vi } from 'vitest';
 import OpenAI from 'openai';
 import { APIUserAbortError, OpenAIError } from 'openai/error';
@@ -705,9 +704,12 @@ describe.each([
         callbackStarted.resolve(true);
         return callbackResult.promise;
       });
-      const params: ChatCompletionToolRunnerParams<[string]> = {
+      const params = {
         model: 'gpt-4o-mini',
         parallel_tool_calls: parallelToolCalls,
+        ...(forcedToolChoice
+          ? { tool_choice: { type: 'function' as const, function: { name: 'readBalance' } } }
+          : {}),
         messages: [{ role: 'user' as const, content: 'read the current balance' }],
         tools: [
           {
@@ -721,9 +723,6 @@ describe.each([
           },
         ],
       };
-      if (forcedToolChoice) {
-        params.tool_choice = { type: 'function', function: { name: 'readBalance' } };
-      }
       const options = {
         signal: controller.signal,
         maxChatCompletions: 1,
@@ -877,9 +876,12 @@ describe.each([
                   await callbackReady.promise;
                 },
           );
-          const params: ChatCompletionToolRunnerParams<[string]> = {
+          const params = {
             model: 'gpt-4o-mini',
             parallel_tool_calls: exitRoute !== 'sequential limit',
+            ...(exitRoute === 'forced tool'
+              ? { tool_choice: { type: 'function' as const, function: { name: 'readBalance' } } }
+              : {}),
             messages: [{ role: 'user' as const, content: 'read the current balance' }],
             tools: [
               {
@@ -893,9 +895,6 @@ describe.each([
               },
             ],
           };
-          if (exitRoute === 'forced tool') {
-            params.tool_choice = { type: 'function', function: { name: 'readBalance' } };
-          }
           const options = { signal: controller.signal, maxChatCompletions: 1, afterCompletion };
           const runner: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, null> = streaming
             ? client.chat.completions.runTools({ ...params, stream: true }, options)
@@ -918,7 +917,6 @@ describe.each([
           if (abortMethod === 'not aborted') {
             await expect(runner.done()).resolves.toBeUndefined();
           } else {
-            // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
             const abortError = await runner.done().catch((error: unknown) => error);
             expect(abortError).toBeInstanceOf(APIUserAbortError);
             expect(Object.getOwnPropertyDescriptor(abortError, 'cause')?.value).toBe(

@@ -169,10 +169,9 @@ function attachSnapshot(stream: ChatCompletionStream<null>, kind: FailureKind) {
     }
 
     if (kind === 'missing-function-name' || kind === 'missing-function-arguments') {
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type, anti-slop/no-chained-type-assertions -- SAFETY: Finalization fixtures deliberately corrupt tool-call and snapshot fields to verify safe validation failures.
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Finalization fixtures deliberately corrupt tool-call and snapshot fields to verify safe validation failures.
       const record = tool as unknown as Record<string, unknown>;
       // SAFETY: This tool fixture was constructed with a function object; the dictionary view permits the malformed field mutations under test.
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Finalization fixtures deliberately corrupt tool-call and snapshot fields to verify safe validation failures.
       const fn = record['function'] as Record<string, unknown>;
       const key = kind === 'missing-function-name' ? 'name' : 'arguments';
       Reflect.deleteProperty(fn, key);
@@ -273,14 +272,12 @@ describe('chat completion tool-finalization diagnostic privacy', () => {
   test.each([
     [
       'a cyclic snapshot value',
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Finalization fixtures deliberately corrupt tool-call and snapshot fields to verify safe validation failures.
       (snapshot: Record<string, unknown>) => {
         snapshot['cycle'] = snapshot;
       },
     ],
     [
       'a BigInt snapshot value',
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Finalization fixtures deliberately corrupt tool-call and snapshot fields to verify safe validation failures.
       (snapshot: Record<string, unknown>) => {
         snapshot['count'] = 42n;
       },
@@ -290,7 +287,7 @@ describe('chat completion tool-finalization diagnostic privacy', () => {
       makeReadableStream(makeSensitiveChunk('missing-type')),
     );
     stream.on('chunk', (_chunk, snapshot) => {
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type, anti-slop/no-chained-type-assertions -- SAFETY: Finalization fixtures deliberately corrupt tool-call and snapshot fields to verify safe validation failures.
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Finalization fixtures deliberately corrupt tool-call and snapshot fields to verify safe validation failures.
       mutateSnapshot(snapshot as unknown as Record<string, unknown>);
     });
 
@@ -323,7 +320,7 @@ describe('chat completion tool-finalization diagnostic privacy', () => {
     'preserves valid completed $name tool calls and confidential content',
     async (type) => {
       const chunk = makeSensitiveChunk(type === 'function' ? 'missing-function-name' : 'missing-custom-name');
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type, anti-slop/no-chained-type-assertions -- SAFETY: Finalization fixtures deliberately corrupt tool-call and snapshot fields to verify safe validation failures.
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Finalization fixtures deliberately corrupt tool-call and snapshot fields to verify safe validation failures.
       const toolCall = chunk.choices[0]?.delta.tool_calls?.[0] as unknown as Record<string, unknown>;
       if (type === 'custom') {
         toolCall['custom'] = { name: 'trusted_custom_tool', input: syntheticToolArguments };

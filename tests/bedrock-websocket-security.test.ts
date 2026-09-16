@@ -57,7 +57,6 @@ class FakeBrowserSocket {
 const originalWebSocket = globalThis.WebSocket;
 const nodeSocketConstructor = vi.mocked(WS.WebSocket);
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function expectPrivateBedrockCredentialFailure(failure: unknown, credential: string): void {
   expect(failure).toBeInstanceOf(TypeError);
   // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.

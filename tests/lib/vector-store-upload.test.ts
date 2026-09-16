@@ -12,7 +12,6 @@ type UploadPromise = ReturnType<OpenAI['files']['create']>;
 
 function deferred<T>() {
   let resolveValue!: (value: T) => void;
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   let rejectValue!: (reason: unknown) => void;
   // oxlint-disable-next-line promise/avoid-new -- Tests control the order in which concurrent uploads settle.
   const promise = new Promise<T>((resolve, reject) => {
@@ -106,13 +105,11 @@ describe('vector-store batch upload orchestration', () => {
     const originalFileIds = fileIds === undefined ? undefined : [...fileIds];
     const options = { maxConcurrency: limit };
 
-    const body: Parameters<typeof client.vectorStores.fileBatches.uploadAndPoll>[1] = {
-      files: createFiles(1),
-    };
-    if (fileIds !== undefined) {
-      body.fileIds = fileIds;
-    }
-    const result = client.vectorStores.fileBatches.uploadAndPoll('vs_123', body, options);
+    const result = client.vectorStores.fileBatches.uploadAndPoll(
+      'vs_123',
+      { files: createFiles(1), ...(fileIds === undefined ? {} : { fileIds }) },
+      options,
+    );
 
     await expect(result).rejects.toBeInstanceOf(RangeError);
     await expect(result).rejects.toThrow('maxConcurrency must be greater than 0');

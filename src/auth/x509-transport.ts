@@ -71,13 +71,10 @@ const credentialOptionNames = new Set([
 const proxyOptionNames = new Set(['url', 'mode', 'ca']);
 
 function safeOptionRecord(
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Credential and proxy options are untrusted runtime inputs and must pass validation before transport construction.
   value: unknown,
   allowed: ReadonlySet<string>,
   label: string,
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Credential option snapshots contain unvalidated descriptor values; each option is validated before use.
 ): Record<string, unknown> {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
   if (!value || typeof value !== 'object' || types.isProxy(value)) {
     throw new Error(`X.509 ${label} options must be a non-proxy object.`);
   }
@@ -86,10 +83,8 @@ function safeOptionRecord(
     throw new Error(`X.509 ${label} options must have only own plain data properties.`);
   }
   // SAFETY: The snapshot starts empty with no prototype; only checked own data properties are copied into it below.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Credential option snapshots contain unvalidated descriptor values; each option is validated before use.
   const snapshot = Object.create(null) as Record<string, unknown>;
   for (const name of Reflect.ownKeys(value)) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
     if (typeof name !== 'string' || !allowed.has(name)) {
       throw new Error(`Unsupported X.509 ${label} option: \`${String(name)}\`.`);
     }
@@ -102,22 +97,18 @@ function safeOptionRecord(
   return snapshot;
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Credential option snapshots contain unvalidated descriptor values; each option is validated before use.
 function requiredCredentialValue(options: Record<string, unknown>, name: string): string {
   const value = options[name];
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new Error(`X.509 credential requires a nonempty own \`${name}\` value.`);
   }
   return value;
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Credential and proxy options are untrusted runtime inputs and must pass validation before transport construction.
 function snapshotCertificateAuthorities(value: unknown): string | string[] | undefined {
   if (value === undefined) {
     return undefined;
   }
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
   if (typeof value === 'string') {
     if (value.trim().length === 0) {
       throw new Error('X.509 certificate authorities must contain nonempty PEM values.');
@@ -130,7 +121,6 @@ function snapshotCertificateAuthorities(value: unknown): string | string[] | und
   const authorities: string[] = [];
   for (let index = 0; index < value.length; index += 1) {
     const entry = Object.getOwnPropertyDescriptor(value, String(index));
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
     if (!entry || !('value' in entry) || typeof entry.value !== 'string' || entry.value.trim().length === 0) {
       throw new Error('X.509 certificate authorities require own plain nonempty PEM strings.');
     }
@@ -173,13 +163,11 @@ function validatedCredentialOptions(options: X509CredentialOptions): ValidatedX5
   const identityProviderId = requiredCredentialValue(configured, 'identityProviderId');
   const serviceAccountId = requiredCredentialValue(configured, 'serviceAccountId');
   const { refreshBufferSeconds, passphrase } = configured;
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
   if (passphrase !== undefined && typeof passphrase !== 'string') {
     throw new Error('X.509 credential requires a string private-key passphrase.');
   }
   if (
     refreshBufferSeconds !== undefined &&
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
     (typeof refreshBufferSeconds !== 'number' ||
       !Number.isSafeInteger(refreshBufferSeconds) ||
       refreshBufferSeconds < 0 ||
@@ -192,7 +180,7 @@ function validatedCredentialOptions(options: X509CredentialOptions): ValidatedX5
   const leaf = new X509Certificate(certificateChain);
   const privateKey = createPrivateKey({
     key: privateKeyPEM,
-    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Create an own data property so an inherited setter cannot intercept the private-key passphrase.
+    // Create an own data property so an inherited setter cannot intercept the private-key passphrase.
     ...(passphrase === undefined ? {} : { passphrase }),
   });
   if (!leaf.checkPrivateKey(privateKey)) {
@@ -237,14 +225,11 @@ function proxyAuthentication(url: URL): string | undefined {
   return Buffer.from(`${username}:${password}`, 'utf-8').toString('base64');
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Credential and proxy options are untrusted runtime inputs and must pass validation before transport construction.
 function normalizeProxyURL(value: unknown): URL {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
   if (typeof value !== 'string' && (typeof value !== 'object' || value === null || types.isProxy(value))) {
     throw new Error('X.509 CONNECT proxy requires an own URL string or URL value.');
   }
   try {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-owned certificate options without trusting proxies, accessors, or coercion hooks.
     return new URL(typeof value === 'string' ? value : URL.prototype.toString.call(value));
   } catch {
     throw new Error('X.509 CONNECT proxy requires a valid proxy URL.');
@@ -252,7 +237,6 @@ function normalizeProxyURL(value: unknown): URL {
 }
 
 function credentialDispatcher(
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Credential and proxy options are untrusted runtime inputs and must pass validation before transport construction.
   proxyOptionsInput: unknown,
   requestTls: VerifiedX509TLSOptions,
 ): { dispatcher: Agent | ProxyAgent; proxy: X509ProxyMode } {
@@ -281,24 +265,26 @@ function credentialDispatcher(
   }
   const auth = proxyAuthentication(url);
 
-  const dispatcherOptions: ProxyAgent.Options = {
-    uri: url.href,
-    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Define proxy credentials as own data without invoking inherited setters.
-    ...(auth === undefined ? {} : { auth }),
-    requestTls,
-    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Keep the optional proxy TLS configuration as an own data property.
-    ...(proxy === 'https-connect'
-      ? {
-          proxyTls: {
-            rejectUnauthorized: true,
-            // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Define explicit proxy trust roots as own data without invoking inherited setters.
-            ...(proxyCA === undefined ? {} : { ca: proxyCA }),
-          },
-        }
-      : {}),
-  };
   // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared transport contract preserves the same dispatcher and proxy types across both construction paths.
-  return { proxy, dispatcher: new ProxyAgent(dispatcherOptions) };
+  return {
+    proxy,
+    dispatcher: new ProxyAgent({
+      uri: url.href,
+      // Define proxy credentials as own data without invoking inherited setters.
+      ...(auth === undefined ? {} : { auth }),
+      requestTls,
+      // Keep the optional proxy TLS configuration as an own data property.
+      ...(proxy === 'https-connect'
+        ? {
+            proxyTls: {
+              rejectUnauthorized: true,
+              // Define explicit proxy trust roots as own data without invoking inherited setters.
+              ...(proxyCA === undefined ? {} : { ca: proxyCA }),
+            },
+          }
+        : {}),
+    }),
+  };
 }
 
 /** Creates one frozen, caller-attested Node.js transport for X.509 workload authentication. */
@@ -321,7 +307,7 @@ export function createX509Transport(options: X509TransportOptions): X509Transpor
         transport: capability,
         identityProviderId,
         serviceAccountId,
-        // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Preserve the cancellation signal as own data without invoking inherited setters.
+        // Preserve the cancellation signal as own data without invoking inherited setters.
         ...(signal ? { signal } : {}),
       }),
     run: (operation) =>
@@ -341,9 +327,9 @@ export function fromX509(options: X509CredentialOptions): X509Credential {
     cert: configured.certificateChain,
     key: configured.privateKey,
     rejectUnauthorized: true,
-    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Define the TLS passphrase as own data so inherited setters cannot intercept it.
+    // Define the TLS passphrase as own data so inherited setters cannot intercept it.
     ...(configured.passphrase === undefined ? {} : { passphrase: configured.passphrase }),
-    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Define explicit workload trust roots as own data without invoking inherited setters.
+    // Define explicit workload trust roots as own data without invoking inherited setters.
     ...(configured.ca === undefined ? {} : { ca: configured.ca }),
   };
   const { dispatcher, proxy } = credentialDispatcher(configured.proxy, requestTls);
@@ -359,7 +345,7 @@ export function fromX509(options: X509CredentialOptions): X509Credential {
       type: 'x509',
       identityProviderId: configured.identityProviderId,
       serviceAccountId: configured.serviceAccountId,
-      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Preserve the optional refresh setting as own data without invoking inherited setters.
+      // Preserve the optional refresh setting as own data without invoking inherited setters.
       ...(configured.refreshBufferSeconds === undefined
         ? {}
         : { refreshBufferSeconds: configured.refreshBufferSeconds }),

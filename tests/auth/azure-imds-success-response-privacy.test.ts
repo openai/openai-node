@@ -154,7 +154,6 @@ describe('Azure IMDS successful-response JSON privacy', () => {
       try {
         await once(metadata.listen(0, '127.0.0.1'), 'listening');
         const address = metadata.address();
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
         if (!address || typeof address === 'string') {
           throw new Error('Expected the Azure metadata server to bind an ephemeral TCP port.');
         }
@@ -952,7 +951,6 @@ describe('Azure IMDS successful-response JSON privacy', () => {
       apiFetch,
     );
 
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const failure = await client.models.list().catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(SubjectTokenProviderError);

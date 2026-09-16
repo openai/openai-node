@@ -10,13 +10,6 @@ function completion(
   id: string,
   toolCalls?: ChatCompletionChunk.Choice.Delta.ToolCall[],
 ): ChatCompletionChunk {
-  const delta: ChatCompletionChunk.Choice.Delta = {
-    role: 'assistant',
-    content: toolCalls ? null : 'finished',
-  };
-  if (toolCalls) {
-    delta.tool_calls = toolCalls;
-  }
   return {
     id,
     object: 'chat.completion.chunk',
@@ -25,7 +18,11 @@ function completion(
     choices: [
       {
         index: 0,
-        delta,
+        delta: {
+          role: 'assistant',
+          content: toolCalls ? null : 'finished',
+          ...(toolCalls ? { tool_calls: toolCalls } : {}),
+        },
         finish_reason: toolCalls ? 'tool_calls' : 'stop',
         logprobs: null,
       },

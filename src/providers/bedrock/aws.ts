@@ -77,10 +77,8 @@ function validateStaticCredentials(options: BedrockProviderOptions): AwsCredenti
   }
 
   if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
     typeof options.accessKeyId !== 'string' ||
     !options.accessKeyId.trim() ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
     typeof options.secretAccessKey !== 'string' ||
     !options.secretAccessKey.trim()
   ) {
@@ -90,19 +88,17 @@ function validateStaticCredentials(options: BedrockProviderOptions): AwsCredenti
   }
   if (
     options.sessionToken !== undefined &&
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
     (typeof options.sessionToken !== 'string' || !options.sessionToken.trim())
   ) {
     throw new Errors.OpenAIError('A static AWS `sessionToken` must not be empty when provided.');
   }
 
-  const credentials: AwsCredentialIdentity = {
+  return {
     accessKeyId: options.accessKeyId,
     secretAccessKey: options.secretAccessKey,
-    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+    // Spread creates an own data property without invoking inherited setters or changing the object prototype.
     ...(options.sessionToken ? { sessionToken: options.sessionToken } : {}),
   };
-  return credentials;
 }
 
 function requestTarget(parsedURL: URL) {
@@ -117,7 +113,6 @@ function requestTarget(parsedURL: URL) {
     const existing = query[name];
     if (existing === undefined) {
       query[name] = value;
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
     } else if (typeof existing === 'string') {
       query[name] = [existing, value];
     } else {
@@ -131,7 +126,6 @@ function signableBody(body: BodyInit | null | undefined): string | ArrayBuffer |
   if (body === undefined || body === null) {
     return undefined;
   }
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
   if (typeof body === 'string' || body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
     return body;
   }
@@ -142,14 +136,11 @@ function signableBody(body: BodyInit | null | undefined): string | ArrayBuffer |
 
 function validateCredentialIdentity(identity: AwsCredentialIdentity): AwsCredentialIdentity {
   if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
     typeof identity?.accessKeyId !== 'string' ||
     !identity.accessKeyId.trim() ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
     typeof identity.secretAccessKey !== 'string' ||
     !identity.secretAccessKey.trim() ||
     (identity.sessionToken !== undefined &&
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate external AWS identities and supported signing inputs before credentials or bodies reach the signer.
       (typeof identity.sessionToken !== 'string' || !identity.sessionToken.trim()))
   ) {
     throw new Errors.OpenAIError(
@@ -237,21 +228,18 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
     const target = requestTarget(parsedURL);
 
     await prepareBedrockAuth(request, context, {
-      resolve: () => {
-        const signer = this.signatureV4();
-        const signable: Parameters<typeof signer.sign>[0] = {
+      resolve: () =>
+        this.signatureV4().sign({
           protocol: parsedURL.protocol,
           hostname: parsedURL.hostname,
-          // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+          // Spread creates an own data property without invoking inherited setters or changing the object prototype.
           ...(parsedURL.port ? { port: Number(parsedURL.port) } : {}),
           method,
           ...target,
           headers: Object.fromEntries(headers.entries()),
-          // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+          // Spread creates an own data property without invoking inherited setters or changing the object prototype.
           ...(body === undefined ? {} : { body }),
-        };
-        return signer.sign(signable);
-      },
+        }),
       failureMessage: this.options.usesDefaultChain
         ? 'Could not find credentials for Bedrock. Pass AWS credentials to `bedrock(...)` or configure the default AWS credential chain.'
         : 'Failed to resolve AWS credentials for Bedrock. Verify your AWS profile, environment variables, or runtime identity configuration and try again.',

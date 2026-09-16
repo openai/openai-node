@@ -530,7 +530,6 @@ export class AssistantStream
     const descriptor = Object.getOwnPropertyDescriptor(event.data, 'id');
     const runStepID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
 
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject malformed wire identifiers before indexing assistant-stream snapshots.
     if (typeof runStepID !== 'string' || runStepID.length === 0) {
       throw new OpenAIError('Received assistant run-step event with an invalid run-step ID');
     }
@@ -592,7 +591,6 @@ export class AssistantStream
   #reserveRunStepAlias(data: RunStepStreamEvent['data'], canonicalID: string): void {
     const descriptor = Object.getOwnPropertyDescriptor(data, 'id');
     const runStepID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject malformed wire identifiers before indexing assistant-stream snapshots.
     if (typeof runStepID !== 'string' || runStepID.length === 0) {
       throw new OpenAIError('Received assistant run-step event with an invalid run-step ID');
     }
@@ -609,7 +607,6 @@ export class AssistantStream
     const descriptor = Object.getOwnPropertyDescriptor(event.data, 'id');
     const messageID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
 
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject malformed wire identifiers before indexing assistant-stream snapshots.
     if (typeof messageID !== 'string' || messageID.length === 0) {
       throw new OpenAIError('Received assistant message event with an invalid message ID');
     }
@@ -653,7 +650,6 @@ export class AssistantStream
   #reserveMessageAlias(data: MessageStreamEvent['data'], canonicalID: string): void {
     const descriptor = Object.getOwnPropertyDescriptor(data, 'id');
     const messageID = descriptor && 'value' in descriptor ? descriptor.value : undefined;
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject malformed wire identifiers before indexing assistant-stream snapshots.
     if (typeof messageID !== 'string' || messageID.length === 0) {
       throw new OpenAIError('Received assistant message event with an invalid message ID');
     }
@@ -968,7 +964,6 @@ export class AssistantStream
     cacheArrays: boolean,
   ): TextContentBlock | ImageFileContentBlock {
     // SAFETY: The accumulator merges the matching message-content delta into its existing block; the public return remains the text/image block union.
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public accumulateDelta helper retains its legacy open dictionary contract for heterogeneous delta fields.
     return accumulateAssistantStreamDelta(currentContent as Record<any, any>, contentElement, cacheArrays) as
       | TextContentBlock
       | ImageFileContentBlock;
@@ -978,7 +973,6 @@ export class AssistantStream
    * Applies an assistant delta to its mutable snapshot, concatenating text and
    * merging nested objects and indexed array entries.
    */
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public accumulateDelta helper retains its legacy open dictionary contract for heterogeneous delta fields.
   static accumulateDelta(acc: Record<string, any>, delta: Record<string, any>): Record<string, any> {
     return accumulateAssistantStreamDelta(acc, delta);
   }

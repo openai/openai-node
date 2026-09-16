@@ -184,7 +184,6 @@ describe('fallback caller abort subscriptions', () => {
               get(target, property) {
                 // oxlint-disable-next-line anti-slop/no-reflect-get -- The compatibility proxy must preserve native AbortSignal accessors with the signal as receiver.
                 const value = Reflect.get(target, property, target);
-                // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The proxy fixture binds host methods while preserving non-callable properties unchanged.
                 return typeof value === 'function' ? value.bind(target) : value;
               },
             })
@@ -297,14 +296,11 @@ describe('fallback caller abort subscriptions', () => {
           return originalResponse;
         },
       });
-      const options: Parameters<typeof client.get>[1] = { signal: caller.signal };
-      if (mode === 'sse') {
-        options.stream = true;
-      }
-      if (mode === 'binary') {
-        options.__binaryResponse = true;
-      }
-      const pending = client.get('/items', options);
+      const pending = client.get('/items', {
+        signal: caller.signal,
+        ...(mode === 'sse' ? { stream: true } : {}),
+        ...(mode === 'binary' ? { __binaryResponse: true } : {}),
+      });
       const response = await pending.asResponse();
       expect(response).toBe(originalResponse);
       expect(response.bodyUsed).toBe(false);

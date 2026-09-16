@@ -184,7 +184,6 @@ test.each(cases)('$source: $status $name', async ({ chunks, resumed, partial, st
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const address = server.address();
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
   if (!address || typeof address === 'string') {
     throw new Error('Expected a local TCP address');
   }
@@ -244,17 +243,16 @@ main();`,
     const [exitCode, signal] = await once(child, 'close');
     expect(signal).toBeNull();
     expect(requests).toHaveLength(resumed ? 2 : 1);
-    const expectedBody = {
-      ...(background ? { background: true } : { model: 'gpt-4o-2024-08-06' }),
-      stream: true,
-    };
-    if (source === 'streaming-tools') {
-      Object.assign(expectedBody, { tools: [{ type: 'function', name: 'query', strict: true }] });
-    }
     expect(requests[0]).toMatchObject({
       method: 'POST',
       url: '/v1/responses',
-      body: expectedBody,
+      body: {
+        ...(background ? { background: true } : { model: 'gpt-4o-2024-08-06' }),
+        ...(source === 'streaming-tools'
+          ? { tools: [{ type: 'function', name: 'query', strict: true }] }
+          : {}),
+        stream: true,
+      },
       syntheticAuthorization: true,
     });
     expect(exitCode).toBe(status === 'completed' ? 0 : 1);

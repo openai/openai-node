@@ -50,7 +50,6 @@ describe('merge()', () => {
   // t.deepEqual(noOptionsNonObjectSource, { foo: 'baz', bar: true });
   expect(noOptionsNonObjectSource).toEqual({ foo: 'baz', bar: true });
 
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Assert the runtime merge contract or probe the descriptor API required by the compatibility fixture.
   (typeof Object.defineProperty === 'function' ? test : test.skip)(
     'avoids invoking array setters unnecessarily',
     () => {
@@ -94,12 +93,10 @@ describe('prototype-pollution safety', () => {
   const graphOperations = [
     {
       name: 'merge',
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (target: Record<string, any>, source: Record<string, any>) => merge(target, source),
     },
     {
       name: 'assign_single_source',
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (target: Record<string, any>, source: Record<string, any>) =>
         assign_single_source(target, source),
     },
@@ -108,12 +105,10 @@ describe('prototype-pollution safety', () => {
   test.each([
     {
       name: 'merge',
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (target: Record<string, unknown>, source: Record<string, unknown>) => merge(target, source),
     },
     {
       name: 'assign_single_source',
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (target: Record<string, unknown>, source: Record<string, unknown>) =>
         assign_single_source(target, source),
     },
@@ -165,27 +160,22 @@ describe('prototype-pollution safety', () => {
   test.each([
     {
       name: 'nested array entries',
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (unsafe: Record<string, unknown>) => merge({}, { nested: [unsafe] }).nested[0],
     },
     {
       name: 'newly assigned array entries',
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (unsafe: Record<string, unknown>) => merge([], [unsafe])[0],
     },
     {
       name: 'array entries appended after a scalar collision',
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (unsafe: Record<string, unknown>) => merge(['existing'], [unsafe])[1],
     },
     {
       name: 'objects adopted after a scalar target',
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (unsafe: Record<string, unknown>) => merge('existing', unsafe)[1],
     },
     {
       name: 'flattened array entries after a scalar target',
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       apply: (unsafe: Record<string, unknown>) => merge('existing', [unsafe])[1],
     },
   ])('sanitizes $name', ({ apply }) => {
@@ -215,7 +205,6 @@ describe('prototype-pollution safety', () => {
   });
 
   test('preserves cycles and shared references when sanitizing adopted records', () => {
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
     const unsafe: Record<string, any> = JSON.parse('{"__proto__":{"polluted":true},"safe":true}');
     unsafe['self'] = unsafe;
     const result = merge({}, { left: unsafe, right: unsafe });
@@ -326,7 +315,6 @@ describe('prototype-pollution safety', () => {
 
     const result = merge({}, { nested: root });
     expect(result.nested === root).toBe(false);
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Assert the runtime merge contract or probe the descriptor API required by the compatibility fixture.
     expect(typeof result.nested.next).toBe('object');
   });
 
@@ -478,7 +466,6 @@ describe('prototype-pollution safety', () => {
     '$name rejects unsupported unsafe keys even when a proxy changes their enumerability',
     ({ apply }) => {
       // SAFETY: This local fixture intentionally controls its own keys and prototype; the dictionary view leaves values untrusted while testing prototype safety.
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       const unsupported = Object.create({ inherited: true }) as Record<string, unknown>;
       Object.defineProperty(unsupported, '__proto__', {
         configurable: true,
@@ -650,7 +637,6 @@ describe('prototype-pollution safety', () => {
     const sealed = Object.seal({ value: true });
     const nonExtensible = Object.preventExtensions({ value: true });
     // SAFETY: This local fixture intentionally controls its own keys and prototype; the dictionary view leaves values untrusted while testing prototype safety.
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
     const unsafe = JSON.parse('{"__proto__":{"polluted":true},"safe":true}') as Record<string, unknown>;
     const frozen = Object.freeze({ child: unsafe });
     const result = apply({}, { sealed, nonExtensible, frozen });
@@ -670,7 +656,6 @@ describe('prototype-pollution safety', () => {
     '$name rejects retained inherited parents polluted by a later child Proxy trap',
     ({ apply }) => {
       // SAFETY: This local fixture intentionally controls its own keys and prototype; the dictionary view leaves values untrusted while testing prototype safety.
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Merge security fixtures preserve arbitrary nested values and hostile own/inherited keys to exercise graph validation.
       const parent = Object.create({ inherited: true }) as Record<string, unknown>;
       let inspections = 0;
       parent['child'] = new Proxy(

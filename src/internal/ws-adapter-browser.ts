@@ -148,7 +148,6 @@ export class BrowserWebSocket implements WebSocketLike {
     switch (event) {
       case 'message': {
         return (ev: MessageEvent) => {
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Native WebSocket message data uses its runtime text-or-binary representation to classify frames.
           const isBinary = typeof ev.data !== 'string';
           listener(ev.data, isBinary);
         };

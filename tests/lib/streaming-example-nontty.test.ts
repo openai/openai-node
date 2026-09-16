@@ -39,11 +39,10 @@ test.each(cases)('$filename (tool=$hasToolCall, empty=$emptyToolCalls)', async (
       }
       let deltas: ChatCompletionChunk.Choice.Delta[];
       if (requests.length > 1 || !hasToolCall) {
-        const first: ChatCompletionChunk.Choice.Delta = { role: 'assistant', content: 'Synthetic ' };
-        if (emptyToolCalls) {
-          first.tool_calls = [];
-        }
-        deltas = [first, { content: 'recommendation.' }];
+        deltas = [
+          { role: 'assistant', content: 'Synthetic ', ...(emptyToolCalls ? { tool_calls: [] } : {}) },
+          { content: 'recommendation.' },
+        ];
       } else if (usesTools) {
         deltas = [
           {
@@ -87,7 +86,6 @@ test.each(cases)('$filename (tool=$hasToolCall, empty=$emptyToolCalls)', async (
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const address = server.address();
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
   if (!address || typeof address === 'string') {
     throw new Error('Expected a local TCP address');
   }

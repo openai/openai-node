@@ -89,7 +89,6 @@ const MERGEABLE_OBJECT_ALL_OF_KEYWORDS = new Set([
 ]);
 
 /** Visits a nested schema together with its root-relative path and containing schema keyword. */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- JSON Schema traversal accepts arbitrary keyword values and validates each node before interpreting it.
 type JSONSchemaChildVisitor = (schema: unknown, path: string[], keyword: string) => void;
 
 /** Assigns schema keywords without invoking the inherited `__proto__` setter. */
@@ -116,13 +115,11 @@ function assignSchema<T extends object>(target: T, ...sources: object[]): T {
  * participate.
  */
 export function forEachJSONSchemaChild(
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public schema conversion boundary accepts extensible JSON Schema objects with unvalidated keyword values.
   schema: JSONSchema | Record<string, unknown>,
   path: string[],
   visit: JSONSchemaChildVisitor,
 ): void {
   // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Input schema fields remain unknown until their keyword-specific validation succeeds.
   const record = schema as Record<string, unknown>;
 
   for (const keyword of JSON_SCHEMA_SINGLE_SCHEMA_KEYWORDS) {
@@ -214,7 +211,6 @@ function stripUndefinedSchemaKeywords(schema: JSONSchemaDefinition, visited = ne
   visited.add(schema);
 
   // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Undefined-keyword cleanup must inspect every own field, including extensions absent from the JSON Schema interface.
   const schemaRecord = schema as Record<string, unknown>;
   for (const keyword of Object.keys(schemaRecord)) {
     if (schemaRecord[keyword] === undefined) {
@@ -237,7 +233,6 @@ function stripUndefinedSchemaKeywords(schema: JSONSchemaDefinition, visited = ne
 function normalizeRootRefAndAllOf(schema: JSONSchema): void {
   const seenRefs = new Set<string>();
   while (true) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof schema.$ref === 'string') {
       if (seenRefs.has(schema.$ref)) {
         throw new Error('Cyclic local $ref at `<root>` is not supported: ' + JSON.stringify(schema.$ref));
@@ -280,7 +275,6 @@ function inlineRootRefObject(schema: JSONSchema): void {
   // Ref siblings are annotations in Draft 7, so keep them while following
   // aliases. Add outer annotations first so they win over inner aliases and
   // the final target when the effective root is assembled.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Schema annotations include arbitrary default/example payloads that must retain their original values.
   const inheritedAnnotations: Record<string, unknown> = Object.fromEntries(
     Object.entries(schema).filter(([keyword]) => JSON_SCHEMA_ANNOTATION_KEYWORDS.has(keyword)),
   );
@@ -297,7 +291,6 @@ function inlineRootRefObject(schema: JSONSchema): void {
         'Local $ref at `<root>` does not resolve to an object or boolean schema: ' + JSON.stringify(ref),
       );
     }
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema permits boolean schemas and untrusted keyword values; validate them before normalization.
     if (typeof target === 'boolean') {
       throw new TypeError('Expected object schema but got boolean; path=<root>');
     }
@@ -319,7 +312,6 @@ function inlineRootRefObject(schema: JSONSchema): void {
     for (const keyword of JSON_SCHEMA_ANNOTATION_KEYWORDS) {
       if (!(keyword in inheritedAnnotations) && keyword in target) {
         // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
-        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Annotation copying preserves arbitrary default/example values selected by the allowed annotation keywords.
         inheritedAnnotations[keyword] = (target as Record<string, unknown>)[keyword];
       }
     }
@@ -345,7 +337,6 @@ function inlineRootRefObject(schema: JSONSchema): void {
     }
   }
   // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Root ref promotion replaces every own schema keyword while preserving arbitrary metadata values.
   const schemaRecord = schema as Record<string, unknown>;
 
   for (const keyword of Object.keys(schema)) {
@@ -397,7 +388,6 @@ function normalizeRootAllOf(schema: JSONSchema): void {
     delete rootMetadata.allOf;
     const normalized = structuredClone(branch);
     // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Root allOf promotion replaces every own schema keyword while preserving arbitrary metadata values.
     const schemaRecord = schema as Record<string, unknown>;
 
     for (const keyword of Object.keys(schema)) {
@@ -462,7 +452,6 @@ function normalizeRootAnyOf(schema: JSONSchema): boolean {
   }
 
   // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Root anyOf promotion replaces every own schema keyword while preserving arbitrary metadata values.
   const schemaRecord = schema as Record<string, unknown>;
 
   for (const keyword of Object.keys(schema)) {
@@ -553,7 +542,6 @@ function rewriteLocalRefsIntoPromotedRootAnyOfBranch(
       return;
     }
 
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string') {
       value.$ref = rewriteRef(value.$ref);
     }
@@ -611,7 +599,6 @@ function normalizeSingletonTypeArrays(schema: JSONSchemaDefinition): void {
 }
 
 function isNullable(schema: JSONSchemaDefinition, root: JSONSchema, seenRefs = new Set<string>()): boolean {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema permits boolean schemas and untrusted keyword values; validate them before normalization.
   if (typeof schema === 'boolean') {
     return schema;
   }
@@ -622,7 +609,6 @@ function isNullable(schema: JSONSchemaDefinition, root: JSONSchema, seenRefs = n
     // a local ref. Keep the proof conservative for every other sibling because
     // resolving those correctly would require intersecting the referenced
     // schema and its sibling constraints.
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(schema) || seenRefs.has(ref)) {
       return false;
     }
@@ -696,7 +682,6 @@ function ensureStrictJsonSchema(
   path: string[],
   root: JSONSchema,
 ): JSONSchema {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema permits boolean schemas and untrusted keyword values; validate them before normalization.
   if (typeof jsonSchema === 'boolean') {
     throw new TypeError(`Expected object schema but got boolean; path=${path.join('/')}`);
   }
@@ -744,7 +729,6 @@ function ensureStrictJsonSchema(
   }
 
   const required = jsonSchema.required ?? [];
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The required keyword must contain string property names before strict-schema normalization.
   if (!Array.isArray(required) || required.some((key) => typeof key !== 'string')) {
     throw new TypeError(
       `Expected \`required\` to be an array of strings; path=${path.join('/') || '<root>'}`,
@@ -824,7 +808,6 @@ function ensureStrictJsonSchema(
   normalizeArrayUnionWrapper(jsonSchema, root);
 
   // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Strict conversion validates arbitrary input keyword values before narrowing them to their supported forms.
   const schemaRecord = jsonSchema as Record<string, unknown>;
   for (const keyword of JSON_SCHEMA_UNSUPPORTED_SCHEMA_KEYWORDS) {
     // Optional converter output often keeps undefined placeholders on the
@@ -855,7 +838,6 @@ function ensureStrictJsonSchema(
     // These boolean forms are already handled as parent-keyword semantics:
     // additionalProperties: false closes objects, while boolean
     // additionalItems does not contain a nested schema to strictify.
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema permits boolean schemas and untrusted keyword values; validate them before normalization.
     if (typeof child === 'boolean' && (keyword === 'additionalProperties' || keyword === 'additionalItems')) {
       return;
     }
@@ -907,7 +889,7 @@ function parseLocalRef(ref: string): string[] | undefined {
   return parts;
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-returns, anti-slop/no-unknown-parameters -- Resolving untrusted schema references may produce any value; callers perform the schema checks. JSON Schema traversal accepts arbitrary keyword values and validates each node before interpreting it.
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Resolving untrusted schema references may produce any value; callers perform the schema checks. JSON Schema traversal accepts arbitrary keyword values and validates each node before interpreting it.
 function resolvePointerPart(resolved: unknown, part: string): unknown | undefined {
   if (Array.isArray(resolved)) {
     if (!/^(?:0|[1-9]\d*)$/.test(part)) {
@@ -991,7 +973,6 @@ export function resolveLocalRef(root: JSONSchema, ref: string): JSONSchemaDefini
   return isSchemaDefinition(resolved) ? resolved : undefined;
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- This existing object predicate supports the converter generic contract without assigning types to individual fields.
 function isObject<T>(obj: T | any[]): obj is Extract<T, Record<string, any>> {
   return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
 }
@@ -1010,7 +991,6 @@ function isObjectOnlySchema(
   }
 
   if (schema.$ref !== undefined) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof schema.$ref !== 'string' || !hasOnlyRefAndAnnotations(schema) || seenRefs.has(schema.$ref)) {
       return false;
     }
@@ -1054,7 +1034,6 @@ function isArrayOnlySchema(
   }
 
   if (schema.$ref !== undefined) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof schema.$ref !== 'string' || !hasOnlyRefAndAnnotations(schema) || seenRefs.has(schema.$ref)) {
       return false;
     }
@@ -1103,7 +1082,6 @@ export function hasOnlyRefAndAnnotations(schema: JSONSchema): boolean {
 
 function hasOnlyAnnotationSiblings(schema: JSONSchema, keyword: string): boolean {
   // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Sibling inspection validates definition maps and permits arbitrary annotation values beside the selected keyword.
   const schemaRecord = schema as Record<string, unknown>;
   return Object.keys(schema).every(
     // Definition maps do not add sibling validation constraints. Keep them
@@ -1333,7 +1311,6 @@ export function rewriteLocalRefsIntoMovedOneOfBranches(root: JSONSchema): void {
       return;
     }
 
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string') {
       value.$ref = rewriteRef(value.$ref);
     }
@@ -1365,7 +1342,6 @@ function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
 
     for (const [index, part] of originalParts.entries()) {
       // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Resolved schema values may contain arbitrary annotation and literal fields beyond the declared schema interface.
       const resolvedRecord = isObject(resolved) ? (resolved as Record<string, unknown>) : undefined;
       if (
         part === 'anyOf' &&
@@ -1416,7 +1392,6 @@ function rewriteLocalRefsIntoFilteredAnyOfBranches(root: JSONSchema): void {
       return;
     }
 
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string') {
       value.$ref = rewriteRef(value.$ref);
     }
@@ -1442,7 +1417,6 @@ function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
       return;
     }
 
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string' && refTargetsAllOfBranch(root, value.$ref)) {
       const pointerParts = parseLocalRef(value.$ref);
       if (!rootOnly || pointerParts?.[0] === 'allOf') {
@@ -1491,7 +1465,6 @@ function preserveAllOfRefTargets(root: JSONSchema, rootOnly = false): void {
       return;
     }
 
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string') {
       value.$ref = rewrittenRefs.get(value.$ref) ?? value.$ref;
     }
@@ -1520,7 +1493,6 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
       return;
     }
 
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string') {
       const parts = parseLocalRef(value.$ref);
       if (
@@ -1573,7 +1545,6 @@ function preserveDiscardedAllOfPropertyRefTargets(root: JSONSchema, discardedPat
       return;
     }
 
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof value.$ref === 'string') {
       value.$ref = rewrittenRefs.get(value.$ref) ?? value.$ref;
     }
@@ -1593,7 +1564,6 @@ function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: 
 
   const ref = schema.$ref;
   if (ref !== undefined) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
     if (typeof ref !== 'string') {
       throw new TypeError(`Received non-string $ref - ${ref}; path=${path.join('/')}`);
     }
@@ -1613,7 +1583,6 @@ function validateRefSchemas(schema: JSONSchemaDefinition, path: string[], root: 
         }\` does not resolve to an object or boolean schema: ${JSON.stringify(ref)}`,
       );
     }
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema permits boolean schemas and untrusted keyword values; validate them before normalization.
     if (typeof resolved === 'boolean') {
       throw new TypeError(`Expected object schema but got boolean; path=${path.join('/')}`);
     }
@@ -1656,7 +1625,6 @@ function resolveObjectAllOfBranch(
   while (true) {
     while (resolved.$ref !== undefined) {
       const ref = resolved.$ref;
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON Schema references come from external schema data and must be strings before resolution.
       if (typeof ref !== 'string' || !hasOnlyRefAndAnnotations(resolved) || seenRefs.has(ref)) {
         return undefined;
       }
@@ -1767,7 +1735,6 @@ export function normalizeObjectAllOfForExclusivity(
       const flattened = structuredClone(branch);
       for (const keyword of Object.keys(normalized)) {
         // SAFETY: Only an enumerated own keyword is deleted from this mutable schema object before installing its normalized replacement.
-        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Normalization removes runtime-selected unsupported keywords from an extensible schema object.
         delete (normalized as Record<string, unknown>)[keyword];
       }
       assignSchema(normalized, flattened, siblings);
@@ -1895,7 +1862,7 @@ function mergeObjectAllOf(
     for (const keyword of JSON_SCHEMA_ROOT_METADATA_KEYWORDS) {
       if (keyword in jsonSchema) {
         // SAFETY: Root annotation keywords are copied unchanged between schema objects; the record views preserve their unknown values.
-        // oxlint-disable-next-line anti-slop/no-known-value-widening, anti-slop/no-unsafe-dictionary-type -- Root annotation keywords are copied dynamically; JSONSchema has no index signature for extension fields. Metadata merging preserves arbitrary annotation/default values under the selected schema keywords.
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- Root annotation keywords are copied dynamically; JSONSchema has no index signature for extension fields. Metadata merging preserves arbitrary annotation/default values under the selected schema keywords.
         (merged as Record<string, unknown>)[keyword] = (jsonSchema as Record<string, unknown>)[keyword];
       }
     }
@@ -1948,7 +1915,6 @@ function mergeObjectAllOf(
       // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
       if (
         (keyword === '$defs' || keyword === 'definitions') &&
-        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Branch inspection validates the runtime-selected schema keyword before recursing into its value.
         isObject((branch as Record<string, unknown>)[keyword])
       ) {
         continue;
@@ -1987,7 +1953,6 @@ function mergeObjectAllOf(
     }
 
     if (branch.required !== undefined) {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The required keyword must contain string property names before strict-schema normalization.
       if (!Array.isArray(branch.required) || branch.required.some((key) => typeof key !== 'string')) {
         fail();
       }
@@ -2092,7 +2057,6 @@ function isMergeableObjectSchema(schema: JSONSchema): boolean {
 
 function hasOnlyNeutralAllOfBranchKeywords(schema: JSONSchema): boolean {
   // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Neutral-branch analysis accepts arbitrary annotation values and validates definition maps before treating them as neutral.
   const schemaRecord = schema as Record<string, unknown>;
   return Object.keys(schema).every(
     (keyword) =>
@@ -2108,7 +2072,6 @@ function isMergeableObjectType(type: JSONSchema['type']): boolean {
   );
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- JSON Schema traversal accepts arbitrary keyword values and validates each node before interpreting it.
 function schemasEqual(left: unknown, right: unknown): boolean {
   if (left === right) {
     return true;
@@ -2122,16 +2085,13 @@ function schemasEqual(left: unknown, right: unknown): boolean {
     return left.every((value, index) => schemasEqual(value, right[index]));
   }
 
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Structural schema equality distinguishes containers from primitive JSON values before recursion.
   if (typeof left !== 'object' || left === null || typeof right !== 'object' || right === null) {
     return false;
   }
 
   // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Schema comparison handles arbitrary keyword and literal values without treating them as trusted sub-schemas.
   const leftRecord = left as Record<string, unknown>;
   // SAFETY: This is an object schema at this traversal point; the record view permits dynamic keyword access while individual values remain subject to schema checks.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Schema comparison handles arbitrary keyword and literal values without treating them as trusted sub-schemas.
   const rightRecord = right as Record<string, unknown>;
   const leftKeys = Object.keys(leftRecord);
   const rightKeys = Object.keys(rightRecord);

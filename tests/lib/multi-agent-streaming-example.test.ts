@@ -60,7 +60,6 @@ async function runExample(events: readonly BetaResponseStreamEvent[], ending: 'd
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const address = server.address();
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
   if (!address || typeof address === 'string') {
     throw new Error('Expected a local TCP address');
   }
@@ -121,11 +120,10 @@ test.each([
   ['incomplete', false, null],
   ['incomplete', true, { agent_name: '/root' }],
 ] as const)('reports a %s root response (partial output: %s)', async (status, partialOutput, agent) => {
-  const terminal = terminalEvent(status);
-  if (agent !== undefined) {
-    terminal.agent = agent;
-  }
-  const result = await runExample([...(partialOutput ? [textEvent] : []), terminal]);
+  const result = await runExample([
+    ...(partialOutput ? [textEvent] : []),
+    { ...terminalEvent(status), ...(agent === undefined ? {} : { agent }) },
+  ]);
 
   expect(result.exitCode).toBe(1);
   expect(result.stderr).toContain(`Response ended with response.${status}.`);
@@ -163,11 +161,10 @@ test.each(
     ].map((owner) => ({ ...owner, ending })),
   ),
 )('accepts $ending after coordinator completion with $ownership ownership', async ({ agent, ending }) => {
-  const terminal = terminalEvent('completed');
-  if (agent !== undefined) {
-    terminal.agent = agent;
-  }
-  const result = await runExample([textEvent, terminal], ending);
+  const result = await runExample(
+    [textEvent, { ...terminalEvent('completed'), ...(agent === undefined ? {} : { agent }) }],
+    ending,
+  );
 
   expect(result.exitCode).toBe(0);
   expect(result.stderr).toBe('');

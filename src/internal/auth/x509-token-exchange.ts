@@ -27,7 +27,6 @@ const SAFE_OAUTH_ERRORS = new Set(['invalid_grant', 'invalid_subject_token', 'to
 const SAFE_RESPONSE_HEADERS = ['retry-after', 'retry-after-ms', 'x-should-retry', 'x-request-id'];
 const MAX_TOKEN_EXCHANGE_DURATION_MS = 5000;
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function transientConnectionError(message: string, failure: unknown): APIConnectionError {
   const error = new APIConnectionError({ message });
   if (isRetryableX509TransportFailure(failure)) {
@@ -53,7 +52,6 @@ export interface X509TokenExchangeOptions {
 
 async function cancelReader(
   reader: ReadableStreamDefaultReader<Uint8Array>,
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   reason?: unknown,
 ): Promise<void> {
   try {
@@ -134,9 +132,7 @@ interface UnvalidatedTokenResponse {
   expires_in?: unknown;
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Token-exchange JSON fields are untrusted until response or OAuth-error validation succeeds.
 function validateTokenResponse(value: unknown): X509ExchangedToken {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Decode untrusted issuer responses and validate token fields before authenticating an API request.
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new OpenAIError('X.509 workload identity token exchange returned an invalid token response.');
   }
@@ -145,7 +141,6 @@ function validateTokenResponse(value: unknown): X509ExchangedToken {
   const response = value as UnvalidatedTokenResponse;
   if (
     !hasOwn(response, 'access_token') ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Decode untrusted issuer responses and validate token fields before authenticating an API request.
     typeof response['access_token'] !== 'string' ||
     !SAFE_ACCESS_TOKEN.test(response['access_token'])
   ) {
@@ -156,7 +151,6 @@ function validateTokenResponse(value: unknown): X509ExchangedToken {
   }
   const tokenType = response['token_type'];
   if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Decode untrusted issuer responses and validate token fields before authenticating an API request.
     typeof tokenType !== 'string' ||
     tokenType.toLowerCase() !== 'bearer' ||
     response['issued_token_type'] !== ACCESS_TOKEN_TYPE
@@ -168,7 +162,6 @@ function validateTokenResponse(value: unknown): X509ExchangedToken {
     throw new OpenAIError('X.509 workload identity token exchange returned an invalid token lifetime.');
   }
   const expiresIn = response['expires_in'];
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Decode untrusted issuer responses and validate token fields before authenticating an API request.
   if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0 || expiresIn > 3600) {
     throw new OpenAIError('X.509 workload identity token exchange returned an invalid token lifetime.');
   }
@@ -190,16 +183,12 @@ function safeResponseHeaders(response: Response, includeRetryHints = false): Hea
   return headers;
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Token-exchange JSON fields are untrusted until response or OAuth-error validation succeeds.
 function readOAuthErrorCode(value: unknown): string | undefined {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Decode untrusted issuer responses and validate token fields before authenticating an API request.
   if (typeof value === 'string') {
     return value;
   }
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Decode untrusted issuer responses and validate token fields before authenticating an API request.
   if (typeof value === 'object' && value !== null && hasOwn(value, 'code')) {
     const code: unknown = Object.getOwnPropertyDescriptor(value, 'code')?.value;
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Decode untrusted issuer responses and validate token fields before authenticating an API request.
     return typeof code === 'string' ? code : undefined;
   }
   return undefined;
@@ -214,7 +203,6 @@ async function oauthError(
 
   try {
     const parsed = await readResponseBody(response, signal);
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Decode untrusted issuer responses and validate token fields before authenticating an API request.
     if (typeof parsed === 'object' && parsed !== null && hasOwn(parsed, 'error')) {
       const code = readOAuthErrorCode(Object.getOwnPropertyDescriptor(parsed, 'error')?.value);
       if (code !== undefined && SAFE_OAUTH_ERRORS.has(code)) {
@@ -247,10 +235,8 @@ export async function exchangeX509Token(options: X509TokenExchangeOptions): Prom
   callerSignal?.throwIfAborted();
   const { identityProviderId, serviceAccountId, transport } = options;
   if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Decode untrusted issuer responses and validate token fields before authenticating an API request.
     typeof identityProviderId !== 'string' ||
     identityProviderId.trim().length === 0 ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Decode untrusted issuer responses and validate token fields before authenticating an API request.
     typeof serviceAccountId !== 'string' ||
     serviceAccountId.trim().length === 0
   ) {

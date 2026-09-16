@@ -36,14 +36,11 @@ const strictWeatherJSONSchema: JSONSchema = {
   additionalProperties: false,
 };
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Standard Schema validation begins with unknown model output and narrows it through the validator.
 function validateWeather(value: unknown) {
   if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The Standard Schema fixture must reject inputs that do not satisfy its city contract.
     typeof value === 'object' &&
     value !== null &&
     'city' in value &&
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The Standard Schema fixture must reject inputs that do not satisfy its city contract.
     typeof value.city === 'string' &&
     'unit' in value &&
     (value.unit === 'c' || value.unit === 'f')
@@ -62,7 +59,6 @@ function validateWeather(value: unknown) {
   };
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Standard Schema fixtures include arbitrary JSON Schema keywords and malformed values checked by the helpers.
 function makeStandardSchema(jsonSchema: Record<string, unknown> = weatherJSONSchema) {
   const input = vi.fn(() => jsonSchema);
   const output = vi.fn(() => ({ type: 'string' }));
@@ -87,7 +83,6 @@ function makeStandardSchema(jsonSchema: Record<string, unknown> = weatherJSONSch
   };
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Standard Schema fixtures include arbitrary JSON Schema keywords and malformed values checked by the helpers.
 function makeStrictSchemaFactories(jsonSchema: Record<string, unknown>) {
   const { standardSchema } = makeStandardSchema(jsonSchema);
 
@@ -107,7 +102,6 @@ function makeStrictSchemaFactories(jsonSchema: Record<string, unknown>) {
   ];
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Standard Schema fixtures include arbitrary JSON Schema keywords and malformed values checked by the helpers.
 function strictSchemasForAllHelpers(jsonSchema: Record<string, unknown>) {
   return makeStrictSchemaFactories(jsonSchema).map((makeSchema) => makeSchema());
 }
@@ -154,7 +148,6 @@ describe('Standard Schema helpers', () => {
     ],
   ] as const;
 
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Standard Schema validation begins with unknown model output and narrows it through the validator.
   const permissiveValidation = (_value: unknown): ReturnType<typeof validateWeather> => ({
     value: { city: 'unvalidated', unit: 'c', normalized: true },
   });
@@ -237,7 +230,6 @@ describe('Standard Schema helpers', () => {
     const originalInput = metadata.jsonSchema.input;
     let metadataReads = 0;
 
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Standard Schema validation begins with unknown model output and narrows it through the validator.
     const strictValidator = function strictValidator(this: typeof metadata, value: unknown) {
       expect(this).toBe(metadata);
       return validateWeather(value);
@@ -458,10 +450,8 @@ describe('Standard Schema helpers', () => {
       },
     });
     // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Standard Schema fixtures include arbitrary JSON Schema keywords and malformed values checked by the helpers.
     const properties = (schema as Record<string, unknown>)['properties'] as Record<string, unknown>;
     // SAFETY: The explicit object-schema fixture produces these JSON Schema keywords; the adjacent assertions verify their expected content.
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Standard Schema fixtures include arbitrary JSON Schema keywords and malformed values checked by the helpers.
     const choice = properties['choice'] as Record<string, unknown>;
     expect(choice).not.toHaveProperty('type');
     expect(choice).not.toHaveProperty('additionalProperties');
@@ -2173,7 +2163,6 @@ describe('Standard Schema helpers', () => {
       ...standardSchema,
       '~standard': {
         ...standardSchema['~standard'],
-        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Standard Schema validation begins with unknown model output and narrows it through the validator.
         validate: async (value: unknown) => validateWeather(value),
       },
     };

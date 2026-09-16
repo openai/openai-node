@@ -61,7 +61,6 @@ describe('partial parsing', () => {
   test('should only throw errors parsing numbers', () =>
     assert(
       property(json({ depthSize: 'large', noUnicodeString: false }), (jsonString) => {
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression distinguishes numeric JSON primitives to select the intended partial-parse assertions.
         const isNumber = typeof JSON.parse(jsonString) === 'number';
         for (let i = 1; i < jsonString.length; i++) {
           // speedup

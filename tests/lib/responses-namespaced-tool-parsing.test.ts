@@ -35,18 +35,15 @@ function namespace(name: string, tools: NamespaceTool['tools']): NamespaceTool {
 }
 
 function toolCall(scope?: string, name = 'lookup', args = '{"city":"Paris"}'): ResponseFunctionToolCall {
-  const call: ResponseFunctionToolCall = {
+  return {
     type: 'function_call',
     id: `fc_${scope ?? 'top'}_${name}`,
     call_id: `call_${scope ?? 'top'}_${name}`,
     name,
+    ...(scope === undefined ? {} : { namespace: scope }),
     arguments: args,
     status: 'completed',
   };
-  if (scope !== undefined) {
-    call.namespace = scope;
-  }
-  return call;
 }
 
 function responseFixture(output: Response['output'], incomplete = false): Response {
@@ -107,7 +104,6 @@ async function request(
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const address = server.address();
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
     if (!address || typeof address === 'string') {
       throw new Error('Expected a loopback HTTP address');
     }
@@ -213,11 +209,9 @@ test.each(modes)('%s does not fall back across namespaces or from custom tools',
 test.each([false, null, undefined])(
   'does not infer strictness from a nested strict=%s tool',
   async (strict) => {
-    const tool: NamespaceTool.Function = { type: 'function', name: 'lookup' };
-    if (strict !== undefined) {
-      tool.strict = strict;
-    }
-    const tools = [namespace('crm', [tool])];
+    const tools = [
+      namespace('crm', [{ type: 'function', name: 'lookup', ...(strict === undefined ? {} : { strict }) }]),
+    ];
     expect(hasAutoParseableInput({ model: 'gpt-5.5', tools })).toBe(false);
     expect(shouldParseToolCall({ model: 'gpt-5.5', tools }, toolCall('crm'))).toBe(false);
     const result = await request('parse', tools, [toolCall('crm', 'lookup', 'not JSON')]);

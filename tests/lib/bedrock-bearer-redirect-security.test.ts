@@ -92,7 +92,6 @@ function captureRequest(
 
 function serverURL(server: Server): string {
   const address = server.address();
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
   if (!address || typeof address === 'string') {
     throw new Error('Expected the redirect test server to bind an ephemeral TCP port');
   }
@@ -218,7 +217,6 @@ describe('Bedrock bearer redirect security', () => {
           )
           .then(
             () => null,
-            // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
             (error: unknown) => error,
           );
 

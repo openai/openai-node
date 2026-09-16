@@ -65,7 +65,6 @@ const privacyStandardSchema = {
     vendor: 'structured-output-privacy',
     // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Standard Schema types is phantom input/output evidence, intentionally undefined at runtime.
     types: undefined as unknown as { input: { ok: boolean }; output: { ok: boolean } },
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Standard Schema validator receives untrusted parser input before validating its fields.
     validate(value: unknown) {
       // SAFETY: This pass-through validator fixture isolates JSON parsing and validator-error ownership; successful test payloads use the declared ok boolean.
       return { value: value as { ok: boolean } };
@@ -102,16 +101,6 @@ function makeChatCompletion(
   args?: string,
   refusal: string | null = null,
 ): OpenAI.Chat.ChatCompletion {
-  const message: OpenAI.Chat.ChatCompletionMessage = { role: 'assistant', content, refusal };
-  if (args !== undefined) {
-    message.tool_calls = [
-      {
-        id: 'call_privacy',
-        type: 'function',
-        function: { name: 'lookup', arguments: args },
-      },
-    ];
-  }
   return {
     id: 'chatcmpl_privacy',
     object: 'chat.completion',
@@ -122,7 +111,22 @@ function makeChatCompletion(
         index: 0,
         finish_reason: args === undefined ? 'stop' : 'tool_calls',
         logprobs: null,
-        message,
+        message: {
+          role: 'assistant',
+          content,
+          refusal,
+          ...(args === undefined
+            ? {}
+            : {
+                tool_calls: [
+                  {
+                    id: 'call_privacy',
+                    type: 'function',
+                    function: { name: 'lookup', arguments: args },
+                  },
+                ],
+              }),
+        },
       },
     ],
   };
@@ -195,7 +199,6 @@ function createClient(body: OpenAI.Chat.ChatCompletion | OpenAI.Responses.Respon
 }
 
 function createStreamingToolClient(content: string | readonly string[], tool: ChatCompletionFunctionTool) {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The fixture accepts either a single text fragment or an iterable of fragments.
   const fragments = typeof content === 'string' ? [content] : content;
   const chunk: OpenAI.Chat.ChatCompletionChunk = {
     id: 'chatcmpl_stream_privacy',
@@ -262,22 +265,24 @@ function createStreamingContentClient(
   format: typeof chatFormat | (typeof helperFamilies)[number]['chatFormat'],
   refusal?: string,
 ) {
-  const chunks = contents.map((content, index): OpenAI.Chat.ChatCompletionChunk => {
-    const delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta = { content };
-    if (index === 0) {
-      delta.role = 'assistant';
-      if (refusal) {
-        delta.refusal = refusal;
-      }
-    }
-    return {
-      id: 'chatcmpl_content_privacy',
-      object: 'chat.completion.chunk',
-      created: 0,
-      model: 'gpt-test',
-      choices: [{ index: 0, finish_reason: null, logprobs: null, delta }],
-    };
-  });
+  const chunks = contents.map((content, index): OpenAI.Chat.ChatCompletionChunk => ({
+    id: 'chatcmpl_content_privacy',
+    object: 'chat.completion.chunk',
+    created: 0,
+    model: 'gpt-test',
+    choices: [
+      {
+        index: 0,
+        finish_reason: null,
+        logprobs: null,
+        delta: {
+          ...(index === 0 ? { role: 'assistant' as const } : {}),
+          ...(index === 0 && refusal ? { refusal } : {}),
+          content,
+        },
+      },
+    ],
+  }));
   const completedChunk: OpenAI.Chat.ChatCompletionChunk = {
     id: 'chatcmpl_content_privacy',
     object: 'chat.completion.chunk',
@@ -311,7 +316,6 @@ interface Scenario {
   parse: (
     content: string,
   ) => Promise<ReturnType<typeof parseChatCompletion> | ReturnType<typeof parseResponse>>;
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Privacy assertions accept different parsed object shapes produced by independent schema fixtures.
   expected: Record<string, unknown>;
 }
 

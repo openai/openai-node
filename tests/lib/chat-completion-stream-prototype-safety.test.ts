@@ -21,7 +21,6 @@ describe('ChatCompletionStream prototype safety', () => {
     name: string;
     inject: (
       chunk: OpenAI.Chat.ChatCompletionChunk,
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The test injects extension metadata and own __proto__ fields into several different wire object kinds.
       properties: Record<string, unknown>,
     ) => OpenAI.Chat.ChatCompletionChunk;
     target: (snapshot: PrototypeSnapshot) => object | undefined;
@@ -105,7 +104,6 @@ describe('ChatCompletionStream prototype safety', () => {
       // SAFETY: The literal JSON deliberately preserves an own __proto__ key; its fixture fields are injected into the stream to verify prototype-safe accumulation.
       const properties = JSON.parse(
         '{"__proto__":{"forged_metadata":"inherited"},"provider_metadata":"preserved"}',
-        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The test injects extension metadata and own __proto__ fields into several different wire object kinds.
       ) as Record<string, unknown>;
       expect(hasOwn(properties, '__proto__')).toBe(true);
 
@@ -346,7 +344,6 @@ describe('ChatCompletionStream prototype safety', () => {
 
     const completionError = await runner.done().then(
       () => null,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 

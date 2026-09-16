@@ -96,15 +96,10 @@ app.use(express.text());
 // See examples/chat-completions/stream-to-client-browser.ts for a more complete example.
 function watchClientDisconnect(req: Request, res: Response) {
   if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host cancellation and HTTP lifecycle methods before registering cleanup.
     typeof AbortController !== 'function' ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host cancellation and HTTP lifecycle methods before registering cleanup.
     typeof req.on !== 'function' ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host cancellation and HTTP lifecycle methods before registering cleanup.
     typeof req.off !== 'function' ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host cancellation and HTTP lifecycle methods before registering cleanup.
     typeof res.on !== 'function' ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host cancellation and HTTP lifecycle methods before registering cleanup.
     typeof res.off !== 'function'
   ) {
     return;
@@ -131,7 +126,6 @@ function watchClientDisconnect(req: Request, res: Response) {
 }
 
 function rethrowUnlessClientAbort(
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   error: unknown,
   disconnect: ReturnType<typeof watchClientDisconnect>,
 ): void {
@@ -190,7 +184,7 @@ const handleRequest = async (req: Request, res: Response) => {
 };
 
 app.post('/', (req: Request, res: Response) =>
-  // oxlint-disable-next-line promise/prefer-await-to-callbacks, anti-slop/no-unknown-parameters -- Express 4 does not await async handlers; consume their arbitrary rejection values in this synchronous route.
+  // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Express 4 does not await async handlers; consume their arbitrary rejection values in this synchronous route.
   handleRequest(req, res).catch((error: unknown) => {
     console.error(error);
     if (res.destroyed || res.writableEnded) {

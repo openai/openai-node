@@ -860,7 +860,6 @@ describe('hostile Bedrock bearer AbortSignal lifecycle', () => {
         options?: Parameters<AbortSignal['addEventListener']>[2],
       ) => {
         controller.abort(reason);
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The signal fixture preserves both listener-function and handleEvent-object forms of EventTarget callbacks.
         if (deliver && typeof listener === 'function') {
           listener.call(controller.signal, new Event('abort'));
         }
@@ -884,7 +883,6 @@ describe('hostile Bedrock bearer AbortSignal lifecycle', () => {
     throwAfterRemovingOnce(signal);
     vi.spyOn(signal, 'addEventListener').mockImplementationOnce((type, listener, options) => {
       controller.abort(reason);
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The signal fixture preserves both listener-function and handleEvent-object forms of EventTarget callbacks.
       if (typeof listener === 'function') {
         listener.call(signal, new Event('abort'));
       }

@@ -130,7 +130,6 @@ describe('assistant tests', () => {
     const iterator = assistantStream[Symbol.asyncIterator]();
     // Wait for the stream's terminal signal so the events and the error have
     // definitely been emitted before we start reading.
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const failure: unknown = await assistantStream.done().catch((error: unknown) => error);
 
     await expect(iterator.next()).resolves.toMatchObject({

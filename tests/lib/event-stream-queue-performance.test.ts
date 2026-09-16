@@ -8,13 +8,11 @@ import type { BaseEvents } from 'openai/lib/EventStream';
 const QUEUE_SIZE = 4096;
 
 interface QueueEvents extends BaseEvents {
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The queue fixture exercises arbitrary payload identities without assigning one event schema.
   value: (value: unknown) => void;
   empty: () => void;
 }
 
 class QueueTestStream extends EventStream<QueueEvents> {
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The queue fixture exercises arbitrary payload identities without assigning one event schema.
   emitValue(value: unknown): void {
     this._emit('value', value);
   }
@@ -182,7 +180,6 @@ describe('EventStream iterator queue performance', () => {
         values.length === 1 &&
         Array.isArray(tuple) &&
         tuple.length === 1 &&
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The retention regression inspects callback tuples before checking the adversarial payload marker.
         typeof tuple[0] === 'object' &&
         tuple[0] !== null &&
         'marker' in tuple[0] &&

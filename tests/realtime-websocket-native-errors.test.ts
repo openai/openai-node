@@ -21,7 +21,6 @@ describe.each([
 
     try {
       const address = server.address();
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
       if (!address || typeof address === 'string') {
         throw new Error('Expected a local TCP server');
       }

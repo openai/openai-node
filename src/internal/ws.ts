@@ -23,7 +23,6 @@ export function getMaxBufferedEvents(options?: WebSocketStreamOptions): number |
 }
 
 /** Reconnection event passed to the `onReconnecting` handler and event listeners. */
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public reconnect event retains its default dictionary type for application-defined connection parameters.
 export interface ReconnectingEvent<Parameters = Record<string, unknown>> {
   /** Which retry attempt this is (1-based). */
   readonly attempt: number;
@@ -34,7 +33,6 @@ export interface ReconnectingEvent<Parameters = Record<string, unknown>> {
   /** The WebSocket close code that triggered reconnection. */
   readonly closeCode: number;
   /** The current query parameters. */
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public reconnect contract permits extra parameter keys whose values belong to the application.
   readonly parameters: (Parameters & Record<string, unknown>) | undefined;
 }
 
@@ -42,14 +40,12 @@ export interface ReconnectingEvent<Parameters = Record<string, unknown>> {
  * Optional overrides returned from the `onReconnecting` handler
  * to customize the next reconnection attempt.
  */
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public reconnect override retains its default dictionary type for application-defined connection parameters.
 export type ReconnectingOverrides<Parameters = Record<string, unknown>> =
   | {
       /**
        * If provided, assigns the query parameters for the next connection.
        * Set to `undefined` to clear all query parameters.
        */
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The public reconnect contract permits extra parameter keys whose values belong to the application.
       parameters?: (Parameters & Record<string, unknown>) | undefined;
     }
   | {
@@ -101,7 +97,6 @@ function isWebSocketCredentialHeader(name: string): boolean {
  */
 export function snapshotWebSocketCredentials(options: {
   auth?: unknown;
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Header overrides are unvalidated values until the transport checks and normalizes them.
   headers?: Record<string, unknown> | undefined;
 }): boolean {
   if (options.auth !== null && options.auth !== undefined) {
@@ -123,14 +118,12 @@ export function snapshotWebSocketCredentials(options: {
     const values = Array.isArray(snapshot) ? snapshot : [snapshot];
     credentials.set(
       name.toLowerCase(),
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- WebSocket transport data and credential headers require runtime validation before parsing or forwarding.
       values.some((item) => typeof item === 'string' && item.trim().length > 0),
     );
   }
   // Node applies header names case-insensitively, and Authorization overrides Basic auth.
   return (
     [...credentials.values()].some(Boolean) ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- WebSocket transport data and credential headers require runtime validation before parsing or forwarding.
     (!credentials.has('authorization') && typeof options.auth === 'string' && options.auth.trim().length > 0)
   );
 }
@@ -188,7 +181,6 @@ export function flattenRawData(data: RawWebSocketData): Exclude<RawWebSocketData
 }
 
 function snapshotRawData(data: RawWebSocketData): Exclude<RawWebSocketData, ArrayBufferView[]> {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- WebSocket transport data and credential headers require runtime validation before parsing or forwarding.
   if (typeof data === 'string') {
     return data;
   }
@@ -205,7 +197,6 @@ function snapshotRawData(data: RawWebSocketData): Exclude<RawWebSocketData, Arra
 }
 
 function rawByteLength(data: RawWebSocketData): number {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- WebSocket transport data and credential headers require runtime validation before parsing or forwarding.
   if (typeof data === 'string') {
     return encodeUTF8(data).byteLength;
   }

@@ -19,7 +19,6 @@ class IdempotentOpenAI extends OpenAI {
   }
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The response fixture serializes heterogeneous valid and malformed API payloads.
 function jsonResponse(value: unknown = {}, init: ResponseInit = {}): Response {
   return Response.json(value, {
     ...init,
@@ -363,11 +362,12 @@ describe('JSON response parsing', () => {
     ['Application/JSON', undefined],
     ['application/json', '0'],
   ])('accepts an empty %s response with content-length %s', async (contentType, contentLength) => {
-    const headers = new Headers({ 'content-type': contentType });
-    if (contentLength !== undefined) {
-      headers.set('content-length', contentLength);
-    }
-    const response = new Response('', { headers });
+    const response = new Response('', {
+      headers: {
+        'content-type': contentType,
+        ...(contentLength === undefined ? {} : { 'content-length': contentLength }),
+      },
+    });
     const fetch = vi.fn(async () => response);
     const client = new OpenAI({ apiKey: 'test-key', fetch });
 
@@ -417,7 +417,6 @@ describe('JSON response parsing', () => {
     const parsed = await client.get('/items');
 
     expect(parsed).toEqual(expected);
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The response fixture distinguishes structured JSON payloads from scalar response expectations.
     if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
       expect(parsed).toMatchObject({ _request_id: 'req_123' });
     }

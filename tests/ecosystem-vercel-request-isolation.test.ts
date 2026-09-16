@@ -82,7 +82,7 @@ function createHandlerHarness(runtime: Runtime, failedClientIDs: number[] = []):
     }
   }
 
-  // oxlint-disable-next-line anti-slop/no-known-value-widening, anti-slop/no-unsafe-dictionary-type -- The test module loader indexes this dependency registry using runtime import specifiers. The VM loader resolves heterogeneous mock module exports from runtime import specifiers.
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The test module loader indexes this dependency registry using runtime import specifiers. The VM loader resolves heterogeneous mock module exports from runtime import specifiers.
   const dependencies: Record<string, unknown> = {
     '../../uploadWebApiTestCases': { uploadWebApiTestCases },
     'fastest-levenshtein': { distance: () => 0 },
@@ -106,7 +106,6 @@ function createHandlerHarness(runtime: Runtime, failedClientIDs: number[] = []):
   });
 
   const handlerExports: {
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The dynamically evaluated handler is invoked with both web and Node request fixtures.
     default?: (request: unknown, response?: MockNodeResponse) => Promise<HandlerResult | undefined>;
     // oxlint-disable-next-line anti-slop/no-known-value-widening -- Executing the CommonJS module populates this initially empty exports object.
   } = {};

@@ -118,7 +118,15 @@ test('inherits Ultracite native and anti-slop plugins and enforces their rules',
     const fixturePath = path.join(fixtureRoot, 'native-plugin.ts');
     writeFileSync(
       fixturePath,
-      "const values = [];\nconsole.log(values instanceof Array);\nconsole.log(Reflect.get({ value: 1 }, 'value'));\n",
+      [
+        'const values = [];',
+        'console.log(values instanceof Array);',
+        "console.log(Reflect.get({ value: 1 }, 'value'));",
+        "const validate = (value: unknown): boolean => typeof value === 'string';",
+        'const payload: Record<string, unknown> = { value: 1 };',
+        "console.log({ ...(validate(payload['value']) ? payload : {}) });",
+        '',
+      ].join('\n'),
     );
 
     const linted = spawnSync(
@@ -131,8 +139,13 @@ test('inherits Ultracite native and anti-slop plugins and enforces their rules',
 
     // SAFETY: This value comes from the controlled oxlint/config invocation above; the following assertions verify the documented output fields.
     const { diagnostics } = JSON.parse(linted.stdout) as { diagnostics: { code: string }[] };
-    expect(diagnostics.map(({ code }) => code)).toContain('unicorn(no-instanceof-array)');
-    expect(diagnostics.map(({ code }) => code)).toContain('anti-slop(no-reflect-get)');
+    const codes = diagnostics.map(({ code }) => code);
+    expect(codes).toContain('unicorn(no-instanceof-array)');
+    expect(codes).toContain('anti-slop(no-reflect-get)');
+    expect(codes).not.toContain('anti-slop(no-runtime-typeof)');
+    expect(codes).not.toContain('anti-slop(no-unknown-parameters)');
+    expect(codes).not.toContain('anti-slop(no-unsafe-dictionary-type)');
+    expect(codes).not.toContain('anti-slop(no-conditional-empty-object-spread)');
 
     const formatted = spawnSync(
       process.execPath,

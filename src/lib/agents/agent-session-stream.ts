@@ -19,7 +19,6 @@ import type { Sessions } from '../../resources/beta/agents/sessions/sessions';
 export type AgentToolOutput = AgentFunctionCallOutputParam | object | null;
 /** Receives a detached JSON object and may return a result asynchronously. */
 export type AgentToolHandler = (
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Tool argument keys and value types are application-defined; handlers receive the public unvalidated argument dictionary.
   arguments_: Record<string, unknown>,
 ) => AgentToolOutput | PromiseLike<AgentToolOutput>;
 
@@ -51,12 +50,10 @@ function isInputContent(value: unknown): value is InputContentParam {
   return hasOwn(content, 'type') && hasOwn(content, field) && typeof content[field] === 'string';
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Tool handlers can return arbitrary runtime values; normalization validates the serialized output contract.
 function normalizedOutput(value: unknown): AgentFunctionCallOutputParam | null {
   if (value === null) {
     return null;
   }
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Agent input and tool-output APIs accept text and structured values; choose the matching serialization path.
   if (typeof value === 'string' || (Array.isArray(value) && value.every(isInputContent))) {
     return value;
   }
@@ -76,7 +73,6 @@ function toolResult(call: AgentFunctionCallItem, value: AgentToolOutput): ToolRe
     turn_id: call.turn_id,
     call_id: call.call_id,
     success: true,
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Agent input and tool-output APIs accept text and structured values; choose the matching serialization path.
     output: normalizedOutput(typeof output === 'string' ? output : JSON.parse(serialized)),
   };
 }
@@ -124,7 +120,6 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
     options?: RequestOptions,
   ) {
     const input: AgentSessionInputMessageParam[] =
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Agent input and tool-output APIs accept text and structured values; choose the matching serialization path.
       typeof params.input === 'string'
         ? [{ role: 'user', content: [{ type: 'input_text', text: params.input }] }]
         : params.input;
@@ -149,7 +144,6 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
   }
 
   /** Closes local requests without cancelling the turn; an optional reason becomes the abort error's cause. */
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   abort(reason?: unknown): void {
     this.controller.abort(reason);
     this.#stream?.controller.abort(this.controller.signal.reason);
@@ -190,15 +184,18 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
       this.#stream = subscription.data;
       this.#response = subscription.response;
       this.#checkAbort();
-      const input: Parameters<Sessions['events']['create']>[1] = {
-        events: [this.#input],
-        // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
-        ...(this.#inputKey === undefined ? {} : { 'Idempotency-Key': this.#inputKey }),
-      };
-      await this.#sessions.events.create(this.#sessionID, input, {
-        ...options,
-        headers: buildHeaders([options.headers, { 'Idempotency-Key': this.#inputKey ?? null }]),
-      });
+      await this.#sessions.events.create(
+        this.#sessionID,
+        {
+          events: [this.#input],
+          // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+          ...(this.#inputKey === undefined ? {} : { 'Idempotency-Key': this.#inputKey }),
+        },
+        {
+          ...options,
+          headers: buildHeaders([options.headers, { 'Idempotency-Key': this.#inputKey ?? null }]),
+        },
+      );
       this.#checkAbort();
       this.#reading = true;
       for await (const event of this.#stream) {
@@ -237,13 +234,11 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
 
   async #result(call: AgentFunctionCallItem, handler: AgentToolHandler): Promise<ToolResult> {
     try {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Agent input and tool-output APIs accept text and structured values; choose the matching serialization path.
       const args: unknown = typeof call.arguments === 'string' ? JSON.parse(call.arguments) : call.arguments;
       if (!isObj(args)) {
         throw new OpenAIError('Function arguments must be a JSON object');
       }
       // SAFETY: Arguments were parsed as JSON and checked to be a non-null non-array object before invoking the handler.
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Tool argument keys and value types are application-defined; handlers receive the public unvalidated argument dictionary.
       return toolResult(call, await this.#wait(() => handler(args as Record<string, unknown>)));
     } catch {
       this.#checkAbort();

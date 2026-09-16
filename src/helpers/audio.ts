@@ -55,7 +55,6 @@ async function nodejsPlayAudio(stream: NodeJS.ReadableStream | Response | File):
 
         // SAFETY: The preceding branch handled Node pipe streams; the remaining response body follows the web ReadableStream contract consumed by fromWeb.
         source =
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Audio helpers distinguish supported stream interfaces and validate timeout behavior for JavaScript callers.
           'pipe' in body && typeof body.pipe === 'function'
             ? body
             : Readable.fromWeb(body as NodeReadableStream);
@@ -153,7 +152,6 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
     let settled = false;
     let callerAbortObserved = false;
     let timeoutAbortObserved = false;
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     let rejectRecording: (error: unknown) => void = reject;
 
     const collectData = (chunk: Buffer) => {
@@ -193,7 +191,6 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
       }
       return true;
     };
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     rejectRecording = (error: unknown) => {
       if (cleanup()) {
         reject(error);
@@ -239,7 +236,6 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
     };
 
     try {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Audio helpers distinguish supported stream interfaces and validate timeout behavior for JavaScript callers.
       if (typeof timeout === 'number' && (timeout > 0 || Number.isNaN(timeout))) {
         internalSignal = AbortSignal.timeout(timeout);
       }

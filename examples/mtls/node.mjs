@@ -13,13 +13,14 @@ const cert = await readFile(requiredEnv('OPENAI_MTLS_CERT_PATH'));
 const key = await readFile(requiredEnv('OPENAI_MTLS_KEY_PATH'));
 const passphrase = process.env['OPENAI_MTLS_KEY_PASSPHRASE'];
 
-const connect = {
-  cert,
-  key,
-  // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
-  ...(passphrase === undefined ? {} : { passphrase }),
-};
-const dispatcher = new Agent({ connect });
+const dispatcher = new Agent({
+  connect: {
+    cert,
+    key,
+    // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+    ...(passphrase === undefined ? {} : { passphrase }),
+  },
+});
 
 try {
   const client = new OpenAI({

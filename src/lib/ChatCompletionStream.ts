@@ -224,7 +224,7 @@ export function makeChatCompletionReadableStreamMessageChunk(
   const payload: ChatCompletionReadableStreamMessage = {
     type: 'message',
     message,
-    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+    // Spread creates an own data property without invoking inherited setters or changing the object prototype.
     ...(toolCallIds ? { tool_call_ids: toolCallIds } : {}),
   };
 
@@ -491,7 +491,6 @@ function captureStructuredJSONSnapshot(
   }
   if (
     !('value' in descriptor) ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect own data descriptors before parsing schema hooks, without invoking getters or serializers.
     (typeof descriptor.value !== 'string' && descriptor.value !== null && descriptor.value !== undefined)
   ) {
     throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
@@ -508,7 +507,6 @@ function captureStructuredMessageSnapshot(
   if (
     !descriptor ||
     !('value' in descriptor) ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect own data descriptors before parsing schema hooks, without invoking getters or serializers.
     typeof descriptor.value !== 'object' ||
     descriptor.value === null
   ) {
@@ -572,7 +570,6 @@ function mapCapturedSnapshotArray<Item, Mapped>(
 ): Mapped[] {
   const descriptor = Object.getOwnPropertyDescriptor(array, 'length');
   const length: unknown = descriptor && 'value' in descriptor ? descriptor.value : undefined;
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate finite integer indexes and lengths before allocating or indexing stream state.
   if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0 || length > maximum) {
     throw new OpenAIError(`Chat completion stream exceeded its snapshot ${kind} limit`);
   }
@@ -617,13 +614,11 @@ function ownFunctionToolIdentity(
   if (!type || !('value' in type) || type.value !== 'function' || !fn || !('value' in fn)) {
     return undefined;
   }
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect own data descriptors before parsing schema hooks, without invoking getters or serializers.
   if (typeof fn.value !== 'object' || fn.value === null) {
     return undefined;
   }
 
   const name = Object.getOwnPropertyDescriptor(fn.value, 'name');
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect own data descriptors before parsing schema hooks, without invoking getters or serializers.
   if (!name || !('value' in name) || typeof name.value !== 'string' || name.value.length === 0) {
     return undefined;
   }
@@ -684,7 +679,6 @@ function snapshotChatCompletionParserParams(params: ChatCompletionCreateParams):
     const lengthDescriptor = Object.getOwnPropertyDescriptor(params.tools, 'length');
     const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
     const toolCount =
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate finite integer indexes and lengths before allocating or indexing stream state.
       typeof length === 'number' && Number.isSafeInteger(length) && length >= 0
         ? Math.min(length, MAX_STREAM_TOOL_CALLS)
         : 0;
@@ -774,7 +768,6 @@ type CanonicalSerializedParserValue =
   | typeof UNSAFE_SERIALIZED_PARSER_VALUE;
 
 function canonicalSerializedParserSchema(
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Parser metadata is inspected through descriptors and may contain arbitrary caller values before validation.
   value: unknown,
   budget: SerializedParserSchemaBudget,
 ): string | undefined {
@@ -793,37 +786,30 @@ function canonicalSerializedParserSchema(
   };
 
   // SAFETY: Object.getPrototypeOf returns an object or null; the following traversal checks inherited properties without assuming a specific prototype type.
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Parser metadata is inspected through descriptors and may contain arbitrary caller values before validation.
   const visit = (current: unknown, depth: number): CanonicalSerializedParserValue => {
     if (depth > MAX_SERIALIZED_PARSER_SCHEMA_DEPTH || budget.nodes >= MAX_SERIALIZED_PARSER_SCHEMA_NODES) {
       return UNSAFE_SERIALIZED_PARSER_VALUE;
     }
     budget.nodes += 1;
 
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bounded JSON-size accounting must reproduce native primitive serialization semantics without coercion.
     if (current === undefined || typeof current === 'function' || typeof current === 'symbol') {
       return OMITTED_SERIALIZED_PARSER_VALUE;
     }
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bounded JSON-size accounting must reproduce native primitive serialization semantics without coercion.
     if (typeof current === 'bigint') {
       return UNSAFE_SERIALIZED_PARSER_VALUE;
     }
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bounded JSON-size accounting must reproduce native primitive serialization semantics without coercion.
     if (current === null || typeof current === 'boolean' || typeof current === 'number') {
       const serialized = stringifyParserSchemaValue(current);
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bounded JSON-size accounting must reproduce native primitive serialization semantics without coercion.
       return typeof serialized === 'string' && charge(serialized.length)
         ? serialized
         : UNSAFE_SERIALIZED_PARSER_VALUE;
     }
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bounded JSON-size accounting must reproduce native primitive serialization semantics without coercion.
     if (typeof current === 'string') {
       if (!charge(current.length * 6 + 2)) {
         return UNSAFE_SERIALIZED_PARSER_VALUE;
       }
       return stringifyParserSchemaValue(current);
     }
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bounded JSON-size accounting must reproduce native primitive serialization semantics without coercion.
     if (typeof current !== 'object' || ancestors.has(current)) {
       return UNSAFE_SERIALIZED_PARSER_VALUE;
     }
@@ -847,7 +833,6 @@ function canonicalSerializedParserSchema(
       if (!serializer) {
         continue;
       }
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect own data descriptors before parsing schema hooks, without invoking getters or serializers.
       if (!('value' in serializer) || typeof serializer.value === 'function') {
         return UNSAFE_SERIALIZED_PARSER_VALUE;
       }
@@ -864,7 +849,6 @@ function canonicalSerializedParserSchema(
         const lengthDescriptor = Object.getOwnPropertyDescriptor(current, 'length');
         const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
         if (
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate finite integer indexes and lengths before allocating or indexing stream state.
           typeof length !== 'number' ||
           !Number.isSafeInteger(length) ||
           length < 0 ||
@@ -911,7 +895,6 @@ function canonicalSerializedParserSchema(
 
       const entries: [string, unknown][] = [];
       for (const key of keys) {
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Schema inspection distinguishes string keys from symbols before visiting JSON properties.
         if (typeof key !== 'string') {
           continue;
         }
@@ -956,7 +939,6 @@ function canonicalSerializedParserSchema(
 
   try {
     const normalized = visit(value, 0);
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
     return typeof normalized === 'string' ? normalized : undefined;
   } catch {
     return undefined;
@@ -976,7 +958,6 @@ function rememberSerializedParserSchema(
   if (
     !parser ||
     !('value' in parser) ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect own data descriptors before parsing schema hooks, without invoking getters or serializers.
     typeof parser.value !== 'function' ||
     !schema ||
     !('value' in schema)
@@ -997,7 +978,6 @@ function hasMatchingSerializedParserSchema(
   // oxlint-disable-next-line anti-slop/no-object-parameters -- The schema holder is inspected through own descriptors before its contents are trusted.
   holder: object,
   key: string,
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Parser metadata is inspected through descriptors and may contain arbitrary caller values before validation.
   value: unknown,
 ): boolean {
   const expected = source && signatures.get(source);
@@ -1012,7 +992,6 @@ function hasMatchingSerializedParserSchema(
 
 function serializedParserDescriptor(
   descriptor: PropertyDescriptor | undefined,
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Parser metadata is inspected through descriptors and may contain arbitrary caller values before validation.
   value: unknown,
 ): PropertyDescriptor {
   return descriptor && 'value' in descriptor
@@ -1046,9 +1025,10 @@ function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): C
   // SAFETY: The fallback is a serialization scaffold: the code below installs the captured wire fields before the tool is returned.
   const source =
     serialized.source ??
-    ((serialized.type === 'function'
-      ? { type: serialized.type, function: {} }
-      : { type: serialized.type }) as ChatCompletionInputTool);
+    ({
+      type: serialized.type,
+      ...(serialized.type === 'function' ? { function: {} } : {}),
+    } as ChatCompletionInputTool);
   const descriptors = Object.getOwnPropertyDescriptors(source);
   descriptors.type = serializedParserDescriptor(descriptors.type, serialized.type);
 
@@ -1064,7 +1044,6 @@ function snapshotSerializedParserTool(serialized: SerializedToolParserConfig): C
   const descriptor = descriptors.function;
   // SAFETY: The preceding guard proves this data descriptor contains a non-null object; no more specific type is assumed.
   const original =
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect own data descriptors before parsing schema hooks, without invoking getters or serializers.
     descriptor && 'value' in descriptor && typeof descriptor.value === 'object' && descriptor.value !== null
       ? (descriptor.value as object)
       : {};
@@ -1110,7 +1089,6 @@ function ownSerializedParserObject(holder: object, key: string): object | undefi
     return undefined;
   }
   const { value } = descriptor;
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
   return typeof value === 'object' && value !== null ? value : undefined;
 }
 
@@ -1155,7 +1133,6 @@ function observeSerializedChatCompletionParserParams(
 
   return observeJSONRequestBody(body, {
     value(holder, key, value) {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
       if (!root && key === '' && typeof value === 'object' && value !== null) {
         root = value;
         tools = undefined;
@@ -1169,7 +1146,6 @@ function observeSerializedChatCompletionParserParams(
       }
 
       if (holder === root && key === 'response_format') {
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
         if (typeof value === 'object' && value !== null) {
           responseFormat = value;
           const owner = ownSerializedParserObject(holder, key);
@@ -1188,7 +1164,6 @@ function observeSerializedChatCompletionParserParams(
               // SAFETY: Proxy property values may be arbitrary; unknown preserves that uncertainty before the property-specific checks below.
               // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys with the original target as accessor receiver.
               const actual = Reflect.get(target, property, target) as unknown;
-              // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
               if (typeof property === 'string') {
                 const index = Number(property);
                 if (
@@ -1199,7 +1174,6 @@ function observeSerializedChatCompletionParserParams(
                 ) {
                   actualToolOwners.set(
                     index,
-                    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
                     typeof actual === 'object' && actual !== null ? actual : undefined,
                   );
                 }
@@ -1218,7 +1192,6 @@ function observeSerializedChatCompletionParserParams(
           !Number.isSafeInteger(index) ||
           index < 0 ||
           index >= MAX_STREAM_TOOL_CALLS ||
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
           typeof value !== 'object' ||
           value === null
         ) {
@@ -1234,10 +1207,8 @@ function observeSerializedChatCompletionParserParams(
 
       const tool = toolFrames.get(holder);
       if (tool) {
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
         if (key === 'type' && typeof value === 'string') {
           tool.type = value;
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
         } else if (key === 'function' && typeof value === 'object' && value !== null) {
           const fn: SerializedFunctionParserConfig = { source: tool.source, schemaMatches: false };
           tool.function = fn;
@@ -1247,7 +1218,6 @@ function observeSerializedChatCompletionParserParams(
       }
 
       if (holder === responseFormat && responseFrame) {
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
         if (key === 'type' && typeof value === 'string') {
           responseFrame.type = value;
         } else if (key === 'json_schema') {
@@ -1264,10 +1234,8 @@ function observeSerializedChatCompletionParserParams(
 
       const fn = functionFrames.get(holder);
       if (fn) {
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
         if (key === 'name' && typeof value === 'string') {
           fn.name = value;
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
         } else if (key === 'strict' && typeof value === 'boolean') {
           fn.strict = value;
         } else if (key === 'parameters') {
@@ -1340,7 +1308,6 @@ export class ChatCompletionStream<ParsedT = null>
     const tools = params?.tools;
     const lengthDescriptor = tools && Object.getOwnPropertyDescriptor(tools, 'length');
     const length = lengthDescriptor && 'value' in lengthDescriptor ? lengthDescriptor.value : undefined;
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate finite integer indexes and lengths before allocating or indexing stream state.
     if (tools && typeof length === 'number' && Number.isSafeInteger(length) && length >= 0) {
       for (let index = 0; index < Math.min(length, MAX_STREAM_TOOL_CALLS); index += 1) {
         const descriptor = Object.getOwnPropertyDescriptor(tools, String(index));
@@ -1518,7 +1485,6 @@ export class ChatCompletionStream<ParsedT = null>
           let argumentsSnapshot: string;
           if (boundIdentity?.parseable) {
             const capturedArguments = captureStructuredJSONSnapshot(toolCallSnapshot.function, 'arguments');
-            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject non-string tool arguments before bounded JSON parsing or argument accumulation.
             if (typeof capturedArguments !== 'string') {
               throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
             }
@@ -1578,7 +1544,6 @@ export class ChatCompletionStream<ParsedT = null>
           this.#validateStructuredSnapshots(this.#currentChatCompletionSnapshot);
         }
         const capturedArguments = captureStructuredJSONSnapshot(toolCallSnapshot.function, 'arguments');
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject non-string tool arguments before bounded JSON parsing or argument accumulation.
         if (typeof capturedArguments !== 'string') {
           throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
         }
@@ -1706,7 +1671,6 @@ export class ChatCompletionStream<ParsedT = null>
         }),
       );
       const state = this.#choiceEventStates[choice.index];
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
       if (parseableContent && !refusal && typeof content === 'string') {
         validateStructuredJSONSnapshot(content, finalJSONBudget, this.#partialJSONParseBudget);
       }
@@ -1738,7 +1702,6 @@ export class ChatCompletionStream<ParsedT = null>
           if (fn && !('value' in fn)) {
             throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
           }
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect own data descriptors before parsing schema hooks, without invoking getters or serializers.
           if (fn && typeof fn.value === 'object' && fn.value !== null) {
             const name = Object.getOwnPropertyDescriptor(fn.value, 'name');
             if (name && !('value' in name)) {
@@ -1762,7 +1725,6 @@ export class ChatCompletionStream<ParsedT = null>
         // SAFETY: The tool-call function is captured through an own data descriptor; its fields are subsequently checked by the structured snapshot reader.
         const fn = descriptor.value as ChatCompletionSnapshot.Choice.Message.ToolCall.Function;
         const argumentsSnapshot = captureStructuredJSONSnapshot(fn, 'arguments');
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject non-string tool arguments before bounded JSON parsing or argument accumulation.
         if (typeof argumentsSnapshot !== 'string') {
           throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
         }
@@ -1871,7 +1833,6 @@ export class ChatCompletionStream<ParsedT = null>
     );
     let chatId;
     for await (const item of stream) {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted stream or serialized schema values before bounded parsing and snapshot mutation.
       if ('error' in item && hasOwn(item, 'error') && typeof item.error === 'object' && item.error !== null) {
         throw new APIError(undefined, item.error, undefined, undefined);
       }
@@ -1938,7 +1899,6 @@ export class ChatCompletionStream<ParsedT = null>
 
     const requestedChoiceCount = this.#params?.n;
     const maxChoices =
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate finite integer indexes and lengths before allocating or indexing stream state.
       typeof requestedChoiceCount === 'number' &&
       Number.isSafeInteger(requestedChoiceCount) &&
       requestedChoiceCount > 0
@@ -2190,7 +2150,6 @@ export class ChatCompletionStream<ParsedT = null>
                   argumentFragment,
                 );
                 const previousArguments = captureStructuredJSONSnapshot(functionSnapshot, 'arguments');
-                // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject non-string tool arguments before bounded JSON parsing or argument accumulation.
                 if (typeof previousArguments !== 'string') {
                   throw new OpenAIError('Chat completion stream contains an unsafe structured JSON snapshot');
                 }
@@ -2436,7 +2395,7 @@ function finalizeChatCompletion<ParsedT>(
     created,
     model,
     object: 'chat.completion',
-    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+    // Spread creates an own data property without invoking inherited setters or changing the object prototype.
     ...(system_fingerprint ? { system_fingerprint } : {}),
   };
 

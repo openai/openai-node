@@ -7,7 +7,6 @@ import type { Run } from 'openai/resources/beta/threads/runs/runs';
 import { Stream } from 'openai/streaming';
 import { assistantStream, completedRun } from './assistant-stream-test-utils';
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Raw event fixtures deliberately include malformed and incomplete payloads outside the generated event union.
 type Event = Record<string, any>;
 
 function iterableEvents(events: Event[], controller = new AbortController()) {
@@ -1475,7 +1474,6 @@ describe('AssistantStream factories and async iteration', () => {
     const runner = AssistantStream.fromReadableStream(readable);
     const failure = await runner.done().then(
       () => null,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -1497,7 +1495,6 @@ describe('AssistantStream factories and async iteration', () => {
     const runner = AssistantStream.fromReadableStream(readable);
     const failure = await runner.done().then(
       () => null,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 

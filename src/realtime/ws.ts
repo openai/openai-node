@@ -56,7 +56,6 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     client ??= new OpenAI();
     const apiKey = props.__apiKey === undefined ? client.apiKey : props.__apiKey;
     // SAFETY: The supplied OpenAI client owns _options; this read detects its existing API-key provider without changing its public surface.
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The public Node WebSocket boundary accepts refreshable credentials and untrusted JSON frames.
     const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
     if (hasProvider && !props.__resolvedApiKey) {
       throw new Error(
@@ -71,7 +70,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     const headers = {
       'User-Agent': `${client.constructor.name}/JS ${VERSION}`,
       ...props.options?.headers,
-      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- A credential must be an own data property without invoking an inherited setter.
+      // A credential must be an own data property without invoking an inherited setter.
       ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${apiKey}` }),
     };
 
@@ -89,12 +88,10 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
           const parsedEvent = parseRealtimeEvent(wsEvent.toString());
 
           if (
-            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The public Node WebSocket boundary accepts refreshable credentials and untrusted JSON frames.
             typeof parsedEvent !== 'object' ||
             parsedEvent === null ||
             Array.isArray(parsedEvent) ||
             !Object.getOwnPropertyDescriptor(parsedEvent, 'type') ||
-            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The public Node WebSocket boundary accepts refreshable credentials and untrusted JSON frames.
             typeof parsedEvent.type !== 'string'
           ) {
             throw new TypeError('Realtime WebSocket event must be an object with a string type.');
@@ -183,7 +180,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
           ...props.options,
           headers: {
             ...props.options?.headers,
-            // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- A credential must be an own data property without invoking an inherited setter.
+            // A credential must be an own data property without invoking an inherited setter.
             ...(isApiKeyProvider ? {} : { 'api-key': apiKey }),
           },
         },

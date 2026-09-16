@@ -260,7 +260,6 @@ export class AbstractChatCompletionRunner<
       if (
         isToolMessage(message) &&
         message.content != null &&
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Chat history and tool-choice inputs can contain runtime variants that select different runner behavior.
         typeof message.content === 'string' &&
         this.messages.some(
           (x) =>
@@ -398,7 +397,6 @@ export class AbstractChatCompletionRunner<
     // SAFETY: The generic runner parameters tie toolContext to ToolContext; undefined remains valid when the caller omits it under that contract.
     const toolContext = inputToolContext as ToolContext;
     const singleFunctionToCall =
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Chat history and tool-choice inputs can contain runtime variants that select different runner behavior.
       typeof tool_choice !== 'string' && tool_choice.type === 'function' && tool_choice?.function?.name;
     const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS, afterCompletion } = options || {};
     const runAfterCompletion = async (completion: ChatCompletion) => {
@@ -453,7 +451,6 @@ export class AbstractChatCompletionRunner<
                   type: 'function',
                   function: {
                     name: t.function.name || t.function.function.name,
-                    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Tool parameter schemas use the published open JSON Schema dictionary contract, including arbitrary extensions.
                     parameters: t.function.parameters as Record<string, unknown>,
                     description: t.function.description,
                     strict: t.function.strict,
@@ -613,9 +610,7 @@ export class AbstractChatCompletionRunner<
     }
   }
 
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Public tool callbacks can return any JavaScript value; this boundary normalizes their results for the API.
   static #stringifyFunctionCallResult(rawContent: unknown): string {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Chat history and tool-choice inputs can contain runtime variants that select different runner behavior.
     if (typeof rawContent === 'string') {
       return rawContent;
     }

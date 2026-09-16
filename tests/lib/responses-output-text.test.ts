@@ -19,7 +19,6 @@ describe('resource responses output_text', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
 
     expect(response).toHaveProperty('output_text');
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Assert the actual runtime output_text type rather than relying on its declaration.
     expect(typeof response.output_text).toBe('string');
   });
 });

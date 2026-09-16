@@ -1,4 +1,3 @@
-import type { ClientOptions } from 'openai';
 import { vi } from 'vitest';
 
 import OpenAI, { AzureOpenAI, OpenAIError } from 'openai';
@@ -46,26 +45,23 @@ const nativeRealtimeSurfaces = [
 ] as const;
 
 function createClient(apiKey = 'permanent-secret', dangerouslyAllowBrowser?: boolean): OpenAI {
-  const options: ClientOptions = { apiKey, baseURL: 'https://trusted.example.com/v1/' };
-  if (dangerouslyAllowBrowser !== undefined) {
-    options.dangerouslyAllowBrowser = dangerouslyAllowBrowser;
-  }
-  return new OpenAI(options);
+  return new OpenAI({
+    apiKey,
+    baseURL: 'https://trusted.example.com/v1/',
+    ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
+  });
 }
 
 function createAzureClient(tokenProvider = false, dangerouslyAllowBrowser?: boolean): AzureOpenAI {
-  const options: ConstructorParameters<typeof AzureOpenAI>[0] = {
+  return new AzureOpenAI({
     apiVersion: '2024-10-01-preview',
     baseURL: 'https://azure.example.com/openai/',
     deployment: 'chat',
     ...(tokenProvider
       ? { azureADTokenProvider: async () => 'azure-bearer-secret' }
       : { apiKey: 'azure-api-key-secret' }),
-  };
-  if (dangerouslyAllowBrowser !== undefined) {
-    options.dangerouslyAllowBrowser = dangerouslyAllowBrowser;
-  }
-  return new AzureOpenAI(options);
+    ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
+  });
 }
 
 function lastNativeSocket(): CapturingNativeSocket {
@@ -79,16 +75,13 @@ function lastNativeSocket(): CapturingNativeSocket {
 function withBrowserWorker<T>(
   workerType: 'DedicatedWorkerGlobalScope' | 'SharedWorkerGlobalScope' | 'ServiceWorkerGlobalScope',
   run: () => T,
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The fixture replaces heterogeneous runtime globals to test browser and server transport selection.
   options: { runtime?: Record<string, unknown>; userAgent?: string } = {},
 ): T {
   const navigator = { userAgent: options.userAgent ?? 'Mozilla/5.0' };
   const browserWorkerGlobalScope = Object.defineProperty(() => null, Symbol.hasInstance, {
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Symbol.hasInstance probe must accept any JavaScript value before comparing the simulated host identity.
     value: (value: unknown) => value === globalThis,
   });
   const browserWorkerNavigator = Object.defineProperty(() => null, Symbol.hasInstance, {
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Symbol.hasInstance probe must accept any JavaScript value before comparing the simulated host identity.
     value: (value: unknown) => value === navigator,
   });
 
@@ -161,11 +154,13 @@ describe.each(nativeRealtimeSurfaces)('$name native realtime browser-worker secu
     const client = createClient(key, clientOptIn);
 
     withBrowserWorker('DedicatedWorkerGlobalScope', () => {
-      const options: ConstructorParameters<typeof Realtime>[0] = { model: 'gpt-realtime' };
-      if (connectionOptIn !== undefined) {
-        options.dangerouslyAllowBrowser = true;
-      }
-      const realtime = new Realtime(options, client);
+      const realtime = new Realtime(
+        {
+          model: 'gpt-realtime',
+          ...(connectionOptIn === undefined ? {} : { dangerouslyAllowBrowser: true }),
+        },
+        client,
+      );
 
       expect(realtime.socket).toBe(lastNativeSocket());
     });

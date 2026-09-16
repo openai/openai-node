@@ -48,7 +48,6 @@ function createSerializedClient(chunks: AsyncIterable<Chunk>, observeBody: (body
     apiKey: 'sk-synthetic-serialized-tool',
     maxRetries: 0,
     fetch: async (_request, init) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (typeof init?.body !== 'string') {
         throw new TypeError('Expected a JSON-serialized chat request');
       }
@@ -91,16 +90,16 @@ async function* contentFragments(fragments: Iterable<string>): AsyncGenerator<Ch
 async function* argumentFragments(fragments: Iterable<string>): AsyncGenerator<Chunk> {
   let first = true;
   for (const fragment of fragments) {
-    const fn: OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall.Function = { arguments: fragment };
-    const toolCall: OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall = { index: 0, function: fn };
-    const delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta = { tool_calls: [toolCall] };
-    if (first) {
-      delta.role = 'assistant';
-      toolCall.id = 'call_bounded';
-      toolCall.type = 'function';
-      fn.name = 'bounded_tool';
-    }
-    yield chunk(delta);
+    yield chunk({
+      ...(first ? { role: 'assistant' as const } : {}),
+      tool_calls: [
+        {
+          index: 0,
+          ...(first ? { id: 'call_bounded', type: 'function' as const } : {}),
+          function: { ...(first ? { name: 'bounded_tool' } : {}), arguments: fragment },
+        },
+      ],
+    });
     first = false;
   }
   yield chunk({}, 'tool_calls');
@@ -109,16 +108,16 @@ async function* argumentFragments(fragments: Iterable<string>): AsyncGenerator<C
 async function* namedArgumentFragments(name: string, fragments: Iterable<string>): AsyncGenerator<Chunk> {
   let first = true;
   for (const fragment of fragments) {
-    const fn: OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall.Function = { arguments: fragment };
-    const toolCall: OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall = { index: 0, function: fn };
-    const delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta = { tool_calls: [toolCall] };
-    if (first) {
-      delta.role = 'assistant';
-      toolCall.id = 'call_named';
-      toolCall.type = 'function';
-      fn.name = name;
-    }
-    yield chunk(delta);
+    yield chunk({
+      ...(first ? { role: 'assistant' as const } : {}),
+      tool_calls: [
+        {
+          index: 0,
+          ...(first ? { id: 'call_named', type: 'function' as const } : {}),
+          function: { ...(first ? { name } : {}), arguments: fragment },
+        },
+      ],
+    });
     first = false;
   }
   yield chunk({}, 'tool_calls');
@@ -735,7 +734,6 @@ it.each(['removed', 'accessor', 'serializer', 'oversized', 'cyclic source'] as c
       throw new Error('unsafe tool parser must not run');
     });
     const callback = vi.fn();
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The malformed tool argument fixture must contain a self-referential value that is not JSON serializable.
     const circular: Record<string, unknown> = {};
     circular['self'] = circular;
     const source =
@@ -754,16 +752,14 @@ it.each(['removed', 'accessor', 'serializer', 'oversized', 'cyclic source'] as c
       kind === 'oversized'
         ? Object.fromEntries(Array.from({ length: 4097 }, (_, index) => [`field${index}`, index]))
         : { type: 'object', properties: kind === 'accessor' || kind === 'serializer' ? nested : {} };
-    const serialize = vi.fn(() => {
-      const fn: OpenAI.Chat.ChatCompletionFunctionTool['function'] = {
+    const serialize = vi.fn(() => ({
+      type: 'function',
+      function: {
         name: strictTool.function.name,
         strict: true,
-      };
-      if (kind !== 'removed') {
-        fn.parameters = parameters;
-      }
-      return { type: 'function', function: fn };
-    });
+        ...(kind === 'removed' ? {} : { parameters }),
+      },
+    }));
     Object.defineProperty(tool, 'toJSON', { configurable: true, value: serialize });
 
     const completion = await ChatCompletionStream.createChatCompletion(
@@ -1000,7 +996,6 @@ it('ignores global stringify replacement inside a tool serializer when comparing
   const parseStaleSchema = vi.fn((value: string) => ({ stale: JSON.parse(value) as unknown }));
   const tool = makeParseableTool(strictTool, { parser: parseStaleSchema, callback: vi.fn() });
   const originalStringify = JSON.stringify;
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The JSON serializer spy receives arbitrary serializable values and preserves the original stringify boundary.
   const forgePrimitive = vi.fn((value: unknown) => originalStringify(value === 'wire' ? 'value' : value));
   const serialize = vi.fn(() => {
     // SAFETY: The test deliberately replaces JSON.stringify with a forged primitive result and restores it afterward to exercise serialization validation.
@@ -1545,7 +1540,6 @@ it('tracks the actual serialized tool contract again when a request is retried',
     apiKey: 'sk-synthetic-retried-serialized-tool',
     maxRetries: 1,
     fetch: async (_request, init) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (typeof init?.body !== 'string') {
         throw new TypeError('Expected a JSON-serialized retry request');
       }
@@ -2158,7 +2152,6 @@ it.each(['byte', 'depth'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => 'unexpected success',
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => (error instanceof Error ? error.message : String(error)),
     );
 
@@ -2227,7 +2220,6 @@ it.each(['byte', 'depth', 'fragment'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => 'unexpected success',
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => (error instanceof Error ? error.message : String(error)),
     );
 
@@ -2427,7 +2419,6 @@ it.each(['content', 'tool'] as const)(
 
     stream.on('chunk', (current, snapshot) => {
       const delta = current.choices[0]?.delta;
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (kind === 'content' && typeof delta?.content === 'string') {
         publicSnapshot = snapshot;
         const message = snapshot.choices[0]?.message;
@@ -2478,7 +2469,6 @@ it.each(
         return;
       }
       const delta = current.choices[0]?.delta;
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (kind === 'content' && typeof delta?.content === 'string') {
         const message = snapshot.choices[0]?.message;
         if (message) {
@@ -2496,7 +2486,6 @@ it.each(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
     expect(failure).toBeInstanceOf(Error);
@@ -2536,7 +2525,6 @@ it.each(['content', 'tool'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
     expect(failure).toBeInstanceOf(Error);
@@ -2552,7 +2540,6 @@ it.each(['content', 'tool'] as const)(
 
     stream.on('chunk', (current, snapshot) => {
       const delta = current.choices[0]?.delta;
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (kind === 'content' && typeof delta?.content === 'string') {
         const message = snapshot.choices[0]?.message;
         if (message) {
@@ -2579,7 +2566,6 @@ it.each(['data', 'accessor'] as const)(
     const readContent = vi.fn(() => unsafe);
 
     stream.on('chunk', (current, snapshot) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (typeof current.choices[0]?.delta.content !== 'string') {
         return;
       }
@@ -2596,7 +2582,6 @@ it.each(['data', 'accessor'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -2615,7 +2600,6 @@ it.each(['refusal', 'message'] as const)(
     let read: (() => void) | undefined;
 
     stream.on('chunk', (current, snapshot) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (typeof current.choices[0]?.delta.content !== 'string') {
         return;
       }
@@ -2639,7 +2623,6 @@ it.each(['refusal', 'message'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -2656,7 +2639,6 @@ it('rejects an inherited structured refusal accessor without invoking it', async
   const read = vi.fn(() => 'Request refused');
 
   stream.on('chunk', (current, snapshot) => {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
     if (typeof current.choices[0]?.delta.content !== 'string') {
       return;
     }
@@ -2671,7 +2653,6 @@ it('rejects an inherited structured refusal accessor without invoking it', async
 
   const failure = await stream.finalChatCompletion().then(
     () => null,
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     (error: unknown) => error,
   );
 
@@ -2685,7 +2666,6 @@ it('rejects an inherited structured choice message without invoking its getter',
   const read = vi.fn(() => ({ content: '{}', role: 'assistant' }));
 
   stream.on('chunk', (current, snapshot) => {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
     if (typeof current.choices[0]?.delta.content !== 'string') {
       return;
     }
@@ -2699,7 +2679,6 @@ it('rejects an inherited structured choice message without invoking its getter',
 
   const failure = await stream.finalChatCompletion().then(
     () => null,
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     (error: unknown) => error,
   );
 
@@ -3036,7 +3015,6 @@ it.each(['choices', 'tool_calls'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -3072,7 +3050,6 @@ it('enforces an aggregate final budget across independently bounded public parse
     tools: [strictTool],
   });
   stream.on('chunk', (current, snapshot) => {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
     if (typeof current.choices[0]?.delta.content !== 'string') {
       return;
     }
@@ -3086,7 +3063,6 @@ it('enforces an aggregate final budget across independently bounded public parse
 
   const failure = await stream.finalChatCompletion().then(
     () => null,
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     (error: unknown) => error,
   );
 
@@ -3135,7 +3111,6 @@ it.each(['content', 'tool'] as const)(
         : { tools: [makeParseableTool(strictTool, { parser: parse, callback: undefined })] }),
     });
     stream.on('chunk', (current, snapshot) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
       if (kind === 'content' && typeof current.choices[0]?.delta.content === 'string') {
         for (const choice of snapshot.choices) {
           choice.message.content = oversizedTogether;
@@ -3151,7 +3126,6 @@ it.each(['content', 'tool'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -3179,13 +3153,11 @@ it('bounds a new strict tool appended to the public snapshot before its final pa
 
   const failure = await stream.finalChatCompletion().then(
     () => null,
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     (error: unknown) => error,
   );
   expect(failure).toBeInstanceOf(Error);
   expect(failure).toHaveProperty('message', expect.stringMatching(/structured JSON byte limit/u));
   expect(
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The regression inspects actual wire fragments and parser calls before asserting bounded parse behavior.
     parse.mock.calls.every(([value]) => typeof value !== 'string' || value.length < 16 * 1024 * 1024),
   ).toBe(true);
 });
@@ -3244,7 +3216,6 @@ it.each(['content', 'tool'] as const)(
 
     const failure = await stream.finalChatCompletion().then(
       () => null,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -3315,7 +3286,8 @@ it('charges repeated whole-snapshot strict-tool scans to the cumulative parse-wo
 
   async function* toolFragments(): AsyncGenerator<Chunk> {
     for (let index = 0; index < toolCount; index += 1) {
-      const delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta = {
+      yield chunk({
+        ...(index === 0 ? { role: 'assistant' as const } : {}),
         tool_calls: [
           {
             index,
@@ -3324,11 +3296,7 @@ it('charges repeated whole-snapshot strict-tool scans to the cumulative parse-wo
             function: { name: strictTool.function.name, arguments: argumentsJSON },
           },
         ],
-      };
-      if (index === 0) {
-        delta.role = 'assistant';
-      }
-      yield chunk(delta);
+      });
     }
     yield chunk({}, 'tool_calls');
   }
@@ -3342,7 +3310,6 @@ it('charges repeated whole-snapshot strict-tool scans to the cumulative parse-wo
 
   const failure = await stream.finalChatCompletion().then(
     () => null,
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     (error: unknown) => error,
   );
 

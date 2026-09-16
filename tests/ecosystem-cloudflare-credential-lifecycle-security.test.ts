@@ -445,7 +445,6 @@ describe('Cloudflare ecosystem credential lifecycle', () => {
       expect(result.status).toBe(1);
       expect(readFileSync(fixture.attempts, 'utf-8')).toBe('1');
       expect(readFileSync(fixture.vars)).toEqual(
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The process fixture accepts text and binary file contents and preserves their bytes.
         typeof contents === 'string' ? Buffer.from(contents) : contents,
       );
       expect(statSync(fixture.vars).mode % 0o1000).toBe(mode);

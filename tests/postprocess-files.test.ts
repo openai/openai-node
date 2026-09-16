@@ -66,11 +66,15 @@ test.each([
     }
 
     const distPath = scenario === 'relative override' ? path.relative(cwd, dist) : dist;
-    const env: NodeJS.ProcessEnv = { CI: 'true', SystemRoot: process.env['SystemRoot'] };
-    if (override) {
-      env['DIST_PATH'] = distPath;
-    }
-    const postprocess = execute(process.execPath, [script], { cwd, env, timeout: 15_000 });
+    const postprocess = execute(process.execPath, [script], {
+      cwd,
+      env: {
+        CI: 'true',
+        SystemRoot: process.env['SystemRoot'],
+        ...(override ? { DIST_PATH: distPath } : {}),
+      },
+      timeout: 15_000,
+    });
     if (scenario === 'missing selected package') {
       await expect(postprocess).rejects.toMatchObject({
         code: 1,

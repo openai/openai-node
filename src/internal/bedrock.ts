@@ -62,7 +62,6 @@ export function errorWithCause(message: string, cause: unknown): Errors.OpenAIEr
 
 /** Trims a configuration string, treating missing and whitespace-only values as absent. */
 export function normalizeOptionalString(value: string | null | undefined): string | undefined {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
   const normalized = typeof value === 'string' ? value.trim() : undefined;
   return normalized || undefined;
 }
@@ -249,9 +248,7 @@ export function assertBedrockRequestOrigin(baseURL: string, requestURL: string):
 }
 
 /** Validates a final WebSocket URL before a legacy Bedrock client resolves or attaches credentials. */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The WebSocket authentication boundary verifies the caller client at runtime before trusting provider metadata.
 export function assertBedrockWebSocketOrigin(client: unknown, requestURL: URL): void {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
   if (typeof client !== 'object' || client === null || !(brand_privateBedrockClient in client)) {
     return;
   }
@@ -354,7 +351,6 @@ function resolveAbortableBedrockAuth<T>(
       }
     };
 
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const rejectSignalFailure = (error: unknown) => {
       if (failure.error) {
         return;
@@ -492,7 +488,6 @@ class BedrockBearerAuth implements BedrockRequestAuth {
       resolve: () => this.tokenProvider(),
       failureMessage: 'Failed to resolve a bearer credential for Bedrock.',
       apply: (token) => {
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
         if (typeof token !== 'string' || !token.trim()) {
           throw new Errors.OpenAIError(
             'The Bedrock bearer credential provider must return a non-empty string.',
@@ -543,7 +538,6 @@ export function resolveBedrockBearerAuth(
   if (
     options.apiKey !== undefined &&
     options.apiKey !== null &&
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Bedrock credential and origin checks validate JavaScript configuration before any credential is sent.
     (typeof options.apiKey !== 'string' || !options.apiKey.trim())
   ) {
     throw new Errors.OpenAIError('The Bedrock bearer credential must not be empty.');

@@ -428,7 +428,6 @@ describe('.stream()', () => {
   });
 
   describe.each(['SSE', 'serialized stream'])('%s shell output collections', (transport) => {
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The shell fixture deliberately contrasts real command arrays with malformed array-like objects.
     function shellStream(commands: unknown, commandIndex: number, eventType: 'delta' | 'done') {
       const events = [
         {
@@ -724,7 +723,6 @@ describe('.stream()', () => {
       () => {
         throw new Error('expected finalResponse() to reject');
       },
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -753,7 +751,6 @@ describe('.stream()', () => {
       () => {
         throw new Error('expected finalResponse() to reject');
       },
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -799,7 +796,6 @@ describe('.stream()', () => {
         () => {
           throw new Error('expected finalResponse() to reject');
         },
-        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         (streamError: unknown) => streamError,
       );
 
@@ -1233,7 +1229,6 @@ describe('.stream()', () => {
       () => {
         throw new Error('Expected the response iterator to reject');
       },
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 

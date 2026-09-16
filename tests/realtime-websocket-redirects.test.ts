@@ -72,17 +72,14 @@ function createClient(apiKey = 'test-key', baseURL = 'https://example.com/v1/'):
 function createAzureClient(
   options: { tokenProvider?: boolean; deployment?: string; baseURL?: string } = {},
 ): AzureOpenAI {
-  const clientOptions: ConstructorParameters<typeof AzureOpenAI>[0] = {
+  return new AzureOpenAI({
     apiVersion: '2024-10-01-preview',
     baseURL: options.baseURL ?? 'https://azure.example.com/openai/',
     ...(options.tokenProvider
       ? { azureADTokenProvider: async () => 'azure-token' }
       : { apiKey: 'azure-key' }),
-  };
-  if (options.deployment !== undefined) {
-    clientOptions.deployment = options.deployment;
-  }
-  return new AzureOpenAI(clientOptions);
+    ...(options.deployment === undefined ? {} : { deployment: options.deployment }),
+  });
 }
 
 function createPlainConnection(options: { port?: number | string }): ReturnType<typeof connect> {
@@ -285,10 +282,8 @@ describe.each([
 
         if (
           !destinationAddress ||
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
           typeof destinationAddress === 'string' ||
           !sourceAddress ||
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
           typeof sourceAddress === 'string'
         ) {
           throw new Error('Expected both redirect test servers to bind ephemeral TCP ports');
@@ -359,10 +354,8 @@ describe.each([
 
       if (
         !destinationAddress ||
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
         typeof destinationAddress === 'string' ||
         !sourceAddress ||
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
         typeof sourceAddress === 'string'
       ) {
         throw new Error('Expected both redirect test servers to bind ephemeral TCP ports');
@@ -474,10 +467,8 @@ describe.each([
         const sourceAddress = source.address();
         if (
           !destinationAddress ||
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
           typeof destinationAddress === 'string' ||
           !sourceAddress ||
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
           typeof sourceAddress === 'string'
         ) {
           throw new Error('Expected both redirect test servers to bind ephemeral TCP ports');

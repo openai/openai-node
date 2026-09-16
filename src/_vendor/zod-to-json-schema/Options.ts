@@ -63,9 +63,10 @@ export const getDefaultOptions = <Target extends Targets>(
   options: Partial<Options<Target>> | string | undefined,
 ): Options<Target> => {
   // We need to add `definitions` here as we may mutate it
+  // Preserve the public string-name overload alongside object options.
   // SAFETY: Defaults and the supplied options are merged into the vendored converter's target-specific options contract, with fresh mutable definitions.
   const resolvedOptions = (
-    typeof options === 'string' // oxlint-disable-line anti-slop/no-runtime-typeof -- Preserve the public string-name overload alongside object options.
+    typeof options === 'string'
       ? {
           ...defaultOptions,
           basePath: ['#'],
@@ -81,7 +82,6 @@ export const getDefaultOptions = <Target extends Targets>(
   ) as Options<Target>;
 
   if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The bundled converter supports both a string schema name and an options object.
     typeof options !== 'string' &&
     options?.definitions &&
     resolvedOptions.$refStrategy === 'extract-to-root' &&

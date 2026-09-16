@@ -19,11 +19,7 @@ function fileClient(statuses: (string | undefined)[], onFetch?: () => void) {
     const status = statuses[index];
     index += 1;
     onFetch?.();
-    const body = { id: 'file_123' };
-    if (status !== undefined) {
-      Object.assign(body, { status });
-    }
-    return Response.json(body);
+    return Response.json({ id: 'file_123', ...(status === undefined ? {} : { status }) });
   });
   return { client: new OpenAI({ apiKey: 'test-key', maxRetries: 0, fetch }), fetch };
 }
@@ -121,14 +117,10 @@ describe('file processing compatibility', () => {
       now = elapsed;
     });
     const { client, fetch } = fileClient(['uploaded', 'processed']);
-    const options: Parameters<OpenAI['files']['waitForProcessing']>[1] = { pollInterval: 7 };
-    if (maxWait !== undefined) {
-      options.maxWait = maxWait;
-    }
+    const options = { pollInterval: 7, ...(maxWait === undefined ? {} : { maxWait }) };
     const promise = client.files.waitForProcessing('file_123', options);
 
     if (fails) {
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       const failure: unknown = await promise.catch((error: unknown) => error);
       expect(failure).toBeInstanceOf(APIConnectionTimeoutError);
       expect(failure).toMatchObject({

@@ -30,7 +30,6 @@ function createLogger() {
   };
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The SSE fixture includes arbitrary JSON values to test event parsing and error classification.
 function record(event: string | undefined, data: unknown): string {
   const eventLine = event === undefined ? '' : `event: ${event}\n`;
 
@@ -96,7 +95,6 @@ async function collect(stream: AsyncIterable<unknown>): Promise<unknown[]> {
 async function rejection(stream: AsyncIterable<unknown>): Promise<unknown> {
   return await collect(stream).then(
     () => null,
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     (error: unknown) => error,
   );
 }
@@ -167,7 +165,6 @@ describe('named SSE provider errors', () => {
     try {
       const caught = await iterator.next().then(
         () => null,
-        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         (error: unknown) => error,
       );
 
@@ -196,7 +193,6 @@ describe('named SSE provider errors', () => {
       }
     })().then(
       () => null,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -361,7 +357,6 @@ describe.each([
           .finalChatCompletion()
           .then(
             () => null,
-            // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
             (error: unknown) => error,
           );
       } else {

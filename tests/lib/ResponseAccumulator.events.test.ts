@@ -27,18 +27,16 @@ function makeResponse(output: OutputItem[] = []): Response {
   };
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Accumulator fixtures intentionally construct incomplete or malformed wire objects before invoking validation.
 function outputItem(value: Record<string, unknown>): OutputItem {
   const { type } = value;
-  const defaults = { id: 'item_123' };
-  if (type === 'function_call' || type === 'custom_tool_call') {
-    Object.assign(defaults, { call_id: 'call_123' });
-  }
   // SAFETY: These partial wire-item fixtures intentionally include malformed fields; the accumulator, not the fixture helper, must validate them.
-  return { ...defaults, ...value } as OutputItem;
+  return {
+    id: 'item_123',
+    ...(type === 'function_call' || type === 'custom_tool_call' ? { call_id: 'call_123' } : {}),
+    ...value,
+  } as OutputItem;
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Accumulator fixtures intentionally construct incomplete or malformed wire objects before invoking validation.
 function snapshotFor(item: Record<string, unknown>): Response {
   return accumulateResponse({
     type: 'response.created',
@@ -47,29 +45,29 @@ function snapshotFor(item: Record<string, unknown>): Response {
   });
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Accumulator fixtures intentionally construct incomplete or malformed wire objects before invoking validation.
 function applyEvent(snapshot: Response, event: Record<string, unknown>): Response {
   const { type, output_index: outputIndex } = event;
   const output =
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The adversarial event fixture must inspect runtime indexes and discriminators before adding defaults.
     typeof outputIndex === 'number' &&
     Number.isSafeInteger(outputIndex) &&
     hasOwn(snapshot.output, outputIndex)
       ? snapshot.output[outputIndex]
       : undefined;
   const requiresItemID =
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The adversarial event fixture must inspect runtime indexes and discriminators before adding defaults.
     typeof type === 'string' &&
     hasOwn(event, 'output_index') &&
     !type.startsWith('response.output_item.') &&
     !type.startsWith('response.shell_call_command.');
 
-  const defaults = { sequence_number: 1 };
-  if (requiresItemID && !hasOwn(event, 'item_id')) {
-    Object.assign(defaults, { item_id: output?.id ?? 'item_123' });
-  }
-  // SAFETY: Deliberately send partial or invalid event fields through the public accumulator to test its runtime validation.
-  return accumulateResponse({ ...defaults, ...event } as ResponseStreamEvent, snapshot);
+  return accumulateResponse(
+    // SAFETY: Deliberately send partial or invalid event fields through the public accumulator to test its runtime validation.
+    {
+      sequence_number: 1,
+      ...(requiresItemID && !hasOwn(event, 'item_id') ? { item_id: output?.id ?? 'item_123' } : {}),
+      ...event,
+    } as ResponseStreamEvent,
+    snapshot,
+  );
 }
 
 describe('ResponseAccumulator output and content events', () => {
@@ -1215,7 +1213,6 @@ describe('ResponseAccumulator lifecycle and error handling', () => {
     };
     const [{ annotations }] = annotationOutput.content;
     // SAFETY: The test deliberately creates an array impostor with Array.prototype but no array slots to exercise descriptor-safe validation.
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The sparse array fixture supplies an inherited arbitrary annotation to verify own-index filtering.
     const annotationPrototype = Object.create(Array.prototype) as Record<number, unknown>;
     [annotationPrototype[0]] = annotations;
     delete annotations[0];

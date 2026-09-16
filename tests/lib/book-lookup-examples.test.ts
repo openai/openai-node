@@ -133,10 +133,8 @@ test.each(cases)('$file serializes get($id) results', async ({ file, streaming, 
           role: 'assistant',
           content: first ? null : 'Synthetic lookup complete.',
           refusal: null,
+          ...(first ? { function_call: { name: 'get', arguments: JSON.stringify({ id }) } } : {}),
         };
-        if (first) {
-          message.function_call = { name: 'get', arguments: JSON.stringify({ id }) };
-        }
         const completion: ChatCompletion = {
           id: 'chatcmpl_synthetic',
           object: 'chat.completion',
@@ -154,7 +152,6 @@ test.each(cases)('$file serializes get($id) results', async ({ file, streaming, 
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const address = server.address();
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
     if (!address || typeof address === 'string') {
       throw new Error('Expected a loopback HTTP address');
     }
@@ -193,7 +190,6 @@ test.each(cases)('$file serializes get($id) results', async ({ file, streaming, 
         : { role: 'function', name: 'get' },
     );
     if (id === 'a1') {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate the actual tool-result message content before checking its serialized lookup result.
       if (typeof lookup?.content !== 'string') {
         throw new TypeError('Expected a serialized book');
       }

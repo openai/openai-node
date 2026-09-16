@@ -6,7 +6,18 @@ const antiSlop = requireConfig('ultracite/oxlint/anti-slop').default;
 const generatedFiles = requireConfig('./scripts/generated-files.cjs');
 
 // Existing handwritten SDK patterns predate these preset rules.
-const compatibilityRules = ['func-style', 'sort-keys'];
+const compatibilityRules = [
+  'func-style',
+  'sort-keys',
+  // SDK boundaries and fixtures accept unknown inputs and open JSON records;
+  // runtime type checks establish the contracts instead of assuming them.
+  'anti-slop/no-runtime-typeof',
+  'anti-slop/no-unknown-parameters',
+  'anti-slop/no-unsafe-dictionary-type',
+  // Conditional literal fields preserve omission and create own data properties,
+  // keeping complete request and wire fixtures visible in one construction.
+  'anti-slop/no-conditional-empty-object-spread',
+];
 
 module.exports = defineConfig({
   extends: [core, antiSlop],

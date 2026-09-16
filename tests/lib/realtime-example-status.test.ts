@@ -96,7 +96,6 @@ test.each(cases)('$provider Realtime $example handles $scenario', async ({ provi
       const event: unknown = JSON.parse(data.toString());
       requests.push(event);
       if (
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Select runtime object events before checking the example terminal status.
         typeof event === 'object' &&
         event !== null &&
         'type' in event &&
@@ -140,7 +139,6 @@ Module._load = function(request, ...args) {
     server.listen(0, '127.0.0.1');
     await listening;
     const address = server.address();
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
     if (!address || typeof address === 'string') {
       throw new Error('Expected a loopback TCP server address');
     }

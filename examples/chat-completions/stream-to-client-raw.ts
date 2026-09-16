@@ -98,15 +98,10 @@ app.use(express.text());
 //
 function watchClientDisconnect(req: Request, res: Response) {
   if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host lifecycle methods and validates external transport failures before handling them.
     typeof AbortController !== 'function' ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host lifecycle methods and validates external transport failures before handling them.
     typeof req.on !== 'function' ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host lifecycle methods and validates external transport failures before handling them.
     typeof req.off !== 'function' ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host lifecycle methods and validates external transport failures before handling them.
     typeof res.on !== 'function' ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host lifecycle methods and validates external transport failures before handling them.
     typeof res.off !== 'function'
   ) {
     return;
@@ -133,7 +128,6 @@ function watchClientDisconnect(req: Request, res: Response) {
 }
 
 function rethrowUnlessClientAbort(
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   error: unknown,
   disconnect: ReturnType<typeof watchClientDisconnect>,
 ): void {
@@ -156,7 +150,6 @@ async function writeResponseChunk(
     } catch (error) {
       if (
         !disconnect.signal.aborted ||
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The example probes host lifecycle methods and validates external transport failures before handling them.
         typeof error !== 'object' ||
         error === null ||
         !('name' in error) ||
@@ -222,7 +215,7 @@ const handleRequest = async (req: Request, res: Response) => {
 };
 
 app.post('/', (req: Request, res: Response) =>
-  // oxlint-disable-next-line promise/prefer-await-to-callbacks, anti-slop/no-unknown-parameters -- Express 4 does not await async handlers; consume their arbitrary rejection values in this synchronous route.
+  // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Express 4 does not await async handlers; consume their arbitrary rejection values in this synchronous route.
   handleRequest(req, res).catch((error: unknown) => {
     console.error(error);
     if (res.destroyed || res.writableEnded) {

@@ -453,7 +453,6 @@ export class Worker {
 
       this.system.writeFile(outputPath, output.outputText);
 
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- TypeScript may omit source-map text; only write a map when the compiler produced a string.
       if (typeof output.sourceMapText === 'string') {
         this.system.writeFile(sourceMapPath, output.sourceMapText);
       }

@@ -5,7 +5,6 @@ import { hasOwn } from 'openai/internal/utils';
 import { AssistantStream } from 'openai/lib/AssistantStream';
 import type { AssistantStreamEvent } from 'openai/resources/beta/assistants';
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Security fixtures construct malformed, sparse, or hostile delta records that cannot claim a valid API event type.
 type Event = Record<string, any>;
 
 function readableEvents(events: Event[]) {
@@ -90,7 +89,6 @@ describe('AssistantStream delta index security', () => {
   });
 
   test('charges sparse growth against one fixed budget for the entire delta batch', () => {
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Security fixtures construct malformed, sparse, or hostile delta records that cannot claim a valid API event type.
     const entries: Record<string, unknown>[] = [];
     const accumulator = { status: 'original', entries };
 
@@ -129,7 +127,6 @@ describe('AssistantStream delta index security', () => {
   });
 
   test('bounds nested sparse growth without limiting dense arrays', () => {
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Security fixtures construct malformed, sparse, or hostile delta records that cannot claim a valid API event type.
     const sparseEntries: Record<string, unknown>[] = [];
 
     AssistantStream.accumulateDelta(
@@ -140,7 +137,6 @@ describe('AssistantStream delta index security', () => {
     expect(sparseEntries).toHaveLength(1024);
     expect(sparseEntries[1023]?.['text']).toBe('last allowed');
 
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Security fixtures construct malformed, sparse, or hostile delta records that cannot claim a valid API event type.
     const rejectedEntries: Record<string, unknown>[] = [];
     expect(() =>
       AssistantStream.accumulateDelta(
@@ -180,7 +176,6 @@ describe('AssistantStream delta index security', () => {
   });
 
   test('rescans externally mutable sparse arrays after same-length hole fills', () => {
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Security fixtures construct malformed, sparse, or hostile delta records that cannot claim a valid API event type.
     const entries: Record<string, unknown>[] = [];
 
     AssistantStream.accumulateDelta(
@@ -201,7 +196,6 @@ describe('AssistantStream delta index security', () => {
 
   test('caches dense multi-event accounting for unexposed stream-owned arrays', async () => {
     let ownKeysCalls = 0;
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Security fixtures construct malformed, sparse, or hostile delta records that cannot claim a valid API event type.
     const toolCalls = new Proxy<Record<string, unknown>[]>([], {
       ownKeys(target) {
         ownKeysCalls += 1;
@@ -253,7 +247,6 @@ describe('AssistantStream delta index security', () => {
   test.each(['missing', 'null', 'undefined'])(
     'rejects a later invalid index before creating a %s nested array',
     (initialState) => {
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Security fixtures construct malformed, sparse, or hostile delta records that cannot claim a valid API event type.
       const details: Record<string, unknown> = {};
       if (initialState !== 'missing') {
         details['children'] = initialState === 'null' ? null : undefined;
@@ -297,7 +290,6 @@ describe('AssistantStream delta index security', () => {
   );
 
   test('validates indexed object deltas when the accumulated array starts empty', () => {
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Security fixtures construct malformed, sparse, or hostile delta records that cannot claim a valid API event type.
     const entries: Record<string, unknown>[] = [];
 
     expect(() =>
@@ -476,7 +468,6 @@ describe('AssistantStream message index security', () => {
     await expect(rejected.done()).rejects.toThrow('invalid content index');
     expect(rejectedMessage.content).toHaveLength(0);
 
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Security fixtures construct malformed, sparse, or hostile delta records that cannot claim a valid API event type.
     const content: Record<string, any>[] = [];
     const accepted = unencodedAssistantStream([
       { event: 'thread.message.created', data: { id: 'msg_accepted', role: 'assistant', content } },
@@ -682,7 +673,6 @@ describe('AssistantStream message index security', () => {
   });
 
   test('bounds cumulative streamed content holes across separate public events', async () => {
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Security fixtures construct malformed, sparse, or hostile delta records that cannot claim a valid API event type.
     const content: Record<string, any>[] = [];
     const runner = assistantStream([
       { event: 'thread.message.created', data: { id: 'msg_123', role: 'assistant', content } },

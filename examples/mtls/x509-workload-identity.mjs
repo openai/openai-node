@@ -25,17 +25,16 @@ const [{ default: OpenAI }, { workloadIdentity }] = await Promise.all([
   import('openai'),
   import('openai/auth/x509-transport'),
 ]);
-const credentialOptions = {
+const credential = workloadIdentity.fromX509({
   certificateChain: cert,
   privateKey: key,
   identityProviderId,
   serviceAccountId,
-  // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+  // Spread creates an own data property without invoking inherited setters or changing the object prototype.
   ...(passphrase === undefined ? {} : { passphrase }),
-  // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+  // Spread creates an own data property without invoking inherited setters or changing the object prototype.
   ...(proxyURL ? { proxy: { url: proxyURL, mode: proxy } } : {}),
-};
-const credential = workloadIdentity.fromX509(credentialOptions);
+});
 try {
   const client = new OpenAI({
     credential,

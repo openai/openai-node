@@ -221,7 +221,6 @@ describe.each(variants)('$name tool schema binding', ({ schema }) => {
         apiKey: 'synthetic-key',
         maxRetries: 0,
         fetch: async (_url, init) => {
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate the emitted transport body before auditing tool-schema binding.
           if (typeof init?.body !== 'string') {
             throw new TypeError('Expected a serialized synthetic request');
           }
@@ -232,7 +231,6 @@ describe.each(variants)('$name tool schema binding', ({ schema }) => {
       });
       const outcome = await parsedArguments(client, tool, stream).then(
         (parsed) => ({ parsed }),
-        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         (error: unknown) => ({ error }),
       );
       const length = fresh ? 4 : 6;

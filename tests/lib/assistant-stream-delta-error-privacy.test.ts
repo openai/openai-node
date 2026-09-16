@@ -18,7 +18,6 @@ const invalidArrayIndexTypeMessage =
 
 interface AssistantEventFixture {
   event: string;
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Privacy fixtures mutate heterogeneous and malformed delta fields to ensure rejected data never appears in errors.
   data: Record<string, unknown>;
 }
 
@@ -31,11 +30,8 @@ interface StreamingScenario {
 }
 
 function messageEvents(
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The delta fixture deliberately accepts invalid indices and heterogeneous values to exercise diagnostic privacy.
   value: unknown = true,
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The delta fixture deliberately accepts invalid indices and heterogeneous values to exercise diagnostic privacy.
   index: unknown = 0,
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The delta fixture deliberately accepts invalid indices and heterogeneous values to exercise diagnostic privacy.
   initialValue: unknown = sensitiveText,
 ): AssistantEventFixture[] {
   return [
@@ -61,9 +57,7 @@ function messageEvents(
 }
 
 function runStepEvents(
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The delta fixture deliberately accepts invalid indices and heterogeneous values to exercise diagnostic privacy.
   value: unknown = true,
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The delta fixture deliberately accepts invalid indices and heterogeneous values to exercise diagnostic privacy.
   index: unknown = 0,
   primitiveEntry = false,
 ): AssistantEventFixture[] {
@@ -204,7 +198,6 @@ function expectPrivateError(error: Error, expectedMessage: string): void {
   }
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Privacy fixtures mutate heterogeneous and malformed delta fields to ensure rejected data never appears in errors.
 function captureStaticFailure(accumulator: Record<string, unknown>, delta: Record<string, unknown>): Error {
   let failure: unknown;
 
@@ -222,7 +215,6 @@ function captureStaticFailure(accumulator: Record<string, unknown>, delta: Recor
 async function expectPrivateStreamFailure(
   stream: AssistantStream,
   scenario: StreamingScenario,
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Privacy fixtures mutate heterogeneous and malformed delta fields to ensure rejected data never appears in errors.
   originalSnapshot: Record<string, unknown>,
 ): Promise<void> {
   const errors = vi.fn();
@@ -447,10 +439,8 @@ describe('AssistantStream malformed-delta diagnostic privacy', () => {
       toString: convert,
       valueOf: convert,
     };
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Privacy fixtures mutate heterogeneous and malformed delta fields to ensure rejected data never appears in errors.
     const accumulator: Record<string, unknown> =
       side === 'accumulator' ? { value: adversarial } : { value: true };
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Privacy fixtures mutate heterogeneous and malformed delta fields to ensure rejected data never appears in errors.
     const delta: Record<string, unknown> =
       side === 'accumulator' ? { value: sensitiveText } : { value: adversarial };
     const failure = captureStaticFailure(accumulator, delta);

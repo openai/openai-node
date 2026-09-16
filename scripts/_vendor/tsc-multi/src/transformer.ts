@@ -146,7 +146,6 @@ export function createTransformer<T extends ts.SourceFile | ts.Bundle>(
             isIdentifier(requireCall.expression) &&
             requireCall.expression.escapedText === 'require' &&
             'original' in node &&
-            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The compiler adapter inspects an optional original AST node supplied by TypeScript.
             typeof node.original === 'object' &&
             node.original !== null &&
             ((original = node.original as ts.Node), nodeIsSynthesized(original)) &&

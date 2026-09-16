@@ -1,7 +1,6 @@
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { AssistantStream } from 'openai/lib/AssistantStream';
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- This wire fixture helper serializes incomplete and invalid events used by the stream security tests.
 type Event = Record<string, any>;
 
 function readableEvents(events: Event[]) {

@@ -53,7 +53,6 @@ class NodeX509Transport implements X509Transport {
 export function registerX509Transport(transport: X509Transport, registered: RegisteredX509Transport): void {
   if (
     !transport ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject forged transport capabilities and unsafe caller options before opening an authenticated connection.
     typeof transport !== 'object' ||
     types.isProxy(transport) ||
     !Object.isFrozen(transport) ||
@@ -90,7 +89,6 @@ function assertNodeRuntime(): void {
 
 function attestedDispatcher(options: X509TransportOptions): Agent | ProxyAgent {
   const dispatcher = dataOption(options, 'dispatcher');
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject forged transport capabilities and unsafe caller options before opening an authenticated connection.
   if (!dispatcher || typeof dispatcher !== 'object') {
     throw new Error('X.509 transport requires a caller-owned Undici Agent or ProxyAgent.');
   }
@@ -172,13 +170,11 @@ function assertConnectProxySupport(): void {
 export function createX509Transport(options: X509TransportOptions): X509Transport {
   assertNodeRuntime();
 
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject forged transport capabilities and unsafe caller options before opening an authenticated connection.
   if (!options || typeof options !== 'object' || types.isProxy(options)) {
     throw new Error('X.509 transport configuration must be a non-proxy object.');
   }
 
   for (const name of Reflect.ownKeys(options)) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject forged transport capabilities and unsafe caller options before opening an authenticated connection.
     if (typeof name !== 'string' || !allowedOptionNames.has(name)) {
       throw new Error(`Unsupported X.509 transport option: \`${String(name)}\`.`);
     }
@@ -206,7 +202,6 @@ export async function sendX509Request(
   target: URL,
   options: RequestInit,
 ): Promise<Response> {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject forged transport capabilities and unsafe caller options before opening an authenticated connection.
   if (!transport || typeof transport !== 'object' || types.isProxy(transport)) {
     throw new Error('Invalid X.509 transport capability.');
   }

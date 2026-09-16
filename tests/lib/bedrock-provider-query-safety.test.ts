@@ -77,7 +77,6 @@ describe('Bedrock SigV4 query parameter safety', () => {
         this: unknown[],
       ): Generator<unknown, undefined, unknown> {
         for (const value of originalIterator.call(this)) {
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The coercion probe identifies marked strings in observed signing data without coercing other values.
           if (typeof value === 'string' && value.startsWith(marker)) {
             visitedValues += 1;
           }

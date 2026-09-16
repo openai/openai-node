@@ -11,7 +11,6 @@ import { OpenAIRealtimeWS as BetaNodeRealtime } from 'openai/beta/realtime/ws';
 type Listener = (event: any) => void;
 
 interface FakeSocket {
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture dispatches malformed error payloads before the SDK performs runtime validation.
   dispatch: (event: string, value: unknown) => void;
 }
 
@@ -24,7 +23,6 @@ vi.mock('ws', () => {
       on: (event: string, listener: Listener) => listeners.set(event, listener),
       send: vi.fn(),
       close: vi.fn(),
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture dispatches malformed error payloads before the SDK performs runtime validation.
       dispatch: (event: string, value: unknown) => listeners.get(event)?.(value),
     };
   }
@@ -42,7 +40,6 @@ class FakeNativeSocket implements FakeSocket {
     this.listeners.set(event, listener);
   }
 
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture dispatches malformed error payloads before the SDK performs runtime validation.
   dispatch(event: string, value: unknown): void {
     this.listeners.get(event)?.(value);
   }
@@ -52,7 +49,6 @@ const originalWebSocket = Object.getOwnPropertyDescriptor(globalThis, 'WebSocket
 
 const errorFields = ['message', 'code', 'param', 'type', 'event_id'] as const;
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Error fixtures override fields with malformed and sensitive values before the public error parser validates them.
 function serverError(overrides: Record<string, unknown> = {}) {
   return {
     type: 'error',

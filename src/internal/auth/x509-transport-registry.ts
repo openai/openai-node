@@ -21,21 +21,17 @@ const transientX509TransportCodes = new Set([
 ]);
 
 /** Retries only known temporary failures when neither error layer reports a permanent code. */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 export function isRetryableX509TransportFailure(failure: unknown): boolean {
   const cause =
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Opaque transport capabilities and external network failures require runtime validation before lookup or retry.
     typeof failure === 'object' && failure !== null
       ? Object.getOwnPropertyDescriptor(failure, 'cause')?.value
       : undefined;
   let retryable = false;
   for (const candidate of [failure, cause]) {
     const code =
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Opaque transport capabilities and external network failures require runtime validation before lookup or retry.
       typeof candidate === 'object' && candidate !== null
         ? Object.getOwnPropertyDescriptor(candidate, 'code')?.value
         : undefined;
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Opaque transport capabilities and external network failures require runtime validation before lookup or retry.
     if (typeof code === 'string') {
       if (!transientX509TransportCodes.has(code)) {
         return false;
@@ -118,9 +114,7 @@ export interface RegisteredX509Transport {
 }
 
 /** Resolves a previously registered opaque capability without importing an optional transport peer. */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Transport capabilities are untrusted until runtime identity and registration checks succeed.
 export function resolveX509Transport(value: unknown): RegisteredX509Transport {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Opaque transport capabilities and external network failures require runtime validation before lookup or retry.
   if (!value || typeof value !== 'object') {
     throw new OpenAIError('X.509 workload identity requires an approved X.509 transport capability.');
   }

@@ -156,13 +156,10 @@ describe('.stream()', () => {
     ['', ''],
   ])('keeps chunk obfuscation out of accumulated completions (%s, %s)', async (first, last) => {
     const padding = [first, last];
-    const chunks = contentChunks('Hello', ' world').map((chunk, index) => {
-      const result = { ...chunk };
-      if (padding[index] !== undefined) {
-        result.obfuscation = padding[index];
-      }
-      return result;
-    });
+    const chunks = contentChunks('Hello', ' world').map((chunk, index) => ({
+      ...chunk,
+      ...(padding[index] === undefined ? {} : { obfuscation: padding[index] }),
+    }));
     const original = JSON.stringify(chunks);
     const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(chunks), {
       model: 'gpt-test',
@@ -1145,7 +1142,6 @@ describe('.stream()', () => {
     const stream = ChatCompletionStream.fromReadableStream(readable);
     const failure = await stream.done().then(
       () => null,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       (error: unknown) => error,
     );
 
@@ -1189,7 +1185,6 @@ describe('.stream()', () => {
       await expect(stream.finalContent()).resolves.toBe('ok');
     } finally {
       // SAFETY: The test installed this configurable synthetic error property; the dictionary view is used only to remove it during cleanup.
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Cleanup removes the synthetic error property installed on Object.prototype by the pollution regression.
       delete (Object.prototype as Record<string, unknown>)['error'];
     }
   });
@@ -1446,19 +1441,21 @@ describe('.stream()', () => {
       const chunks = customToolChunks().map((chunk) => ({
         ...chunk,
         choices: chunk.choices.flatMap((choice) =>
-          [0, 1].map((index) => {
-            const delta = { ...choice.delta };
-            if (choice.delta.tool_calls) {
-              delta.tool_calls = choice.delta.tool_calls.map((toolCall) => {
-                const result = { ...toolCall };
-                if (toolCall.id) {
-                  result.id = `${toolCall.id}_${index}`;
-                }
-                return result;
-              });
-            }
-            return { ...choice, index, delta };
-          }),
+          [0, 1].map((index) => ({
+            ...choice,
+            index,
+            delta: {
+              ...choice.delta,
+              ...(choice.delta.tool_calls
+                ? {
+                    tool_calls: choice.delta.tool_calls.map((toolCall) => ({
+                      ...toolCall,
+                      ...(toolCall.id ? { id: `${toolCall.id}_${index}` } : {}),
+                    })),
+                  }
+                : {}),
+            },
+          })),
         ),
       }));
       const fetch = vi.fn(async () => responseWithAnnotations(chunks, annotationCount));
@@ -1525,25 +1522,21 @@ describe('.stream()', () => {
       { index: 0, arguments: '"SF"}' },
       { index: 1, arguments: '"NY"}' },
     ];
-    const chunks = fragments.map((fragment, position) => {
-      const fn: OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall.Function = {
-        arguments: fragment.arguments,
-      };
-      const toolCall: OpenAI.Chat.ChatCompletionChunk.Choice.Delta.ToolCall = {
-        index: fragment.index,
-        function: fn,
-      };
-      const delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta = { tool_calls: [toolCall] };
-      if (position === 0) {
-        delta.role = 'assistant';
-      }
-      if (position < 2) {
-        toolCall.id = `call_${fragment.index}`;
-        toolCall.type = 'function';
-        fn.name = 'get_weather';
-      }
-      return customToolChunk(delta);
-    });
+    const chunks = fragments.map((fragment, position) =>
+      customToolChunk({
+        ...(position === 0 ? { role: 'assistant' } : {}),
+        tool_calls: [
+          {
+            index: fragment.index,
+            ...(position < 2 ? { id: `call_${fragment.index}`, type: 'function' as const } : {}),
+            function: {
+              ...(position < 2 ? { name: 'get_weather' } : {}),
+              arguments: fragment.arguments,
+            },
+          },
+        ],
+      }),
+    );
     chunks.push(customToolChunk({}, 'tool_calls'));
     const client = streamingClient(false, async () => responseWithAnnotations(chunks, 0));
     const stream = client.chat.completions.stream({

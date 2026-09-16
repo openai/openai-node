@@ -21,15 +21,14 @@ async function createProvider(region: string) {
 
   const { bedrock } = await import('openai/providers/bedrock/aws');
   const profile = process.env['AWS_PROFILE'];
-  const options: Parameters<typeof bedrock>[0] = {
+  return bedrock({
     endpoint: 'runtime',
     region,
     // Ignore a stale AWS_BEARER_TOKEN_BEDROCK when using AWS credentials.
     apiKey: null,
-    // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+    // Spread creates an own data property without invoking inherited setters or changing the object prototype.
     ...(profile ? { profile } : {}),
-  };
-  return bedrock(options);
+  });
 }
 
 async function main() {

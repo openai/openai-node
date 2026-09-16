@@ -42,7 +42,6 @@ function runPublicSurface(surface: Surface, headers: Headers, signedPayload = pa
 
 function expectSuccessfulResult(
   surface: Surface,
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The shared assertion receives either a parsed webhook or the void signature-verification result.
   result: unknown,
   expectedEvent: typeof event = event,
 ): void {

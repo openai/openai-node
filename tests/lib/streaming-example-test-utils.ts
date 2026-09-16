@@ -16,7 +16,6 @@ type Example = (typeof examples)[number];
 interface Completion {
   choices: [{ delta: { content: string } }];
 }
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The VM harness also exercises incomplete legacy request and response objects without lifecycle APIs.
 type RouteHandler = (request: unknown, response: unknown) => Promise<void>;
 
 interface ExampleRuntime {
@@ -177,7 +176,6 @@ export function loadExample(
   };
 
   const express = Object.assign(() => app, {
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The VM harness also exercises incomplete legacy request and response objects without lifecycle APIs.
     text: () => (_request: unknown, _response: unknown, next: () => void) => next(),
   });
 
@@ -282,7 +280,7 @@ export function loadExample(
   }
 
   const commonJS = { exports: {} };
-  // oxlint-disable-next-line anti-slop/no-known-value-widening, anti-slop/no-unsafe-dictionary-type -- The VM installs heterogeneous globals and conditionally adds AbortController to simulate runtimes with and without it.
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The VM installs heterogeneous globals and conditionally adds AbortController to simulate runtimes with and without it.
   const globals: Record<string, unknown> = {
     Buffer,
     console: { error: runtime.consoleError, log: vi.fn() },
@@ -300,7 +298,6 @@ export function loadExample(
   return runtime;
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- The VM harness also exercises incomplete legacy request and response objects without lifecycle APIs.
 export function invoke(runtime: ExampleRuntime, request: unknown, response: unknown): Promise<void> {
   if (!runtime.handler) {
     throw new Error('The streaming example did not register its Express route');
@@ -323,7 +320,6 @@ async function listen(server: ReturnType<typeof createServer>): Promise<string> 
   server.listen(0, '127.0.0.1');
   await listening;
   const address = server.address();
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
   if (address === null || typeof address === 'string') {
     throw new Error('The streaming example loopback server has no local port');
   }

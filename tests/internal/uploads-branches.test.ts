@@ -316,7 +316,6 @@ describe('lazy multipart stream encoding', () => {
       .formData()
       .then(
         (form) => ({ hasUpload: form.has('upload'), purposes: form.getAll('purpose') }),
-        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         (error: unknown) => error,
       );
 
@@ -363,7 +362,6 @@ describe('lazy multipart stream encoding', () => {
       .formData()
       .then(
         (form) => ({ hasUpload: form.has('upload'), purposes: form.getAll('purpose') }),
-        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         (error: unknown) => error,
       );
 

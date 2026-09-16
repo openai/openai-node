@@ -155,11 +155,11 @@ describe('embedding request compatibility', () => {
     'preserves numeric output for a request-body override with %s encoding',
     async (format) => {
       const body = Object.freeze({ ...request });
-      const overrideBody: OpenAI.Embeddings.EmbeddingCreateParams = { ...request, input: 'overridden' };
-      if (format !== undefined) {
-        overrideBody.encoding_format = format;
-      }
-      Object.freeze(overrideBody);
+      const overrideBody = Object.freeze({
+        ...request,
+        input: 'overridden',
+        ...(format === undefined ? {} : { encoding_format: format }),
+      });
       const expectedEmbedding = format === 'base64' ? encodedVector : vector;
       const headers = Object.freeze({ 'X-Custom': 'kept' });
       let bodyReads = 0;
@@ -209,11 +209,10 @@ describe('embedding request compatibility', () => {
     async (customization) => {
       const floatVector = [1.25, -2.5, 3.75, 4.5];
       const floatBody = { ...request, encoding_format: 'float' };
-      const body: typeof request & { toJSON?: () => typeof floatBody } = { ...request };
-      if (customization === 'serialization') {
-        body.toJSON = () => floatBody;
-      }
-      Object.freeze(body);
+      const body = Object.freeze({
+        ...request,
+        ...(customization === 'serialization' ? { toJSON: () => floatBody } : {}),
+      });
       const originalBody = { ...body };
       const fetch = vi.fn<Fetch>(async (_url, init) => {
         expect(JSON.parse(String(init?.body))).toEqual(floatBody);
@@ -224,7 +223,6 @@ describe('embedding request compatibility', () => {
         if (customization === 'replacement') {
           options.body = floatBody;
         } else if (customization === 'mutation') {
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The request hook validates its runtime body before exercising in-place serialization changes.
           if (typeof options.body !== 'object' || options.body === null) {
             throw new Error('Expected an object request body');
           }

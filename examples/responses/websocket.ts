@@ -162,7 +162,6 @@ const parseArgs = (argv: string[]): CLIArgs => {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Tool arguments come from model output and must be validated before use as string identifiers.
     if (typeof arg !== 'string') {
       throw new TypeError('Unexpected missing CLI argument');
     }
@@ -203,7 +202,6 @@ const parseArgs = (argv: string[]): CLIArgs => {
   return { model, useBetaHeader, showEvents, showToolIO };
 };
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Incoming WebSocket JSON fields remain unknown until the example validates the event fields it uses.
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
@@ -221,7 +219,6 @@ const parseSKUArguments = (rawArguments: string): SKUArguments => {
   }
 
   const skuValue = parsed['sku'];
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Tool arguments come from model output and must be validated before use as string identifiers.
   if (typeof skuValue !== 'string') {
     throw new TypeError(`Tool arguments must include a string \`sku\`: ${rawArguments}`);
   }
@@ -486,7 +483,6 @@ const main = async (): Promise<void> => {
   }
 };
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 main().catch((error: unknown) => {
   console.error(error);
   process.exitCode = 1;

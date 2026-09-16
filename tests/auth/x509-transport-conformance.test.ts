@@ -1,4 +1,3 @@
-import type { ClientOptions } from 'openai';
 import { X509Certificate } from 'node:crypto';
 import { Agent, ProxyAgent, fetch } from 'undici';
 import { expect } from 'vitest';
@@ -33,7 +32,7 @@ function createAgent(certificate: TestCertificate): Agent {
 }
 
 function createProxyAgent(proxyURL: URL, encrypted: boolean): ProxyAgent {
-  const options: ProxyAgent.Options = {
+  return new ProxyAgent({
     uri: proxyURL.href,
     token: PROXY_AUTHORIZATION,
     requestTls: {
@@ -42,16 +41,17 @@ function createProxyAgent(proxyURL: URL, encrypted: boolean): ProxyAgent {
       key: lab.firstClient.privateKey,
       servername: 'localhost',
     },
-  };
-  if (encrypted) {
-    options.proxyTls = {
-      ca: lab.proxyCertificateAuthority,
-      cert: lab.proxyClient.certificate,
-      key: lab.proxyClient.privateKey,
-      servername: 'localhost',
-    };
-  }
-  return new ProxyAgent(options);
+    ...(encrypted
+      ? {
+          proxyTls: {
+            ca: lab.proxyCertificateAuthority,
+            cert: lab.proxyClient.certificate,
+            key: lab.proxyClient.privateKey,
+            servername: 'localhost',
+          },
+        }
+      : {}),
+  });
 }
 
 function createSDKClient(
@@ -73,7 +73,6 @@ function createSDKClient(
       },
     },
     fetch: async (input, init) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The fetch boundary accepts Request, URL, or string inputs and must inspect the effective target.
       const target = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
       if (init?.redirect !== 'manual') {
         throw new Error('The SDK did not preserve its manual redirect policy');
@@ -382,11 +381,10 @@ describe('real-wire X.509 transport conformance', () => {
           provider,
           defaultQuery: { api_key: 'synthetic-provider-private-api-key' },
         });
-        const options: ClientOptions = { credential };
-        if (defaultQuery !== undefined) {
-          options.defaultQuery = defaultQuery;
-        }
-        const clone = original.withOptions(options);
+        const clone = original.withOptions({
+          credential,
+          ...(defaultQuery === undefined ? {} : { defaultQuery }),
+        });
 
         expect(clone.baseURL).toBe('https://mtls.api.openai.com/v1');
         expect(clone.apiKey).toBeNull();

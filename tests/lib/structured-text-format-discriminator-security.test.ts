@@ -12,7 +12,6 @@ import { z as zodV3 } from 'zod/v3';
 import { z as zodV4 } from 'zod/v4';
 import { z as zodV4Mini } from 'zod/v4-mini';
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Adversarial metadata fixtures include symbols, accessors, serialization hooks, and non-JSON values.
 type UnsafeFormatMetadata = Record<PropertyKey, unknown>;
 interface ParsedWeather {
   city: string;
@@ -27,9 +26,7 @@ const standardSchema = {
   '~standard': {
     version: 1 as const,
     vendor: 'synthetic-validator',
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Standard Schema validator contract receives untrusted parsed values before checking their fields.
     validate: (value: unknown) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The test schema must validate untrusted input before returning a successful parsed city.
       if (typeof value === 'object' && value !== null && 'city' in value && typeof value.city === 'string') {
         return { value: { city: value.city, normalized: true as const } };
       }
@@ -285,7 +282,6 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
       }
       Object.freeze(metadata);
 
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary text-format metadata until assertions inspect the actual wire values.
       let requestBody: { text?: { format?: Record<string, unknown> } } | undefined;
       const fetch = vi.fn(async (_request: string | URL | Request, init?: RequestInit) => {
         // SAFETY: Decode the synthetic request or serialized format produced in this test to inspect the protected discriminator and schema fields.
@@ -355,7 +351,6 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
   test.each(['text', 'json_object'])(
     'sends a strict schema and validates the public Responses parse result despite %s metadata',
     async (override) => {
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary text-format metadata until assertions inspect the actual wire values.
       let requestBody: { text?: { format?: Record<string, unknown> } } | undefined;
       const fetch = vi.fn(async (_request: string | URL | Request, init?: RequestInit) => {
         // SAFETY: Decode the synthetic request or serialized format produced in this test to inspect the protected discriminator and schema fields.
@@ -480,7 +475,6 @@ describe('shared structured text-format factory', () => {
     const wire = JSON.stringify({ text: { format } });
     // SAFETY: Decode the synthetic request or serialized format produced in this test to inspect the protected discriminator and schema fields.
     const serialized = JSON.parse(wire) as {
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Serialization tests preserve arbitrary text-format metadata until assertions inspect the actual wire values.
       text: { format: Record<string, unknown> };
     };
 

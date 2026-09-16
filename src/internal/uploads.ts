@@ -64,7 +64,6 @@ export function toStreamingFile(
   name: string,
   options?: Pick<FilePropertyBag, 'type'>,
 ): StreamingFile {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-supplied multipart metadata before it can become a file name or content type.
   if (typeof name !== 'string' || !name) {
     throw new TypeError('toStreamingFile requires a non-empty file name');
   }
@@ -74,11 +73,12 @@ export function toStreamingFile(
     validateStreamingFileType(type);
   }
 
-  const file: StreamingFile = { [brand_privateStreamingFile]: true, data, name };
-  if (type) {
-    return { ...file, type };
-  }
-  return file;
+  return {
+    [brand_privateStreamingFile]: true,
+    data,
+    name,
+    ...(type ? { type } : {}),
+  };
 }
 
 /**
@@ -108,7 +108,6 @@ export const checkFileSupport = () => {
     // SAFETY: This optional Node global is inspected only to improve the missing-File diagnostic in runtimes without process.
     const { process } = globalThis as any;
     const isOldNode =
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
       typeof process?.versions?.node === 'string' &&
       Number.parseInt(process.versions.node.split('.'), 10) < 20;
     throw new Error(
@@ -163,7 +162,6 @@ export function makeFile(
  * discard their directories.
  */
 export function getName(value: any, options?: { stripFilename?: boolean | undefined }): string | undefined {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
   if (typeof value !== 'object' || value === null) {
     return undefined;
   }
@@ -273,7 +271,6 @@ const supportsFormDataMap = /* @__PURE__ */ new WeakMap<Fetch, Promise<boolean>>
  */
 function supportsFormData(fetchObject: OpenAI | Fetch): Promise<boolean> {
   // SAFETY: The union has already excluded callable fetch values; the remaining OpenAI client owns the fetch implementation used by this probe.
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
   const fetch: Fetch = typeof fetchObject === 'function' ? fetchObject : (fetchObject as any).fetch;
   const cached = supportsFormDataMap.get(fetch);
   if (cached) {
@@ -321,7 +318,6 @@ export type CreateFormOptions = {
  * @throws {TypeError} If the fetch implementation cannot encode global
  * `FormData`, a field is `null`, or a field has an unsupported value.
  */
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- The exported form builder retains its default dictionary type for application-defined multipart fields.
 export const createForm = async <T = Record<string, unknown>>(
   body: T | undefined,
   fetch: OpenAI | Fetch,
@@ -361,7 +357,6 @@ const isUploadable = (value: unknown): value is Uploadable =>
     isBlob(value));
 
 // SAFETY: The enclosing object guard and own-key enumeration allow reading these property values without assigning them a trusted value type.
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
 const hasStreamingUploadableValue = (value: unknown): boolean => {
   if (isStreamingFile(value) || isAsyncIterable(value) || isReadableStream(value)) {
     return true;
@@ -369,11 +364,9 @@ const hasStreamingUploadableValue = (value: unknown): boolean => {
   if (Array.isArray(value)) {
     return value.some(hasStreamingUploadableValue);
   }
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
   if (value && typeof value === 'object' && !isBlob(value) && !(value instanceof Response)) {
     // Own properties only, matching what form encoding serializes; inherited values are never encoded.
     for (const k of Object.keys(value)) {
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Recursive upload detection inspects arbitrary body fields and validates each value before using it as an upload.
       if (hasStreamingUploadableValue((value as Record<string, unknown>)[k])) {
         return true;
       }
@@ -383,7 +376,6 @@ const hasStreamingUploadableValue = (value: unknown): boolean => {
 };
 
 // SAFETY: The enclosing object guard and own-key enumeration allow reading these property values without assigning them a trusted value type.
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
 const hasUploadableValue = (value: unknown): boolean => {
   if (isUploadable(value)) {
     return true;
@@ -391,7 +383,6 @@ const hasUploadableValue = (value: unknown): boolean => {
   if (Array.isArray(value)) {
     return value.some(hasUploadableValue);
   }
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
   if (value && typeof value === 'object') {
     // Own properties only, matching what form encoding serializes; inherited values are never encoded.
     for (const k of Object.keys(value)) {
@@ -469,9 +460,7 @@ async function* iterateMultipartBody(
   yield encodeUTF8(`--${boundary}--\r\n`);
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
 function* iterateFormEntries(body: unknown): Generator<FormEntry> {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
   if (!body || typeof body !== 'object') {
     return;
   }
@@ -481,7 +470,6 @@ function* iterateFormEntries(body: unknown): Generator<FormEntry> {
   }
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
 function* iterateFormValue(key: string, value: unknown): Generator<FormEntry> {
   if (value === undefined) {
     return;
@@ -493,11 +481,8 @@ function* iterateFormValue(key: string, value: unknown): Generator<FormEntry> {
   }
 
   if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
     typeof value === 'string' ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
     typeof value === 'number' ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
     typeof value === 'boolean' ||
     isUploadable(value)
   ) {
@@ -506,7 +491,6 @@ function* iterateFormValue(key: string, value: unknown): Generator<FormEntry> {
     for (const entry of value) {
       yield* iterateFormValue(key + '[]', entry);
     }
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
   } else if (typeof value === 'object') {
     for (const [name, prop] of Object.entries(value)) {
       yield* iterateFormValue(`${key}[${name}]`, prop);
@@ -522,7 +506,6 @@ function getStreamingFileName(value: Uploadable, options: CreateFormOptions): st
   // oxlint-disable-next-line anti-slop/no-known-value-widening -- The runtime guard validates JavaScript and custom upload values before trusting the StreamingFile brand.
   if (isStreamingFile(value)) {
     const { name } = value;
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-supplied multipart metadata before it can become a file name or content type.
     if (typeof name !== 'string' || !name) {
       throw new TypeError('Streaming upload file name must be a non-empty string');
     }
@@ -549,7 +532,6 @@ function getStreamingFileType(value: Uploadable): string {
 }
 
 function validateStreamingFileType(type: string): string {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate caller-supplied multipart metadata before it can become a file name or content type.
   if (typeof type !== 'string') {
     throw new TypeError('Streaming upload content type must be a string');
   }
@@ -572,9 +554,7 @@ function getStreamingFileData(value: Uploadable): Exclude<Uploadable, StreamingF
   return value;
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
 async function* iterateBytes(value: unknown): AsyncGenerator<Uint8Array> {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
   if (typeof value === 'string') {
     yield encodeUTF8(value);
   } else if (ArrayBuffer.isView(value)) {
@@ -584,7 +564,6 @@ async function* iterateBytes(value: unknown): AsyncGenerator<Uint8Array> {
   } else if (value instanceof Response) {
     yield* iterateBytes(value.body || (await value.blob()));
   } else if (value instanceof Blob) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
     if (typeof value.stream === 'function') {
       yield* iterateBytes(value.stream());
     } else {
@@ -615,7 +594,6 @@ function escapeHeaderValue(value: string): string {
 const addFormValue = async (
   form: FormData,
   key: string,
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Upload serialization accepts heterogeneous caller values and validates each body, field, or chunk before use.
   value: unknown,
   options: CreateFormOptions,
 ): Promise<void> => {
@@ -629,7 +607,6 @@ const addFormValue = async (
   }
 
   // Nested form keys use the current bracketed encoding.
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     form.append(key, String(value));
   } else if (value instanceof Response) {
@@ -672,7 +649,6 @@ const addFormValue = async (
         form.append(entryKey, entryValue);
       }
     }
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Form encoding accepts JavaScript values and must distinguish scalar, file, stream, and object inputs at runtime.
   } else if (typeof value === 'object') {
     await Promise.all(
       Object.entries(value).map(([name, prop]) => addFormValue(form, `${key}[${name}]`, prop, options)),

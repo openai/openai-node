@@ -147,7 +147,6 @@ describe.each(examples)('$file exit status', ({ file, kind, model }) => {
       server.listen(0, '127.0.0.1');
       await once(server, 'listening');
       const address = server.address();
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
       if (!address || typeof address === 'string') {
         throw new Error('Expected a loopback HTTP address');
       }
@@ -231,7 +230,6 @@ test('manual conversation example drains large error diagnostics before exiting'
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const address = server.address();
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
     if (!address || typeof address === 'string') {
       throw new Error('Expected a loopback HTTP address');
     }

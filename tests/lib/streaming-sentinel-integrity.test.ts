@@ -85,7 +85,6 @@ async function collect(source: AsyncIterable<unknown>): Promise<unknown[]> {
 async function rejection(source: AsyncIterable<unknown>): Promise<unknown> {
   return await collect(source).then(
     () => {},
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     (error: unknown) => error,
   );
 }

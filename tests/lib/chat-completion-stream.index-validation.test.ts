@@ -7,10 +7,8 @@ import { Stream } from 'openai/streaming';
 type StreamIndexKind = 'choice' | 'tool call';
 
 function createChunk(
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Malformed index fixtures must reach the runtime validator without a trusted numeric type.
   index: unknown,
   kind: StreamIndexKind,
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Index fixtures combine arbitrary extension fields with invalid wire indices before stream validation.
   additionalFields: Record<string, unknown> = {},
 ): OpenAI.Chat.ChatCompletionChunk {
   const choice =
@@ -65,14 +63,11 @@ function createStream(chunks: OpenAI.Chat.ChatCompletionChunk[], n?: number | nu
     },
   } as unknown as OpenAI;
 
-  const params: Parameters<typeof ChatCompletionStream.createChatCompletion>[1] = {
+  return ChatCompletionStream.createChatCompletion(client, {
     model: 'gpt-test',
     messages: [],
-  };
-  if (n !== undefined) {
-    params.n = n;
-  }
-  return ChatCompletionStream.createChatCompletion(client, params);
+    ...(n === undefined ? {} : { n }),
+  });
 }
 
 function getSnapshotArray(stream: ChatCompletionStream, kind: StreamIndexKind): unknown[] | undefined {

@@ -85,7 +85,6 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
     }
   }
 
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Native channel events enter an untrusted boundary before their message data is parsed and validated.
   private readonly onMessage = (message: unknown): void => {
     if (this.disposed) {
       return;
@@ -94,17 +93,14 @@ export class DataChannel<ClientEvent, ServerEvent extends { type: string }> {
     try {
       // SAFETY: The message event boundary reads only optional data and then checks it is a string before parsing.
       const { data } = message as { data?: unknown };
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted data-channel JSON and its own event discriminator before dispatch.
       if (typeof data !== 'string') {
         throw new TypeError('Invalid protocol message.');
       }
       event = JSON.parse(data);
       if (
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted data-channel JSON and its own event discriminator before dispatch.
         typeof event !== 'object' ||
         event === null ||
         Array.isArray(event) ||
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted data-channel JSON and its own event discriminator before dispatch.
         typeof Object.getOwnPropertyDescriptor(event, 'type')?.value !== 'string'
       ) {
         throw new TypeError('Invalid protocol message.');

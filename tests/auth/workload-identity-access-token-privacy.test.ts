@@ -1,4 +1,3 @@
-import type { ClientOptions } from 'openai';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import type { Server } from 'node:http';
@@ -118,17 +117,14 @@ function createHarness(accessToken: string, tokenType: TokenType = 'jwt') {
 type Harness = ReturnType<typeof createHarness>;
 
 function createPublicClient(harness: Harness, logger?: ReturnType<typeof createLogger>): OpenAI {
-  const options: ClientOptions = {
+  return new OpenAI({
     apiKey: null,
     workloadIdentity: harness.config,
     fetch: harness.fetch,
     maxRetries: 0,
     logLevel: logger ? 'debug' : 'off',
-  };
-  if (logger) {
-    options.logger = logger;
-  }
-  return new OpenAI(options);
+    ...(logger ? { logger } : {}),
+  });
 }
 
 function createLogger() {
@@ -682,7 +678,6 @@ describe('workload identity OAuth access-token confidentiality and integrity', (
     server.listen(0, '127.0.0.1');
     await listening;
     const address = server.address();
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
     if (!address || typeof address === 'string') {
       throw new Error('Expected an authenticated loopback TCP address.');
     }
@@ -737,7 +732,6 @@ describe('workload identity OAuth access-token confidentiality and integrity', (
     server.listen(0, '127.0.0.1');
     await listening;
     const address = server.address();
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
     if (!address || typeof address === 'string') {
       throw new Error('Expected an authenticated loopback TCP address.');
     }
@@ -803,7 +797,6 @@ describe('workload identity OAuth access-token confidentiality and integrity', (
       server.listen(0, '127.0.0.1');
       await listening;
       const address = server.address();
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
       if (!address || typeof address === 'string') {
         throw new Error('Expected an authenticated loopback TCP address.');
       }

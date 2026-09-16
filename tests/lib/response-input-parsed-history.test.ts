@@ -77,7 +77,6 @@ describe.each(['parse', 'stream'] as const)('replaying %s response history', (mo
         apiKey: 'synthetic-key',
         maxRetries: 0,
         fetch: async (_url, init) => {
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate the transport body before parsing and checking the exact serialized request.
           if (typeof init?.body !== 'string') {
             throw new TypeError('Expected a serialized response request');
           }

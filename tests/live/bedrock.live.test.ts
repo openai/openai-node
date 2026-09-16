@@ -149,16 +149,13 @@ async function providerForAuth(
     }
     case 'static': {
       const sessionToken = process.env['AWS_SESSION_TOKEN']?.trim();
-      const options: Parameters<typeof awsBedrock>[0] = {
+      return awsBedrock({
         ...endpoint,
         apiKey: null,
         accessKeyId: requiredEnv('AWS_ACCESS_KEY_ID'),
         secretAccessKey: requiredEnv('AWS_SECRET_ACCESS_KEY'),
-      };
-      if (sessionToken) {
-        options.sessionToken = sessionToken;
-      }
-      return awsBedrock(options);
+        ...(sessionToken ? { sessionToken } : {}),
+      });
     }
     case 'custom-provider': {
       const { defaultProvider } = await import('@aws-sdk/credential-provider-node');
@@ -196,12 +193,12 @@ describe.each(selectedAuthModes)(`Amazon Bedrock ${endpointMode} live (%s)`, (au
   let client: OpenAI;
 
   beforeAll(async () => {
-    const endpoint: Parameters<typeof providerForAuth>[1] = { region, endpoint: endpointMode };
-    if (baseURL) {
-      endpoint.baseURL = baseURL;
-    }
     client = new OpenAI({
-      provider: await providerForAuth(authMode, endpoint),
+      provider: await providerForAuth(authMode, {
+        region,
+        endpoint: endpointMode,
+        ...(baseURL ? { baseURL } : {}),
+      }),
       maxRetries: 0,
       timeout: 120_000,
     });

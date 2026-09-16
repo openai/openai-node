@@ -98,7 +98,6 @@ async function runExample(
   });
   await once(server, 'listening');
   const address = server.address();
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
   if (!address || typeof address === 'string') {
     throw new Error('Expected a local TCP address');
   }
@@ -201,7 +200,6 @@ test('completes all turns and closes normally without reporting an unfinished re
     const responseID = `resp_${index}`;
     if (
       request.type === 'response.create' &&
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The transport fixture distinguishes named tool selection from string tool-choice modes.
       typeof request.tool_choice === 'object' &&
       request.tool_choice?.type === 'function'
     ) {
@@ -239,13 +237,10 @@ test('completes all turns and closes normally without reporting an unfinished re
 
 describe.each(apiErrors)('$name API errors', ({ event }) => {
   test.each([false, true])('handles the failure once when followed by a close: %s', async (close) => {
-    const result = await runExample(() => {
-      const reply: Reply = { events: [event] };
-      if (close) {
-        reply.close = 'clean';
-      }
-      return reply;
-    });
+    const result = await runExample(() => ({
+      events: [event],
+      ...(close ? { close: 'clean' as const } : {}),
+    }));
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain('Synthetic API failure');

@@ -150,10 +150,8 @@ async function inspectRedirect({
     const sourceAddress = source.address();
     if (
       !destinationAddress ||
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
       typeof destinationAddress === 'string' ||
       !sourceAddress ||
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
       typeof sourceAddress === 'string'
     ) {
       throw new Error('Expected both redirect test servers to bind ephemeral TCP ports');

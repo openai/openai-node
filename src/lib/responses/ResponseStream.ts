@@ -152,7 +152,6 @@ export class ResponseStream<ParsedT = null>
       // First-party providers nest their error payload; retain flat compatibility for
       // serialized events matching the currently published event schema.
       const error =
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- An error event can contain malformed server data; validate its container before extracting error details.
         'error' in event && typeof event.error === 'object' && event.error !== null ? event.error : event;
       throw new APIError(undefined, error, event.message, undefined);
     }

@@ -51,11 +51,9 @@ function exchangeDeadline(timeout: number | undefined, callerSignal: AbortSignal
       : setTimeout(() => deadline.abort(new APIConnectionTimeoutError()), timeout);
   const timerHandle: unknown = timer;
   if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
     typeof timerHandle === 'object' &&
     timerHandle !== null &&
     'unref' in timerHandle &&
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
     typeof timerHandle.unref === 'function'
   ) {
     timerHandle.unref();
@@ -161,9 +159,7 @@ export function isX509WorkloadIdentity(
 }
 
 /** Rejects unsupported WebSocket authentication before any connection or credential side effect. */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Custom request hooks can replace bodies and clients; this boundary validates or tracks their actual runtime values.
 export function assertX509WebSocketSupported(client: unknown): void {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
   if (!client || typeof client !== 'object') {
     return;
   }
@@ -263,20 +259,19 @@ export class X509WorkloadIdentityAuth {
 
   /** Reconstructs the immutable selectors captured before caller-owned identity mutation. */
   identitySnapshot(): X509WorkloadIdentity {
-    const identity: X509WorkloadIdentity = {
+    return {
       type: 'x509',
       identityProviderId: this.#identityProviderId,
       serviceAccountId: this.#serviceAccountId,
-      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(this.#configuredRefreshBufferMs === undefined
         ? {}
         : { refreshBufferMs: this.#configuredRefreshBufferMs }),
-      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(this.#configuredRefreshBufferSeconds === undefined
         ? {}
         : { refreshBufferSeconds: this.#configuredRefreshBufferSeconds }),
     };
-    return identity;
   }
 
   /** Preserves explicitly headerless requests without presenting a certificate to the issuer. */
@@ -438,7 +433,6 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Owns only SDK-created iterator adapters until authenticated dispatch takes responsibility. */
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Custom request hooks can replace bodies and clients; this boundary validates or tracks their actual runtime values.
   ownRequestBody(body: unknown, source: unknown): void {
     if (body instanceof ReadableStream && body !== source) {
       this.#scope().materializedBody = body;
@@ -446,15 +440,12 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Recognizes every one-shot upload before issuer authentication or request replay. */
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Custom request hooks can replace bodies and clients; this boundary validates or tracks their actual runtime values.
   static isStreamingRequestBody(body: unknown): boolean {
     return (
       (globalThis.ReadableStream !== undefined && body instanceof globalThis.ReadableStream) ||
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
       (typeof body === 'object' &&
         body !== null &&
         (Symbol.asyncIterator in body ||
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
           (Symbol.iterator in body && 'next' in body && typeof body.next === 'function')))
     );
   }
@@ -478,7 +469,6 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Transfers the dispatched upload while retiring any SDK-owned body replaced by a hook. */
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Custom request hooks can replace bodies and clients; this boundary validates or tracks their actual runtime values.
   releaseRequestBody(body: unknown): void {
     const scope = this.#scope();
     if (scope.materializedBody === body) {
@@ -551,13 +541,13 @@ export class X509WorkloadIdentityAuth {
       wallStartedAt,
       monotonicStartedAt,
       owner: this,
-      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(deadlineArmed ? { deadlineArmed } : {}),
-      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(request ? { request } : {}),
-      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(effectiveSignal ? { effectiveSignal } : {}),
-      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(requestOwner ? { requestOwner } : {}),
     };
     return (operation) =>
@@ -628,10 +618,8 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Trusts only issuer or connection failures privately branded by the approved transport. */
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   static isRetryableFailure(error: unknown): boolean {
     return (
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
       typeof error === 'object' &&
       error !== null &&
       (isTransientX509ConnectionError(error) || isRetryableX509IssuerError(error))
@@ -639,9 +627,7 @@ export class X509WorkloadIdentityAuth {
   }
 
   /** Reads safe retry hints only from a privately branded, sanitized issuer response. */
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   static retryHeaders(error: unknown): Headers | undefined {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
     if (!error || typeof error !== 'object' || !isRetryableX509IssuerError(error)) {
       return undefined;
     }
@@ -702,7 +688,6 @@ export class X509WorkloadIdentityAuth {
   }
 
   async #recoverRefreshFailure(
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     error: unknown,
     attempt: X509RefreshAttempt,
     cached: CachedX509Token | undefined,
@@ -721,7 +706,6 @@ export class X509WorkloadIdentityAuth {
     if (fallback !== undefined) {
       return fallback;
     }
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
     if (error && typeof error === 'object' && !(error instanceof OAuthError)) {
       const oauth:
         | { status: 400 | 401 | 403; error: { error: string } | undefined; headers: Headers }
@@ -734,7 +718,6 @@ export class X509WorkloadIdentityAuth {
   }
 
   #fallbackToken(
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     error: unknown,
     cached: CachedX509Token | undefined,
     scope: X509RequestScope | undefined,
@@ -969,7 +952,6 @@ export class X509WorkloadIdentityAuth {
   fetch(): Fetch {
     return async (input, init = {}) => {
       const target = assertX509APIOrigin(
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Certificate authentication validates request bodies, transport failures, and host capabilities at runtime.
         typeof input === 'string' || input instanceof URL ? input : input.url,
       );
       assertX509FetchOptions(init);

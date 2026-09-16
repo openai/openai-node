@@ -105,7 +105,6 @@ function streamedTurn({ kind, finishReason }: Turn): ChatCompletionChunk[] {
 function mockClient(firstTurn: Turn) {
   const requests: { stream?: boolean }[] = [];
   const fetch = vi.fn<Fetch>(async (_url, init) => {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- This fetch test boundary requires serialized JSON and rejects other BodyInit forms before parsing.
     if (typeof init?.body !== 'string') {
       throw new TypeError('Expected a serialized chat completion request');
     }

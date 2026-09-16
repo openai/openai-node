@@ -17,7 +17,6 @@ type FakeNodeSocket = {
   on: Mock;
   send: Mock;
   close: Mock;
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture forwards arbitrary native event and server message values to the adapter boundary.
   dispatch: (event: string, value: unknown) => void;
 };
 
@@ -32,7 +31,6 @@ vi.mock('ws', () => ({
       on: vi.fn((event: string, listener: Listener) => listeners.set(event, listener)),
       send: vi.fn(),
       close: vi.fn(),
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture forwards arbitrary native event and server message values to the adapter boundary.
       dispatch: (event: string, value: unknown) => listeners.get(event)?.(value),
     } satisfies FakeNodeSocket;
   }),
@@ -59,7 +57,6 @@ class FakeBrowserSocket {
     this.listeners.set(event, listener);
   }
 
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The socket fixture forwards arbitrary native event and server message values to the adapter boundary.
   dispatch(event: string, value: unknown): void {
     this.listeners.get(event)?.(value);
   }
@@ -116,20 +113,17 @@ function createAzureClient(
     baseURL?: string;
   } = {},
 ): AzureOpenAI {
-  const clientOptions: ConstructorParameters<typeof AzureOpenAI>[0] = {
+  return new AzureOpenAI({
     apiVersion: '2024-10-01-preview',
     baseURL: options.baseURL ?? 'https://azure.example.com/openai/',
     ...(options.tokenProvider
       ? { azureADTokenProvider: async () => 'azure-token' }
       : { apiKey: 'azure-key' }),
-  };
-  if (options.deployment !== undefined) {
-    clientOptions.deployment = options.deployment;
-  }
-  if (options.dangerouslyAllowBrowser !== undefined) {
-    clientOptions.dangerouslyAllowBrowser = options.dangerouslyAllowBrowser;
-  }
-  return new AzureOpenAI(clientOptions);
+    ...(options.deployment === undefined ? {} : { deployment: options.deployment }),
+    ...(options.dangerouslyAllowBrowser === undefined
+      ? {}
+      : { dangerouslyAllowBrowser: options.dangerouslyAllowBrowser }),
+  });
 }
 
 beforeEach(() => {
@@ -567,15 +561,12 @@ describe.each([
     );
 
     expect(model.url.toString()).toBe('wss://example.com/v1/realtime?model=gpt-realtime');
-    const expectedHeaders = {
+    expect(lastNodeSocket().options.headers).toMatchObject({
       Authorization: 'Bearer test-key',
       'User-Agent': `OpenAI/JS ${VERSION}`,
       'X-Custom': 'value',
-    };
-    if (beta) {
-      Object.assign(expectedHeaders, { 'OpenAI-Beta': 'realtime=v1' });
-    }
-    expect(lastNodeSocket().options.headers).toMatchObject(expectedHeaders);
+      ...(beta ? { 'OpenAI-Beta': 'realtime=v1' } : {}),
+    });
 
     const sideband = new Realtime({ callID: 'call-123' }, client);
     expect(sideband.url.searchParams.get('call_id')).toBe('call-123');

@@ -154,7 +154,6 @@ export function isAutoParsableResponseFormat<ParsedT>(
  * predicate so the runtime, the streaming events and
  * {@link ExtractParsedContentFromParams} cannot drift apart.
  */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This public parser boundary accepts caller-supplied formats and validates their parser metadata at runtime.
 export function isParseableResponseFormat(format: unknown): boolean {
   // SAFETY: Only the optional discriminator is read; arbitrary input is not treated as a validated response-format schema.
   return isAutoParsableResponseFormat(format) || (format as { type?: string } | null)?.type === 'json_schema';
@@ -166,18 +165,15 @@ export function isParseableResponseFormat(format: unknown): boolean {
  *
  * Returns `null` for formats that are not auto-parseable.
  */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This public parser boundary accepts caller-supplied formats and validates their parser metadata at runtime.
 export function parseResponseFormatContent<ParsedT>(format: unknown, content: string): ParsedT | null {
   if (!isParseableResponseFormat(format)) {
     return null;
   }
 
   if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A caller-supplied response format may expose a callable parser; validate that hook before invoking it.
     typeof format === 'object' &&
     format !== null &&
     '$parseRaw' in format &&
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A caller-supplied response format may expose a callable parser; validate that hook before invoking it.
     typeof format.$parseRaw === 'function'
   ) {
     // SAFETY: The format's captured parser owns the ParsedT output contract; this function forwards its result without coercion.

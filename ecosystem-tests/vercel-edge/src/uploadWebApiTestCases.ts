@@ -26,7 +26,6 @@ export function uploadWebApiTestCases({
   /**
    * Jest expect(a).toEqual(b) function, or an imitation in envs like Cloudflare workers
    */
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The shared assertion adapter compares arbitrary expected and actual values across runtimes.
   expectEqual(a: unknown, b: unknown): void;
   /**
    * Assert that the levenshtein distance between the two given strings is less than the given max distance.

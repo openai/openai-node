@@ -26,7 +26,6 @@ interface FakeNodeSocket {
 
 interface FakeBrowserSocket {
   addEventListener: (event: string, listener: Listener) => void;
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
   dispatch: (event: Record<string, unknown>) => void;
   send: () => void;
   close: () => void;
@@ -44,7 +43,6 @@ interface WebSocketVariant {
   name: string;
   event: string;
   create: (client: OpenAI) => PublicWebSocket;
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
   dispatch: (connection: PublicWebSocket, event: Record<string, unknown>) => void;
 }
 
@@ -53,7 +51,6 @@ interface AuditedEvents {
   other: (value: string) => void;
   pair: (value: string, index: number) => void;
   empty: () => void;
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   error: (error: unknown) => void;
   __proto__: (value: number) => void;
 }
@@ -109,7 +106,6 @@ function createBrowserSocket(): FakeBrowserSocket {
       registrations.push(listener);
       listeners.set(event, registrations);
     },
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
     dispatch(event: Record<string, unknown>) {
       for (const listener of listeners.get('message') ?? []) {
         listener({ data: JSON.stringify(event) });
@@ -124,20 +120,16 @@ function installBrowserSocket(): void {
   vi.stubGlobal('WebSocket', vi.fn().mockImplementation(createBrowserSocket));
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
 function dispatchBrowser(connection: PublicWebSocket, event: Record<string, unknown>): void {
   // SAFETY: The matching variant installs this controlled browser or Node socket fake before dispatch; inspect its test-only event delivery method.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
   (connection.socket as { dispatch: (value: Record<string, unknown>) => void }).dispatch(event);
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
 function dispatchNodeRealtime(connection: PublicWebSocket, event: Record<string, unknown>): void {
   // SAFETY: The matching variant installs this controlled browser or Node socket fake before dispatch; inspect its test-only event delivery method.
   (connection.socket as FakeNodeSocket).emit('message', Buffer.from(JSON.stringify(event)));
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Transport adapters serialize heterogeneous event payloads before delivering them to the public WebSocket parser.
 function dispatchResponses(connection: PublicWebSocket, event: Record<string, unknown>): void {
   // SAFETY: The matching variant installs this controlled browser or Node socket fake before dispatch; inspect its test-only event delivery method.
   (connection.socket as { platformSocket: FakeNodeSocket }).platformSocket.emit(
@@ -218,9 +210,8 @@ function measureListenerMovement(operation: () => void) {
 
   function trackedFilter(
     this: unknown[],
-    // oxlint-disable-next-line anti-slop/no-unknown-returns, anti-slop/no-unknown-parameters -- Array.filter accepts any truthy callback result; instrumentation must preserve that native signature. The Array.filter instrumentation preserves the native callback contract for arbitrary elements and receivers.
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Array.filter accepts any truthy callback result; instrumentation must preserve that native signature. The Array.filter instrumentation preserves the native callback contract for arbitrary elements and receivers.
     predicate: (value: unknown, index: number, values: unknown[]) => unknown,
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The Array.filter instrumentation preserves the native callback contract for arbitrary elements and receivers.
     thisArg?: unknown,
   ) {
     const result = originalFilter.call(this, predicate, thisArg);
@@ -313,7 +304,6 @@ describe.each(websocketVariants)('$name event waiters', ({ event, create, dispat
       if (mode === 'success') {
         expect(
           settled.every(
-            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Select the actual event payload from recorded callback arguments before asserting its delivery.
             (value) => typeof value === 'object' && value !== null && 'type' in value && value.type === event,
           ),
         ).toBe(true);

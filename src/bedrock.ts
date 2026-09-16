@@ -164,7 +164,6 @@ export class BedrockOpenAI extends OpenAI {
     }
 
     // SAFETY: The widening keeps a runtime guard for JavaScript callers that supply an API-key function despite the declared string contract.
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject a JavaScript function supplied as a static Bedrock API key before it can become a credential.
     if (typeof (apiKey as unknown) === 'function') {
       throw new Errors.OpenAIError(
         'Pass refreshable Bedrock credentials via `bedrockTokenProvider`, not `apiKey`.',
@@ -284,12 +283,11 @@ export class BedrockOpenAI extends OpenAI {
     const bedrockTokenProvider =
       options.apiKey === undefined ? (options.bedrockTokenProvider ?? this.bedrockTokenProvider) : undefined;
 
-    const clientOptions = {
-      ...options,
-      // oxlint-disable-next-line anti-slop/no-conditional-empty-object-spread -- Spread creates an own data property without invoking inherited setters or changing the object prototype.
-      ...(bedrockTokenProvider ? { apiKey: undefined, bedrockTokenProvider } : {}),
-    };
     // SAFETY: Bedrock options extend the base client options; forwarding them preserves the subclass's existing withOptions construction behavior.
-    return super.withOptions(clientOptions as Partial<ClientOptions>);
+    return super.withOptions({
+      ...options,
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+      ...(bedrockTokenProvider ? { apiKey: undefined, bedrockTokenProvider } : {}),
+    } as Partial<ClientOptions>);
   }
 }

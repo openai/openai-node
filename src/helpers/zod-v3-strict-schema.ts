@@ -19,7 +19,6 @@ interface SchemaDefinition {
   options: readonly SchemaNode[] | Map<unknown, SchemaNode>;
   getter: () => SchemaNode;
   value?: unknown;
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Native enum definition entries are unvalidated until the string/number checks establish their domains.
   values?: readonly unknown[] | Record<string, unknown>;
 }
 
@@ -91,20 +90,16 @@ function unsupported(path: string, kind: string, explanation: string): never {
   );
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema literals and parsed results are untrusted until their JSON domains and serialization behavior are validated.
 function literalDomain(value: unknown): JSONDomain | undefined {
   if (value === null) {
     return { type: 'null', values: new Set([null]) };
   }
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
   if (typeof value === 'string') {
     return { type: 'string', values: new Set([value]) };
   }
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
   if (typeof value === 'boolean') {
     return { type: 'boolean', values: new Set([value]) };
   }
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
   if (typeof value === 'number' && Number.isFinite(value)) {
     return { type: 'number', values: new Set([value]) };
   }
@@ -117,13 +112,11 @@ function nativeEnumDomains(def: SchemaDefinition): JSONDomain[] {
     return [];
   }
   // SAFETY: The preceding guard accepts a non-array object; its values remain unknown until individual definition checks.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Native enum definition entries are unvalidated until the string/number checks establish their domains.
   const object = definitionValues as Record<string, unknown>;
   const values = Object.keys(object)
     .filter((key) => {
       const value = object[key];
       return (
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
         (typeof value === 'string' || typeof value === 'number') && typeof object[String(value)] !== 'number'
       );
     })
@@ -135,7 +128,6 @@ function nativeEnumDomains(def: SchemaDefinition): JSONDomain[] {
   return (['string', 'number'] as const)
     .map((type) => ({
       type,
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
       values: new Set(values.filter((value) => typeof value === type)),
     }))
     .filter((domain) => domain.values.size > 0);
@@ -301,9 +293,7 @@ function hasFiniteNumberOutput(def: SchemaDefinition): boolean {
     return true;
   }
   return (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
     checks.some(({ kind, value }) => kind === 'min' && typeof value === 'number' && Number.isFinite(value)) &&
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
     checks.some(({ kind, value }) => kind === 'max' && typeof value === 'number' && Number.isFinite(value))
   );
 }
@@ -457,7 +447,6 @@ function assertNoJSONSerializationHook(value: object, path: string): void {
     if (!descriptor) {
       continue;
     }
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
     if (!('value' in descriptor) || typeof descriptor.value === 'function') {
       throw new Error(
         `Strict Structured Outputs schema field \`${path}\` contains an unsupported \`toJSON\` serialization hook`,
@@ -476,24 +465,19 @@ function assertJSONSerializableNumber(value: number, path: string): void {
 }
 
 export function assertJSONSerializableSchema(
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema literals and parsed results are untrusted until their JSON domains and serialization behavior are validated.
   value: unknown,
   path = '$',
   ancestors = new Set<object>(),
 ): void {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
   if (value === null || typeof value === 'string' || typeof value === 'boolean') {
     return;
   }
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
   if (typeof value === 'number' && Number.isFinite(value)) {
     assertJSONSerializableNumber(value, path);
     return;
   }
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
   if (typeof value !== 'object') {
     throw new TypeError(
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect Zod metadata and JSON literal kinds before accepting a strict Structured Outputs schema.
       `Strict Structured Outputs schema field \`${path}\` contains a non-JSON ${typeof value} value`,
     );
   }

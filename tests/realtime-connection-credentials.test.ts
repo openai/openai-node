@@ -61,7 +61,6 @@ function credential(connection: { socket: unknown }): string | undefined {
 function clientFor(azure: boolean, apiKey: string | (() => Promise<string>)) {
   return azure
     ? new AzureOpenAI({
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Exercise the public static-key and callable-provider credential forms without changing the fixture.
         ...(typeof apiKey === 'function' ? { azureADTokenProvider: apiKey } : { apiKey }),
         apiVersion: '2024-10-01-preview',
         baseURL: 'https://azure.example/openai/',

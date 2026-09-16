@@ -175,7 +175,6 @@ export async function toFile(
 async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Promise<BlobPart[]> {
   const parts: BlobPart[] = [];
   if (
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Upload conversion accepts text, binary, and iterable inputs from JavaScript callers.
     typeof value === 'string' ||
     ArrayBuffer.isView(value) || // includes Uint8Array, Buffer, etc.
     isArrayBuffer(value)
@@ -192,7 +191,6 @@ async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Prom
   } else {
     const constructor = value?.constructor?.name;
     throw new Error(
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Upload conversion accepts text, binary, and iterable inputs from JavaScript callers.
       `Unexpected data type: ${typeof value}${
         constructor ? `; constructor: ${constructor}` : ''
       }${propsForError(value)}`,
@@ -202,9 +200,7 @@ async function getBytes(value: BlobLikePart | AsyncIterable<BlobLikePart>): Prom
   return parts;
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Invalid upload diagnostics must accept arbitrary rejected values without assuming their object type.
 function propsForError(value: unknown): string {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Upload conversion accepts text, binary, and iterable inputs from JavaScript callers.
   if (typeof value !== 'object' || value === null) {
     return '';
   }

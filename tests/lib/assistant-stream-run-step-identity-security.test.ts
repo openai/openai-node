@@ -5,7 +5,6 @@ import { ReadableStreamFrom } from 'openai/internal/shims';
 import { AssistantStream } from 'openai/lib/AssistantStream';
 import type { AssistantStreamEvent } from 'openai/resources/beta/assistants';
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Raw event fixtures omit or corrupt identity fields to exercise validation beyond the generated event contract.
 type Event = Record<string, any>;
 
 function readableEvents(events: Event[]) {
@@ -327,7 +326,6 @@ describe('AssistantStream run-step identity security', () => {
       runner.on('toolCallDone', toolDone);
       runner.on('run', runDone);
 
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
       const failure = await runner.done().catch((error: unknown) => error);
 
       expect(failure).toBeInstanceOf(OpenAIError);

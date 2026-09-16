@@ -1,4 +1,3 @@
-import type { ClientOptions } from 'openai';
 import { vi } from 'vitest';
 
 import OpenAI from 'openai';
@@ -47,16 +46,13 @@ async function createPublicStream(
     data?: string;
   } = {},
 ): Promise<PublicStream> {
-  const clientOptions: ClientOptions = {
+  const client = new OpenAI({
     apiKey: 'sk-synthetic-client-credential',
     maxRetries: 0,
     logLevel: options.logLevel ?? 'error',
+    ...(options.logger ? { logger: options.logger } : {}),
     fetch: async () => createResponse(surface, options.data),
-  };
-  if (options.logger) {
-    clientOptions.logger = options.logger;
-  }
-  const client = new OpenAI(clientOptions);
+  });
 
   if (surface.surface === 'assistants') {
     return await client.beta.threads.runs.create('thread_synthetic', {
@@ -131,7 +127,6 @@ describe('malformed SSE diagnostic privacy', () => {
         () => {
           throw new Error('Expected the malformed SSE payload to be rejected.');
         },
-        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
         (error: unknown) => error,
       );
 

@@ -76,7 +76,6 @@ describe('standalone readable stream adapter', () => {
     const iterator = adaptStandaloneReadableStream<string>(stream);
 
     expect(iterator).not.toBe(stream);
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Assert the runtime iterator exposes its required next method before exercising adaptation.
     expect(typeof iterator.next).toBe('function');
     await expect(iterator.next()).resolves.toEqual({ done: false, value: 'value' });
     await expect(iterator.next()).resolves.toEqual({ done: true, value: undefined });

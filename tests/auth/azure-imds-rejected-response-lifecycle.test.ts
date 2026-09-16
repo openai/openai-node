@@ -289,7 +289,6 @@ describe('Azure IMDS rejected-response lifecycle', () => {
       try {
         await once(metadata.listen(0, '127.0.0.1'), 'listening');
         const address = metadata.address();
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
         if (!address || typeof address === 'string') {
           throw new Error('Expected the Azure metadata server to bind an ephemeral TCP port.');
         }

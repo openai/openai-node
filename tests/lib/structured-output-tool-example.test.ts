@@ -118,6 +118,7 @@ test.each(cases)('structured-output tool example: $name', async ({ output, succe
         id: 'resp_synthetic',
         object: 'response',
         created_at: 0,
+        ...(status === undefined ? {} : { status }),
         error: status === 'failed' ? { code: 'server_error', message: 'Synthetic response failure' } : null,
         incomplete_details: status === 'incomplete' ? { reason: 'max_output_tokens' } : null,
         instructions: null,
@@ -130,9 +131,6 @@ test.each(cases)('structured-output tool example: $name', async ({ output, succe
         tools: JSON.parse(body.toString()).tools,
         top_p: 1,
       };
-      if (status !== undefined) {
-        responseBody.status = status;
-      }
       response.writeHead(200, { 'content-type': 'application/json', connection: 'close' });
       response.end(JSON.stringify(responseBody));
     });
@@ -142,7 +140,6 @@ test.each(cases)('structured-output tool example: $name', async ({ output, succe
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const address = server.address();
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
     if (!address || typeof address === 'string') {
       throw new Error('Expected a loopback HTTP address');
     }

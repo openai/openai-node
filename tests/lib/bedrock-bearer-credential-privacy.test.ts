@@ -1,4 +1,3 @@
-import type { ClientOptions } from 'openai';
 import { vi } from 'vitest';
 
 import OpenAI, { BedrockOpenAI, OpenAIError } from 'openai';
@@ -92,14 +91,12 @@ function createBedrockClient({
   logger?: TestLogger;
   tokenProvider?: TokenProvider;
 }): OpenAI {
-  const clientOptions: Pick<ClientOptions, 'fetch' | 'maxRetries' | 'logLevel' | 'logger'> = {
+  const clientOptions = {
     fetch,
     maxRetries: 0,
-    logLevel: 'debug',
+    logLevel: 'debug' as const,
+    ...(logger ? { logger } : {}),
   };
-  if (logger) {
-    clientOptions.logger = logger;
-  }
 
   if (entrypoint === 'legacy') {
     return new BedrockOpenAI({
@@ -161,7 +158,6 @@ function expectPrivateLogs(logger: TestLogger, credential: string): void {
 
   for (const argumentsList of calls) {
     for (const value of argumentsList) {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect strings verbatim and JSON-encode structured diagnostics when checking for leaked credentials.
       const serialized = typeof value === 'string' ? value : JSON.stringify(value);
       expect(serialized).not.toContain(credential);
       expect(serialized).not.toContain(SENSITIVE_CREDENTIAL);

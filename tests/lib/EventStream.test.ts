@@ -24,7 +24,6 @@ import type { BaseEvents } from 'openai/lib/EventStream';
 
 interface TestEvents extends BaseEvents {
   foo: (value: string, index: number) => void;
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Retention regressions intentionally emit heterogeneous objects, primitives, proxies, and malformed values.
   payload: (value: unknown) => void;
 }
 
@@ -33,7 +32,6 @@ class TestStream extends EventStream<TestEvents> {
     this._emit('foo', value, index);
   }
 
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Retention regressions intentionally emit heterogeneous objects, primitives, proxies, and malformed values.
   emitPayload(value: unknown) {
     this._emit('payload', value);
   }
@@ -906,7 +904,7 @@ describe('EventStream iterator buffer limits', () => {
     { name: 'Set-value proxy', wrap: (proxy: object) => new Set([proxy]) },
   ])('rejects a detached $name before invoking its hidden handler', async ({ wrap }) => {
     const retained = 'x'.repeat(9 * 1024 * 1024);
-    // oxlint-disable-next-line anti-slop/no-object-parameters, anti-slop/no-unknown-parameters -- The hostile Proxy trap reflects arbitrary targets and accepts any Reflect.get receiver, including values unrelated to its target.
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- The hostile Proxy trap reflects arbitrary targets and accepts any Reflect.get receiver, including values unrelated to its target.
     const read = vi.fn((target: object, property: PropertyKey, receiver: unknown) => {
       if (retained.length === 0) {
         throw new Error('Expected retained handler state');

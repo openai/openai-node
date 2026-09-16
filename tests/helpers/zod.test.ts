@@ -14,16 +14,13 @@ import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 import { z as zv4Mini } from 'zod/v4-mini';
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema traversal inspects arbitrary JSON keyword values before following references or counting enums.
 function collectRefs(value: unknown, refs: string[] = []): string[] {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect emitted JSON Schema containers and references to verify the converter output.
   if (!value || typeof value !== 'object') {
     return refs;
   }
 
   // SAFETY: The traversal checks for a non-null object before reading schema keywords; keyword values remain subject to the following checks.
   const maybeRef = (value as { $ref?: unknown }).$ref;
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect emitted JSON Schema containers and references to verify the converter output.
   if (typeof maybeRef === 'string') {
     refs.push(maybeRef);
   }
@@ -35,9 +32,7 @@ function collectRefs(value: unknown, refs: string[] = []): string[] {
   return refs;
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema traversal inspects arbitrary JSON keyword values before following references or counting enums.
 function countEnumValues(value: unknown): number {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect emitted JSON Schema containers and references to verify the converter output.
   if (!value || typeof value !== 'object') {
     return 0;
   }
@@ -50,7 +45,6 @@ function countEnumValues(value: unknown): number {
   }
 
   // SAFETY: The traversal checks for a non-null object before reading schema keywords; keyword values remain subject to the following checks.
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
   const record = value as Record<string, unknown>;
   const enumValues = Array.isArray(record['enum']) ? record['enum'].length : 0;
   let nestedEnumValues = 0;
@@ -60,7 +54,7 @@ function countEnumValues(value: unknown): number {
   return enumValues + nestedEnumValues;
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-returns, anti-slop/no-unsafe-dictionary-type -- JSON Pointer traversal may resolve any schema or literal value, which each fixture checks afterward. These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JSON Pointer traversal may resolve any schema or literal value, which each fixture checks afterward. These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
 function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unknown {
   expect(pointer.startsWith('#/')).toBe(true);
 
@@ -71,30 +65,23 @@ function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unk
   let value: unknown = root;
   for (const token of tokens) {
     expect(value).not.toBeNull();
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect emitted JSON Schema containers and references to verify the converter output.
     expect(typeof value).toBe('object');
     // SAFETY: The traversal checks for a non-null object before reading schema keywords; keyword values remain subject to the following checks.
     expect(hasOwn(value as object, token)).toBe(true);
     // SAFETY: The traversal checks for a non-null object before reading schema keywords; keyword values remain subject to the following checks.
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     value = (value as Record<string, unknown>)[token];
   }
   return value;
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
 function expectDefinitionRefsToResolve(schema: Record<string, unknown>) {
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Schema traversal inspects arbitrary JSON keyword values before following references or counting enums.
   const visit = (value: unknown, resolving: Set<string>) => {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect emitted JSON Schema containers and references to verify the converter output.
     if (!value || typeof value !== 'object') {
       return;
     }
 
     // SAFETY: The traversal checks for a non-null object before reading schema keywords; keyword values remain subject to the following checks.
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     const ref = (value as Record<string, unknown>)['$ref'];
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect emitted JSON Schema containers and references to verify the converter output.
     if (typeof ref === 'string') {
       const definition = resolveJsonPointer(schema, ref);
       expect(definition).toBeDefined();
@@ -358,10 +345,8 @@ describe.each([
     });
 
     // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     const schema = zodResponseFormat(Root, 'example-scope').json_schema.schema as Record<string, unknown>;
     // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
-    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     const definitions = (schema['definitions'] ?? schema['$defs'] ?? {}) as Record<string, unknown>;
     const refs = collectRefs(schema);
     const definitionNames = Object.keys(definitions);
@@ -370,7 +355,6 @@ describe.each([
     expect(definitionNames).not.toContainEqual(expect.stringMatching(/\s/));
     if (version === 'v3') {
       // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       const rootProperties = schema['properties'] as Record<string, Record<string, unknown>>;
       // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const groupProperties = rootProperties['group']?.['properties'] as Record<string, { $ref?: string }>;
@@ -409,7 +393,6 @@ describe.each([
       }),
       'shared',
       { schemaDefinitions: { foo: Foo, bar: Bar } },
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     ).json_schema.schema as Record<string, unknown>;
 
     expect(countEnumValues(schema)).toBe(fooValues.length + barValues.length);
@@ -422,7 +405,6 @@ describe.each([
     // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
     const schema = zodResponseFormat(z.object({ first: Shared, second: Shared }), 'root', {
       schemaDefinitions: { root: Shared },
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     }).json_schema.schema as Record<string, unknown>;
 
     expect(collectRefs(schema)).toContain('#/definitions/root');
@@ -434,7 +416,6 @@ describe.each([
     // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
     const schema = zodResponseFormat(z.object({ first: Shared, second: Shared }), 'response', {
       schemaDefinitions: { 'foo/bar~baz': Shared },
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     }).json_schema.schema as Record<string, unknown>;
 
     expect(collectRefs(schema)).toContain('#/definitions/foo~1bar~0baz');
@@ -446,7 +427,6 @@ describe.each([
     // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
     const schema = zodResponseFormat(z.object({ first: Shared, second: Shared }), 'response', {
       schemaDefinitions: { 'foo%2Fbar': Shared },
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
     }).json_schema.schema as Record<string, unknown>;
 
     expect(collectRefs(schema)).toContain('#/definitions/foo%252Fbar');
@@ -799,7 +779,6 @@ describe.each([
           nullableSecond: nullable,
         }),
         'wrappers',
-        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       ).schema as Record<string, unknown>;
 
       expectDefinitionRefsToResolve(schema);
@@ -810,7 +789,6 @@ describe.each([
       expect(brandedRef).toBeDefined();
 
       // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       const definitions = schema['definitions'] as Record<string, unknown>;
       expect(definitions[brandedRef!.replace('#/definitions/', '')]).toMatchObject({ type: 'string' });
     });
@@ -832,10 +810,8 @@ describe.each([
           lateSecond: late,
         }),
         'wrapperState',
-        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       ).schema as Record<string, any>;
       // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       const definitions = schema['definitions'] as Record<string, any>;
 
       // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
@@ -863,10 +839,8 @@ describe.each([
           second: recursive,
         }),
         'recursive',
-        // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       ).schema as Record<string, any>;
       // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
       const definitions = schema['definitions'] as Record<string, any>;
 
       // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.

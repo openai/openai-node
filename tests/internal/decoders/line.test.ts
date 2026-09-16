@@ -158,7 +158,6 @@ describe('line decoder', () => {
         const buffer = Reflect.construct(NativeUint8Array, args) as Uint8Array;
         return new Proxy(buffer, {
           get(target, property) {
-            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The proxy fixture distinguishes indexed byte access and callable host methods without changing decoding.
             if (typeof property === 'string' && /^\d+$/u.test(property)) {
               scanned += 1;
               if (scanned > count * 4) {
@@ -167,7 +166,6 @@ describe('line decoder', () => {
             }
             // oxlint-disable-next-line anti-slop/no-reflect-get -- The instrumented typed-array proxy must forward arbitrary keys with the native target as receiver.
             const value = Reflect.get(target, property, target);
-            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The proxy fixture distinguishes indexed byte access and callable host methods without changing decoding.
             return typeof value === 'function' ? value.bind(target) : value;
           },
         });

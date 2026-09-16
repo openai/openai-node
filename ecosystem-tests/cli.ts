@@ -516,7 +516,6 @@ const projectRunners = {
     // dependency. For the default path, add that declaration only after npm
     // installs the local tarball so it cannot substitute a registry package.
     const installedPackage = JSON.parse(await fs.readFile('node_modules/openai/package.json', 'utf-8'));
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The ecosystem harness validates runtime package, process, and command-line data before using it.
     assert.ok(typeof installedPackage.version === 'string');
     await fs.writeFile(
       'package.json',
@@ -571,7 +570,6 @@ async function startProxy() {
   await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
 
   const address = proxy.address();
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
   assert.ok(address && typeof address !== 'string');
   process.env['ECOSYSTEM_TESTS_PROXY'] = 'http://127.0.0.1:' + address.port;
 
@@ -629,7 +627,6 @@ function parseArgs() {
         type: 'string',
         default: '0',
         description: 'number of times to retry failing jobs',
-        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- CLI option coercion validates values received from the external argument parser.
         coerce: (value: unknown) => {
           const retry = Number(value);
           const decimal = /^[+-]?(?<whole>\d*)(?:\.(?<fraction>\d*))?(?:e(?<exponent>[+-]?\d+))?$/iu.exec(
@@ -669,7 +666,6 @@ function parseArgs() {
     })
     .check((args) => {
       for (const project of args._) {
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The ecosystem harness validates runtime package, process, and command-line data before using it.
         if (typeof project !== 'string' || !projectNamesSet.has(project)) {
           throw new Error(`Unknown ecosystem project: ${JSON.stringify(project)}`);
         }
@@ -733,7 +729,6 @@ async function main() {
   } else if (positionalArgs.length) {
     // SAFETY: Yargs choices and the explicit project-name membership check reject unregistered project names before runner lookup.
     projectsToRun = positionalArgs.filter(
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The ecosystem harness validates runtime package, process, and command-line data before using it.
       (n) => typeof n === 'string' && projectNamesSet.has(n),
     ) as typeof projectNames;
   } else {
@@ -999,7 +994,6 @@ async function withRetry(
   identifier: string,
   retryAmount: number,
   retryDelayMs: number,
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
   shouldRetry: (err: unknown) => boolean = () => true,
 ): Promise<void> {
   let retriesLeft = retryAmount;
@@ -1025,25 +1019,15 @@ async function withRetry(
   }
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function errorMessage(err: unknown): string {
-  if (
-    err &&
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The ecosystem harness validates runtime package, process, and command-line data before using it.
-    typeof err === 'object' &&
-    'shortMessage' in err &&
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The ecosystem harness validates runtime package, process, and command-line data before using it.
-    typeof err.shortMessage === 'string'
-  ) {
+  if (err && typeof err === 'object' && 'shortMessage' in err && typeof err.shortMessage === 'string') {
     return err.shortMessage;
   }
   return String(err);
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function isLikelyNodeCrash(err: unknown): boolean {
   // SAFETY: This command failure inspection reads optional execa fields for logging or crash classification; absent fields are handled by the surrounding fallback.
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The ecosystem harness validates runtime package, process, and command-line data before using it.
   const signal = err && typeof err === 'object' ? (err as any).signal : undefined;
   if (signal === 'SIGABRT' || signal === 'SIGSEGV' || signal === 'SIGBUS' || signal === 'SIGILL') {
     return true;
@@ -1051,7 +1035,6 @@ function isLikelyNodeCrash(err: unknown): boolean {
 
   const output =
     // SAFETY: This command failure inspection reads optional execa fields for logging or crash classification; absent fields are handled by the surrounding fallback.
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The ecosystem harness validates runtime package, process, and command-line data before using it.
     err && typeof err === 'object' ? `${(err as any).stderr || ''}\n${(err as any).stdout || ''}` : '';
   return /Fatal error in|Check failed:|Segmentation fault|core dumped/i.test(output);
 }
@@ -1090,7 +1073,6 @@ async function buildPackage() {
   });
 
   const pack = JSON.parse(proc.stdout);
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The ecosystem harness validates runtime package, process, and command-line data before using it.
   assert.ok(Array.isArray(pack), `Expected pack output to be an array but got ${typeof pack}`);
   assert.ok(pack.length === 1, `Expected pack output to be an array of length 1 but got ${pack.length}`);
 

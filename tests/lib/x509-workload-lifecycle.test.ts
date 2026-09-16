@@ -453,7 +453,6 @@ describe('X.509 workload credential lifecycle', () => {
     vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url, request) => {
       if (url.origin === 'https://mtls.auth.openai.com') {
         const body: unknown = JSON.parse(String(request.body));
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Inspect the outgoing token-exchange body before synchronizing the lifecycle regression.
         if (typeof body === 'object' && body && 'service_account_id' in body) {
           accounts.push(String(body.service_account_id));
         }

@@ -7,7 +7,6 @@ import {
 } from '../../src/internal/responses/response-accumulator';
 
 type OutputItem = Response['output'][number];
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Wire identity fixtures deliberately omit or corrupt fields across several event kinds.
 type EventFields = Record<string, unknown>;
 
 function makeResponse(output: OutputItem[] = []): Response {

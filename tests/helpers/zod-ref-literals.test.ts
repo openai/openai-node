@@ -9,10 +9,8 @@ import { z as zv3 } from 'zod/v3';
 import { z as zv4 } from 'zod/v4';
 import { z as zv4Mini } from 'zod/v4-mini';
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Reference tests traverse schema keywords and arbitrary literal/default objects with different value shapes.
 type JSONSchemaRecord = Record<string, unknown>;
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Serialized schema properties are inspected only after their runtime object structure is checked.
 function schemaProperties(schema: unknown): Record<string, JSONSchemaRecord> {
   // SAFETY: The explicit Zod fixture defines these object properties, arrays, or defaults; the assertions check their serialized reference/literal representation.
   return (schema as { properties: Record<string, JSONSchemaRecord> }).properties;

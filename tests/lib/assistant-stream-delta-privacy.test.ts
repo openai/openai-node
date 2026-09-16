@@ -8,7 +8,6 @@ const syntheticCredential = 'sk-synthetic-private-assistant-token-7f3e';
 const syntheticPatient = 'synthetic-patient-123-45-6789';
 const missingIndexMessage = 'Expected array delta entry to have an `index` property';
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Privacy fixtures intentionally pass invalid tool-call fields and arbitrary sensitive values through delta validation.
 function sensitiveToolCall(): Record<string, unknown> {
   // oxlint-disable-next-line anti-slop/no-known-value-widening -- Callers add malformed or missing-index fields to this open-ended wire fixture before accumulation.
   return {
@@ -63,7 +62,6 @@ function createRedactingLogger() {
   return {
     redactedMessages,
     logger: {
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The console spy receives arbitrary diagnostic arguments and checks them without trusting their type.
       error: vi.fn((message: unknown) => {
         redactedMessages.push(
           String(message)
@@ -80,7 +78,6 @@ function createRedactingLogger() {
   };
 }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Privacy fixtures intentionally pass invalid tool-call fields and arbitrary sensitive values through delta validation.
 function expectStaticFailure(accumulator: Record<string, unknown>, delta: Record<string, unknown>) {
   let failure: unknown;
 

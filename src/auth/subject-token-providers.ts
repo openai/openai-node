@@ -20,7 +20,6 @@ const nativeErrorBrandDescriptor = getOwnErrorDescriptor(Error, 'isError');
 const nativeErrorBrand =
   nativeErrorBrandDescriptor &&
   'value' in nativeErrorBrandDescriptor &&
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Metadata-service responses and cross-realm failures must be inspected without trusting their declared types.
   typeof nativeErrorBrandDescriptor.value === 'function'
     ? // oxlint-disable-next-line anti-slop/no-object-parameters -- The native error-brand predicate inspects arbitrary objects without trusting their properties.
       (nativeErrorBrandDescriptor.value as (error: object) => boolean)
@@ -38,7 +37,6 @@ function hasNativeErrorPrototype(prototype: object, kind: 'Error' | 'SyntaxError
     name.value !== kind ||
     !constructor ||
     !('value' in constructor) ||
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Metadata-service responses and cross-realm failures must be inspected without trusting their declared types.
     typeof constructor.value !== 'function'
   ) {
     return false;
@@ -105,7 +103,6 @@ function classifyCrossRealmAzureError(error: object): AzureJSONErrorKind {
   }
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function inspectAzureJSONErrorCause(error: unknown): boolean {
   const visited = new Set<object>();
   let current = error;
@@ -114,7 +111,6 @@ function inspectAzureJSONErrorCause(error: unknown): boolean {
     if (current instanceof SyntaxError) {
       return true;
     }
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Metadata-service responses and cross-realm failures must be inspected without trusting their declared types.
     if (typeof current !== 'object' || current === null) {
       return false;
     }
@@ -151,7 +147,6 @@ function inspectAzureJSONErrorCause(error: unknown): boolean {
   return true;
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
 function isMalformedAzureJSONError(error: unknown): boolean {
   try {
     return inspectAzureJSONErrorCause(error);
@@ -160,10 +155,8 @@ function isMalformedAzureJSONError(error: unknown): boolean {
   }
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Metadata-service JSON is untrusted until the token field passes runtime validation.
 function readAzureAccessToken(data: unknown): string {
   const token = isObj(data) && hasOwn(data, 'access_token') ? data['access_token'] : undefined;
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Metadata-service responses and cross-realm failures must be inspected without trusting their declared types.
   if (typeof token !== 'string' || token.trim().length === 0) {
     throw new SubjectTokenProviderError("IMDS response missing 'access_token' field", 'azure-imds');
   }

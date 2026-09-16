@@ -141,7 +141,6 @@ describe('resource embeddings', () => {
       encoding_format: 'base64',
     });
 
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Assert the response retains a base64 string when float decoding is disabled.
     expect(typeof response.data?.[0]?.embedding).toBe('string');
   });
 });

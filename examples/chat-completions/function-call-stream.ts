@@ -135,10 +135,8 @@ function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChu
     for (const [key, value] of Object.entries(delta)) {
       if (acc[key] === undefined || acc[key] === null) {
         acc[key] = value;
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Accumulate streamed deltas according to their text or object representation.
       } else if (typeof acc[key] === 'string' && typeof value === 'string') {
         acc[key] += value;
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Accumulate streamed deltas according to their text or object representation.
       } else if (typeof acc[key] === 'object' && !Array.isArray(acc[key])) {
         acc[key] = reduce(acc[key], value);
       }

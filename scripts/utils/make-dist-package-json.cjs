@@ -7,7 +7,6 @@ function processExportMap(m) {
     }
 
     const value = m[key];
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Package metadata permits string leaves and nested export conditions that require different rewriting.
     if (typeof value === 'string') {
       m[key] = value.replace(/^\.\/dist\//, './');
     } else {
@@ -43,7 +42,6 @@ if (pkgJson.imports?.['#x509-transport-state']) {
 }
 
 for (const key of ['types', 'main', 'module']) {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Package metadata permits string leaves and nested export conditions that require different rewriting.
   if (typeof pkgJson[key] === 'string') {
     pkgJson[key] = pkgJson[key].replace(/^(\.\/)?dist\//, './');
   }

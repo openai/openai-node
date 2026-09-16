@@ -1036,10 +1036,8 @@ describe('toStrictJsonSchema', () => {
         properties: {
           value: { $ref: '#/$defs/Text', type: 'number' },
         },
+        ...(isRequired ? { required: ['value'] } : {}),
       };
-      if (isRequired) {
-        schema.required = ['value'];
-      }
 
       expect(() => toStrictJsonSchema(schema)).toThrow('has non-annotation siblings that Draft 7 ignores');
     });

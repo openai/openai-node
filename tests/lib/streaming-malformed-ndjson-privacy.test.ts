@@ -31,7 +31,6 @@ function readable(
     {
       start(controller) {
         for (const chunk of chunks) {
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The fixture deliberately mixes text and binary transport chunks before decoding malformed NDJSON.
           controller.enqueue(typeof chunk === 'string' ? encoder.encode(chunk) : chunk);
         }
         if (close) {

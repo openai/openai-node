@@ -23,7 +23,6 @@ export function parseRealtimeEvent(data: string): RealtimeServerEvent {
   }
 }
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Error fields arrive from untrusted realtime frames and may be noncoercible JSON values.
 function safeErrorValue(value: unknown): string {
   try {
     return String(value);
@@ -183,7 +182,6 @@ export function buildRealtimeURL(
 ): URL {
   assertX509WebSocketSupported(client);
   const config: RealtimeConnectionConfig =
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The public beta Realtime API preserves its shorthand string and structured connection overloads.
     typeof connection === 'string' ? { model: connection } : connection;
   const baseURL = client.baseURL;
   const azure = isAzure(client);

@@ -37,7 +37,6 @@ describe('allSettledWithThrow', () => {
   test('keeps rejected errors out of serialized aggregate failures', async () => {
     const secret = 'sk-synthetic-private-upload-secret';
     const rejected = allSettledWithThrow([Promise.reject(new Error(secret))]);
-    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Failures and rejection reasons can be arbitrary JavaScript values; preserve them until inspection or forwarding.
     const error = await rejected.catch((caughtError: unknown) => caughtError);
 
     expect(error).toBeInstanceOf(Error);

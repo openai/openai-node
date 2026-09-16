@@ -23,20 +23,18 @@ describe('azure redirect safety', () => {
   ] as const)(
     'disables automatic redirects for static API keys despite %s',
     async (_configuration, clientRedirect, requestRedirect) => {
-      const clientOptions: ConstructorParameters<typeof AzureOpenAI>[0] = { baseURL, apiKey, apiVersion };
-      if (clientRedirect) {
-        clientOptions.fetchOptions = { redirect: clientRedirect };
-      }
-      const client = new AzureOpenAI(clientOptions);
+      const client = new AzureOpenAI({
+        baseURL,
+        apiKey,
+        apiVersion,
+        ...(clientRedirect ? { fetchOptions: { redirect: clientRedirect } } : {}),
+      });
 
-      const options: Parameters<typeof client.buildRequest>[0] = {
+      const { req } = await client.buildRequest({
         path: '/foo',
         method: 'get',
-      };
-      if (requestRedirect) {
-        options.fetchOptions = { redirect: requestRedirect };
-      }
-      const { req } = await client.buildRequest(options);
+        ...(requestRedirect ? { fetchOptions: { redirect: requestRedirect } } : {}),
+      });
 
       expect(req.headers.get('api-key')).toBe(apiKey);
       expect(req.redirect).toBe('manual');
@@ -107,7 +105,7 @@ describe('azure redirect safety', () => {
     'preserves %s for bearer-only authentication',
     async (_configuration, clientRedirect, requestRedirect, expectedRedirect) => {
       let requestedInit: RequestInit | undefined;
-      const clientOptions: ConstructorParameters<typeof AzureOpenAI>[0] = {
+      const client = new AzureOpenAI({
         baseURL,
         azureADTokenProvider: async () => 'azure-ad-token',
         apiVersion,
@@ -115,11 +113,8 @@ describe('azure redirect safety', () => {
           requestedInit = init;
           return globalThis.Response.json({ ok: true });
         },
-      };
-      if (clientRedirect) {
-        clientOptions.fetchOptions = { redirect: clientRedirect };
-      }
-      const client = new AzureOpenAI(clientOptions);
+        ...(clientRedirect ? { fetchOptions: { redirect: clientRedirect } } : {}),
+      });
 
       await client.get('/foo', requestRedirect ? { fetchOptions: { redirect: requestRedirect } } : undefined);
 
@@ -137,21 +132,19 @@ describe('azure redirect safety', () => {
   ] as const)(
     'preserves %s when the API key header is explicitly removed',
     async (_configuration, clientRedirect, requestRedirect, expectedRedirect) => {
-      const clientOptions: ConstructorParameters<typeof AzureOpenAI>[0] = { baseURL, apiKey, apiVersion };
-      if (clientRedirect) {
-        clientOptions.fetchOptions = { redirect: clientRedirect };
-      }
-      const client = new AzureOpenAI(clientOptions);
+      const client = new AzureOpenAI({
+        baseURL,
+        apiKey,
+        apiVersion,
+        ...(clientRedirect ? { fetchOptions: { redirect: clientRedirect } } : {}),
+      });
 
-      const options: Parameters<typeof client.buildRequest>[0] = {
+      const { req } = await client.buildRequest({
         path: '/foo',
         method: 'get',
         headers: { 'api-key': null },
-      };
-      if (requestRedirect) {
-        options.fetchOptions = { redirect: requestRedirect };
-      }
-      const { req } = await client.buildRequest(options);
+        ...(requestRedirect ? { fetchOptions: { redirect: requestRedirect } } : {}),
+      });
 
       expect(req.headers.has('api-key')).toBe(false);
       expect(req.redirect).toBe(expectedRedirect);
@@ -188,10 +181,8 @@ describe('azure redirect safety', () => {
 
         if (
           !destinationAddress ||
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
           typeof destinationAddress === 'string' ||
           !sourceAddress ||
-          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
           typeof sourceAddress === 'string'
         ) {
           throw new Error('Expected both redirect test servers to bind ephemeral TCP ports');

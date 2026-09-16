@@ -249,7 +249,6 @@ describe('SDK-owned X.509 credential transport', () => {
 
     try {
       const address = proxy.address();
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
       if (!address || typeof address === 'string') {
         throw new Error('Expected a loopback TCP server address');
       }
@@ -635,7 +634,6 @@ describe('explicit X.509 transport capability', () => {
 
     try {
       const address = attacker.address();
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
       if (!address || typeof address === 'string') {
         throw new Error('Expected a loopback TCP server address');
       }

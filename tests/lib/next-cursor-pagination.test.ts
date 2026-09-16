@@ -67,7 +67,6 @@ describe.each(['items', 'pages'] as const)('NextCursorPage %s iteration', (mode)
       server.listen(0, '127.0.0.1');
       await listening;
       const address = server.address();
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A Node server address may be a pipe string; the fixture requires a listening TCP address before reading its port.
       if (!address || typeof address === 'string') {
         throw new Error('Expected a TCP server address');
       }
@@ -108,14 +107,11 @@ describe.each(['items', 'pages'] as const)('NextCursorPage %s iteration', (mode)
       for (const [index, request] of requests.entries()) {
         expect(request.method).toBe('GET');
         expect(request.url.pathname).toBe('/v1/organization/groups');
-        const expectedQuery = {
+        expect(Object.fromEntries(request.url.searchParams)).toEqual({
           limit: '1',
           order: 'asc',
-        };
-        if (index !== 0) {
-          Object.assign(expectedQuery, { after: pages[index - 1]?.next });
-        }
-        expect(Object.fromEntries(request.url.searchParams)).toEqual(expectedQuery);
+          ...(index === 0 ? {} : { after: pages[index - 1]?.next }),
+        });
         expect(request.headers.authorization).toBe('Bearer synthetic-admin-key');
         expect(request.headers['x-pagination-test']).toBe('synthetic');
       }
