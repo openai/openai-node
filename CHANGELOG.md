@@ -1,5 +1,61 @@
 # Changelog
 
+## [7.16.0](https://github.com/openai/openai-node/compare/v7.15.0...v7.16.0) (2026-09-15)
+
+
+### Features
+
+* **websocket:** add per-iterator incoming event limits ([#2748](https://github.com/openai/openai-node/issues/2748)) ([76e4456](https://github.com/openai/openai-node/commit/76e4456611ad77ef77573b79c48116325fe4e171))
+
+
+### Bug Fixes
+
+* **api:** handle malformed WebSocket events and improve buffering ([#2739](https://github.com/openai/openai-node/issues/2739)) ([b7abc26](https://github.com/openai/openai-node/commit/b7abc265422eca4a6558b1e88c67c21384e400f0))
+* bound fallback abort subscriptions with weak lifetimes ([#2745](https://github.com/openai/openai-node/issues/2745)) ([a93347a](https://github.com/openai/openai-node/commit/a93347a5bd997f4eccb1bf9dc45bfc6d440ac099))
+* **deps-dev:** bump @cloudflare/workers-types from 5.20260830.1 to 5.20260906.1 in /ecosystem-tests/cloudflare-worker ([#2731](https://github.com/openai/openai-node/issues/2731)) ([6cd6579](https://github.com/openai/openai-node/commit/6cd6579bf431bcb0d548b710a30c6c59e4d17a19))
+* **deps-dev:** bump @types/node from 26.2.0 to 26.4.1 ([#2737](https://github.com/openai/openai-node/issues/2737)) ([a95c0bf](https://github.com/openai/openai-node/commit/a95c0bff8493ede75154b3735df105c8445ec80f))
+* **deps-dev:** bump oxfmt from 0.62.0 to 0.66.0 ([#2738](https://github.com/openai/openai-node/issues/2738)) ([0fe46cd](https://github.com/openai/openai-node/commit/0fe46cd474c8e7f1b27bc8d9a21efaaaa56980e5))
+* **deps-dev:** bump oxlint from 1.80.0 to 1.81.0 ([#2730](https://github.com/openai/openai-node/issues/2730)) ([b4986b1](https://github.com/openai/openai-node/commit/b4986b166cc7b00f9e3d49526c034cb8b12ed8df))
+* **deps-dev:** bump puppeteer from 25.9.0 to 25.10.0 in /ecosystem-tests/browser-direct-import ([#2728](https://github.com/openai/openai-node/issues/2728)) ([4f3fdec](https://github.com/openai/openai-node/commit/4f3fdec46fc823cc3d39fadde76754c4f4248a9d))
+* **deps-dev:** bump puppeteer from 25.9.0 to 25.10.0 in /ecosystem-tests/ts-browser-webpack ([#2736](https://github.com/openai/openai-node/issues/2736)) ([a70286b](https://github.com/openai/openai-node/commit/a70286bfe1b24be45e702ccbaf379ef9fa153a92))
+* **deps-dev:** bump webpack from 5.110.2 to 5.110.3 in /ecosystem-tests/ts-browser-webpack ([#2734](https://github.com/openai/openai-node/issues/2734)) ([b08c0bd](https://github.com/openai/openai-node/commit/b08c0bdbf50c4e8bab1bb1209ff6d66000c59b33))
+* **deps-dev:** bump wrangler from 4.127.1 to 4.129.0 in /ecosystem-tests/cloudflare-worker ([#2729](https://github.com/openai/openai-node/issues/2729)) ([e4a9bdd](https://github.com/openai/openai-node/commit/e4a9bdda8d45a33c95265b0a32e76dbd725cc3ae))
+* **deps:** bump undici from 7.29.0 to 7.29.1 in /ecosystem-tests/node-ts-cjs ([#2732](https://github.com/openai/openai-node/issues/2732)) ([b499843](https://github.com/openai/openai-node/commit/b4998438f95a65123a9093ccef1e3cb1be8568c5))
+* **deps:** bump undici from 8.9.0 to 8.10.2 ([#2733](https://github.com/openai/openai-node/issues/2733)) ([d3c6c4f](https://github.com/openai/openai-node/commit/d3c6c4f05d13e7d4736f17c6765089c9079af952))
+* keep callback credentials local to each HTTP request ([#2744](https://github.com/openai/openai-node/issues/2744)) ([35dcdbf](https://github.com/openai/openai-node/commit/35dcdbf24cef0b60f8c2dbfbbef20f7ecb4d766c))
+* **live:** avoid repeated acknowledgment normalization ([#2747](https://github.com/openai/openai-node/issues/2747)) ([dcbbb25](https://github.com/openai/openai-node/commit/dcbbb25c874d2f9bf02ac0c8eb1750c9528a7133))
+* **live:** trim transcript acknowledgment suffixes in linear time ([#2740](https://github.com/openai/openai-node/issues/2740)) ([45a2bf1](https://github.com/openai/openai-node/commit/45a2bf16e1b70d0a44cd8174da38ae8b2ed56169))
+* **responses:** safely format WebSocket error messages ([#2741](https://github.com/openai/openai-node/issues/2741)) ([c94cbf6](https://github.com/openai/openai-node/commit/c94cbf6842d03a2b7ddff842edb7213cdf8c1ca3))
+* **tests:** handle ecosystem proxy socket failures ([#2743](https://github.com/openai/openai-node/issues/2743)) ([1a24082](https://github.com/openai/openai-node/commit/1a240825ce5bd40bc53c378ca246f442cca46b0b))
+* **websocket:** discard unread events when an iterator returns ([#2742](https://github.com/openai/openai-node/issues/2742)) ([482930e](https://github.com/openai/openai-node/commit/482930ebde8fcf42ed2d21973fe5acdb064f25b0))
+
+
+### Chores
+
+* bump smol-toml in Vercel Edge fixture ([#2721](https://github.com/openai/openai-node/issues/2721)) ([3c4e4d2](https://github.com/openai/openai-node/commit/3c4e4d26e3aebd422bc73787e4fcbd1773607785))
+
+## [7.15.0](https://github.com/openai/openai-node/compare/v7.14.0...v7.15.0) (2026-09-10)
+
+
+### Features
+
+* **api:** add Agents API ([#2719](https://github.com/openai/openai-node/issues/2719)) ([20a47f9](https://github.com/openai/openai-node/commit/20a47f9d608885c73a8053a4036b1faec9b5493f))
+
+## [7.14.0](https://github.com/openai/openai-node/compare/v7.13.0...v7.14.0) (2026-09-10)
+
+
+### Features
+
+* **api:** Add Live API ([c037ba7](https://github.com/openai/openai-node/commit/c037ba724235cd58943e95d5b3b98ff76235e83c))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump joi from 18.2.3 to 18.2.5 in /ecosystem-tests/vercel-edge ([#2702](https://github.com/openai/openai-node/issues/2702)) ([029b805](https://github.com/openai/openai-node/commit/029b805b8d65995a9f53d8872ee83cd4b145355b))
+* **deps:** bump next from 15.5.23 to 15.5.25 in /ecosystem-tests/vercel-edge ([#2703](https://github.com/openai/openai-node/issues/2703)) ([e9446db](https://github.com/openai/openai-node/commit/e9446db4bc43ce7977a4957c9990bddb8fc5913f))
+* **deps:** bump sharp from 0.35.3 to 0.35.4 in /ecosystem-tests/vercel-edge ([#2704](https://github.com/openai/openai-node/issues/2704)) ([ca95705](https://github.com/openai/openai-node/commit/ca957050c7cfd8c4a12335ee3345148a660827cc))
+* **deps:** update remaining tooling and fixture patches ([#2712](https://github.com/openai/openai-node/issues/2712)) ([bcaabee](https://github.com/openai/openai-node/commit/bcaabee91cf476446cfd79e4fd71bf0c80fe157b))
+
 ## [7.13.0](https://github.com/openai/openai-node/compare/v7.12.1...v7.13.0) (2026-09-09)
 
 
