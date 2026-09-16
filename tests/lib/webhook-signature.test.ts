@@ -186,6 +186,6 @@ describe('webhook signature compatibility', () => {
     const { payload, headers, secret } = createFixture();
     const verify = createClient().webhooks.verifySignature;
 
-    await expect(Reflect.apply(verify, {}, [payload, headers, secret])).rejects.toBeInstanceOf(TypeError);
+    await expect(verify.call({}, payload, headers, secret)).rejects.toBeInstanceOf(TypeError);
   });
 });

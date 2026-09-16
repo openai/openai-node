@@ -196,6 +196,7 @@ function measureListenerMovement(operation: () => void): {
       spliceCalls += 1;
     }
     if (deleteCount === undefined) {
+      // oxlint-disable-next-line anti-slop/no-reflect-apply -- Preserve native splice's one-argument overload and omitted deleteCount in this instrumentation.
       return Reflect.apply(originalSplice, this, [start]);
     }
     return originalSplice.call(this, start, deleteCount, ...items);

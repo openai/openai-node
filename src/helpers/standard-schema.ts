@@ -528,6 +528,7 @@ function parseStandardSchema<Schema extends StandardSchemaLike>(
 ): InferStandardOutput<Schema> {
   const parsed = parseResponseFormatContent({ type: 'json_schema', $parseRaw: undefined }, content);
   const { standard, validate } = getBinding();
+  // oxlint-disable-next-line anti-slop/no-reflect-apply -- A validator may shadow call; invoke the captured function with its original metadata receiver.
   const result = Reflect.apply(validate, standard, [parsed]);
 
   if (isPromiseLike(result)) {

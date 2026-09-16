@@ -158,7 +158,7 @@ describe('canonical strict vendor-converter roots', () => {
     { name: 'a boxed string', value: Reflect.construct(String, ['value']) },
     { name: 'a boxed number', value: Reflect.construct(Number, [42]) },
     { name: 'a boxed boolean', value: Reflect.construct(Boolean, [true]) },
-    { name: 'a boxed BigInt', value: Reflect.construct(Object, [Reflect.apply(BigInt, undefined, [1])]) },
+    { name: 'a boxed BigInt', value: Reflect.construct(Object, [1n]) },
     { name: 'a custom prototype', value: Object.create({ inherited: true }) as object },
   ])('rejects $name carriers through the same plain-record boundary', ({ value }) => {
     expect(() => convertStrictRoot(Object.assign(value, { type: 'object' as const }))).toThrow(

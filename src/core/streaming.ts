@@ -391,6 +391,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
       if (!this.#isTeeBranch) {
         controller.abort();
       }
+      // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the captured iterator method with its receiver even if a caller-supplied function shadows call.
       await Reflect.apply(returnMethod, iterator, []);
     }
   }

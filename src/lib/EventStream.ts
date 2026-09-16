@@ -94,6 +94,7 @@ function captureNativeProxyDetector(): ((value: object) => boolean) | undefined 
     if (!loader || !('value' in loader) || typeof loader.value !== 'function') {
       return undefined;
     }
+    // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the descriptor value without reading a potentially overridden call property.
     const util: unknown = Reflect.apply(loader.value, process, ['node:util']);
     if (typeof util !== 'object' || util === null) {
       return undefined;
@@ -582,7 +583,7 @@ function estimateRetainedBufferBytes(
       return { bytes: 0, kind: 'map' };
     }
     case 'Date': {
-      Reflect.apply(dateTimestampGetter, current, []);
+      dateTimestampGetter.call(current);
       return { bytes: 8, kind: 'date' };
     }
     case 'Set': {
@@ -894,7 +895,7 @@ function inspectBufferedEventGraph(
         if (!symbolDescriptionGetter) {
           return false;
         }
-        const description = Reflect.apply(symbolDescriptionGetter, current, []) as string | undefined;
+        const description = symbolDescriptionGetter.call(current) as string | undefined;
         return charge(8 + (description?.length ?? 0) * 2);
       })
     ) {

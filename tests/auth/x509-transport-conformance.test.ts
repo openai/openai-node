@@ -290,9 +290,10 @@ describe('real-wire X.509 transport conformance', () => {
     try {
       const original = new OpenAI({ credential });
 
-      expect(() => Reflect.apply(original.withOptions, original, [{ credential: null }])).toThrow(
-        /credential.*SDK|SDK.*credential/iu,
-      );
+      expect(() => {
+        // @ts-expect-error Exercise a JavaScript caller explicitly removing the credential.
+        original.withOptions({ credential: null });
+      }).toThrow(/credential.*SDK|SDK.*credential/iu);
       expect(original.baseURL).toBe('https://mtls.api.openai.com/v1');
     } finally {
       await credential.close();
