@@ -6,6 +6,8 @@ import { sleep } from '../../../internal/utils/sleep';
 import { type WebSocketLike, ReadyState } from '../../../internal/ws-adapter';
 import {
   SendQueue,
+  getMaxBufferedEvents,
+  type WebSocketStreamOptions,
   flattenRawData,
   isRecoverableClose,
   type RawWebSocketData,
@@ -61,11 +63,11 @@ export interface SidebandWSBaseOptions {
   reconnect?: SidebandWSReconnectOptions | null | undefined;
 
   /**
-   * Maximum size of the outgoing message queue in bytes.
-   * Messages queued while the socket is connecting or reconnecting are held
-   * in memory up to this limit. Once the limit is reached, new messages are
-   * discarded and an `error` event is emitted.
-   * Default: 1 MB
+   * Byte budget for outgoing messages queued while the socket is connecting
+   * or reconnecting. An empty queue accepts one message even if it exceeds
+   * this budget. Further messages are discarded and an `error` event is emitted
+   * if the total queued size would exceed the budget.
+   * Default: 1 MiB (1,048,576 bytes).
    */
   maxQueueSize?: number | undefined;
 }
@@ -175,6 +177,11 @@ export abstract class SidebandWSBase<TSocket extends WebSocketLike> extends Side
    * The iterator will exit if the socket closes but exiting the iterator
    * does not close the socket.
    *
+   * Pass `maxBufferedEvents` to limit queued records for this iterator, including
+   * lifecycle events. Overflow discards its backlog and rejects `next()` with a
+   * WebSocketError; the shared socket and other iterators remain active.
+   * Omitted means unlimited. This is an event-count limit, not a byte limit.
+   *
    * @example
    * ```ts
    * for await (const event of client.stream()) {
@@ -192,26 +199,59 @@ export abstract class SidebandWSBase<TSocket extends WebSocketLike> extends Side
    * }
    * ```
    */
-  stream(): AsyncIterableIterator<SidebandStreamMessage> {
-    return this[Symbol.asyncIterator]();
+  stream(options?: WebSocketStreamOptions): AsyncIterableIterator<SidebandStreamMessage> {
+    return options === undefined ? this[Symbol.asyncIterator]() : this[Symbol.asyncIterator](options);
   }
 
-  [Symbol.asyncIterator](): AsyncIterableIterator<SidebandStreamMessage> {
+  [Symbol.asyncIterator](options?: WebSocketStreamOptions): AsyncIterableIterator<SidebandStreamMessage> {
     if (!this.socket) {
       throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
     }
 
+    const maxBufferedEvents = getMaxBufferedEvents(options);
+
     // Two-queue async iterator: `queue` buffers incoming messages,
     // `resolvers` buffers waiting next() calls. A push wakes the
     // oldest next(); a next() drains the oldest message.
-    const queue: SidebandStreamMessage[] = [];
-    const resolvers: (() => void)[] = [];
+    const queue: (SidebandStreamMessage | undefined)[] = [];
+    const resolvers: ((() => void) | undefined)[] = [];
+    let queueHead = 0;
+    let resolverHead = 0;
     let done = false;
+    let failure: WebSocketError | undefined;
     let currentSocket = this.socket;
 
+    const wakeResolver = () => {
+      if (resolverHead >= resolvers.length) return;
+
+      const resolver = resolvers[resolverHead];
+      resolvers[resolverHead] = undefined;
+      resolverHead += 1;
+      if (resolverHead >= 64 && resolverHead * 2 >= resolvers.length) {
+        resolvers.splice(0, resolverHead);
+        resolverHead = 0;
+      }
+      resolver?.();
+    };
+
     const push = (msg: SidebandStreamMessage) => {
+      if (done) return;
+
+      if (maxBufferedEvents !== undefined && queue.length - queueHead >= maxBufferedEvents) {
+        failure = new WebSocketError(
+          `WebSocket stream exceeded maxBufferedEvents (${maxBufferedEvents})`,
+          null,
+        );
+        done = true;
+        queue.length = 0;
+        queueHead = 0;
+        cleanup();
+        flushResolvers();
+        return;
+      }
+
       queue.push(msg);
-      resolvers.shift()?.();
+      wakeResolver();
     };
 
     const onEvent = (event: SidebandAPI.ConnectServerEvent) => {
@@ -241,9 +281,14 @@ export abstract class SidebandWSBase<TSocket extends WebSocketLike> extends Side
     };
 
     const flushResolvers = () => {
-      for (let resolver = resolvers.shift(); resolver; resolver = resolvers.shift()) {
-        resolver();
+      while (resolverHead < resolvers.length) {
+        const resolver = resolvers[resolverHead];
+        resolvers[resolverHead] = undefined;
+        resolverHead += 1;
+        resolver?.();
       }
+      resolvers.length = 0;
+      resolverHead = 0;
     };
 
     const onClose = (
@@ -257,8 +302,9 @@ export abstract class SidebandWSBase<TSocket extends WebSocketLike> extends Side
       cleanup();
     };
 
-    const onSocketSwap = (oldSocket: TSocket, newSocket: TSocket) => {
-      oldSocket.off('open', onOpen);
+    const onSocketSwap = (_oldSocket: TSocket, newSocket: TSocket) => {
+      if (currentSocket === newSocket) return;
+      currentSocket.off('open', onOpen);
       newSocket.on('open', onOpen);
       currentSocket = newSocket;
     };
@@ -315,9 +361,21 @@ export abstract class SidebandWSBase<TSocket extends WebSocketLike> extends Side
       }
     }
 
-    const resolve = (res: (value: IteratorResult<SidebandStreamMessage>) => void) => {
-      if (queue.length > 0) {
-        res({ value: queue.shift()!, done: false });
+    const resolve = (
+      res: (value: IteratorResult<SidebandStreamMessage>) => void,
+      reject: (error: WebSocketError) => void,
+    ) => {
+      if (failure) {
+        reject(failure);
+      } else if (queueHead < queue.length) {
+        const queued = queue[queueHead]!;
+        queue[queueHead] = undefined;
+        queueHead += 1;
+        if (queueHead >= 64 && queueHead * 2 >= queue.length) {
+          queue.splice(0, queueHead);
+          queueHead = 0;
+        }
+        res({ value: queued, done: false });
       } else if (done) {
         res({ value: undefined, done: true });
       } else {
@@ -327,10 +385,10 @@ export abstract class SidebandWSBase<TSocket extends WebSocketLike> extends Side
     };
 
     const next = (): Promise<IteratorResult<SidebandStreamMessage>> =>
-      new Promise((res) => {
-        if (resolve(res)) return;
+      new Promise((res, reject) => {
+        if (resolve(res, reject)) return;
         resolvers.push(() => {
-          resolve(res);
+          resolve(res, reject);
         });
       });
 
@@ -338,6 +396,8 @@ export abstract class SidebandWSBase<TSocket extends WebSocketLike> extends Side
       next,
       return: (): Promise<IteratorReturnResult<undefined>> => {
         done = true;
+        queue.length = 0;
+        queueHead = 0;
         cleanup();
         flushResolvers();
         return Promise.resolve({ value: undefined, done: true });
@@ -367,6 +427,35 @@ export abstract class SidebandWSBase<TSocket extends WebSocketLike> extends Side
         event = JSON.parse(text) as SidebandAPI.ConnectServerEvent;
       } catch {
         this._emit('raw', data);
+        return;
+      }
+
+      if (
+        event === null ||
+        typeof event !== 'object' ||
+        Array.isArray(event) ||
+        !Object.prototype.hasOwnProperty.call(event, 'type') ||
+        typeof event.type !== 'string'
+      ) {
+        this._onError(
+          null,
+          'received invalid WebSocket event: expected an object with an own string type',
+          undefined,
+        );
+        return;
+      }
+
+      const eventType: string = event.type;
+      const reservedEventType =
+        eventType === 'raw' ||
+        eventType === 'close' ||
+        eventType === 'event' ||
+        eventType === 'reconnecting' ||
+        eventType === 'reconnected' ||
+        eventType === 'open' ||
+        eventType === 'error';
+      if (reservedEventType && eventType !== 'error') {
+        this._onError(null, 'received reserved WebSocket event type', undefined);
         return;
       }
 

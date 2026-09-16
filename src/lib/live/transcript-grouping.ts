@@ -15,11 +15,17 @@ export type GroupingUpdate =
   | { type: 'updated'; segment: TranscriptSegment }
   | { type: 'closed'; segment: TranscriptSegment; reason: TranscriptSegmentCloseReason };
 
+interface Acknowledgment {
+  characters: number;
+  text: string | undefined;
+}
+
 type Turn = TranscriptFragment & {
   id: string;
   previousId: string | null;
   emitted: boolean;
   canDropAsBackchannel: boolean;
+  acknowledgment?: Acknowledgment | undefined;
 };
 
 const ACKNOWLEDGMENTS = [
@@ -42,14 +48,16 @@ const ACKNOWLEDGMENTS = [
 ];
 
 function normalizeAcknowledgment(text: string): string {
-  return text
+  const normalized = text
     .toLowerCase()
     .split('-')
     .join(' ')
-    .replace(/^[\s.,!?;:"'()[\]{}]+/u, '')
-    .replace(/[\s.,!?;:"'()[\]{}]+$/u, '')
-    .split(/\s+/u)
-    .join(' ');
+    .replace(/^[\s.,!?;:"'()[\]{}]+/u, '');
+  let end = normalized.length;
+  while (end > 0 && /[\s.,!?;:"'()[\]{}]/u.test(normalized.charAt(end - 1))) {
+    end -= 1;
+  }
+  return normalized.slice(0, end).split(/\s+/u).join(' ');
 }
 
 /** The v2 grouping policy, driven by timed public text rather than engine frames. */
@@ -63,6 +71,7 @@ export class TranscriptGrouping {
   private readonly options: Required<TranscriptGrouperOptions>;
   private readonly idPrefix: string;
   private readonly acknowledgments: readonly string[];
+  private readonly maxAcknowledgmentLength: number;
 
   constructor(options: Required<TranscriptGrouperOptions>, idPrefix: string) {
     this.options = options;
@@ -71,6 +80,11 @@ export class TranscriptGrouping {
       ...ACKNOWLEDGMENTS,
       ...options.additionalAcknowledgments.map(normalizeAcknowledgment).filter(Boolean),
     ];
+    let maxLength = 0;
+    for (const acknowledgment of this.acknowledgments) {
+      maxLength = Math.max(maxLength, acknowledgment.length);
+    }
+    this.maxAcknowledgmentLength = maxLength;
   }
 
   get speaker(): TranscriptFragment['speaker'] | undefined {
@@ -183,16 +197,22 @@ export class TranscriptGrouping {
       this.buffer(fragment);
       return this.promote();
     }
+    const withinDuration =
+      fragment.endMs - (this.buffered?.startMs ?? fragment.startMs) < this.options.backchannelMaxDurationMs;
+    const acknowledgment = this.acknowledgment(fragment, withinDuration);
+    const normalized = withinDuration ? acknowledgment.text : undefined;
     if (separation < this.options.minTurnSeparationMs) {
-      this.buffer(fragment, this.possibleAcknowledgment(fragment));
+      this.buffer(
+        fragment,
+        normalized !== undefined &&
+          normalized.length > 0 &&
+          this.acknowledgments.some((phrase) => phrase.startsWith(normalized)),
+        acknowledgment,
+      );
       return [];
     }
-    if (this.buffered && this.standaloneAcknowledgment(fragment, this.buffered)) {
-      this.buffer(fragment, true);
-      return [];
-    }
-    if (!this.buffered && this.standaloneAcknowledgment(fragment)) {
-      this.buffer(fragment, false);
+    if (normalized !== undefined && this.acknowledgments.includes(normalized)) {
+      this.buffer(fragment, this.buffered !== undefined, acknowledgment);
       return [];
     }
     this.buffered = this.maybeDropBackchannel(undefined, fragment);
@@ -227,7 +247,7 @@ export class TranscriptGrouping {
     turn.endMs = Math.max(turn.endMs, fragment.endMs);
   }
 
-  private buffer(fragment: TranscriptFragment, canDrop?: boolean): void {
+  private buffer(fragment: TranscriptFragment, canDrop?: boolean, acknowledgment?: Acknowledgment): void {
     if (this.buffered) {
       TranscriptGrouping.append(this.buffered, fragment);
     } else {
@@ -236,6 +256,7 @@ export class TranscriptGrouping {
     if (canDrop !== undefined) {
       this.buffered.canDropAsBackchannel = canDrop;
     }
+    this.buffered.acknowledgment = acknowledgment;
   }
 
   private promote(): GroupingUpdate[] {
@@ -344,19 +365,30 @@ export class TranscriptGrouping {
     return this.buffered.canDropAsBackchannel ? undefined : this.buffered;
   }
 
-  private standaloneAcknowledgment(fragment: TranscriptFragment, previous?: Turn): boolean {
-    return (
-      fragment.endMs - (previous?.startMs ?? fragment.startMs) < this.options.backchannelMaxDurationMs &&
-      this.acknowledgments.includes(normalizeAcknowledgment((previous?.text ?? '') + fragment.text))
-    );
-  }
-
-  private possibleAcknowledgment(fragment: TranscriptFragment): boolean {
-    const text = normalizeAcknowledgment((this.buffered?.text ?? '') + fragment.text);
-    return (
-      fragment.endMs - (this.buffered?.startMs ?? fragment.startMs) < this.options.backchannelMaxDurationMs &&
-      text.length > 0 &&
-      this.acknowledgments.some((acknowledgment) => acknowledgment.startsWith(text))
-    );
+  private acknowledgment(fragment: TranscriptFragment, withinDuration: boolean): Acknowledgment {
+    const previous = this.buffered?.acknowledgment;
+    const previousCharacters = previous?.characters ?? 0;
+    let characters = previousCharacters;
+    const separator = /[\s.,!?;:"'()[\]{}-]/u;
+    for (
+      let index = 0;
+      index < fragment.text.length && characters <= this.maxAcknowledgmentLength;
+      index += 1
+    ) {
+      if (!separator.test(fragment.text.charAt(index))) {
+        characters += 1;
+      }
+    }
+    // Significant characters cannot disappear during normalization. Once they
+    // outgrow the configured phrases, stop counting without allocating tokens.
+    let text: string | undefined;
+    if (characters === previousCharacters && previous?.text !== undefined) {
+      // Keep the raw suffix in the turn: later text can make punctuation internal.
+      ({ text } = previous);
+    } else if (withinDuration && characters <= this.maxAcknowledgmentLength) {
+      // Retain whole-string Unicode casing (including context-sensitive sigma).
+      text = normalizeAcknowledgment((this.buffered?.text ?? '') + fragment.text);
+    }
+    return { characters, text };
   }
 }

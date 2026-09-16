@@ -6,6 +6,8 @@ import { ForksWSBase, type ForksWSBaseOptions, type ForksWSParameters } from './
 import { OpenAI } from '../../../client';
 import { VERSION } from '../../../version';
 
+export type { WebSocketStreamOptions } from '../../../internal/ws';
+
 export type { ForksWSParameters, ForksWSReconnectOptions } from './ws-base';
 
 export interface ForksWSClientOptions extends WS.ClientOptions, ForksWSBaseOptions {}

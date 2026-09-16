@@ -50,6 +50,13 @@ const packedPackagePath = require('node:path');
     'OAuthError',
     'SubjectTokenProviderError',
   ];
+  const paginationExportNames = [
+    'ConversationCursorPage',
+    'CursorPage',
+    'NextCursorPage',
+    'Page',
+    'TokenPage',
+  ];
   const run = (command: string, args: string[], options: RunOptions = {}): string =>
     childProcess.execFileSync(command, args, {
       cwd: temporaryDirectory,
@@ -119,6 +126,7 @@ const packedPackagePath = require('node:path');
       path.join(temporaryDirectory, 'consumer.cjs'),
       [
         "const OpenAI = require('openai');",
+        "const pagination = require('openai/core/pagination');",
         "const { bedrock } = require('openai/providers/bedrock');",
         "const auth = require('openai/auth');",
         "if (typeof OpenAI !== 'function') throw new Error('CommonJS default export is not constructable');",
@@ -127,6 +135,10 @@ const packedPackagePath = require('node:path');
           (name) =>
             `if (typeof auth.${name} !== 'function') throw new Error('CommonJS auth export ${name} is unavailable');`,
         ),
+        ...paginationExportNames.map(
+          (name) =>
+            `if (typeof OpenAI.${name} !== 'function' || OpenAI.${name} !== pagination.${name}) throw new Error('CommonJS pagination static ${name} does not match its public export');`,
+        ),
         "new OpenAI({ apiKey: 'test' });",
       ].join('\n'),
     );
@@ -134,6 +146,7 @@ const packedPackagePath = require('node:path');
       path.join(temporaryDirectory, 'consumer.mjs'),
       [
         "import OpenAI from 'openai';",
+        "import * as pagination from 'openai/core/pagination';",
         "import { bedrock } from 'openai/providers/bedrock';",
         `import { ${authExportNames.join(', ')} } from 'openai/auth';`,
         "if (typeof OpenAI !== 'function') throw new Error('ESM default export is not constructable');",
@@ -141,6 +154,10 @@ const packedPackagePath = require('node:path');
         ...authExportNames.map(
           (name) =>
             `if (typeof ${name} !== 'function') throw new Error('ESM auth export ${name} is unavailable');`,
+        ),
+        ...paginationExportNames.map(
+          (name) =>
+            `if (typeof OpenAI.${name} !== 'function' || OpenAI.${name} !== pagination.${name}) throw new Error('ESM pagination static ${name} does not match its public export');`,
         ),
         "new OpenAI({ apiKey: 'test' });",
       ].join('\n'),

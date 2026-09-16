@@ -6,6 +6,8 @@ import { SidebandWSBase, type SidebandWSBaseOptions, type SidebandWSParameters }
 import { OpenAI } from '../../../client';
 import { VERSION } from '../../../version';
 
+export type { WebSocketStreamOptions } from '../../../internal/ws';
+
 export type { SidebandWSParameters, SidebandWSReconnectOptions } from './ws-base';
 
 export interface SidebandWSClientOptions extends WS.ClientOptions, SidebandWSBaseOptions {}
