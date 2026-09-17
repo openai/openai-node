@@ -1,5 +1,26 @@
 # Changelog
 
+## [7.18.0](https://github.com/openai/openai-node/compare/v7.17.0...v7.18.0) (2026-09-17)
+
+
+### Features
+
+* **api:** add agent session model settings ([#2755](https://github.com/openai/openai-node/issues/2755)) ([d1385bb](https://github.com/openai/openai-node/commit/d1385bbb15cfb8b7780b9984c6dd122db1a713ec))
+* **api:** add audio-mini model choices ([#2759](https://github.com/openai/openai-node/issues/2759)) ([b350d59](https://github.com/openai/openai-node/commit/b350d59a28202f8c0fd976d9f14f19cafd3b2c0c))
+* **api:** add managed Responses WebSocket sessions ([#2760](https://github.com/openai/openai-node/issues/2760)) ([a38c533](https://github.com/openai/openai-node/commit/a38c533411c37883f91925b2fc2804cdaedbcc5d))
+* **api:** add prompt-cache prewarming ([#2761](https://github.com/openai/openai-node/issues/2761)) ([f468949](https://github.com/openai/openai-node/commit/f46894993f12d6a79d36dc46ffc8a65415026c72))
+
+
+### Bug Fixes
+
+* **api:** validate WebSocket results and preserve header defaults ([#2763](https://github.com/openai/openai-node/issues/2763)) ([a7e830b](https://github.com/openai/openai-node/commit/a7e830bde9deeeb4a511b27ef03839bfcc6e5583))
+
+
+### Chores
+
+* **api:** clarify incoming SIP call ID usage ([#2758](https://github.com/openai/openai-node/issues/2758)) ([67e9d29](https://github.com/openai/openai-node/commit/67e9d298de6c865956e564f86018ad3908691e78))
+* **api:** update image request examples ([#2762](https://github.com/openai/openai-node/issues/2762)) ([1d244f0](https://github.com/openai/openai-node/commit/1d244f0bc01f7069676a115788102490c5af2c5e))
+
 ## [7.17.0](https://github.com/openai/openai-node/compare/v7.16.0...v7.17.0) (2026-09-16)
 
 
