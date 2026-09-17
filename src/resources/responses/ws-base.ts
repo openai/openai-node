@@ -7,6 +7,7 @@ import { type WebSocketLike, ReadyState } from '../../internal/ws-adapter';
 import {
   SendQueue,
   getMaxBufferedEvents,
+  rawByteLength,
   type WebSocketStreamOptions,
   flattenRawData,
   isRecoverableClose,
@@ -18,6 +19,21 @@ import {
 import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../client';
 import { OpenAIError } from '../../core/error';
+
+const webSocketEventPayloads = new WeakMap<ResponsesAPI.ResponsesServerEvent, string>();
+const webSocketEventBytes = new WeakMap<ResponsesAPI.ResponsesServerEvent, number>();
+
+/** Uses immutable wire size, or JSON accounting for a custom emitter. @internal */
+export function getWebSocketEventBytes(event: ResponsesAPI.ResponsesServerEvent): number {
+  return webSocketEventBytes.get(event) ?? rawByteLength(JSON.stringify(event));
+}
+
+/** Original JSON, available only during synchronous event notification.
+ * @internal
+ */
+export function getWebSocketEventPayload(event: ResponsesAPI.ResponsesServerEvent): string | undefined {
+  return webSocketEventPayloads.get(event);
+}
 
 export interface ResponsesWSReconnectOptions {
   /**
@@ -440,6 +456,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
       }
 
       const eventType: string = event.type;
+      const errorEvent = event.type === 'error' ? event : undefined;
       const reservedEventType =
         eventType === 'raw' ||
         eventType === 'close' ||
@@ -453,13 +470,19 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
         return;
       }
 
-      this._emit('event', event);
+      webSocketEventBytes.set(event, rawByteLength(data));
+      webSocketEventPayloads.set(event, text);
+      try {
+        this._emit('event', event);
+      } finally {
+        webSocketEventPayloads.delete(event);
+      }
 
-      if (event.type === 'error') {
-        this._onError(event);
+      if (errorEvent) {
+        this._onError(errorEvent);
       } else {
         // @ts-ignore TS isn't smart enough to get the relationship right here
-        this._emit(event.type, event);
+        this._emit(eventType, event);
       }
     });
 

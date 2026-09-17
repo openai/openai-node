@@ -224,6 +224,10 @@ test('completes all turns and closes normally without reporting an unfinished re
   expect(result.exitCode).toBe(0);
   expect(result.stderr).toBe('');
   expect(result.requests).toHaveLength(6);
+  for (const request of result.requests) {
+    expect(request).not.toHaveProperty('stream');
+    expect(request).not.toHaveProperty('background');
+  }
   expect(result.stdout.match(/Assistant: Synthetic answer/gu)).toHaveLength(3);
   expect(result.requests.map((request) => request.previous_response_id)).toEqual([
     null,

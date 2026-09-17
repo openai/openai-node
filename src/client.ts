@@ -739,6 +739,21 @@ export class OpenAI {
     return this._options.defaultQuery;
   }
 
+  /** @internal Client request headers for each new WebSocket handshake. */
+  _buildWebSocketHeaders(authHeaders: Record<string, string>): Record<string, string> {
+    return Object.fromEntries(
+      buildHeaders([
+        {
+          'User-Agent': this.getUserAgent(),
+          'OpenAI-Organization': this.organization,
+          'OpenAI-Project': this.project,
+        },
+        authHeaders,
+        this._options.defaultHeaders,
+      ]).values,
+    );
+  }
+
   protected validateHeaders(
     { values, nulls }: NullableHeaders,
     schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean } = {

@@ -87,6 +87,12 @@ function lastNodeSocket(): FakeNodeSocket {
   return socket;
 }
 
+function lastNodeHeader(name: string) {
+  return Object.entries(lastNodeSocket().options.headers ?? {}).find(
+    ([header]) => header.toLowerCase() === name.toLowerCase(),
+  )?.[1];
+}
+
 function createUnauthenticatedClient(): OpenAI {
   return new OpenAI({ apiKey: null, adminAPIKey: 'admin-only', baseURL: 'https://example.com/v1/' });
 }
@@ -304,9 +310,7 @@ describe('Bedrock WebSocket origin containment', () => {
 
     const websocket = new StableResponsesWS(client);
     expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
-    expect(lastNodeSocket().options.headers).toMatchObject({
-      Authorization: 'Bearer replacement-bedrock-secret',
-    });
+    expect(lastNodeHeader('authorization')).toBe('Bearer replacement-bedrock-secret');
   });
 
   test.each(realtimeSurfaces)(
@@ -348,9 +352,7 @@ describe('Bedrock WebSocket origin containment', () => {
         `wss://bedrock.example.com/custom/v2/${path}${path === 'realtime' ? '?model=gpt-realtime' : ''}`,
       );
       if (kind === 'node') {
-        expect(lastNodeSocket().options.headers).toMatchObject({
-          Authorization: 'Bearer static-bedrock-secret',
-        });
+        expect(lastNodeHeader('authorization')).toBe('Bearer static-bedrock-secret');
       } else {
         expect(lastBrowserSocket().protocols).toContain('openai-insecure-api-key.static-bedrock-secret');
       }
@@ -396,9 +398,7 @@ describe('Bedrock WebSocket origin containment', () => {
         expect(lastNodeSocket().url.toString()).toBe(
           'wss://bedrock.example.com/openai/v1/realtime?model=gpt-realtime',
         );
-        expect(lastNodeSocket().options.headers).toMatchObject({
-          Authorization: 'Bearer rotating-bedrock-secret',
-        });
+        expect(lastNodeHeader('authorization')).toBe('Bearer rotating-bedrock-secret');
       } else {
         expect(lastBrowserSocket().url).toBe(
           'wss://bedrock.example.com/openai/v1/realtime?model=gpt-realtime',
@@ -422,8 +422,8 @@ describe.each([
     expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
     expect(lastNodeSocket().options).toMatchObject({
       followRedirects: false,
-      headers: { 'X-Custom': 'value' },
     });
-    expect(lastNodeSocket().options.headers).not.toHaveProperty('Authorization');
+    expect(lastNodeHeader('x-custom')).toBe('value');
+    expect(lastNodeHeader('authorization')).toBeUndefined();
   });
 });

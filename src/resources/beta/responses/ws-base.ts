@@ -7,6 +7,7 @@ import { type WebSocketLike, ReadyState } from '../../../internal/ws-adapter';
 import {
   SendQueue,
   getMaxBufferedEvents,
+  rawByteLength,
   type WebSocketStreamOptions,
   flattenRawData,
   isRecoverableClose,
@@ -18,6 +19,19 @@ import {
 import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../../client';
 import { OpenAIError } from '../../../core/error';
+
+const webSocketEventPayloads = new WeakMap<object, string>();
+const webSocketEventBytes = new WeakMap<object, number>();
+
+/** Original wire size, available only during synchronous event notification. @internal */
+export function getWebSocketEventBytes(event: object): number | undefined {
+  return webSocketEventBytes.get(event);
+}
+
+/** Original JSON, available only during synchronous event notification. @internal */
+export function getWebSocketEventPayload(event: object): string | undefined {
+  return webSocketEventPayloads.get(event);
+}
 
 export interface ResponsesWSReconnectOptions {
   /**
@@ -457,7 +471,14 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
         return;
       }
 
-      this._emit('event', event);
+      webSocketEventBytes.set(event, rawByteLength(data));
+      webSocketEventPayloads.set(event, text);
+      try {
+        this._emit('event', event);
+      } finally {
+        webSocketEventBytes.delete(event);
+        webSocketEventPayloads.delete(event);
+      }
 
       if (event.type === 'error') {
         this._onError(event);
