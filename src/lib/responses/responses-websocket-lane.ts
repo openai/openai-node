@@ -5,7 +5,7 @@ import type {
 } from '../../resources/responses/responses';
 import { WebSocketError } from '../../resources/responses/internal-base';
 import { OpenAIError } from '../../core/error';
-import { hasOwn } from '../../internal/utils/values';
+import { hasOwn, isObj } from '../../internal/utils/values';
 import {
   cloneResponse,
   createCanonicalResponseContext,
@@ -240,7 +240,10 @@ export class ResponsesWebSocketLane {
       const output = hasOwn(response, 'output') ? response.output : undefined;
       const outputText = hasOwn(response, 'output_text') ? response.output_text : undefined;
       if (
-        (output !== undefined && output !== null && !Array.isArray(output)) ||
+        (output !== undefined &&
+          output !== null &&
+          (!Array.isArray(output) ||
+            !output.every((item) => ResponsesWebSocketLane.#isValidOutputItem(item)))) ||
         // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate present wire fields before exposing a typed final response.
         (outputText !== undefined && outputText !== null && typeof outputText !== 'string')
       ) {
@@ -283,6 +286,38 @@ export class ResponsesWebSocketLane {
       this.fail(error);
       throw error;
     }
+    if (!ResponsesWebSocketLane.#isValidOutputItem(event.item)) {
+      const error = new OpenAIError('Invalid Responses WebSocket completed output item');
+      this.fail(error);
+      throw error;
+    }
+  }
+
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This is the wire boundary that validates untyped output items.
+  static #isValidOutputItem(item: unknown): boolean {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Wire items require an own string discriminator, including unknown future variants.
+    if (!isObj(item) || !hasOwn(item, 'type') || typeof item['type'] !== 'string') {
+      return false;
+    }
+    if (item['type'] !== 'message') {
+      return true;
+    }
+    return (
+      hasOwn(item, 'content') &&
+      Array.isArray(item['content']) &&
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Validate untyped message parts before exposing the final response.
+      item['content'].every((content: unknown) => {
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Message parts use the same wire discriminator contract.
+        if (!isObj(content) || !hasOwn(content, 'type') || typeof content['type'] !== 'string') {
+          return false;
+        }
+        return (
+          content['type'] !== 'output_text' ||
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Canonical text accumulation consumes this exact wire field.
+          (hasOwn(content, 'text') && typeof content['text'] === 'string')
+        );
+      })
+    );
   }
 
   #validateTerminalResponse(event: { response?: unknown }): void {

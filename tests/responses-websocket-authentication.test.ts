@@ -58,6 +58,35 @@ describe.each([
     },
   );
 
+  test.each([
+    {
+      name: 'undefined',
+      value: undefined,
+      expectedAuthorization: 'Bearer SYNTHETIC_KEY',
+      expectedCustom: 'client-default',
+    },
+    { name: 'null', value: null, expectedAuthorization: undefined, expectedCustom: undefined },
+    { name: 'empty string', value: '', expectedAuthorization: '', expectedCustom: '' },
+  ])(
+    'preserves $name header override semantics on the wire',
+    async ({ value, expectedAuthorization, expectedCustom }) => {
+      const headers = await inspectHandshake(
+        Responses,
+        (baseURL) =>
+          new OpenAI({
+            baseURL,
+            apiKey: 'SYNTHETIC_KEY',
+            defaultHeaders: { 'X-Client-Default': 'client-default' },
+          }),
+        // JavaScript callers can use the SDK's undefined/no-override and null/removal semantics.
+        // SAFETY: These intentional non-string fixtures exercise the public JavaScript header boundary.
+        { headers: { Authorization: value as string, 'X-Client-Default': value as string } },
+      );
+      expect(headers.authorization).toBe(expectedAuthorization);
+      expect(headers['x-client-default']).toBe(expectedCustom);
+    },
+  );
+
   test('preserves Basic authentication for an empty static api key', async () => {
     const headers = await inspectHandshake(
       Responses,

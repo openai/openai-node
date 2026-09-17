@@ -62,7 +62,8 @@ the socket. Its ID remains reserved until reconnect, even after a terminal event
 because steering can create an automatic successor. Continue using the same open
 lane for sequential responses. Closing the session releases its listeners and lanes; the caller
 still owns and must close the connection. Accepted events remain available if
-the transport closes before the consumer reads them.
+the transport closes before the consumer reads them. After a physical transport error,
+new lanes and sends are rejected until a replacement connection successfully opens.
 
 If the underlying connection reconnects, all old lanes fail. After the connection
 is restored, register new lanes and explicitly restore application state before
