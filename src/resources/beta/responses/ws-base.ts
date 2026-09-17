@@ -7,6 +7,7 @@ import { type WebSocketLike, ReadyState } from '../../../internal/ws-adapter';
 import {
   SendQueue,
   getMaxBufferedEvents,
+  recordWebSocketError,
   rawByteLength,
   type WebSocketStreamOptions,
   flattenRawData,
@@ -489,6 +490,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     });
 
     socket.on('error', (err: Error) => {
+      recordWebSocketError(socket, err);
       // Suppress transient errors during reconnection — the retry loop
       // already handles them and will surface a close if retries exhaust.
       if (this._isReconnecting) return;

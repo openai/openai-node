@@ -140,6 +140,13 @@ describe.each([
     { output: {} },
     { output: [], output_text: 3 },
     { output: [{ type: 'message', content: null }] },
+    { output: [null], output_text: '' },
+    { output: [{}], output_text: '' },
+    { output: [{ type: 3 }], output_text: '' },
+    { output: [{ type: 'message', content: null }], output_text: '' },
+    { output: [{ type: 'message', content: [null] }], output_text: '' },
+    { output: [{ type: 'message', content: [{ type: 3 }] }], output_text: '' },
+    { output: [{ type: 'message', content: [{ type: 'output_text', text: 3 }] }], output_text: '' },
   ])('fails only the lane with malformed terminal fields %j', async (response) => {
     await withSocket(async (connection, peer, _server, session) => {
       const lane = session.lane('invalid');
@@ -167,45 +174,65 @@ describe.each([
     });
   });
 
-  test.each([{ item: null }, { item: false }, { item: 0 }, { item: 'invalid' }, { item: [] }])(
-    'rejects a malformed completed output item $item',
-    async ({ item }) => {
-      await withSocket(async (connection, peer, _server, session) => {
-        const lane = session.lane('invalid');
-        const other = session.lane('other');
-        const failed = lane.finalResponse().catch((error: unknown) => error);
-        const rawItem = connection.emitted('response.output_item.done');
-        peer.send(
-          JSON.stringify({ type: 'response.output_item.done', stream_id: 'invalid', output_index: 0, item }),
-        );
-        peer.send(
-          JSON.stringify({
-            type: 'response.completed',
-            stream_id: 'invalid',
-            response: { id: 'invalid', output_text: '' },
-          }),
-        );
-        expect(await rawItem).toMatchObject({ item });
-        const error = await failed;
-        expect(error).toBeInstanceOf(OpenAIError);
-        expect(error).toMatchObject({ message: 'Responses WebSocket output item must be an object' });
-        await expect(lane.finalResponse()).rejects.toBe(error);
-        expect(() => lane.create({ input: 'next' })).toThrow('output item must be an object');
-        peer.send(
-          JSON.stringify({ type: 'response.completed', stream_id: 'other', response: { id: 'other' } }),
-        );
-        expect(await other.finalResponse()).toMatchObject({ id: 'other', output: [], output_text: '' });
-        expect(connection.socket.readyState).toBe(WebSocket.OPEN);
-      });
+  test.each([
+    { item: null, message: 'Responses WebSocket output item must be an object' },
+    { item: false, message: 'Responses WebSocket output item must be an object' },
+    { item: 0, message: 'Responses WebSocket output item must be an object' },
+    { item: 'invalid', message: 'Responses WebSocket output item must be an object' },
+    { item: [], message: 'Responses WebSocket output item must be an object' },
+    { item: {}, message: 'Invalid Responses WebSocket completed output item' },
+    { item: { type: 3 }, message: 'Invalid Responses WebSocket completed output item' },
+    {
+      item: { type: 'message', content: null },
+      message: 'Invalid Responses WebSocket completed output item',
     },
-  );
+  ])('rejects a malformed completed output item $item', async ({ item, message }) => {
+    await withSocket(async (connection, peer, _server, session) => {
+      const lane = session.lane('invalid');
+      const other = session.lane('other');
+      const failed = lane.finalResponse().catch((error: unknown) => error);
+      const rawItem = connection.emitted('response.output_item.done');
+      peer.send(
+        JSON.stringify({ type: 'response.output_item.done', stream_id: 'invalid', output_index: 0, item }),
+      );
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'invalid',
+          response: { id: 'invalid', output_text: '' },
+        }),
+      );
+      expect(await rawItem).toMatchObject({ item });
+      const error = await failed;
+      expect(error).toBeInstanceOf(OpenAIError);
+      expect(error).toMatchObject({ message });
+      await expect(lane.finalResponse()).rejects.toBe(error);
+      expect(() => lane.create({ input: 'next' })).toThrow(message);
+      peer.send(
+        JSON.stringify({ type: 'response.completed', stream_id: 'other', response: { id: 'other' } }),
+      );
+      expect(await other.finalResponse()).toMatchObject({ id: 'other', output: [], output_text: '' });
+      expect(connection.socket.readyState).toBe(WebSocket.OPEN);
+    });
+  });
 
-  test('preserves a completed output item with a future type', async () => {
+  test.each(['completed item', 'terminal output'])('preserves a future type from %s', async (source) => {
     await withSocket(async (_connection, peer, _server, session) => {
       const lane = session.lane();
       const item = { type: 'future_output_item', payload: { values: ['retained'] } };
-      peer.send(JSON.stringify({ type: 'response.output_item.done', output_index: 0, item }));
-      peer.send(JSON.stringify({ type: 'response.completed', response: { id: 'future', output_text: '' } }));
+      if (source === 'completed item') {
+        peer.send(JSON.stringify({ type: 'response.output_item.done', output_index: 0, item }));
+      }
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          response: {
+            id: 'future',
+            output: source === 'terminal output' ? [item] : undefined,
+            output_text: '',
+          },
+        }),
+      );
       expect(await lane.finalResponse()).toMatchObject({ id: 'future', output: [item], output_text: '' });
     });
   });
@@ -347,6 +374,87 @@ describe.each([
       });
     },
   );
+
+  test('dispatches through the physical socket selected by a custom accessor', async () => {
+    await withSocket(async (connection, peer, _server, session) => {
+      await withSocket(async (otherConnection) => {
+        const { socket } = connection;
+        const otherSocket = otherConnection.socket;
+        const descriptor = Object.getOwnPropertyDescriptor(connection, 'socket');
+        if (!descriptor) {
+          throw new Error('Missing socket descriptor');
+        }
+        const lane = session.lane();
+        const received = once(peer, 'message');
+        let reads = 0;
+        Object.defineProperty(connection, 'socket', {
+          configurable: true,
+          get() {
+            reads += 1;
+            return reads === 1 ? socket : otherSocket;
+          },
+        });
+        try {
+          lane.create({ input: 'selected transport' });
+        } finally {
+          Object.defineProperty(connection, 'socket', descriptor);
+        }
+        // A barrier on the selected transport makes a wrong-socket send fail without hanging.
+        socket.send(JSON.stringify({ type: 'response.create', input: 'barrier' }));
+        const [message] = await received;
+        expect(JSON.parse(String(message))).toMatchObject({ input: 'selected transport' });
+      });
+    });
+  });
+
+  test('blocks fresh work after a physical error until a replacement connection succeeds', async () => {
+    await withSocket(async (connection, peer, server, session) => {
+      const lane = session.lane();
+      const waiting = session.lane('waiting');
+      const received = connection.emitted('event');
+      peer.send(JSON.stringify({ type: 'response.completed', response: { id: 'accepted' } }));
+      await received;
+      const failed = expect(waiting.receive()).rejects.toThrow('synthetic transport failure');
+      const oldSocket = connection.socket;
+      let callbackFailures: unknown[] = [];
+      connection.on('error', () => {
+        callbackFailures = [
+          () => session.lane('from-error').create({ input: 'new lane from error callback' }),
+          () => lane.create({ input: 'existing lane from error callback' }),
+        ].map((attempt) => {
+          try {
+            attempt();
+            return null;
+          } catch (error) {
+            return error;
+          }
+        });
+      });
+      oldSocket.platformSocket.emit('error', new Error('synthetic transport failure'));
+      await failed;
+      expect(callbackFailures).toEqual([
+        expect.objectContaining({ message: 'synthetic transport failure' }),
+        expect.objectContaining({ message: 'synthetic transport failure' }),
+      ]);
+      const barrier = once(peer, 'message');
+      oldSocket.send(JSON.stringify({ type: 'response.create', input: 'barrier' }));
+      const [barrierMessage] = await barrier;
+      expect(JSON.parse(String(barrierMessage))).toMatchObject({ input: 'barrier' });
+      expect(oldSocket.readyState).toBe(WebSocket.OPEN);
+      expect(() => session.lane('fresh')).toThrow('synthetic transport failure');
+      expect(() => lane.create({ input: 'must not send' })).toThrow('synthetic transport failure');
+      expect(await lane.finalResponse()).toMatchObject({ id: 'accepted' });
+      const reconnected = connection.emitted('reconnected');
+      const incoming = once(server, 'connection');
+      peer.close(1011);
+      await reconnected;
+      const [replacementPeer] = await incoming;
+      const sent = once(replacementPeer, 'message');
+      session.lane('fresh').create({ input: 'restored state' });
+      const [message] = await sent;
+      expect(JSON.parse(String(message))).toMatchObject({ input: 'restored state', stream_id: 'fresh' });
+    });
+  });
 
   test('tracks only current transport errors after reconnect and releases its listener on close', async () => {
     await withSocket(async (connection, peer, server, session) => {

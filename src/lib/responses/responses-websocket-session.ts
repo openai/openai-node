@@ -4,7 +4,7 @@ import { WebSocketError } from '../../resources/responses/internal-base';
 import { OpenAIError } from '../../core/error';
 import { ReadyState } from '../../internal/ws-adapter';
 import type { WebSocketLike } from '../../internal/ws-adapter';
-import { rawByteLength } from '../../internal/ws';
+import { getWebSocketError, rawByteLength } from '../../internal/ws';
 import { hasOwn, isObj } from '../../internal/utils/values';
 import { getWebSocketEventBytes, getWebSocketEventPayload } from '../../resources/responses/ws-base';
 import {
@@ -86,6 +86,7 @@ export class ResponsesWebSocketSession {
   #bytes = 0;
   #closed = false;
   #socket: WebSocketLike | undefined;
+  #failedTransport: { socket: WebSocketLike | undefined; error: WebSocketError } | undefined;
 
   constructor(
     connection: ResponsesEmitter & { readonly socket: WebSocketLike },
@@ -120,6 +121,7 @@ export class ResponsesWebSocketSession {
     if (this.#closed) {
       throw new OpenAIError('Responses WebSocket session is closed');
     }
+    this.#assertTransportAvailable(this.#connection.socket);
     if (
       streamID !== undefined &&
       // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Untyped JavaScript callers must not create non-string routing keys through RegExp coercion.
@@ -139,12 +141,14 @@ export class ResponsesWebSocketSession {
       lane: new ResponsesWebSocketLane(
         streamID,
         (event) => {
-          if (this.#connection.socket.readyState !== ReadyState.OPEN) {
+          const { socket } = this.#connection;
+          this.#assertTransportAvailable(socket);
+          if (socket.readyState !== ReadyState.OPEN) {
             throw new OpenAIError('Wait for an open Responses WebSocket before sending');
           }
           // The emitter's reconnect queue may replay an uncertain write. Send
           // directly to the physical socket, including during its open callback.
-          this.#connection.socket.send(JSON.stringify(event));
+          socket.send(JSON.stringify(event));
         },
         (bytes) => {
           this.#events -= 1;
@@ -259,6 +263,7 @@ export class ResponsesWebSocketSession {
   #onSocketError = (cause: Error): void => {
     const error = new WebSocketError(cause.message, null);
     Object.assign(error, { cause });
+    this.#failedTransport = { socket: this.#socket, error };
     for (const { lane } of this.#lanes.values()) {
       lane.end(error);
     }
@@ -275,8 +280,34 @@ export class ResponsesWebSocketSession {
     }
     this.#socket?.off('error', this.#onSocketError);
     this.#socket = this.#connection.socket;
+    this.#clearRecoveredTransportError(this.#socket);
     this.#socket.on('error', this.#onSocketError);
   };
+
+  #assertTransportAvailable(socket: WebSocketLike): void {
+    // Native transports record failure before forwarding their public error event.
+    const cause = getWebSocketError(socket);
+    if (cause) {
+      const error = new WebSocketError(cause.message, null);
+      Object.assign(error, { cause });
+      throw error;
+    }
+    this.#clearRecoveredTransportError(socket);
+    if (this.#failedTransport) {
+      throw this.#failedTransport.error;
+    }
+  }
+
+  #clearRecoveredTransportError(socket: WebSocketLike): void {
+    // Application recovery callbacks can run before our reconnected listener.
+    if (
+      this.#failedTransport &&
+      socket !== this.#failedTransport.socket &&
+      socket.readyState === ReadyState.OPEN
+    ) {
+      this.#failedTransport = undefined;
+    }
+  }
 
   #failLanes(error: Error): void {
     for (const { lane } of this.#lanes.values()) {

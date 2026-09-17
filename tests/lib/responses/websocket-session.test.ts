@@ -695,6 +695,7 @@ test('never queues or replays an uncertain send during the replacement socket op
     const [peer] = await incoming;
     await once(connection.socket.platformSocket, 'open');
     const reconnected = once(progress, 'reconnected');
+    connection.socket.platformSocket.emit('error', new Error('synthetic prior transport failure'));
     peer.close(1011);
     await reconnected;
     connection.socket.send(JSON.stringify({ type: 'response.create', input: 'barrier' }));
@@ -777,6 +778,8 @@ test.each([false, true])(
     }
     const handshakes: Record<string, string | string[] | undefined>[] = [];
     const messages: string[] = [];
+    const progress = new EventTarget();
+    const restored = once(progress, 'restored');
     server.on('connection', (peer, request) => {
       handshakes.push({
         authorization: request.headers.authorization,
@@ -786,7 +789,10 @@ test.each([false, true])(
         project: request.headers['openai-project'],
         userAgent: request.headers['user-agent'],
       });
-      peer.on('message', (data) => messages.push(String(data)));
+      peer.on('message', (data) => {
+        messages.push(String(data));
+        progress.dispatchEvent(new Event('restored'));
+      });
     });
     const defaults = {
       'X-Client-Only': 'client-first',
@@ -818,6 +824,18 @@ test.each([false, true])(
       },
     });
     connection.on('error', () => {});
+    let restoredLane: ResponsesWebSocketLane | undefined;
+    let restoreError: unknown;
+    // Run before the session's own reconnected listener.
+    connection.on('reconnected', () => {
+      try {
+        // oxlint-disable-next-line eslint/no-use-before-define -- Register before session construction to exercise the application's earlier recovery listener.
+        restoredLane = session.lane('turn');
+        restoredLane.create({ model: 'test-model', input: 'restored state' });
+      } catch (error) {
+        restoreError = error;
+      }
+    });
     const session = new ResponsesWebSocketSession(connection, { ...limits, maxBufferedEvents: 1 });
     try {
       const [peer] = await incoming;
@@ -849,11 +867,13 @@ test.each([false, true])(
       expect(() => oldLane.create({ model: 'test-model', input: 'never' })).toThrow(
         transportError ? undefined : 'restored explicitly',
       );
-      const lane = session.lane('turn');
+      expect(restoreError).toBeUndefined();
+      if (!restoredLane) {
+        throw new Error('Missing restored lane');
+      }
+      const lane = restoredLane;
       oldLane.close();
-      const received = once(nextPeer, 'message');
-      lane.create({ model: 'test-model', input: 'restored state' });
-      await received;
+      await restored;
       expect(messages.map((value) => JSON.parse(value).input)).toEqual(['restored state']);
       nextPeer.send(
         JSON.stringify({

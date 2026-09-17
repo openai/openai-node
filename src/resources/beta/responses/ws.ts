@@ -33,14 +33,17 @@ export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
 
   protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
     const capturedAuthHeaders = { ...authHeaders };
+    const headers = new Map(Object.entries(this._client._buildWebSocketHeaders(capturedAuthHeaders)));
+    for (const [name, value] of Object.entries(this._wsOptions?.headers ?? {})) {
+      if (value === null) {
+        headers.delete(name.toLowerCase());
+      } else if (value !== undefined) {
+        headers.set(name.toLowerCase(), value);
+      }
+    }
     const socketOptions: ResponsesWSClientOptions = {
       ...this._wsOptions,
-      headers: {
-        ...this._client._buildWebSocketHeaders(capturedAuthHeaders),
-        ...Object.fromEntries(
-          Object.entries(this._wsOptions?.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]),
-        ),
-      },
+      headers: Object.fromEntries(headers),
       followRedirects: false,
     };
     if (

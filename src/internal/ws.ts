@@ -1,5 +1,18 @@
 import { concatBytes, encodeUTF8 } from './utils/bytes';
 import { OpenAIError } from '../core/error';
+import type { WebSocketLike } from './ws-adapter';
+
+const webSocketErrors = new WeakMap<WebSocketLike, Error>();
+
+/** Records physical failure before transport callbacks notify public observers. @internal */
+export function recordWebSocketError(socket: WebSocketLike, error: Error): void {
+  webSocketErrors.set(socket, error);
+}
+
+/** Returns physical failure for this socket instance, never for a replacement. @internal */
+export function getWebSocketError(socket: WebSocketLike): Error | undefined {
+  return webSocketErrors.get(socket);
+}
 
 /** Options for an independently buffered WebSocket stream iterator. */
 export interface WebSocketStreamOptions {
