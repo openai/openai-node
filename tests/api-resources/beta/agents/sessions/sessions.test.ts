@@ -78,7 +78,14 @@ describe('resource sessions', () => {
     await expect(
       client.beta.agents.sessions.update(
         'session_id',
-        { metadata: { foo: 'string' } },
+        {
+          agent: {
+            model: 'model',
+            reasoning: { effort: 'none' },
+            service_tier: 'auto',
+          },
+          metadata: { foo: 'string' },
+        },
         { path: '/_stainless_unknown_path' },
       ),
     ).rejects.toThrow(OpenAI.NotFoundError);
