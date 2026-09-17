@@ -105,7 +105,13 @@ export function snapshotWebSocketCredentials(options: {
   const credentials = new Map<string, boolean>();
   const headers = options.headers ?? {};
   for (const [name, value] of Object.entries(headers)) {
-    if (!isWebSocketCredentialHeader(name)) {
+    const normalizedName = name.toLowerCase().split('_').join('-');
+    // Routing metadata is still protected on redirects, but cannot authenticate a socket.
+    if (
+      !isWebSocketCredentialHeader(name) ||
+      normalizedName === 'openai-organization' ||
+      normalizedName === 'openai-project'
+    ) {
       continue;
     }
     let snapshot = value;
@@ -196,9 +202,24 @@ function snapshotRawData(data: RawWebSocketData): Exclude<RawWebSocketData, Arra
   return data.slice(0);
 }
 
-function rawByteLength(data: RawWebSocketData): number {
+/** Counts wire bytes without allocating another payload-sized buffer. */
+export function rawByteLength(data: RawWebSocketData): number {
   if (typeof data === 'string') {
-    return encodeUTF8(data).byteLength;
+    let bytes = 0;
+    for (let index = 0; index < data.length; index += 1) {
+      const code = data.codePointAt(index)!;
+      if (code < 128) {
+        bytes += 1;
+      } else if (code < 2048) {
+        bytes += 2;
+      } else if (code <= 65_535) {
+        bytes += 3;
+      } else {
+        bytes += 4;
+        index += 1;
+      }
+    }
+    return bytes;
   }
   if (Array.isArray(data)) {
     return data.reduce((sum, buf) => sum + buf.byteLength, 0);

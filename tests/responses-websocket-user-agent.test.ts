@@ -19,7 +19,13 @@ vi.mock('ws', async () => {
 
       constructor(url: URL, options: ClientOptions) {
         super();
-        handshake(url, options);
+        // HTTP header names are case-insensitive across both adapters.
+        handshake(url, {
+          ...options,
+          headers: Object.fromEntries(
+            Object.entries(options.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]),
+          ),
+        });
       }
     },
   };
@@ -54,7 +60,7 @@ describe.each([
 
     try {
       const expectedOptions = expect.objectContaining({
-        headers: expect.objectContaining({ 'User-Agent': expected }),
+        headers: expect.objectContaining({ 'user-agent': expected }),
       });
       expect(handshake).toHaveBeenCalledTimes(1);
       expect(handshake).toHaveBeenNthCalledWith(1, expect.any(URL), expectedOptions);

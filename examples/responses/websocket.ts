@@ -372,7 +372,6 @@ const runResponse = async ({
       type: 'response.create',
       model,
       input: inputPayload,
-      stream: true,
       previous_response_id: previousResponseID,
       tools: TOOLS,
       tool_choice: toolChoice,

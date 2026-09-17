@@ -4,7 +4,6 @@ import * as WS from 'ws';
 import { NodeWebSocket } from '../../internal/ws-adapter-node';
 import { LiveWSBase, type LiveWSBaseOptions } from './ws-base';
 import { OpenAI } from '../../client';
-import { VERSION } from '../../version';
 
 export type { WebSocketStreamOptions } from '../../internal/ws';
 
@@ -32,10 +31,10 @@ export class LiveWS extends LiveWSBase<NodeWebSocket> {
     const ws = new WS.WebSocket(url, {
       ...this._wsOptions,
       headers: {
-        'User-Agent': `${this._client.constructor.name}/JS ${VERSION}`,
-
-        ...authHeaders,
-        ...this._wsOptions?.headers,
+        ...this._client._buildWebSocketHeaders(authHeaders),
+        ...Object.fromEntries(
+          Object.entries(this._wsOptions?.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]),
+        ),
       },
       followRedirects: false,
     });

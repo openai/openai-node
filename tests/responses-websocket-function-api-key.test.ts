@@ -18,7 +18,13 @@ vi.mock('ws', async () => {
 
       constructor(url: URL, options: ClientOptions) {
         super();
-        handshake(url, options);
+        // HTTP header names are case-insensitive across both adapters.
+        handshake(url, {
+          ...options,
+          headers: Object.fromEntries(
+            Object.entries(options.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]),
+          ),
+        });
       }
     },
   };
@@ -32,9 +38,14 @@ describe.each([
   { name: 'stable', Responses: StableResponsesWS },
   { name: 'beta', Responses: BetaResponsesWS },
 ])('$name Responses WebSocket function api keys', ({ Responses }) => {
-  test('rejects an unresolved function api key instead of opening an unauthenticated socket', () => {
+  test.each([
+    {},
+    { organization: 'org-synthetic' },
+    { project: 'project-synthetic' },
+    { defaultHeaders: { 'OpenAI-Organization': 'org-synthetic', 'openai-project': 'project-synthetic' } },
+  ])('rejects an unresolved function api key with client routing options %j', (options) => {
     const apiKey = vi.fn(async () => 'sk-refreshed');
-    const client = new OpenAI({ apiKey });
+    const client = new OpenAI({ apiKey, ...options });
 
     expect(() => new Responses(client)).toThrow(/unresolved function-based apiKey/u);
     expect(apiKey).not.toHaveBeenCalled();
@@ -55,7 +66,7 @@ describe.each([
         expect(handshake).toHaveBeenCalledWith(
           expect.any(URL),
           expect.objectContaining({
-            headers: expect.objectContaining({ [headerName]: 'Bearer caller-managed-token' }),
+            headers: expect.objectContaining({ authorization: 'Bearer caller-managed-token' }),
           }),
         );
       } finally {
@@ -69,6 +80,10 @@ describe.each([
     { name: 'proxy authorization', options: { headers: { 'Proxy-Authorization': 'Basic proxy' } } },
     { name: 'cookie', options: { headers: { Cookie: 'session=secret' } } },
     { name: 'X-API-Key', options: { headers: { 'X-API-Key': 'key-secret' } } },
+    {
+      name: 'distinct custom header spellings',
+      options: { headers: { X_Auth_Token: 'synthetic-token', 'X-Auth-Token': '' } },
+    },
   ])('allows caller-supplied $name with an unresolved function api key', ({ options }) => {
     const apiKey = vi.fn(async () => 'sk-refreshed');
     const client = new OpenAI({ apiKey });
@@ -102,6 +117,8 @@ describe.each([
   test.each([
     { headers: { 'OpenAI-Beta': 'responses_websockets=2026-02-06', 'X-Trace-Id': 'trace' } },
     { headers: { 'X-Auth-Token': '   ' } },
+    { headers: { OpenAI_Organization: 'org-synthetic' } },
+    { headers: { OpenAI_Project: 'project-synthetic' } },
     { headers: { Authorization: 'Bearer overwritten', authorization: '' } },
     { auth: 'user:pass', headers: { Authorization: '' } },
   ])('rejects socket options without a usable final credential: %j', (options) => {
@@ -128,7 +145,7 @@ describe.each([
 
   test('accepts a function api key after it has been resolved', async () => {
     const apiKey = vi.fn(async () => 'sk-refreshed');
-    const client = new OpenAI({ apiKey });
+    const client = new OpenAI({ apiKey, organization: 'org-synthetic', project: 'project-synthetic' });
     expect(await client._callApiKey()).toBe(true);
 
     const responses = new Responses(client);
@@ -137,7 +154,11 @@ describe.each([
       expect(handshake).toHaveBeenCalledWith(
         expect.any(URL),
         expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: 'Bearer sk-refreshed' }),
+          headers: expect.objectContaining({
+            authorization: 'Bearer sk-refreshed',
+            'openai-organization': 'org-synthetic',
+            'openai-project': 'project-synthetic',
+          }),
         }),
       );
       expect(apiKey).toHaveBeenCalledTimes(1);
@@ -156,7 +177,7 @@ describe.each([
       expect(handshake).toHaveBeenCalledWith(
         expect.any(URL),
         expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: 'Bearer caller-managed-token' }),
+          headers: expect.objectContaining({ authorization: 'Bearer caller-managed-token' }),
         }),
       );
     } finally {
@@ -172,7 +193,7 @@ describe.each([
     try {
       expect(handshake).toHaveBeenCalledWith(
         expect.any(URL),
-        expect.objectContaining({ headers: expect.objectContaining({ Authorization: '' }) }),
+        expect.objectContaining({ headers: expect.objectContaining({ authorization: '' }) }),
       );
     } finally {
       responses.close();

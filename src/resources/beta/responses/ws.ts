@@ -4,7 +4,6 @@ import * as WS from 'ws';
 import { NodeWebSocket } from '../../../internal/ws-adapter-node';
 import { ResponsesWSBase, type ResponsesWSBaseOptions } from './ws-base';
 import { OpenAI } from '../../../client';
-import { VERSION } from '../../../version';
 import { OpenAIError } from '../../../core/error';
 import { snapshotWebSocketCredentials } from '../../../internal/ws';
 
@@ -37,9 +36,10 @@ export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
     const socketOptions: ResponsesWSClientOptions = {
       ...this._wsOptions,
       headers: {
-        'User-Agent': `${this._client.constructor.name}/JS ${VERSION}`,
-        ...capturedAuthHeaders,
-        ...this._wsOptions?.headers,
+        ...this._client._buildWebSocketHeaders(capturedAuthHeaders),
+        ...Object.fromEntries(
+          Object.entries(this._wsOptions?.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]),
+        ),
       },
       followRedirects: false,
     };
