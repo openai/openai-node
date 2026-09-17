@@ -91,7 +91,8 @@ export class Sessions extends APIResource {
   }
 
   /**
-   * Updates session metadata. Omitted fields are unchanged. See
+   * Updates session metadata, model, reasoning effort, or service tier. Model
+   * settings apply to subsequent turns. Omitted fields are unchanged. See
    * [managing sessions](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage).
    *
    * @example
@@ -269,11 +270,56 @@ export interface SessionCreateParamsStreaming extends SessionCreateParamsBase {
 
 export interface SessionUpdateParams {
   /**
+   * Model settings for subsequent turns. Omitted fields stay unchanged.
+   */
+  agent?: SessionUpdateParams.Agent;
+
+  /**
    * Replaces all metadata. Omit to leave unchanged, or pass null or {} to clear it.
    * Up to 16 string key-value pairs, with keys up to 64 and values up to 512
    * characters.
    */
   metadata?: { [key: string]: string } | null;
+}
+
+export namespace SessionUpdateParams {
+  /**
+   * Model settings for subsequent turns. Omitted fields stay unchanged.
+   */
+  export interface Agent {
+    /**
+     * The model for subsequent turns. Omit to keep the current model.
+     */
+    model?: string;
+
+    /**
+     * Reasoning settings to update. Omit to keep the current effort.
+     */
+    reasoning?: Agent.Reasoning;
+
+    /**
+     * The service tier used for model requests.
+     *
+     * - `auto` - Selects the service tier automatically.
+     * - `default` - Uses the default service tier.
+     * - `flex` - Uses the flex service tier.
+     * - `priority` - Uses the priority service tier.
+     * - `fast` - Uses the fast service tier.
+     */
+    service_tier?: 'auto' | 'default' | 'flex' | 'priority' | 'fast' | null;
+  }
+
+  export namespace Agent {
+    /**
+     * Reasoning settings to update. Omit to keep the current effort.
+     */
+    export interface Reasoning {
+      /**
+       * The amount of reasoning effort the model should use.
+       */
+      effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
+    }
+  }
 }
 
 export interface SessionListParams extends CursorPageParams {
