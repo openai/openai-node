@@ -9002,6 +9002,12 @@ export namespace ResponsesClientEvent {
       mode?: 'implicit' | 'explicit';
 
       /**
+       * Prepares the prompt cache without generating output. Defaults to `false`. When
+       * set to `true`, overrides the `generate` field to `false`.
+       */
+      prewarm?: boolean;
+
+      /**
        * The minimum lifetime applied to every implicit and explicit cache breakpoint
        * written by the request. Defaults to `30m`, which is currently the only supported
        * value. The backend may retain cache entries for longer.
@@ -11015,6 +11021,12 @@ export namespace ResponseCreateParams {
      * request does not use prompt caching.
      */
     mode?: 'implicit' | 'explicit';
+
+    /**
+     * Prepares the prompt cache without generating output. Defaults to `false`. When
+     * set to `true`, overrides the `generate` field to `false`.
+     */
+    prewarm?: boolean;
 
     /**
      * The minimum lifetime applied to every implicit and explicit cache breakpoint
