@@ -1,12 +1,159 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
+import * as EventTypesAPI from './event-types';
+import { EventTypes } from './event-types';
+import { APIPromise } from '../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
 
 export class Webhooks extends APIResource {
+  eventTypes: EventTypesAPI.EventTypes = new EventTypesAPI.EventTypes(this._client);
+
+  /**
+   * Creates a webhook endpoint for the authenticated project.
+   *
+   * @example
+   * ```ts
+   * const webhookEndpointWithSecret =
+   *   await client.webhooks.create({
+   *     event_types: ['batch.completed'],
+   *     name: 'x',
+   *     url: 'https://',
+   *   });
+   * ```
+   */
+  create(body: WebhookCreateParams, options?: RequestOptions): APIPromise<WebhookEndpointWithSecret> {
+    return this._client.post('/webhook_endpoints', { body, ...options, __security: { bearerAuth: true } });
+  }
+
+  /**
+   * Retrieves a webhook endpoint for the authenticated project.
+   *
+   * @example
+   * ```ts
+   * const webhookEndpoint = await client.webhooks.retrieve(
+   *   'whe_123',
+   * );
+   * ```
+   */
+  retrieve(webhookEndpointID: string, options?: RequestOptions): APIPromise<WebhookEndpoint> {
+    return this._client.get(path`/webhook_endpoints/${webhookEndpointID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
+  }
+
+  /**
+   * Updates a webhook endpoint for the authenticated project.
+   *
+   * @example
+   * ```ts
+   * const webhookEndpoint = await client.webhooks.update('whe_123');
+   * ```
+   */
+  update(
+    webhookEndpointID: string,
+    body: WebhookUpdateParams | null | undefined = {},
+    options?: RequestOptions,
+  ): APIPromise<WebhookEndpoint> {
+    return this._client.post(path`/webhook_endpoints/${webhookEndpointID}`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
+  }
+
+  /**
+   * Returns webhook endpoints for the authenticated project in newest-first order.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const webhookEndpoint of client.webhooks.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(
+    query: WebhookListParams | null | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<WebhookEndpointsPage, WebhookEndpoint> {
+    return this._client.getAPIList('/webhook_endpoints', CursorPage<WebhookEndpoint>, {
+      query,
+      ...options,
+      __security: { bearerAuth: true },
+    });
+  }
+
+  /**
+   * Deletes a webhook endpoint for the authenticated project.
+   *
+   * @example
+   * ```ts
+   * const deletedWebhookEndpoint = await client.webhooks.delete(
+   *   'whe_123',
+   * );
+   * ```
+   */
+  delete(webhookEndpointID: string, options?: RequestOptions): APIPromise<DeletedWebhookEndpoint> {
+    return this._client.delete(path`/webhook_endpoints/${webhookEndpointID}`, {
+      ...options,
+      __security: { bearerAuth: true },
+    });
+  }
+
+  /**
+   * Rotates the signing secret for a webhook endpoint in the authenticated project.
+   *
+   * @example
+   * ```ts
+   * const webhookEndpointWithSecret =
+   *   await client.webhooks.rotateSecret('whe_123');
+   * ```
+   */
+  rotateSecret(
+    webhookEndpointID: string,
+    body: WebhookRotateSecretParams | null | undefined = {},
+    options?: RequestOptions,
+  ): APIPromise<WebhookEndpointWithSecret> {
+    return this._client.post(path`/webhook_endpoints/${webhookEndpointID}/rotate_secret`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
+  }
+
+  /**
+   * Sends a sample event to a webhook endpoint for the authenticated project.
+   *
+   * @example
+   * ```ts
+   * const webhookEndpointTestResult =
+   *   await client.webhooks.test('whe_123', {
+   *     event_type: 'batch.completed',
+   *   });
+   * ```
+   */
+  test(
+    webhookEndpointID: string,
+    body: WebhookTestParams,
+    options?: RequestOptions,
+  ): APIPromise<WebhookEndpointTestResult> {
+    return this._client.post(path`/webhook_endpoints/${webhookEndpointID}/test`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true },
+    });
+  }
+
   unwrap(body: string): UnwrapWebhookEvent {
     return JSON.parse(body) as UnwrapWebhookEvent;
   }
 }
+
+export type WebhookEndpointsPage = CursorPage<WebhookEndpoint>;
 
 /**
  * Sent when a batch API request has been cancelled.
@@ -174,6 +321,23 @@ export namespace BatchFailedWebhookEvent {
      */
     id: string;
   }
+}
+
+export interface DeletedWebhookEndpoint {
+  /**
+   * The ID of the deleted webhook endpoint.
+   */
+  id: string;
+
+  /**
+   * Whether the endpoint was deleted.
+   */
+  deleted: boolean;
+
+  /**
+   * The object type, which is always webhook_endpoint.deleted.
+   */
+  object: 'webhook_endpoint.deleted';
 }
 
 /**
@@ -908,12 +1072,281 @@ export type UnwrapWebhookEvent =
   | SafetyAlertCreatedWebhookEvent
   | SafetyOrgAlertCreatedWebhookEvent;
 
+export interface WebhookEndpoint {
+  /**
+   * The unique ID of the webhook endpoint.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp when the endpoint was created.
+   */
+  created_at: number;
+
+  /**
+   * The event types that trigger deliveries to this endpoint.
+   */
+  event_types: Array<string>;
+
+  /**
+   * The human-readable name of the endpoint.
+   */
+  name: string;
+
+  /**
+   * The object type, which is always webhook_endpoint.
+   */
+  object: 'webhook_endpoint';
+
+  /**
+   * A masked hint for the endpoint's signing secret.
+   */
+  signing_secret_hint: string | null;
+
+  /**
+   * The HTTPS URL that receives webhook deliveries.
+   */
+  url: string;
+
+  /**
+   * The Unix timestamp of the last endpoint configuration or signing-secret change.
+   * Initialized at creation; tests and unchanged updates do not advance it.
+   */
+  updated_at?: number;
+}
+
+export interface WebhookEndpointList {
+  /**
+   * The webhook endpoints in this page.
+   */
+  data: Array<WebhookEndpoint>;
+
+  /**
+   * The ID of the first endpoint in this page.
+   */
+  first_id: string | null;
+
+  /**
+   * Whether more webhook endpoints are available.
+   */
+  has_more: boolean;
+
+  /**
+   * The ID of the last endpoint in this page.
+   */
+  last_id: string | null;
+
+  /**
+   * The object type, which is always list.
+   */
+  object: 'list';
+}
+
+export interface WebhookEndpointTestResult {
+  /**
+   * The event type sent in the test.
+   */
+  event_type: string;
+
+  /**
+   * The object type, which is always webhook_endpoint.test.
+   */
+  object: 'webhook_endpoint.test';
+
+  /**
+   * The HTTP status code returned by the endpoint.
+   */
+  status_code: number;
+
+  /**
+   * Whether the test request completed. Always true for returned results; use
+   * status_code to determine the endpoint response.
+   */
+  success: true;
+
+  /**
+   * The ID of the webhook endpoint that received the test.
+   */
+  webhook_endpoint_id: string;
+}
+
+export interface WebhookEndpointWithSecret {
+  /**
+   * The unique ID of the webhook endpoint.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp when the endpoint was created.
+   */
+  created_at: number;
+
+  /**
+   * The event types that trigger deliveries to this endpoint.
+   */
+  event_types: Array<string>;
+
+  /**
+   * The human-readable name of the endpoint.
+   */
+  name: string;
+
+  /**
+   * The object type, which is always webhook_endpoint.
+   */
+  object: 'webhook_endpoint';
+
+  /**
+   * The endpoint's signing secret. This is returned only when the endpoint is
+   * created or the secret is rotated.
+   */
+  signing_secret: string;
+
+  /**
+   * A masked hint for the endpoint's signing secret.
+   */
+  signing_secret_hint: string | null;
+
+  /**
+   * The HTTPS URL that receives webhook deliveries.
+   */
+  url: string;
+
+  /**
+   * The Unix timestamp of the last endpoint configuration or signing-secret change.
+   * Initialized at creation; tests and unchanged updates do not advance it.
+   */
+  updated_at?: number;
+}
+
+export interface WebhookEventTypeList {
+  /**
+   * The webhook event types available to the authenticated project.
+   */
+  data: Array<string>;
+
+  /**
+   * The object type, which is always list.
+   */
+  object: 'list';
+}
+
+export interface WebhookCreateParams {
+  /**
+   * The event types that trigger deliveries to this endpoint.
+   */
+  event_types: Array<
+    | 'batch.completed'
+    | 'batch.failed'
+    | 'batch.expired'
+    | 'batch.cancelled'
+    | 'response.completed'
+    | 'response.failed'
+    | 'response.cancelled'
+    | 'response.incomplete'
+    | 'eval.run.succeeded'
+    | 'eval.run.failed'
+    | 'eval.run.canceled'
+    | 'fine_tuning.job.succeeded'
+    | 'fine_tuning.job.failed'
+    | 'fine_tuning.job.cancelled'
+    | 'realtime.call.incoming'
+    | 'video.completed'
+    | 'video.failed'
+    | 'safety.alert.created'
+  >;
+
+  /**
+   * A human-readable name for the webhook endpoint.
+   */
+  name: string;
+
+  /**
+   * The HTTPS URL that receives webhook deliveries.
+   */
+  url: string;
+}
+
+export interface WebhookUpdateParams {
+  /**
+   * The complete set of event types that should trigger deliveries.
+   */
+  event_types?: Array<
+    | 'batch.completed'
+    | 'batch.failed'
+    | 'batch.expired'
+    | 'batch.cancelled'
+    | 'response.completed'
+    | 'response.failed'
+    | 'response.cancelled'
+    | 'response.incomplete'
+    | 'eval.run.succeeded'
+    | 'eval.run.failed'
+    | 'eval.run.canceled'
+    | 'fine_tuning.job.succeeded'
+    | 'fine_tuning.job.failed'
+    | 'fine_tuning.job.cancelled'
+    | 'realtime.call.incoming'
+    | 'video.completed'
+    | 'video.failed'
+    | 'safety.alert.created'
+  >;
+
+  /**
+   * A new human-readable name for the webhook endpoint.
+   */
+  name?: string;
+
+  /**
+   * A new HTTPS URL that receives webhook deliveries.
+   */
+  url?: string;
+}
+
+export interface WebhookListParams extends CursorPageParams {}
+
+export interface WebhookRotateSecretParams {
+  /**
+   * Whether to keep the previous signing secret valid for 24 hours after rotation.
+   * Defaults to false, which invalidates the previous secret immediately.
+   */
+  keep_old_secret_active_for_24_hours?: boolean;
+}
+
+export interface WebhookTestParams {
+  /**
+   * The event type to send as a sample delivery.
+   */
+  event_type:
+    | 'batch.completed'
+    | 'batch.failed'
+    | 'batch.expired'
+    | 'batch.cancelled'
+    | 'response.completed'
+    | 'response.failed'
+    | 'response.cancelled'
+    | 'response.incomplete'
+    | 'eval.run.succeeded'
+    | 'eval.run.failed'
+    | 'eval.run.canceled'
+    | 'fine_tuning.job.succeeded'
+    | 'fine_tuning.job.failed'
+    | 'fine_tuning.job.cancelled'
+    | 'realtime.call.incoming'
+    | 'video.completed'
+    | 'video.failed'
+    | 'safety.alert.created';
+}
+
+Webhooks.EventTypes = EventTypes;
+
 export declare namespace Webhooks {
   export {
     type BatchCancelledWebhookEvent as BatchCancelledWebhookEvent,
     type BatchCompletedWebhookEvent as BatchCompletedWebhookEvent,
     type BatchExpiredWebhookEvent as BatchExpiredWebhookEvent,
     type BatchFailedWebhookEvent as BatchFailedWebhookEvent,
+    type DeletedWebhookEndpoint as DeletedWebhookEndpoint,
     type EvalRunCanceledWebhookEvent as EvalRunCanceledWebhookEvent,
     type EvalRunFailedWebhookEvent as EvalRunFailedWebhookEvent,
     type EvalRunSucceededWebhookEvent as EvalRunSucceededWebhookEvent,
@@ -930,5 +1363,18 @@ export declare namespace Webhooks {
     type SafetyAlertCreatedWebhookEvent as SafetyAlertCreatedWebhookEvent,
     type SafetyOrgAlertCreatedWebhookEvent as SafetyOrgAlertCreatedWebhookEvent,
     type UnwrapWebhookEvent as UnwrapWebhookEvent,
+    type WebhookEndpoint as WebhookEndpoint,
+    type WebhookEndpointList as WebhookEndpointList,
+    type WebhookEndpointTestResult as WebhookEndpointTestResult,
+    type WebhookEndpointWithSecret as WebhookEndpointWithSecret,
+    type WebhookEventTypeList as WebhookEventTypeList,
+    type WebhookEndpointsPage as WebhookEndpointsPage,
+    type WebhookCreateParams as WebhookCreateParams,
+    type WebhookUpdateParams as WebhookUpdateParams,
+    type WebhookListParams as WebhookListParams,
+    type WebhookRotateSecretParams as WebhookRotateSecretParams,
+    type WebhookTestParams as WebhookTestParams,
   };
+
+  export { EventTypes as EventTypes };
 }
