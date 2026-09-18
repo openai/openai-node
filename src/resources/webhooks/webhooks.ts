@@ -717,6 +717,14 @@ export namespace LiveCallIncomingWebhookEvent {
      * untrusted call metadata.
      */
     sip_headers: Array<Data.SipHeader>;
+
+    /**
+     * Media protection selected on the SIP leg during SDP negotiation. `srtp`
+     * indicates SRTP; `rtp` indicates unencrypted RTP. Omitted when unknown. This does
+     * not describe SIP signaling security or confirm that media has flowed. Clients
+     * should handle unrecognized values as unknown.
+     */
+    sip_media_security?: 'rtp' | 'srtp' | (string & {});
   }
 
   export namespace Data {
@@ -791,6 +799,14 @@ export namespace LiveTransportIncomingWebhookEvent {
      * The incoming transport type. Always `sip`.
      */
     type: 'sip';
+
+    /**
+     * Media protection selected on the SIP leg during SDP negotiation. `srtp`
+     * indicates SRTP; `rtp` indicates unencrypted RTP. Omitted when unknown. This does
+     * not describe SIP signaling security or confirm that media has flowed. Clients
+     * should handle unrecognized values as unknown.
+     */
+    sip_media_security?: 'rtp' | 'srtp' | (string & {});
   }
 
   export namespace Data {
@@ -861,6 +877,14 @@ export namespace RealtimeCallIncomingWebhookEvent {
      * untrusted call metadata.
      */
     sip_headers: Array<Data.SipHeader>;
+
+    /**
+     * Media protection selected on the SIP leg during SDP negotiation. `srtp`
+     * indicates SRTP; `rtp` indicates unencrypted RTP. Omitted when unknown. This does
+     * not describe SIP signaling security or confirm that media has flowed. Clients
+     * should handle unrecognized values as unknown.
+     */
+    sip_media_security?: 'rtp' | 'srtp' | (string & {});
   }
 
   export namespace Data {
