@@ -175,8 +175,9 @@ export interface ConversationItemAdded {
  * "history" of the conversation and to add new items mid-stream, but has the
  * current limitation that it cannot populate assistant audio messages.
  *
- * If successful, the server will respond with a `conversation.item.created` event,
- * otherwise an `error` event will be sent.
+ * If successful, the server will emit a `conversation.item.added` event and, when
+ * the item is finalized, a `conversation.item.done` event. Otherwise, an `error`
+ * event will be sent.
  */
 export interface ConversationItemCreateEvent {
   /**
@@ -2263,10 +2264,14 @@ export interface RealtimeResponseCreateMcpTool {
   authorization?: string;
 
   /**
-   * Identifier for service connectors, like those available in ChatGPT. One of
-   * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
-   * service connectors
+   * @deprecated Identifier for service connectors, like those available in ChatGPT.
+   * One of `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more
+   * about service connectors
    * [here](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#connectors).
+   *
+   * This field is deprecated for models released after September 1, 2026. Use
+   * `server_url` to connect to a remote MCP server, or `tunnel_id` to connect
+   * through a Secure MCP Tunnel.
    *
    * Currently supported `connector_id` values are:
    *
@@ -3317,10 +3322,14 @@ export namespace RealtimeToolsConfigUnion {
     authorization?: string;
 
     /**
-     * Identifier for service connectors, like those available in ChatGPT. One of
-     * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
-     * service connectors
+     * @deprecated Identifier for service connectors, like those available in ChatGPT.
+     * One of `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more
+     * about service connectors
      * [here](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#connectors).
+     *
+     * This field is deprecated for models released after September 1, 2026. Use
+     * `server_url` to connect to a remote MCP server, or `tunnel_id` to connect
+     * through a Secure MCP Tunnel.
      *
      * Currently supported `connector_id` values are:
      *
