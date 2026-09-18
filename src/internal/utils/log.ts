@@ -138,6 +138,41 @@ export function redactURL(value: string): string {
   return url.href;
 }
 
+/** Copies JSON diagnostic data without mutating caller-visible values. */
+function redactBody(body: unknown): unknown {
+  const copies = new WeakMap<object, object>();
+  const pending: Array<{ source: object; target: object }> = [];
+  const copyValue = (value: unknown): unknown => {
+    if (typeof value === 'function') return '[Function]';
+    if (value === null || typeof value !== 'object') return value;
+    const prototype = Object.getPrototypeOf(value);
+    if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return value;
+    const existing = copies.get(value);
+    if (existing) return existing;
+    const target = Array.isArray(value) ? new Array(value.length) : {};
+    copies.set(value, target);
+    pending.push({ source: value, target });
+    return target;
+  };
+
+  const result = copyValue(body);
+  for (let item = pending.pop(); item; item = pending.pop()) {
+    for (const [name, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(item.source))) {
+      if (!descriptor.enumerable) continue;
+      const value = 'value' in descriptor ? descriptor.value : '[Accessor]';
+      const sensitive =
+        isSensitiveHeader(name) || name.toLowerCase().replace(/[-_]/gu, '') === 'signingsecret';
+      Object.defineProperty(item.target, name, {
+        value: sensitive ? '***' : copyValue(value),
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+    }
+  }
+  return result;
+}
+
 export const formatRequestDetails = (details: {
   options?: RequestOptions | undefined;
   headers?: Headers | Record<string, string> | undefined;
@@ -179,6 +214,9 @@ export const formatRequestDetails = (details: {
         ([name, value]) => [name, isSensitiveHeader(name) ? '***' : value],
       ),
     );
+  }
+  if ('body' in details) {
+    details.body = redactBody(details.body);
   }
   if ('retryOfRequestLogID' in details) {
     if (details.retryOfRequestLogID) {

@@ -81,16 +81,18 @@ export async function defaultParseResponse<T>(
   })().catch((error: unknown) => {
     throw asAbortError(error, props.controller.signal);
   });
-  loggerFor(client).debug(
-    `[${requestLogID}] response parsed`,
-    formatRequestDetails({
-      retryOfRequestLogID,
-      url: response.url,
-      status: response.status,
-      body,
-      durationMs: Date.now() - startTime,
-    }),
-  );
+  if (client.logLevel === 'debug') {
+    loggerFor(client).debug(
+      `[${requestLogID}] response parsed`,
+      formatRequestDetails({
+        retryOfRequestLogID,
+        url: response.url,
+        status: response.status,
+        body,
+        durationMs: Date.now() - startTime,
+      }),
+    );
+  }
   return body;
 }
 
