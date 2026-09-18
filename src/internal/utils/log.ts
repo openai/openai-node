@@ -94,6 +94,7 @@ const sensitiveQueryNames = new Set([
   'token',
   'password',
   'clientsecret',
+  'signingsecret',
   'xamzsecuritytoken',
   'xamzsignature',
   'xamzcredential',
@@ -138,6 +139,43 @@ export function redactURL(value: string): string {
   return url.href;
 }
 
+/** Copies JSON diagnostic data without mutating caller-visible values. */
+function redactBody(body: unknown): unknown {
+  const copies = new WeakMap<object, object>();
+  const pending: Array<{ source: object; target: object }> = [];
+  const copyValue = (value: unknown, name?: string): unknown => {
+    if (typeof value === 'function') return '[Function]';
+    if (typeof value === 'string' && name?.toLowerCase() === 'url') {
+      // JSON payload URLs can carry credentials in any component, including the path.
+      return '***';
+    }
+    if (value === null || typeof value !== 'object') return value;
+    const prototype = Object.getPrototypeOf(value);
+    if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return value;
+    const existing = copies.get(value);
+    if (existing) return existing;
+    const target = Array.isArray(value) ? new Array(value.length) : {};
+    copies.set(value, target);
+    pending.push({ source: value, target });
+    return target;
+  };
+
+  const result = copyValue(body);
+  for (let item = pending.pop(); item; item = pending.pop()) {
+    for (const [name, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(item.source))) {
+      if (!descriptor.enumerable) continue;
+      const value = 'value' in descriptor ? descriptor.value : '[Accessor]';
+      Object.defineProperty(item.target, name, {
+        value: isSensitiveHeader(name) ? '***' : copyValue(value, name),
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+    }
+  }
+  return result;
+}
+
 export const formatRequestDetails = (details: {
   options?: RequestOptions | undefined;
   headers?: Headers | Record<string, string> | undefined;
@@ -153,6 +191,9 @@ export const formatRequestDetails = (details: {
   if (details.options) {
     details.options = { ...details.options };
     delete details.options['headers']; // redundant + leaks internals
+    if ('body' in details.options) {
+      details.options.body = redactBody(details.options.body);
+    }
     if (details.options.path) {
       const path = details.options.path;
       const redacted = new URL(redactURL(new URL(path, 'https://redacted.invalid').href));
@@ -179,6 +220,9 @@ export const formatRequestDetails = (details: {
         ([name, value]) => [name, isSensitiveHeader(name) ? '***' : value],
       ),
     );
+  }
+  if ('body' in details) {
+    details.body = redactBody(details.body);
   }
   if ('retryOfRequestLogID' in details) {
     if (details.retryOfRequestLogID) {

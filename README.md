@@ -660,8 +660,9 @@ Available log levels, from most to least verbose:
 - `'off'` - Disable all logging
 
 At the `'debug'` level, all HTTP requests and responses are logged, including headers and bodies.
-Some authentication-related headers are redacted, but sensitive data in request and response bodies
-may still be visible.
+Authentication-related headers and credential fields in JSON bodies are redacted. String-valued
+`url` fields in JSON bodies are masked in full, including ordinary URLs, because URL paths can
+contain credentials. Other sensitive data in request and response bodies may still be visible.
 
 #### Custom logger
 
