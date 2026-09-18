@@ -1279,9 +1279,8 @@ export class OpenAI {
     const startTime = x509Authentication?.requestStartedAt(options) ?? Date.now();
 
     if (this.logLevel === 'debug') {
-      // Redact the actual JSON payload without re-running caller serialization hooks.
-      const jsonBody = typeof req.body === 'string' ? safeJSON(req.body) : undefined;
-      const body = jsonBody === undefined ? req.body : jsonBody;
+      // Summarize serialized strings without reparsing or re-running caller serialization hooks.
+      const body = typeof req.body === 'string' ? { type: 'string', length: req.body.length } : req.body;
       loggerFor(this).debug(
         `[${requestLogID}] sending request`,
         formatRequestDetails({

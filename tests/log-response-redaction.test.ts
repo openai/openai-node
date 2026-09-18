@@ -103,14 +103,18 @@ describe('response debug logging', () => {
           const logger = {
             error() {}, warn() {}, info() {},
             debug(message, details) {
-              const logged = message.includes('sending request') ? details.options.body : details.body;
+              if (message.includes('sending request')) {
+                assert.deepEqual(details.options.body, { type: 'string', length: json.length });
+                requests++;
+                return;
+              }
+              const logged = details.body;
               if (!logged) return;
               assert.equal(logged.signing_secret, '***');
               assert.equal(logged.url, '***');
               assert.equal(Array.isArray(logged.values), Array.isArray(values));
               assert.equal(Array.isArray(logged.values) ? logged.values.length : Object.keys(logged.values).length, count);
               assert.equal(logged.values[count - 1], 0);
-              if (message.includes('sending request')) requests++;
               if (message.includes('response parsed')) responses++;
             },
           };
@@ -296,7 +300,7 @@ describe('response debug logging', () => {
         expect.stringContaining('sending request'),
         expect.objectContaining({
           options: expect.objectContaining({
-            body: { ...body, url: '***', signing_secret: '***' },
+            body: { type: 'string', length: JSON.stringify(body).length },
           }),
         }),
       );
@@ -306,7 +310,7 @@ describe('response debug logging', () => {
     },
   );
 
-  test('redacts the serialized request without invoking toJSON again', async () => {
+  test('summarizes the serialized request without invoking toJSON again', async () => {
     const logger = createLogger();
     let serializations = 0;
     const params = {
@@ -332,16 +336,33 @@ describe('response debug logging', () => {
       expect.stringContaining('sending request'),
       expect.objectContaining({
         options: expect.objectContaining({
-          body: {
-            name: params.name,
-            url: '***',
-            event_types: params.event_types,
-          },
+          body: { type: 'string', length: expect.any(Number) },
         }),
       }),
     );
     expect(JSON.stringify(logger.debug.mock.calls)).not.toContain('synthetic-serialized-token');
     expect(serializations).toBe(1);
+  });
+
+  test.each([
+    ['application/json', '{"signing_secret":"synthetic-secret"}'],
+    ['text/plain', '{"signing_secret":"synthetic-secret"}'],
+    ['text/plain', 'synthetic plain text'],
+  ])('summarizes a raw string request with content type %s', async (contentType, body) => {
+    const logger = createLogger();
+    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const client = new OpenAI({ apiKey: 'synthetic-api-key', logLevel: 'debug', logger, fetch });
+
+    await client.post('/example', { body, headers: { 'content-type': contentType } });
+
+    expect(fetch).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body }));
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.stringContaining('sending request'),
+      expect.objectContaining({
+        options: expect.objectContaining({ body: { type: 'string', length: body.length } }),
+      }),
+    );
+    expect(JSON.stringify(logger.debug.mock.calls)).not.toContain('synthetic-secret');
   });
 
   test('keeps non-JSON request bodies unchanged', async () => {
