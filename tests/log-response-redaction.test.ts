@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';
 import { compiledFixture } from './utils/compiled-fixtures';
 import OpenAI from 'openai';
+import { formatRequestDetails } from 'openai/internal/utils/log';
 import type { WebhookCreateParams } from 'openai/resources/webhooks/webhooks';
 
 function createLogger() {
@@ -10,6 +11,77 @@ function createLogger() {
 }
 
 describe('response debug logging', () => {
+  test.each([false, true])('shares unchanged response branches with masking %s', async (masking) => {
+    const logger = createLogger();
+    const body = {
+      data: [0, false, '', null, { count: 1 }],
+      nested: { signing_secret: masking ? 'synthetic-secret' : '***' },
+    };
+    const client = new OpenAI({
+      apiKey: 'synthetic-api-key',
+      logLevel: 'debug',
+      logger,
+      fetch: async () => Response.json(body),
+    });
+
+    const response = await client.get<typeof body>('/example');
+    const logged = logger.debug.mock.calls.find(([message]) => message.includes('response parsed'))?.[1]
+      ?.body;
+
+    expect(logged).toEqual({ ...body, nested: { signing_secret: '***' } });
+    expect(logged.data).toBe(response.data);
+    expect(response).toEqual(body);
+    if (masking) {
+      expect(logged).not.toBe(response);
+      expect(logged.nested).not.toBe(response.nested);
+    } else {
+      expect(logged).toBe(response);
+    }
+  });
+
+  test('copies a changed array while sharing its unchanged elements', async () => {
+    const logger = createLogger();
+    const body = { data: [{ count: 1 }, { credentials: { signing_secret: 'synthetic-secret' } }] };
+    const client = new OpenAI({
+      apiKey: 'synthetic-api-key',
+      logLevel: 'debug',
+      logger,
+      fetch: async () => Response.json(body),
+    });
+
+    const response = await client.get<typeof body>('/example');
+    const logged = logger.debug.mock.calls.find(([message]) => message.includes('response parsed'))?.[1]
+      ?.body;
+
+    expect(logged).toEqual({ data: [{ count: 1 }, { credentials: { signing_secret: '***' } }] });
+    expect(logged.data).not.toBe(response.data);
+    expect(logged.data[0]).toBe(response.data[0]);
+    expect(response).toEqual(body);
+  });
+
+  test('preserves cyclic diagnostic links and shared references without invoking accessors', () => {
+    const read = vi.fn(() => 'synthetic-accessor');
+    interface CyclicDiagnostic {
+      signing_secret: string;
+      parent?: object;
+    }
+    const child: CyclicDiagnostic = { signing_secret: 'synthetic-secret' };
+    const body = { child, alias: child };
+    child.parent = body;
+    Object.defineProperty(body, 'accessor', { get: read, enumerable: true });
+    const logged = formatRequestDetails({ body }).body;
+
+    expect(read).not.toHaveBeenCalled();
+    expect(logged).toHaveProperty('accessor', '[Accessor]');
+    expect(logged).toHaveProperty('child.signing_secret', '***');
+    expect(Object.getOwnPropertyDescriptor(logged, 'alias')?.value).toBe(
+      Object.getOwnPropertyDescriptor(logged, 'child')?.value,
+    );
+    expect(logged).toHaveProperty('child.parent', logged);
+    expect(child.signing_secret).toBe('synthetic-secret');
+    expect(child.parent).toBe(body);
+  });
+
   test.each(['array', 'object'])('logs wide JSON %s bodies within a bounded heap', (container) => {
     const result = spawnSync(
       process.execPath,

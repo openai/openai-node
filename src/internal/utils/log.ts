@@ -139,11 +139,39 @@ export function redactURL(value: string): string {
   return url.href;
 }
 
-/** Copies JSON diagnostic data without mutating caller-visible values. */
+/** Redacts JSON diagnostics without mutating caller values, sharing unchanged branches. */
 function redactBody(body: unknown): unknown {
+  type Frame = {
+    source: object;
+    target: object;
+    keys: Iterator<string | number>;
+    parentName: string | undefined;
+  };
   const copies = new WeakMap<object, object>();
-  const pending: Array<{ source: object; target: object }> = [];
-  const copyValue = (value: unknown, name?: string): unknown => {
+  const active = new WeakMap<object, Frame>();
+  const pending: Frame[] = [];
+  // Parsed JSON arrays have only indexed elements; never materialize their index keys.
+  const keysFor = (value: object): Iterator<string | number> =>
+    Array.isArray(value) ? Array.prototype.keys.call(value) : Object.keys(value)[Symbol.iterator]();
+  const write = (target: object, name: string, value: unknown) => {
+    Object.defineProperty(target, name, { value, enumerable: true, configurable: true, writable: true });
+  };
+  const writable = (frame: Frame): object => {
+    if (frame.target !== frame.source) return frame.target;
+    const target = Array.isArray(frame.source) ? new Array(frame.source.length) : {};
+    frame.target = target;
+    copies.set(frame.source, target);
+    const keys = keysFor(frame.source);
+    for (let key = keys.next(); !key.done; key = keys.next()) {
+      const name = String(key.value);
+      const descriptor = Object.getOwnPropertyDescriptor(frame.source, name);
+      if (descriptor?.enumerable) {
+        write(target, name, 'value' in descriptor ? descriptor.value : '[Accessor]');
+      }
+    }
+    return target;
+  };
+  const visit = (value: unknown, name?: string): unknown => {
     if (typeof value === 'function') return '[Function]';
     if (typeof value === 'string' && name?.toLowerCase() === 'url') {
       // JSON payload URLs can carry credentials in any component, including the path.
@@ -154,29 +182,35 @@ function redactBody(body: unknown): unknown {
     if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return value;
     const existing = copies.get(value);
     if (existing) return existing;
-    const target = Array.isArray(value) ? new Array(value.length) : {};
-    copies.set(value, target);
-    pending.push({ source: value, target });
-    return target;
+    // Cycles are not JSON, but diagnostic callers may supply them. Preserve their links safely.
+    const ancestor = active.get(value);
+    if (ancestor) return writable(ancestor);
+    const frame = { source: value, target: value, keys: keysFor(value), parentName: name };
+    active.set(value, frame);
+    pending.push(frame);
+    return value;
   };
 
-  const result = copyValue(body);
-  for (let item = pending.pop(); item; item = pending.pop()) {
-    // Parsed JSON arrays have only indexed elements; avoid allocating their enumerable index keys.
-    const keys = Array.isArray(item.source)
-      ? Array.prototype.keys.call(item.source)
-      : Object.keys(item.source);
-    for (const key of keys) {
-      const name = String(key);
-      const descriptor = Object.getOwnPropertyDescriptor(item.source, name);
-      if (!descriptor?.enumerable) continue;
-      const value = 'value' in descriptor ? descriptor.value : '[Accessor]';
-      Object.defineProperty(item.target, name, {
-        value: isSensitiveHeader(name) ? '***' : copyValue(value, name),
-        enumerable: true,
-        configurable: true,
-        writable: true,
-      });
+  let result = visit(body);
+  for (let frame = pending[pending.length - 1]; frame; frame = pending[pending.length - 1]) {
+    const key = frame.keys.next();
+    if (key.done) {
+      pending.pop();
+      active.delete(frame.source);
+      const parent = pending[pending.length - 1];
+      if (!parent) result = frame.target;
+      else if (frame.target !== frame.source && frame.parentName !== undefined) {
+        write(writable(parent), frame.parentName, frame.target);
+      }
+      continue;
+    }
+    const name = String(key.value);
+    const descriptor = Object.getOwnPropertyDescriptor(frame.source, name);
+    if (!descriptor?.enumerable) continue;
+    const value = 'value' in descriptor ? descriptor.value : '[Accessor]';
+    const redacted = isSensitiveHeader(name) ? '***' : visit(value, name);
+    if (!('value' in descriptor) || redacted !== value) {
+      write(writable(frame), name, redacted);
     }
   }
   return result;
