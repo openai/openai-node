@@ -1,5 +1,7 @@
-import { vi } from 'vitest';
+import { expect, vi } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';
+import { compiledFixture } from './utils/compiled-fixtures';
 import OpenAI from 'openai';
 import type { WebhookCreateParams } from 'openai/resources/webhooks/webhooks';
 
@@ -8,6 +10,62 @@ function createLogger() {
 }
 
 describe('response debug logging', () => {
+  test.each(['array', 'object'])('logs wide JSON %s bodies within a bounded heap', (container) => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--max-old-space-size=128',
+        '-e',
+        `
+          const assert = require('node:assert/strict');
+          const OpenAI = require(process.argv[1]).default;
+          const count = 100_000;
+          const values = process.argv[2] === 'array' ? Array(count).fill(0) : {};
+          if (!Array.isArray(values)) {
+            for (let index = 0; index < count; index++) values[index] = 0;
+          }
+          const body = { values, signing_secret: 'synthetic-secret', url: 'https://example.com/hook' };
+          const json = JSON.stringify(body);
+          let requests = 0;
+          let responses = 0;
+          const logger = {
+            error() {}, warn() {}, info() {},
+            debug(message, details) {
+              const logged = message.includes('sending request') ? details.options.body : details.body;
+              if (!logged) return;
+              assert.equal(logged.signing_secret, '***');
+              assert.equal(logged.url, '***');
+              assert.equal(Array.isArray(logged.values), Array.isArray(values));
+              assert.equal(Object.keys(logged.values).length, count);
+              assert.equal(logged.values[count - 1], 0);
+              if (message.includes('sending request')) requests++;
+              if (message.includes('response parsed')) responses++;
+            },
+          };
+          const client = new OpenAI({
+            apiKey: 'synthetic-api-key', logLevel: 'debug', logger,
+            fetch: async (_url, options) => {
+              assert.equal(options.body, json);
+              return new Response(json, { headers: { 'content-type': 'application/json' } });
+            },
+          });
+          client.post('/example', { body }).then(response => {
+            assert.equal(JSON.stringify(response), json);
+            assert.equal(body.signing_secret, 'synthetic-secret');
+            assert.equal(requests, 1);
+            assert.equal(responses, 1);
+          }).catch(error => { console.error(error); process.exitCode = 1; });
+        `,
+        compiledFixture('src', 'index.ts'),
+        container,
+      ],
+      { encoding: 'utf-8', timeout: 15_000, env: { ...process.env, NODE_OPTIONS: '' } },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.signal).toBeNull();
+    expect(result.status, result.stderr).toBe(0);
+  });
+
   test.each(['create', 'rotate'] as const)(
     'redacts the %s signing secret without changing the response',
     async (operation) => {

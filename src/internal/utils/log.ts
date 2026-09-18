@@ -162,8 +162,10 @@ function redactBody(body: unknown): unknown {
 
   const result = copyValue(body);
   for (let item = pending.pop(); item; item = pending.pop()) {
-    for (const [name, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(item.source))) {
-      if (!descriptor.enumerable) continue;
+    // Read descriptors individually so wide JSON does not allocate a descriptor table and entry pairs.
+    for (const name in item.source) {
+      const descriptor = Object.getOwnPropertyDescriptor(item.source, name);
+      if (!descriptor?.enumerable) continue;
       const value = 'value' in descriptor ? descriptor.value : '[Accessor]';
       Object.defineProperty(item.target, name, {
         value: isSensitiveHeader(name) ? '***' : copyValue(value, name),
