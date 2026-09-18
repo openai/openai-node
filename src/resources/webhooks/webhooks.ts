@@ -1303,7 +1303,12 @@ export interface WebhookUpdateParams {
   url?: string;
 }
 
-export interface WebhookListParams extends CursorPageParams {}
+export interface WebhookListParams extends Omit<CursorPageParams, 'after'> {
+  /**
+   * ID of the last webhook endpoint from the previous page.
+   */
+  after?: string | null;
+}
 
 export interface WebhookRotateSecretParams {
   /**

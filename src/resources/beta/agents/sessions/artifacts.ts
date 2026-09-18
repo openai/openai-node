@@ -197,11 +197,21 @@ export interface ArtifactRetrieveParams {
   session_id: string;
 }
 
-export interface ArtifactListParams extends CursorPageParams {
+export interface ArtifactListParams extends Omit<CursorPageParams, 'after' | 'limit'> {
+  /**
+   * Return artifacts after this immutable artifact ID.
+   */
+  after?: string | null;
+
   /**
    * Restrict the listing to artifacts produced by this environment.
    */
   environment_id?: string | null;
+
+  /**
+   * The maximum number of artifacts to return, between 1 and 100.
+   */
+  limit?: number | null;
 
   /**
    * Sort by creation time and ID. Defaults to descending.
