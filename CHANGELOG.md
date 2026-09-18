@@ -1,5 +1,17 @@
 # Changelog
 
+## [7.19.0](https://github.com/openai/openai-node/compare/v7.18.0...v7.19.0) (2026-09-18)
+
+
+### Features
+
+* **api:** add webhook endpoint management ([#2764](https://github.com/openai/openai-node/issues/2764)) ([2d18dfc](https://github.com/openai/openai-node/commit/2d18dfc18e4771df2692301ac6ea0d8d97cc8544))
+
+
+### Chores
+
+* **api:** deprecate MCP connector_id ([#2767](https://github.com/openai/openai-node/issues/2767)) ([645c5ad](https://github.com/openai/openai-node/commit/645c5ad06d097712958b51016165b5277c931a84))
+
 ## [7.18.0](https://github.com/openai/openai-node/compare/v7.17.0...v7.18.0) (2026-09-17)
 
 
