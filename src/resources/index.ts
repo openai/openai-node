@@ -156,4 +156,4 @@ export {
   type VideoRemixParams,
   type VideosPage,
 } from './videos';
-export { Webhooks } from './webhooks';
+export { Webhooks } from './webhooks/webhooks';
