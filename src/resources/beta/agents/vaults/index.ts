@@ -7,6 +7,8 @@ export {
   type CredentialAuthCreateParam,
   type CredentialAuthRotateParam,
   type CredentialDeleted,
+  type CredentialNetworking,
+  type CredentialNetworkingParam,
   type McpOauthTokenEndpointAuth,
   type McpOauthTokenEndpointAuthCreateParam,
   type McpOauthTokenEndpointAuthRotateParam,

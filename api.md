@@ -582,6 +582,8 @@ Types:
 - <code><a href="./src/resources/beta/agents/vaults/credentials.ts">CredentialAuthCreateParam</a></code>
 - <code><a href="./src/resources/beta/agents/vaults/credentials.ts">CredentialAuthRotateParam</a></code>
 - <code><a href="./src/resources/beta/agents/vaults/credentials.ts">CredentialDeleted</a></code>
+- <code><a href="./src/resources/beta/agents/vaults/credentials.ts">CredentialNetworking</a></code>
+- <code><a href="./src/resources/beta/agents/vaults/credentials.ts">CredentialNetworkingParam</a></code>
 - <code><a href="./src/resources/beta/agents/vaults/credentials.ts">McpOauthTokenEndpointAuth</a></code>
 - <code><a href="./src/resources/beta/agents/vaults/credentials.ts">McpOauthTokenEndpointAuthCreateParam</a></code>
 - <code><a href="./src/resources/beta/agents/vaults/credentials.ts">McpOauthTokenEndpointAuthRotateParam</a></code>
