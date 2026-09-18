@@ -21,7 +21,9 @@ Types:
 - <code><a href="./src/resources/webhooks/webhooks.ts">ResponseFailedWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks/webhooks.ts">ResponseIncompleteWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks/webhooks.ts">SafetyAlertCreatedWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks/webhooks.ts">SafetyDeactivationIssuedWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks/webhooks.ts">SafetyOrgAlertCreatedWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks/webhooks.ts">SafetyWarningIssuedWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks/webhooks.ts">UnwrapWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks/webhooks.ts">WebhookEndpoint</a></code>
 - <code><a href="./src/resources/webhooks/webhooks.ts">WebhookEndpointList</a></code>

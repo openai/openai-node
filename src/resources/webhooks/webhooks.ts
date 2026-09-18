@@ -1037,6 +1037,42 @@ export namespace SafetyAlertCreatedWebhookEvent {
 }
 
 /**
+ * Sent when a deactivation is issued for a safety identifier in your organization.
+ */
+export interface SafetyDeactivationIssuedWebhookEvent {
+  /**
+   * The unique ID of the webhook event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp in seconds when the event was created.
+   */
+  created_at: number;
+
+  data: SafetyDeactivationIssuedWebhookEvent.Data;
+
+  /**
+   * Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * Always `safety.deactivation_issued`.
+   */
+  type: 'safety.deactivation_issued';
+}
+
+export namespace SafetyDeactivationIssuedWebhookEvent {
+  export interface Data {
+    /**
+     * The safety case ID to pass to `GET /v1/safety/cases/{id}`.
+     */
+    id: string;
+  }
+}
+
+/**
  * Sent when an approved safety alert is available for an enterprise workspace.
  */
 export interface SafetyOrgAlertCreatedWebhookEvent {
@@ -1073,6 +1109,42 @@ export namespace SafetyOrgAlertCreatedWebhookEvent {
 }
 
 /**
+ * Sent when a warning is issued for a safety identifier in your organization.
+ */
+export interface SafetyWarningIssuedWebhookEvent {
+  /**
+   * The unique ID of the webhook event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp in seconds when the event was created.
+   */
+  created_at: number;
+
+  data: SafetyWarningIssuedWebhookEvent.Data;
+
+  /**
+   * Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * Always `safety.warning_issued`.
+   */
+  type: 'safety.warning_issued';
+}
+
+export namespace SafetyWarningIssuedWebhookEvent {
+  export interface Data {
+    /**
+     * The safety case ID to pass to `GET /v1/safety/cases/{id}`.
+     */
+    id: string;
+  }
+}
+
+/**
  * Sent when a batch API request has been cancelled.
  */
 export type UnwrapWebhookEvent =
@@ -1094,7 +1166,9 @@ export type UnwrapWebhookEvent =
   | ResponseFailedWebhookEvent
   | ResponseIncompleteWebhookEvent
   | SafetyAlertCreatedWebhookEvent
-  | SafetyOrgAlertCreatedWebhookEvent;
+  | SafetyDeactivationIssuedWebhookEvent
+  | SafetyOrgAlertCreatedWebhookEvent
+  | SafetyWarningIssuedWebhookEvent;
 
 export interface WebhookEndpoint {
   /**
@@ -1390,7 +1464,9 @@ export declare namespace Webhooks {
     type ResponseFailedWebhookEvent as ResponseFailedWebhookEvent,
     type ResponseIncompleteWebhookEvent as ResponseIncompleteWebhookEvent,
     type SafetyAlertCreatedWebhookEvent as SafetyAlertCreatedWebhookEvent,
+    type SafetyDeactivationIssuedWebhookEvent as SafetyDeactivationIssuedWebhookEvent,
     type SafetyOrgAlertCreatedWebhookEvent as SafetyOrgAlertCreatedWebhookEvent,
+    type SafetyWarningIssuedWebhookEvent as SafetyWarningIssuedWebhookEvent,
     type UnwrapWebhookEvent as UnwrapWebhookEvent,
     type WebhookEndpoint as WebhookEndpoint,
     type WebhookEndpointList as WebhookEndpointList,
