@@ -139,7 +139,12 @@ export declare namespace FileCreateParams {
   }
 }
 
-export interface FileListParams extends TokenPageParams {
+export interface FileListParams extends Omit<TokenPageParams, 'limit'> {
+  /**
+   * The maximum number of files to return, between 1 and 100.
+   */
+  limit?: number | null;
+
   /**
    * Sort by case-sensitive path components. Defaults to descending.
    *

@@ -1278,16 +1278,22 @@ export class OpenAI {
     const retryLogStr = retryOfRequestLogID === undefined ? '' : `, retryOf: ${retryOfRequestLogID}`;
     const startTime = x509Authentication?.requestStartedAt(options) ?? Date.now();
 
-    loggerFor(this).debug(
-      `[${requestLogID}] sending request`,
-      formatRequestDetails({
-        retryOfRequestLogID,
-        method: options.method,
-        url,
-        options: x509Authentication ? { body: req.body, ...x509Authentication.requestSnapshot() } : options,
-        headers: req.headers,
-      }),
-    );
+    if (this.logLevel === 'debug') {
+      // Summarize serialized strings without reparsing or re-running caller serialization hooks.
+      const body = typeof req.body === 'string' ? { type: 'string', length: req.body.length } : req.body;
+      loggerFor(this).debug(
+        `[${requestLogID}] sending request`,
+        formatRequestDetails({
+          retryOfRequestLogID,
+          method: options.method,
+          url,
+          options: x509Authentication
+            ? { body, ...x509Authentication.requestSnapshot() }
+            : { ...options, body },
+          headers: req.headers,
+        }),
+      );
+    }
 
     const callerSignal = x509Authentication ? x509Authentication.requestSnapshot().signal : options.signal;
     if (callerSignal?.aborted || req.signal?.aborted) {

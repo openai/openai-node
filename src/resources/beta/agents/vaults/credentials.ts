@@ -643,7 +643,13 @@ export interface CredentialUpdateParams {
   auth: CredentialAuthRotateParam;
 }
 
-export interface CredentialListParams extends CursorPageParams {
+export interface CredentialListParams extends Omit<CursorPageParams, 'limit'> {
+  /**
+   * The maximum number of resources to return. Defaults to 20. Values are clamped
+   * between 1 and 100.
+   */
+  limit?: number | null;
+
   /**
    * Sort order by the `created_at` timestamp. Use `asc` for ascending order or
    * `desc` for descending order. Defaults to `desc`.

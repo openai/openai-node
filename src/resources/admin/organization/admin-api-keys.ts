@@ -191,7 +191,12 @@ export interface AdminAPIKeyCreateParams {
   expires_in_seconds?: number;
 }
 
-export interface AdminAPIKeyListParams extends CursorPageParams {
+export interface AdminAPIKeyListParams extends Omit<CursorPageParams, 'after'> {
+  /**
+   * Return keys with IDs that come after this ID in the pagination order.
+   */
+  after?: string | null;
+
   /**
    * Order results by creation time, ascending or descending.
    */
