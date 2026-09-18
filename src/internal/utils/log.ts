@@ -162,8 +162,12 @@ function redactBody(body: unknown): unknown {
 
   const result = copyValue(body);
   for (let item = pending.pop(); item; item = pending.pop()) {
-    // Read descriptors individually so wide JSON does not allocate a descriptor table and entry pairs.
-    for (const name in item.source) {
+    // Parsed JSON arrays have only indexed elements; avoid allocating their enumerable index keys.
+    const keys = Array.isArray(item.source)
+      ? Array.prototype.keys.call(item.source)
+      : Object.keys(item.source);
+    for (const key of keys) {
+      const name = String(key);
       const descriptor = Object.getOwnPropertyDescriptor(item.source, name);
       if (!descriptor?.enumerable) continue;
       const value = 'value' in descriptor ? descriptor.value : '[Accessor]';

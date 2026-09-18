@@ -19,7 +19,7 @@ describe('response debug logging', () => {
         `
           const assert = require('node:assert/strict');
           const OpenAI = require(process.argv[1]).default;
-          const count = 100_000;
+          const count = 250_000;
           const values = process.argv[2] === 'array' ? Array(count).fill(0) : {};
           if (!Array.isArray(values)) {
             for (let index = 0; index < count; index++) values[index] = 0;
@@ -36,7 +36,7 @@ describe('response debug logging', () => {
               assert.equal(logged.signing_secret, '***');
               assert.equal(logged.url, '***');
               assert.equal(Array.isArray(logged.values), Array.isArray(values));
-              assert.equal(Object.keys(logged.values).length, count);
+              assert.equal(Array.isArray(logged.values) ? logged.values.length : Object.keys(logged.values).length, count);
               assert.equal(logged.values[count - 1], 0);
               if (message.includes('sending request')) requests++;
               if (message.includes('response parsed')) responses++;
