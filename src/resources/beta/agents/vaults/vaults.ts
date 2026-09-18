@@ -11,6 +11,8 @@ import {
   CredentialDeleteParams,
   CredentialDeleted,
   CredentialListParams,
+  CredentialNetworking,
+  CredentialNetworkingParam,
   CredentialRetrieveParams,
   CredentialUpdateParams,
   Credentials,
@@ -112,8 +114,7 @@ export class Vaults extends APIResource {
 export type VaultsPage = CursorPage<Vault>;
 
 /**
- * A collection of credentials that agent tools can use to authenticate to MCP
- * servers.
+ * A collection of credentials for MCP servers and OpenAI-hosted environments.
  */
 export interface Vault {
   /**
@@ -230,6 +231,8 @@ export declare namespace Vaults {
     type CredentialAuthCreateParam as CredentialAuthCreateParam,
     type CredentialAuthRotateParam as CredentialAuthRotateParam,
     type CredentialDeleted as CredentialDeleted,
+    type CredentialNetworking as CredentialNetworking,
+    type CredentialNetworkingParam as CredentialNetworkingParam,
     type McpOauthTokenEndpointAuth as McpOauthTokenEndpointAuth,
     type McpOauthTokenEndpointAuthCreateParam as McpOauthTokenEndpointAuthCreateParam,
     type McpOauthTokenEndpointAuthRotateParam as McpOauthTokenEndpointAuthRotateParam,

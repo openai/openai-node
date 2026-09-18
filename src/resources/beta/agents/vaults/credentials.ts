@@ -155,7 +155,7 @@ export class Credentials extends APIResource {
 export type CredentialsPage = CursorPage<Credential>;
 
 /**
- * Metadata for a stored MCP server credential. Secret values are never returned.
+ * Metadata for a stored credential. Secret values are never returned.
  */
 export interface Credential {
   /**
@@ -164,7 +164,7 @@ export interface Credential {
   id: string;
 
   /**
-   * The authentication method and non-secret configuration for the MCP server.
+   * The authentication method and non-secret configuration of the credential.
    */
   auth: CredentialAuth;
 
@@ -195,12 +195,12 @@ export interface Credential {
 }
 
 /**
- * The MCP server and authentication configuration of a vault credential, excluding
- * secrets.
+ * The authentication configuration of a vault credential, excluding secrets.
  */
 export type CredentialAuth =
   | CredentialAuth.VaultCredentialAuthResourceMcpOauth
-  | CredentialAuth.VaultCredentialAuthResourceStaticBearer;
+  | CredentialAuth.VaultCredentialAuthResourceStaticBearer
+  | CredentialAuth.VaultCredentialAuthResourceEnvironmentVariable;
 
 export namespace CredentialAuth {
   /**
@@ -278,14 +278,39 @@ export namespace CredentialAuth {
      */
     type: 'static_bearer';
   }
+
+  /**
+   * Metadata for an HTTP credential used only in OpenAI-hosted environments. Sandbox
+   * code receives a placeholder. The proxy substitutes the secret for allowed HTTPS
+   * destinations on ports 443 and 8443. The real secret is not available to sandbox
+   * code for local computation and is never returned in this resource.
+   */
+  export interface VaultCredentialAuthResourceEnvironmentVariable {
+    /**
+     * The destinations where the proxy can substitute the secret, subject to the
+     * environment network policy.
+     */
+    networking: CredentialsAPI.CredentialNetworking;
+
+    /**
+     * The environment variable name that receives the placeholder in the sandbox.
+     */
+    secret_name: string;
+
+    /**
+     * The type of the object. Always `environment_variable`.
+     */
+    type: 'environment_variable';
+  }
 }
 
 /**
- * Authentication credentials for an MCP server used by agent tools.
+ * Authentication credentials for an MCP server or an OpenAI-hosted environment.
  */
 export type CredentialAuthCreateParam =
   | CredentialAuthCreateParam.CreateVaultCredentialAuthParamMcpOauth
-  | CredentialAuthCreateParam.CreateVaultCredentialAuthParamStaticBearer;
+  | CredentialAuthCreateParam.CreateVaultCredentialAuthParamStaticBearer
+  | CredentialAuthCreateParam.CreateVaultCredentialAuthParamEnvironmentVariable;
 
 export namespace CredentialAuthCreateParam {
   /**
@@ -378,15 +403,52 @@ export namespace CredentialAuthCreateParam {
      */
     type: 'static_bearer';
   }
+
+  /**
+   * An HTTP credential for OpenAI-hosted environments only. The sandbox receives an
+   * environment variable containing a placeholder, not the secret. Use the
+   * placeholder unchanged in outgoing requests. The egress proxy replaces the
+   * placeholder with the secret for allowed HTTPS destinations on ports 443 and
+   * 8443. Sandbox code cannot read the real secret or use it for local computation,
+   * such as signing a request.
+   */
+  export interface CreateVaultCredentialAuthParamEnvironmentVariable {
+    /**
+     * The destinations where the proxy can substitute this secret. The environment
+     * network policy must also allow them.
+     */
+    networking: CredentialsAPI.CredentialNetworkingParam;
+
+    /**
+     * The environment variable name that receives the placeholder, such as
+     * `SERVICE_API_KEY`. Use ASCII letters, digits, and underscores, starting with a
+     * letter or underscore. Names starting with `CODEX_` and managed proxy or
+     * certificate variable names are reserved.
+     */
+    secret_name: string;
+
+    /**
+     * The write-only secret to store. Never returned in credential resources or
+     * supplied directly to sandbox code. Must be nonempty and must not contain
+     * carriage returns, newlines, or NUL bytes.
+     */
+    secret_value: string;
+
+    /**
+     * The type of the object. Always `environment_variable`.
+     */
+    type: 'environment_variable';
+  }
 }
 
 /**
- * Updates to a vault credential without changing its authentication method or MCP
- * server.
+ * Updates to a vault credential without changing its authentication method or
+ * destination configuration.
  */
 export type CredentialAuthRotateParam =
   | CredentialAuthRotateParam.RotateVaultCredentialAuthParamMcpOauth
-  | CredentialAuthRotateParam.RotateVaultCredentialAuthParamStaticBearer;
+  | CredentialAuthRotateParam.RotateVaultCredentialAuthParamStaticBearer
+  | CredentialAuthRotateParam.RotateVaultCredentialAuthParamEnvironmentVariable;
 
 export namespace CredentialAuthRotateParam {
   /**
@@ -456,6 +518,24 @@ export namespace CredentialAuthRotateParam {
      */
     type: 'static_bearer';
   }
+
+  /**
+   * Replace the secret for an OpenAI-hosted environment credential. The environment
+   * variable name and networking configuration remain unchanged.
+   */
+  export interface RotateVaultCredentialAuthParamEnvironmentVariable {
+    /**
+     * The write-only replacement secret. Never returned in credential resources or
+     * supplied directly to sandbox code. Must be nonempty and must not contain
+     * carriage returns, newlines, or NUL bytes.
+     */
+    secret_value: string;
+
+    /**
+     * The type of the object. Always `environment_variable`.
+     */
+    type: 'environment_variable';
+  }
 }
 
 /**
@@ -476,6 +556,86 @@ export interface CredentialDeleted {
    * The object type. Always `vault.credential.deleted`.
    */
   object: 'vault.credential.deleted';
+}
+
+/**
+ * Destination permissions for an environment-variable credential. These do not
+ * grant network access to the environment.
+ */
+export type CredentialNetworking =
+  | CredentialNetworking.VaultCredentialNetworkingResourceUnrestricted
+  | CredentialNetworking.VaultCredentialNetworkingResourceLimited;
+
+export namespace CredentialNetworking {
+  /**
+   * Allows substitution for destinations permitted by the environment network
+   * policy. Requires `environment.network.access` to be `restricted`, with explicit
+   * `allowed_domains`.
+   */
+  export interface VaultCredentialNetworkingResourceUnrestricted {
+    /**
+     * The type of the object. Always `unrestricted`.
+     */
+    type: 'unrestricted';
+  }
+
+  /**
+   * Allows substitution only for the listed hosts. The environment network policy
+   * must also allow these hosts.
+   */
+  export interface VaultCredentialNetworkingResourceLimited {
+    /**
+     * The 1 to 16 distinct allowed hostnames or IPv4 addresses, normalized to
+     * lowercase. Entries contain no scheme, path, port, or wildcard. IPv6 addresses
+     * are not supported.
+     */
+    allowed_hosts: Array<string>;
+
+    /**
+     * The type of the object. Always `limited`.
+     */
+    type: 'limited';
+  }
+}
+
+/**
+ * Destination permissions for an environment-variable credential. These do not
+ * grant network access to the environment.
+ */
+export type CredentialNetworkingParam =
+  | CredentialNetworkingParam.VaultCredentialNetworkingParamUnrestricted
+  | CredentialNetworkingParam.VaultCredentialNetworkingParamLimited;
+
+export namespace CredentialNetworkingParam {
+  /**
+   * Allows substitution for destinations permitted by the environment network
+   * policy. Requires `environment.network.access` to be `restricted`, with explicit
+   * `allowed_domains`.
+   */
+  export interface VaultCredentialNetworkingParamUnrestricted {
+    /**
+     * The type of the object. Always `unrestricted`.
+     */
+    type: 'unrestricted';
+  }
+
+  /**
+   * Allows substitution only for the listed hosts. The environment network policy
+   * must also allow these hosts.
+   */
+  export interface VaultCredentialNetworkingParamLimited {
+    /**
+     * The 1 to 16 distinct allowed hostnames or IPv4 addresses, normalized to
+     * lowercase. Entries contain no scheme, path, port, or wildcard. IPv6 addresses
+     * are not supported.
+     */
+    allowed_hosts: Array<string>;
+
+    /**
+     * The type of the object. Always `limited`.
+     */
+    type: 'limited';
+  }
 }
 
 /**
@@ -612,7 +772,7 @@ export namespace McpOauthTokenEndpointAuthRotateParam {
 
 export interface CredentialCreateParams {
   /**
-   * The authentication method and secret values to store for the MCP server.
+   * The authentication method and write-only secret values to store.
    */
   auth: CredentialAuthCreateParam;
 
@@ -680,6 +840,8 @@ export declare namespace Credentials {
     type CredentialAuthCreateParam as CredentialAuthCreateParam,
     type CredentialAuthRotateParam as CredentialAuthRotateParam,
     type CredentialDeleted as CredentialDeleted,
+    type CredentialNetworking as CredentialNetworking,
+    type CredentialNetworkingParam as CredentialNetworkingParam,
     type McpOauthTokenEndpointAuth as McpOauthTokenEndpointAuth,
     type McpOauthTokenEndpointAuthCreateParam as McpOauthTokenEndpointAuthCreateParam,
     type McpOauthTokenEndpointAuthRotateParam as McpOauthTokenEndpointAuthRotateParam,
