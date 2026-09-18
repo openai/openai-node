@@ -1163,6 +1163,7 @@ export interface BetaResponse {
     | 'gpt-5.1'
     | 'gpt-5.1-2025-11-13'
     | 'gpt-5.1-codex'
+    | 'gpt-5.1-mini'
     | 'gpt-5.1-chat-latest'
     | 'gpt-5'
     | 'gpt-5-mini'
@@ -1228,7 +1229,6 @@ export interface BetaResponse {
     | 'gpt-3.5-turbo-1106'
     | 'gpt-3.5-turbo-0125'
     | 'gpt-3.5-turbo-16k-0613'
-    | 'gpt-5.1-mini'
     | 'o1-pro'
     | 'o1-pro-2025-03-19'
     | 'o3-pro'
@@ -11742,6 +11742,7 @@ export namespace BetaResponsesClientEvent {
       | 'gpt-5.1'
       | 'gpt-5.1-2025-11-13'
       | 'gpt-5.1-codex'
+      | 'gpt-5.1-mini'
       | 'gpt-5.1-chat-latest'
       | 'gpt-5'
       | 'gpt-5-mini'
@@ -11807,7 +11808,6 @@ export namespace BetaResponsesClientEvent {
       | 'gpt-3.5-turbo-1106'
       | 'gpt-3.5-turbo-0125'
       | 'gpt-3.5-turbo-16k-0613'
-      | 'gpt-5.1-mini'
       | 'o1-pro'
       | 'o1-pro-2025-03-19'
       | 'o3-pro'
@@ -13217,10 +13217,14 @@ export namespace BetaTool {
     authorization?: string;
 
     /**
-     * Identifier for service connectors, like those available in ChatGPT. One of
-     * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
-     * service connectors
+     * @deprecated Identifier for service connectors, like those available in ChatGPT.
+     * One of `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more
+     * about service connectors
      * [here](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#connectors).
+     *
+     * This field is deprecated for models released after September 1, 2026. Use
+     * `server_url` to connect to a remote MCP server, or `tunnel_id` to connect
+     * through a Secure MCP Tunnel.
      *
      * Currently supported `connector_id` values are:
      *
@@ -13981,6 +13985,7 @@ export interface ResponseCreateParamsBase {
     | 'gpt-5.1'
     | 'gpt-5.1-2025-11-13'
     | 'gpt-5.1-codex'
+    | 'gpt-5.1-mini'
     | 'gpt-5.1-chat-latest'
     | 'gpt-5'
     | 'gpt-5-mini'
@@ -14046,7 +14051,6 @@ export interface ResponseCreateParamsBase {
     | 'gpt-3.5-turbo-1106'
     | 'gpt-3.5-turbo-0125'
     | 'gpt-3.5-turbo-16k-0613'
-    | 'gpt-5.1-mini'
     | 'o1-pro'
     | 'o1-pro-2025-03-19'
     | 'o3-pro'
@@ -14651,6 +14655,7 @@ export interface ResponseCompactParams {
     | 'gpt-5.1'
     | 'gpt-5.1-2025-11-13'
     | 'gpt-5.1-codex'
+    | 'gpt-5.1-mini'
     | 'gpt-5.1-chat-latest'
     | 'gpt-5'
     | 'gpt-5-mini'
@@ -14716,7 +14721,6 @@ export interface ResponseCompactParams {
     | 'gpt-3.5-turbo-1106'
     | 'gpt-3.5-turbo-0125'
     | 'gpt-3.5-turbo-16k-0613'
-    | 'gpt-5.1-mini'
     | 'o1-pro'
     | 'o1-pro-2025-03-19'
     | 'o3-pro'
