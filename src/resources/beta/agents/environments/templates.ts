@@ -392,8 +392,7 @@ export namespace TemplateCreateParams {
     /**
      * The environment's network access mode.
      *
-     * - `enabled` - Allows unrestricted network access, matching an omitted network
-     *   policy.
+     * - `enabled` - Allows unrestricted network access.
      * - `disabled` - Disables network access.
      * - `restricted` - Allows access only to configured domains.
      */
@@ -481,8 +480,7 @@ export namespace TemplateUpdateParams {
     /**
      * The environment's network access mode.
      *
-     * - `enabled` - Allows unrestricted network access, matching an omitted network
-     *   policy.
+     * - `enabled` - Allows unrestricted network access.
      * - `disabled` - Disables network access.
      * - `restricted` - Allows access only to configured domains.
      */
