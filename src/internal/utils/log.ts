@@ -139,83 +139,6 @@ export function redactURL(value: string): string {
   return url.href;
 }
 
-/** Redacts JSON diagnostics without mutating caller values, sharing unchanged branches. */
-function redactBody(body: unknown): unknown {
-  type Frame = {
-    source: object;
-    target: object;
-    keys: Iterator<string | number>;
-    parentName: string | undefined;
-  };
-  const copies = new WeakMap<object, object>();
-  const active = new WeakMap<object, Frame>();
-  const pending: Frame[] = [];
-  // Parsed JSON arrays have only indexed elements; never materialize their index keys.
-  const keysFor = (value: object): Iterator<string | number> =>
-    Array.isArray(value) ? Array.prototype.keys.call(value) : Object.keys(value)[Symbol.iterator]();
-  const write = (target: object, name: string, value: unknown) => {
-    Object.defineProperty(target, name, { value, enumerable: true, configurable: true, writable: true });
-  };
-  const writable = (frame: Frame): object => {
-    if (frame.target !== frame.source) return frame.target;
-    const target = Array.isArray(frame.source) ? new Array(frame.source.length) : {};
-    frame.target = target;
-    copies.set(frame.source, target);
-    const keys = keysFor(frame.source);
-    for (let key = keys.next(); !key.done; key = keys.next()) {
-      const name = String(key.value);
-      const descriptor = Object.getOwnPropertyDescriptor(frame.source, name);
-      if (descriptor?.enumerable) {
-        write(target, name, 'value' in descriptor ? descriptor.value : '[Accessor]');
-      }
-    }
-    return target;
-  };
-  const visit = (value: unknown, name?: string): unknown => {
-    if (typeof value === 'function') return '[Function]';
-    if (typeof value === 'string' && name?.toLowerCase() === 'url') {
-      // JSON payload URLs can carry credentials in any component, including the path.
-      return '***';
-    }
-    if (value === null || typeof value !== 'object') return value;
-    const prototype = Object.getPrototypeOf(value);
-    if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return value;
-    const existing = copies.get(value);
-    if (existing) return existing;
-    // Cycles are not JSON, but diagnostic callers may supply them. Preserve their links safely.
-    const ancestor = active.get(value);
-    if (ancestor) return writable(ancestor);
-    const frame = { source: value, target: value, keys: keysFor(value), parentName: name };
-    active.set(value, frame);
-    pending.push(frame);
-    return value;
-  };
-
-  let result = visit(body);
-  for (let frame = pending[pending.length - 1]; frame; frame = pending[pending.length - 1]) {
-    const key = frame.keys.next();
-    if (key.done) {
-      pending.pop();
-      active.delete(frame.source);
-      const parent = pending[pending.length - 1];
-      if (!parent) result = frame.target;
-      else if (frame.target !== frame.source && frame.parentName !== undefined) {
-        write(writable(parent), frame.parentName, frame.target);
-      }
-      continue;
-    }
-    const name = String(key.value);
-    const descriptor = Object.getOwnPropertyDescriptor(frame.source, name);
-    if (!descriptor?.enumerable) continue;
-    const value = 'value' in descriptor ? descriptor.value : '[Accessor]';
-    const redacted = isSensitiveHeader(name) ? '***' : visit(value, name);
-    if (!('value' in descriptor) || redacted !== value) {
-      write(writable(frame), name, redacted);
-    }
-  }
-  return result;
-}
-
 export const formatRequestDetails = (details: {
   options?: RequestOptions | undefined;
   headers?: Headers | Record<string, string> | undefined;
@@ -231,9 +154,6 @@ export const formatRequestDetails = (details: {
   if (details.options) {
     details.options = { ...details.options };
     delete details.options['headers']; // redundant + leaks internals
-    if ('body' in details.options) {
-      details.options.body = redactBody(details.options.body);
-    }
     if (details.options.path) {
       const path = details.options.path;
       const redacted = new URL(redactURL(new URL(path, 'https://redacted.invalid').href));
@@ -260,9 +180,6 @@ export const formatRequestDetails = (details: {
         ([name, value]) => [name, isSensitiveHeader(name) ? '***' : value],
       ),
     );
-  }
-  if ('body' in details) {
-    details.body = redactBody(details.body);
   }
   if ('retryOfRequestLogID' in details) {
     if (details.retryOfRequestLogID) {

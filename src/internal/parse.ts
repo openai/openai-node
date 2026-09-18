@@ -20,6 +20,7 @@ export async function defaultParseResponse<T>(
   props: APIResponseProps,
 ): Promise<WithRequestID<T>> {
   const { response, requestLogID, retryOfRequestLogID, startTime } = props;
+  let jsonBodyLength: number | undefined;
   const body = await (async () => {
     if (props.options.stream) {
       loggerFor(client).debug('response', response.status, response.url, response.headers, response.body);
@@ -73,6 +74,7 @@ export async function defaultParseResponse<T>(
       }
 
       const json = JSON.parse(bodyText);
+      jsonBodyLength = bodyText.length;
       return addRequestID(json as T, response);
     }
 
@@ -88,7 +90,7 @@ export async function defaultParseResponse<T>(
         retryOfRequestLogID,
         url: response.url,
         status: response.status,
-        body,
+        body: jsonBodyLength === undefined ? body : { type: 'json', length: jsonBodyLength },
         durationMs: Date.now() - startTime,
       }),
     );

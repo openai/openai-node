@@ -3,7 +3,6 @@ import { spawnSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';
 import { compiledFixture } from './utils/compiled-fixtures';
 import OpenAI from 'openai';
-import { formatRequestDetails } from 'openai/internal/utils/log';
 import type { WebhookCreateParams } from 'openai/resources/webhooks/webhooks';
 
 function createLogger() {
@@ -11,76 +10,25 @@ function createLogger() {
 }
 
 describe('response debug logging', () => {
-  test.each([false, true])('shares unchanged response branches with masking %s', async (masking) => {
-    const logger = createLogger();
-    const body = {
-      data: [0, false, '', null, { count: 1 }],
-      nested: { signing_secret: masking ? 'synthetic-secret' : '***' },
-    };
-    const client = new OpenAI({
-      apiKey: 'synthetic-api-key',
-      logLevel: 'debug',
-      logger,
-      fetch: async () => Response.json(body),
-    });
-
-    const response = await client.get<typeof body>('/example');
-    const logged = logger.debug.mock.calls.find(([message]) => message.includes('response parsed'))?.[1]
-      ?.body;
-
-    expect(logged).toEqual({ ...body, nested: { signing_secret: '***' } });
-    expect(logged.data).toBe(response.data);
-    expect(response).toEqual(body);
-    if (masking) {
-      expect(logged).not.toBe(response);
-      expect(logged.nested).not.toBe(response.nested);
-    } else {
-      expect(logged).toBe(response);
-    }
-  });
-
-  test('copies a changed array while sharing its unchanged elements', async () => {
-    const logger = createLogger();
-    const body = { data: [{ count: 1 }, { credentials: { signing_secret: 'synthetic-secret' } }] };
-    const client = new OpenAI({
-      apiKey: 'synthetic-api-key',
-      logLevel: 'debug',
-      logger,
-      fetch: async () => Response.json(body),
-    });
-
-    const response = await client.get<typeof body>('/example');
-    const logged = logger.debug.mock.calls.find(([message]) => message.includes('response parsed'))?.[1]
-      ?.body;
-
-    expect(logged).toEqual({ data: [{ count: 1 }, { credentials: { signing_secret: '***' } }] });
-    expect(logged.data).not.toBe(response.data);
-    expect(logged.data[0]).toBe(response.data[0]);
-    expect(response).toEqual(body);
-  });
-
-  test('preserves cyclic diagnostic links and shared references without invoking accessors', () => {
-    const read = vi.fn(() => 'synthetic-accessor');
-    interface CyclicDiagnostic {
-      signing_secret: string;
-      parent?: object;
-    }
-    const child: CyclicDiagnostic = { signing_secret: 'synthetic-secret' };
-    const body = { child, alias: child };
-    child.parent = body;
-    Object.defineProperty(body, 'accessor', { get: read, enumerable: true });
-    const logged = formatRequestDetails({ body }).body;
-
-    expect(read).not.toHaveBeenCalled();
-    expect(logged).toHaveProperty('accessor', '[Accessor]');
-    expect(logged).toHaveProperty('child.signing_secret', '***');
-    expect(Object.getOwnPropertyDescriptor(logged, 'alias')?.value).toBe(
-      Object.getOwnPropertyDescriptor(logged, 'child')?.value,
-    );
-    expect(logged).toHaveProperty('child.parent', logged);
-    expect(child.signing_secret).toBe('synthetic-secret');
-    expect(child.parent).toBe(body);
-  });
+  test.each([null, false, 0, '', 'synthetic-secret', [0, false, null], { value: 'synthetic-secret' }])(
+    'summarizes JSON response %j without changing its value',
+    async (body) => {
+      const logger = createLogger();
+      const json = JSON.stringify(body);
+      const client = new OpenAI({
+        apiKey: 'synthetic-api-key',
+        logLevel: 'debug',
+        logger,
+        fetch: async () => new Response(json, { headers: { 'content-type': 'application/json' } }),
+      });
+      expect(await client.get('/example')).toEqual(body);
+      expect(logger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('response parsed'),
+        expect.objectContaining({ body: { type: 'json', length: json.length } }),
+      );
+      expect(JSON.stringify(logger.debug.mock.calls)).not.toContain('synthetic-secret');
+    },
+  );
 
   test.each(['array', 'object'])('logs wide JSON %s bodies within a bounded heap', (container) => {
     const result = spawnSync(
@@ -110,11 +58,7 @@ describe('response debug logging', () => {
               }
               const logged = details.body;
               if (!logged) return;
-              assert.equal(logged.signing_secret, '***');
-              assert.equal(logged.url, '***');
-              assert.equal(Array.isArray(logged.values), Array.isArray(values));
-              assert.equal(Array.isArray(logged.values) ? logged.values.length : Object.keys(logged.values).length, count);
-              assert.equal(logged.values[count - 1], 0);
+              assert.deepEqual(logged, { type: 'json', length: json.length });
               if (message.includes('response parsed')) responses++;
             },
           };
@@ -175,7 +119,7 @@ describe('response debug logging', () => {
       expect(dataAndResponse.data).toBe(response);
       expect(logger.debug).toHaveBeenCalledWith(
         expect.stringContaining('response parsed'),
-        expect.objectContaining({ body: { ...body, url: '***', signing_secret: '***' } }),
+        expect.objectContaining({ body: { type: 'json', length: JSON.stringify(body).length } }),
       );
       expect(JSON.stringify(logger.debug.mock.calls)).not.toContain(body.signing_secret);
     },
@@ -200,12 +144,7 @@ describe('response debug logging', () => {
     expect(logger.debug).toHaveBeenCalledWith(
       expect.stringContaining('response parsed'),
       expect.objectContaining({
-        body: {
-          data: [{ signing_secret: '***', count: 0, enabled: false }],
-          credentials: { API_Key: '***', password: '***' },
-          empty: '',
-          absent: null,
-        },
+        body: { type: 'json', length: JSON.stringify(body).length },
       }),
     );
     const logs = JSON.stringify(logger.debug.mock.calls);
@@ -248,7 +187,7 @@ describe('response debug logging', () => {
       expect(logger.debug).toHaveBeenCalledWith(
         expect.stringContaining('response parsed'),
         expect.objectContaining({
-          body: { ...body, url: '***', signing_secret: '***' },
+          body: { type: 'json', length: JSON.stringify(body).length },
         }),
       );
       const diagnostics = JSON.stringify(logger.debug.mock.calls);
@@ -395,7 +334,7 @@ describe('response debug logging', () => {
     expect(await client.get('/example')).toEqual(body);
     expect(logger.debug).toHaveBeenCalledWith(
       expect.stringContaining('response parsed'),
-      expect.objectContaining({ body: { ...body, url: '***' } }),
+      expect.objectContaining({ body: { type: 'json', length: JSON.stringify(body).length } }),
     );
   });
 
@@ -436,10 +375,7 @@ describe('response debug logging', () => {
       expect(logger.debug).toHaveBeenCalledWith(
         expect.stringContaining('response parsed'),
         expect.objectContaining({
-          body:
-            operation === 'list'
-              ? { object: 'list', data: [{ ...endpoint, url: '***' }], has_more: false }
-              : { ...endpoint, url: '***' },
+          body: { type: 'json', length: JSON.stringify(body).length },
         }),
       );
       expect(logger.debug).toHaveBeenCalledWith(
@@ -500,7 +436,7 @@ describe('response debug logging', () => {
     },
   );
 
-  test('preserves own prototype-named properties in the redacted copy', async () => {
+  test('preserves own prototype-named properties in the response', async () => {
     const logger = createLogger();
     const json = '{"__proto__":{"signing_secret":"synthetic-prototype-secret"}}';
     const client = new OpenAI({
@@ -515,7 +451,7 @@ describe('response debug logging', () => {
     expect(response).toEqual(JSON.parse(json));
     expect(logger.debug).toHaveBeenCalledWith(
       expect.stringContaining('response parsed'),
-      expect.objectContaining({ body: JSON.parse('{"__proto__":{"signing_secret":"***"}}') }),
+      expect.objectContaining({ body: { type: 'json', length: json.length } }),
     );
     expect(JSON.stringify(logger.debug.mock.calls)).not.toContain('synthetic-prototype-secret');
     expect(Object.prototype).not.toHaveProperty('signing_secret');
