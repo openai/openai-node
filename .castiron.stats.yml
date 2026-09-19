@@ -2,8 +2,8 @@ schema_version: 1
 generation_id: edd8564f-49f3-4374-95fd-71bb3e76c5df
 # Schema hashes track the API reference merged from main; codegen fields retain
 # this promotion's generated baseline.
-openapi_spec_hash: 83d739d1f34f3c6641c60fb43f882cb9
-openapi_transformed_spec_hash: 43dd121f8393c5003ae166b79c7a5208
+openapi_spec_hash: 72dd9904e4616e46924320e49100670e
+openapi_transformed_spec_hash: 936295cde2c58fbc0ba7339229e8da19
 config_hash: aaaa47e4b5e2e071e92723b91f510a6b
 codegen_sha: ad3352e16161814a2dcfcd23f72b0056ba01c7c6
 codegen_hash: 88da26ea186b74f71343f523f57c1cc4f248d82bc6860407caf759e225f11ce8

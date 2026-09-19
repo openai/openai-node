@@ -1,6 +1,7 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../core/resource';
+import * as ExternalStorageAPI from './external-storage';
 import {
   ConversationCursorPage,
   type ConversationCursorPageParams,
@@ -98,6 +99,8 @@ export interface AuditLogListResponse {
     | 'checkpoint.permission.deleted'
     | 'external_key.registered'
     | 'external_key.removed'
+    | 'external_storage.registered'
+    | 'external_storage.removed'
     | 'group.created'
     | 'group.updated'
     | 'group.deleted'
@@ -299,6 +302,16 @@ export interface AuditLogListResponse {
    * The details for events with this `type`.
    */
   'external_key.removed'?: AuditLogListResponse.ExternalKeyRemoved;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'external_storage.registered'?: AuditLogListResponse.ExternalStorageRegistered;
+
+  /**
+   * The details for events with this `type`.
+   */
+  'external_storage.removed'?: AuditLogListResponse.ExternalStorageRemoved;
 
   /**
    * The details for events with this `type`.
@@ -850,6 +863,50 @@ export namespace AuditLogListResponse {
   export interface ExternalKeyRemoved {
     /**
      * The ID of the external key configuration.
+     */
+    id?: string;
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface ExternalStorageRegistered {
+    /**
+     * The ID of the external storage configuration.
+     */
+    id?: string;
+
+    /**
+     * The configuration for the external storage.
+     */
+    data?: ExternalStorageRegistered.Data;
+  }
+
+  export namespace ExternalStorageRegistered {
+    /**
+     * The configuration for the external storage.
+     */
+    export interface Data {
+      /**
+       * The OpenAI geography derived from the storage region.
+       */
+      geography?: string;
+
+      /**
+       * The external storage provider configuration.
+       */
+      provider?:
+        | ExternalStorageAPI.AwsExternalStorageProvider
+        | ExternalStorageAPI.AzureExternalStorageProvider;
+    }
+  }
+
+  /**
+   * The details for events with this `type`.
+   */
+  export interface ExternalStorageRemoved {
+    /**
+     * The ID of the external storage configuration.
      */
     id?: string;
   }
@@ -1906,6 +1963,8 @@ export interface AuditLogListParams extends ConversationCursorPageParams {
     | 'checkpoint.permission.deleted'
     | 'external_key.registered'
     | 'external_key.removed'
+    | 'external_storage.registered'
+    | 'external_storage.removed'
     | 'group.created'
     | 'group.updated'
     | 'group.deleted'
