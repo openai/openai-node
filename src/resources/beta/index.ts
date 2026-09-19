@@ -31,6 +31,7 @@ export {
   type AgentSessionEnvironmentFailedEvent,
   type AgentSessionEnvironmentPendingEvent,
   type AgentSessionEnvironmentReadyEvent,
+  type AgentSessionEnvironmentResetEvent,
   type AgentSessionEnvironmentState,
   type AgentSessionErrorEvent,
   type AgentSessionEvent,
