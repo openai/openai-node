@@ -132,6 +132,7 @@ export class Responses extends APIResource {
   /**
    * Retrieves a model response with the given ID.
    * Pass `stream` in the query argument; options-only calls reject `options.query.stream`.
+   * A second argument typed as `RequestOptions` may stream, so its return type includes `Stream`.
    *
    * @example
    * ```ts
@@ -150,7 +151,11 @@ export class Responses extends APIResource {
     query: QueryOptions<ResponseRetrieveParamsStreaming>,
     options?: RequestOptions,
   ): APIPromise<Stream<ResponseStreamEvent>>;
-  retrieve(responseID: string, options?: LegacyRequestOptions): APIPromise<Response>;
+  retrieve(responseID: string, options?: LegacyRequestOptions & { stream?: never }): APIPromise<Response>;
+  retrieve(
+    responseID: string,
+    options?: LegacyRequestOptions,
+  ): APIPromise<Stream<ResponseStreamEvent> | Response>;
   retrieve(
     responseID: string,
     query?: QueryOptions<ResponseRetrieveParamsBase> | undefined,

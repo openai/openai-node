@@ -14,7 +14,10 @@ test('accepts reusable RequestOptions in supported legacy GET calls', async () =
   });
   const options: OpenAI.RequestOptions = { headers: { 'x-legacy-test': 'preserved' } };
   const response = client.responses.retrieve('resp_test', options);
-  compareType<typeof response, APIPromise<OpenAI.Responses.Response>>(true);
+  compareType<
+    typeof response,
+    APIPromise<OpenAI.Responses.Response | Stream<OpenAI.Responses.ResponseStreamEvent>>
+  >(true);
 
   await Promise.all([
     response,
