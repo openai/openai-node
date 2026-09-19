@@ -7,6 +7,9 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagin
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+/**
+ * Create and manage model responses.
+ */
 export class InputItems extends APIResource {
   /**
    * Returns a list of input items for a given response.
