@@ -114,6 +114,9 @@ function normalizeRequestOptionsForQuery(
   };
 }
 
+/**
+ * Create and manage model responses.
+ */
 export class InputItems extends APIResource {
   /**
    * Returns a list of input items for a given response.
