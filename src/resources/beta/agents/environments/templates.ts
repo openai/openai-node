@@ -8,6 +8,113 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 export class Templates extends APIResource {
   /**
    * Creates reusable environment configuration without returning confidential setup
@@ -92,9 +199,101 @@ export class Templates extends APIResource {
    * ```
    */
   list(
-    query: TemplateListParams | null | undefined = {},
+    query?:
+      | (TemplateListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<EnvironmentTemplatesPage, EnvironmentTemplate>;
+  list(
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<EnvironmentTemplatesPage, EnvironmentTemplate>;
+  list(
+    query:
+      | TemplateListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<EnvironmentTemplatesPage, EnvironmentTemplate> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as TemplateListParams | null | undefined;
     return this._client.getAPIList('/agents/environments/templates', CursorPage<EnvironmentTemplate>, {
       query,
       ...options,
@@ -358,12 +557,13 @@ export interface TemplateCreateParams {
   name?: string | null;
 
   /**
-   * Network access for an OpenAI-hosted environment.
+   * Network access policy for the environment. Defaults to disabled for GA requests
+   * and enabled for alpha/beta requests.
    */
   network?: TemplateCreateParams.Network | null;
 
   /**
-   * Packages to install in an OpenAI-hosted environment.
+   * Packages to install in the environment. Defaults to empty package lists.
    */
   packages?: TemplateCreateParams.Packages | null;
 
@@ -386,7 +586,8 @@ export interface TemplateCreateParams {
 
 export namespace TemplateCreateParams {
   /**
-   * Network access for an OpenAI-hosted environment.
+   * Network access policy for the environment. Defaults to disabled for GA requests
+   * and enabled for alpha/beta requests.
    */
   export interface Network {
     /**
@@ -405,7 +606,7 @@ export namespace TemplateCreateParams {
   }
 
   /**
-   * Packages to install in an OpenAI-hosted environment.
+   * Packages to install in the environment. Defaults to empty package lists.
    */
   export interface Packages {
     /**
@@ -447,12 +648,14 @@ export interface TemplateUpdateParams {
   name?: string | null;
 
   /**
-   * Network access for an OpenAI-hosted environment.
+   * Network access available after setup completes. Omit to preserve the current
+   * policy, or pass `null` to reset to disabled for GA requests or enabled for
+   * alpha/beta requests.
    */
   network?: TemplateUpdateParams.Network | null;
 
   /**
-   * Packages to install in an OpenAI-hosted environment.
+   * Packages installed before the runtime network policy applies.
    */
   packages?: TemplateUpdateParams.Packages | null;
 
@@ -474,7 +677,9 @@ export interface TemplateUpdateParams {
 
 export namespace TemplateUpdateParams {
   /**
-   * Network access for an OpenAI-hosted environment.
+   * Network access available after setup completes. Omit to preserve the current
+   * policy, or pass `null` to reset to disabled for GA requests or enabled for
+   * alpha/beta requests.
    */
   export interface Network {
     /**
@@ -493,7 +698,7 @@ export namespace TemplateUpdateParams {
   }
 
   /**
-   * Packages to install in an OpenAI-hosted environment.
+   * Packages installed before the runtime network policy applies.
    */
   export interface Packages {
     /**

@@ -15,6 +15,113 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 /**
  * Manage fine-tuning jobs to tailor a model to your specific training data.
  */
@@ -73,9 +180,101 @@ export class Jobs extends APIResource {
    * ```
    */
   list(
-    query: JobListParams | null | undefined = {},
+    query?:
+      | (JobListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<FineTuningJobsPage, FineTuningJob>;
+  list(
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<FineTuningJobsPage, FineTuningJob>;
+  list(
+    query:
+      | JobListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FineTuningJobsPage, FineTuningJob> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'metadata'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as JobListParams | null | undefined;
     return this._client.getAPIList('/fine_tuning/jobs', CursorPage<FineTuningJob>, {
       query,
       ...options,
@@ -115,9 +314,103 @@ export class Jobs extends APIResource {
    */
   listEvents(
     fineTuningJobID: string,
-    query: JobListEventsParams | null | undefined = {},
+    query?:
+      | (JobListEventsParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent>;
+  listEvents(
+    fineTuningJobID: string,
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent>;
+  listEvents(
+    fineTuningJobID: string,
+    query:
+      | JobListEventsParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as JobListEventsParams | null | undefined;
     return this._client.getAPIList(
       path`/fine_tuning/jobs/${fineTuningJobID}/events`,
       CursorPage<FineTuningJobEvent>,
