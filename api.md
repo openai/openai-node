@@ -408,6 +408,16 @@ Methods:
 
 - <code title="get /safety/alerts/{id}">client.safety.alerts.<a href="./src/resources/safety/alerts.ts">retrieve</a>(id) -> SafetyAlert</code>
 
+## Cases
+
+Types:
+
+- <code><a href="./src/resources/safety/cases.ts">SafetyCase</a></code>
+
+Methods:
+
+- <code title="get /safety/cases/{id}">client.safety.cases.<a href="./src/resources/safety/cases.ts">retrieve</a>(id) -> SafetyCase</code>
+
 # [Webhooks](src/resources/webhooks/api.md)
 
 # Beta
