@@ -1322,6 +1322,9 @@ export class OpenAI {
    */
   uploads: API.Uploads = new API.Uploads(this);
   admin: API.Admin = new API.Admin(this);
+  /**
+   * Create and manage model responses.
+   */
   responses: API.Responses = new API.Responses(this);
   live: API.Live = new API.Live(this);
   realtime: API.Realtime = new API.Realtime(this);

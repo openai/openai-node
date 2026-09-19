@@ -121,6 +121,9 @@ function normalizeRequestOptionsForQuery(
   };
 }
 
+/**
+ * Create and manage model responses.
+ */
 export class Responses extends APIResource {
   inputItems: InputItemsAPI.InputItems = new InputItemsAPI.InputItems(this._client);
   inputTokens: InputTokensAPI.InputTokens = new InputTokensAPI.InputTokens(this._client);
