@@ -171,53 +171,17 @@ export class Batches extends APIResource {
       | undefined,
     options?: RequestOptions,
   ): PagePromise<BatchesPage, Batch>;
-  list(
-    options?: {
-      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
-    } & {
-      [
-        K in
-          | 'method'
-          | 'path'
-          | 'body'
-          | 'stream'
-          | 'httpAgent'
-          | 'fetchOptions'
-          | 'defaultBaseURL'
-          | '__metadata'
-          | '__binaryRequest'
-          | '__binaryResponse'
-          | '__streamClass'
-          | '__security'
-          | '__synthesizeEventData'
-      ]?: never;
-    },
-  ): PagePromise<BatchesPage, Batch>;
+  list(options?: {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  }): PagePromise<BatchesPage, Batch>;
   list(
     query:
       | BatchListParams
-      | ({
+      | {
           [
             K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
           ]?: RequestOptions[K];
-        } & {
-          [
-            K in
-              | 'method'
-              | 'path'
-              | 'body'
-              | 'stream'
-              | 'httpAgent'
-              | 'fetchOptions'
-              | 'defaultBaseURL'
-              | '__metadata'
-              | '__binaryRequest'
-              | '__binaryResponse'
-              | '__streamClass'
-              | '__security'
-              | '__synthesizeEventData'
-          ]?: never;
-        })
+        }
       | null
       | undefined = {},
     options?: RequestOptions,

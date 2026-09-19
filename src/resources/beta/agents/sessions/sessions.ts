@@ -278,53 +278,17 @@ export class Sessions extends APIResource {
       | undefined,
     options?: RequestOptions,
   ): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession>;
-  list(
-    options?: {
-      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
-    } & {
-      [
-        K in
-          | 'method'
-          | 'path'
-          | 'body'
-          | 'stream'
-          | 'httpAgent'
-          | 'fetchOptions'
-          | 'defaultBaseURL'
-          | '__metadata'
-          | '__binaryRequest'
-          | '__binaryResponse'
-          | '__streamClass'
-          | '__security'
-          | '__synthesizeEventData'
-      ]?: never;
-    },
-  ): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession>;
+  list(options?: {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  }): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession>;
   list(
     query:
       | SessionListParams
-      | ({
+      | {
           [
             K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
           ]?: RequestOptions[K];
-        } & {
-          [
-            K in
-              | 'method'
-              | 'path'
-              | 'body'
-              | 'stream'
-              | 'httpAgent'
-              | 'fetchOptions'
-              | 'defaultBaseURL'
-              | '__metadata'
-              | '__binaryRequest'
-              | '__binaryResponse'
-              | '__streamClass'
-              | '__security'
-              | '__synthesizeEventData'
-          ]?: never;
-        })
+        }
       | null
       | undefined = {},
     options?: RequestOptions,

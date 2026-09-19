@@ -171,51 +171,17 @@ export class Items extends APIResource {
     sessionID: string,
     options?: {
       [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
-    } & {
-      [
-        K in
-          | 'method'
-          | 'path'
-          | 'body'
-          | 'stream'
-          | 'httpAgent'
-          | 'fetchOptions'
-          | 'defaultBaseURL'
-          | '__metadata'
-          | '__binaryRequest'
-          | '__binaryResponse'
-          | '__streamClass'
-          | '__security'
-          | '__synthesizeEventData'
-      ]?: never;
     },
   ): PagePromise<AgentSessionItemsPage, AgentsAPI.AgentSessionItem>;
   list(
     sessionID: string,
     query:
       | ItemListParams
-      | ({
+      | {
           [
             K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
           ]?: RequestOptions[K];
-        } & {
-          [
-            K in
-              | 'method'
-              | 'path'
-              | 'body'
-              | 'stream'
-              | 'httpAgent'
-              | 'fetchOptions'
-              | 'defaultBaseURL'
-              | '__metadata'
-              | '__binaryRequest'
-              | '__binaryResponse'
-              | '__streamClass'
-              | '__security'
-              | '__synthesizeEventData'
-          ]?: never;
-        })
+        }
       | null
       | undefined = {},
     options?: RequestOptions,

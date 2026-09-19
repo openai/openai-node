@@ -194,51 +194,17 @@ export class Certificates extends APIResource {
     certificateID: string,
     options?: {
       [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
-    } & {
-      [
-        K in
-          | 'method'
-          | 'path'
-          | 'body'
-          | 'stream'
-          | 'httpAgent'
-          | 'fetchOptions'
-          | 'defaultBaseURL'
-          | '__metadata'
-          | '__binaryRequest'
-          | '__binaryResponse'
-          | '__streamClass'
-          | '__security'
-          | '__synthesizeEventData'
-      ]?: never;
     },
   ): APIPromise<Certificate>;
   retrieve(
     certificateID: string,
     query:
       | CertificateRetrieveParams
-      | ({
+      | {
           [
             K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
           ]?: RequestOptions[K];
-        } & {
-          [
-            K in
-              | 'method'
-              | 'path'
-              | 'body'
-              | 'stream'
-              | 'httpAgent'
-              | 'fetchOptions'
-              | 'defaultBaseURL'
-              | '__metadata'
-              | '__binaryRequest'
-              | '__binaryResponse'
-              | '__streamClass'
-              | '__security'
-              | '__synthesizeEventData'
-          ]?: never;
-        })
+        }
       | null
       | undefined = {},
     options?: RequestOptions,
@@ -329,53 +295,17 @@ export class Certificates extends APIResource {
       | undefined,
     options?: RequestOptions,
   ): PagePromise<CertificateListResponsesPage, CertificateListResponse>;
-  list(
-    options?: {
-      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
-    } & {
-      [
-        K in
-          | 'method'
-          | 'path'
-          | 'body'
-          | 'stream'
-          | 'httpAgent'
-          | 'fetchOptions'
-          | 'defaultBaseURL'
-          | '__metadata'
-          | '__binaryRequest'
-          | '__binaryResponse'
-          | '__streamClass'
-          | '__security'
-          | '__synthesizeEventData'
-      ]?: never;
-    },
-  ): PagePromise<CertificateListResponsesPage, CertificateListResponse>;
+  list(options?: {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  }): PagePromise<CertificateListResponsesPage, CertificateListResponse>;
   list(
     query:
       | CertificateListParams
-      | ({
+      | {
           [
             K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
           ]?: RequestOptions[K];
-        } & {
-          [
-            K in
-              | 'method'
-              | 'path'
-              | 'body'
-              | 'stream'
-              | 'httpAgent'
-              | 'fetchOptions'
-              | 'defaultBaseURL'
-              | '__metadata'
-              | '__binaryRequest'
-              | '__binaryResponse'
-              | '__streamClass'
-              | '__security'
-              | '__synthesizeEventData'
-          ]?: never;
-        })
+        }
       | null
       | undefined = {},
     options?: RequestOptions,

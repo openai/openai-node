@@ -208,51 +208,17 @@ export class Files extends APIResource {
     vectorStoreID: string,
     options?: {
       [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
-    } & {
-      [
-        K in
-          | 'method'
-          | 'path'
-          | 'body'
-          | 'stream'
-          | 'httpAgent'
-          | 'fetchOptions'
-          | 'defaultBaseURL'
-          | '__metadata'
-          | '__binaryRequest'
-          | '__binaryResponse'
-          | '__streamClass'
-          | '__security'
-          | '__synthesizeEventData'
-      ]?: never;
     },
   ): PagePromise<VectorStoreFilesPage, VectorStoreFile>;
   list(
     vectorStoreID: string,
     query:
       | FileListParams
-      | ({
+      | {
           [
             K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
           ]?: RequestOptions[K];
-        } & {
-          [
-            K in
-              | 'method'
-              | 'path'
-              | 'body'
-              | 'stream'
-              | 'httpAgent'
-              | 'fetchOptions'
-              | 'defaultBaseURL'
-              | '__metadata'
-              | '__binaryRequest'
-              | '__binaryResponse'
-              | '__streamClass'
-              | '__security'
-              | '__synthesizeEventData'
-          ]?: never;
-        })
+        }
       | null
       | undefined = {},
     options?: RequestOptions,

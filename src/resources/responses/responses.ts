@@ -233,6 +233,7 @@ export class Responses extends APIResource {
 
   /**
    * Retrieves a model response with the given ID.
+   * Pass `stream` in the query argument; options-only calls reject `options.query.stream`.
    *
    * @example
    * ```ts
@@ -343,51 +344,17 @@ export class Responses extends APIResource {
     responseID: string,
     options?: {
       [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
-    } & {
-      [
-        K in
-          | 'method'
-          | 'path'
-          | 'body'
-          | 'stream'
-          | 'httpAgent'
-          | 'fetchOptions'
-          | 'defaultBaseURL'
-          | '__metadata'
-          | '__binaryRequest'
-          | '__binaryResponse'
-          | '__streamClass'
-          | '__security'
-          | '__synthesizeEventData'
-      ]?: never;
     },
   ): APIPromise<Response>;
   retrieve(
     responseID: string,
     query:
       | ResponseRetrieveParamsBase
-      | ({
+      | {
           [
             K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
           ]?: RequestOptions[K];
-        } & {
-          [
-            K in
-              | 'method'
-              | 'path'
-              | 'body'
-              | 'stream'
-              | 'httpAgent'
-              | 'fetchOptions'
-              | 'defaultBaseURL'
-              | '__metadata'
-              | '__binaryRequest'
-              | '__binaryResponse'
-              | '__streamClass'
-              | '__security'
-              | '__synthesizeEventData'
-          ]?: never;
-        })
+        }
       | undefined = {},
     options?: RequestOptions,
   ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
@@ -398,6 +365,13 @@ export class Responses extends APIResource {
     );
     if (normalizeRequestOptionsForQueryOptions !== undefined) {
       options = normalizeRequestOptionsForQueryOptions;
+      if (typeof options.query === 'object' && options.query !== null && !Array.isArray(options.query)) {
+        // Validate and send the same query values, including fields supplied by getters.
+        options.query = { ...options.query };
+        if ('stream' in options.query && options.query.stream !== undefined) {
+          throw new TypeError('Pass stream in the query argument, not in options.query.');
+        }
+      }
       query = {};
     }
     query = query as ResponseRetrieveParams | undefined;
