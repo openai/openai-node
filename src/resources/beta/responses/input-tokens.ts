@@ -6,6 +6,9 @@ import { APIPromise } from '../../../core/api-promise';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 
+/**
+ * Create and manage model responses.
+ */
 export class InputTokens extends APIResource {
   /**
    * Returns input token counts of the request.
