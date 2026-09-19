@@ -9310,7 +9310,7 @@ export namespace BetaResponseOutputText {
  */
 export interface BetaResponseOutputTextAnnotationAddedEvent {
   /**
-   * An annotation that applies to a span of output text.
+   * The annotation object being added. (See annotation schema for details.)
    */
   annotation:
     | BetaResponseOutputTextAnnotationAddedEvent.FileCitation
@@ -13454,10 +13454,9 @@ export namespace BetaTool {
     background?: 'transparent' | 'opaque' | 'auto';
 
     /**
-     * Control how much effort the model will exert to match the style and features,
-     * especially facial features, of input images. This parameter is only supported
-     * for `gpt-image-1` and `gpt-image-1.5` and later models, unsupported for
-     * `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.
+     * Controls fidelity to the original input image(s). This parameter is supported
+     * for GPT image models that support input fidelity. `gpt-image-2` and
+     * `gpt-image-2-2026-04-21` ignore this parameter.
      */
     input_fidelity?: 'high' | 'low' | null;
 
