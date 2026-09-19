@@ -79,7 +79,7 @@ export class Roles extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<RolesPage, Role>;
   list(
-    query?: QueryOptions<RoleListParams> | null | undefined,
+    query?: QueryOptions<RoleListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<RolesPage, Role>;
   list(

@@ -32,7 +32,7 @@ export class InputItems extends APIResource {
   ): PagePromise<ResponseItemsPage, ResponsesAPI.ResponseItem>;
   list(
     responseID: string,
-    query?: QueryOptions<InputItemListParams> | null | undefined,
+    query?: QueryOptions<InputItemListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ResponseItemsPage, ResponsesAPI.ResponseItem>;
   list(

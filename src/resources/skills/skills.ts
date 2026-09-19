@@ -66,7 +66,7 @@ export class Skills extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<SkillsPage, Skill>;
   list(
-    query?: QueryOptions<SkillListParams> | null | undefined,
+    query?: QueryOptions<SkillListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<SkillsPage, Skill>;
   list(

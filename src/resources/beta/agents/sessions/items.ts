@@ -35,7 +35,7 @@ export class Items extends APIResource {
   ): PagePromise<AgentSessionItemsPage, AgentsAPI.AgentSessionItem>;
   list(
     sessionID: string,
-    query?: QueryOptions<ItemListParams> | null | undefined,
+    query?: QueryOptions<ItemListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<AgentSessionItemsPage, AgentsAPI.AgentSessionItem>;
   list(

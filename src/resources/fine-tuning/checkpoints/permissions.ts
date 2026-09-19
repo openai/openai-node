@@ -65,7 +65,7 @@ export class Permissions extends APIResource {
   ): APIPromise<PermissionRetrieveResponse>;
   retrieve(
     fineTunedModelCheckpoint: string,
-    query?: QueryOptions<PermissionRetrieveParams> | null | undefined,
+    query?: QueryOptions<PermissionRetrieveParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): APIPromise<PermissionRetrieveResponse>;
   retrieve(
@@ -113,7 +113,7 @@ export class Permissions extends APIResource {
   ): PagePromise<PermissionListResponsesPage, PermissionListResponse>;
   list(
     fineTunedModelCheckpoint: string,
-    query?: QueryOptions<PermissionListParams> | null | undefined,
+    query?: QueryOptions<PermissionListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<PermissionListResponsesPage, PermissionListResponse>;
   list(

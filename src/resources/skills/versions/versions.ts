@@ -55,7 +55,7 @@ export class Versions extends APIResource {
   list(skillID: string, options?: LegacyRequestOptions): PagePromise<SkillVersionsPage, SkillVersion>;
   list(
     skillID: string,
-    query?: QueryOptions<VersionListParams> | null | undefined,
+    query?: QueryOptions<VersionListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<SkillVersionsPage, SkillVersion>;
   list(

@@ -31,7 +31,7 @@ export class AuditLogs extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<AuditLogListResponsesPage, AuditLogListResponse>;
   list(
-    query?: QueryOptions<AuditLogListParams> | null | undefined,
+    query?: QueryOptions<AuditLogListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<AuditLogListResponsesPage, AuditLogListResponse>;
   list(

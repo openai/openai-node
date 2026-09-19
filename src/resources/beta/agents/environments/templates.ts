@@ -98,7 +98,7 @@ export class Templates extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<EnvironmentTemplatesPage, EnvironmentTemplate>;
   list(
-    query?: QueryOptions<TemplateListParams> | null | undefined,
+    query?: QueryOptions<TemplateListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<EnvironmentTemplatesPage, EnvironmentTemplate>;
   list(

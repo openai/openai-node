@@ -64,7 +64,7 @@ export class Runs extends APIResource {
   list(evalID: string, options?: LegacyRequestOptions): PagePromise<RunListResponsesPage, RunListResponse>;
   list(
     evalID: string,
-    query?: QueryOptions<RunListParams> | null | undefined,
+    query?: QueryOptions<RunListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<RunListResponsesPage, RunListResponse>;
   list(

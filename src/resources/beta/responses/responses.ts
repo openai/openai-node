@@ -93,7 +93,7 @@ export class Responses extends APIResource {
   ): APIPromise<Stream<BetaResponseStreamEvent> | BetaResponse>;
   retrieve(
     responseID: string,
-    params?: QueryOptions<ResponseRetrieveParamsBase> | undefined,
+    params?: QueryOptions<ResponseRetrieveParamsBase> | LegacyRequestOptions | undefined,
     options?: RequestOptions,
   ): APIPromise<Stream<BetaResponseStreamEvent> | BetaResponse>;
   retrieve(

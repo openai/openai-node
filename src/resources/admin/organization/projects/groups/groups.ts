@@ -84,7 +84,7 @@ export class Groups extends APIResource {
   list(projectID: string, options?: LegacyRequestOptions): PagePromise<ProjectGroupsPage, ProjectGroup>;
   list(
     projectID: string,
-    query?: QueryOptions<GroupListParams> | null | undefined,
+    query?: QueryOptions<GroupListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ProjectGroupsPage, ProjectGroup>;
   list(

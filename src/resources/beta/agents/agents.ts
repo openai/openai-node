@@ -114,7 +114,7 @@ export class Agents extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<AgentsPage, Agent>;
   list(
-    query?: QueryOptions<AgentListParams> | null | undefined,
+    query?: QueryOptions<AgentListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<AgentsPage, Agent>;
   list(

@@ -74,7 +74,7 @@ export class Roles extends APIResource {
   list(userID: string, options?: LegacyRequestOptions): PagePromise<RoleListResponsesPage, RoleListResponse>;
   list(
     userID: string,
-    query?: QueryOptions<RoleListParams> | null | undefined,
+    query?: QueryOptions<RoleListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<RoleListResponsesPage, RoleListResponse>;
   list(

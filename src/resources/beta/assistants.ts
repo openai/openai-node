@@ -70,7 +70,7 @@ export class Assistants extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<AssistantsPage, Assistant>;
   list(
-    query?: QueryOptions<AssistantListParams> | null | undefined,
+    query?: QueryOptions<AssistantListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<AssistantsPage, Assistant>;
   list(

@@ -158,7 +158,7 @@ export class Responses extends APIResource {
   ): APIPromise<Stream<ResponseStreamEvent> | Response>;
   retrieve(
     responseID: string,
-    query?: QueryOptions<ResponseRetrieveParamsBase> | undefined,
+    query?: QueryOptions<ResponseRetrieveParamsBase> | LegacyRequestOptions | undefined,
     options?: RequestOptions,
   ): APIPromise<Stream<ResponseStreamEvent> | Response>;
   retrieve(

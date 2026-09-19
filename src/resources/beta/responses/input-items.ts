@@ -33,7 +33,7 @@ export class InputItems extends APIResource {
   ): PagePromise<BetaResponseItemsPage, ResponsesAPI.BetaResponseItem>;
   list(
     responseID: string,
-    params?: QueryOptions<InputItemListParams> | null | undefined,
+    params?: QueryOptions<InputItemListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<BetaResponseItemsPage, ResponsesAPI.BetaResponseItem>;
   list(

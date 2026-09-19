@@ -71,7 +71,7 @@ export class Messages extends APIResource {
   list(threadID: string, options?: LegacyRequestOptions): PagePromise<MessagesPage, Message>;
   list(
     threadID: string,
-    query?: QueryOptions<MessageListParams> | null | undefined,
+    query?: QueryOptions<MessageListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<MessagesPage, Message>;
   list(

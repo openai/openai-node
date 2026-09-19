@@ -75,7 +75,7 @@ export class Users extends APIResource {
   ): PagePromise<OrganizationGroupUsersPage, OrganizationGroupUser>;
   list(
     groupID: string,
-    query?: QueryOptions<UserListParams> | null | undefined,
+    query?: QueryOptions<UserListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<OrganizationGroupUsersPage, OrganizationGroupUser>;
   list(

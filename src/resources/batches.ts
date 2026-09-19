@@ -36,7 +36,7 @@ export class Batches extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<BatchesPage, Batch>;
   list(
-    query?: QueryOptions<BatchListParams> | null | undefined,
+    query?: QueryOptions<BatchListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<BatchesPage, Batch>;
   list(

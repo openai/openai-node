@@ -125,7 +125,7 @@ export class SpendAlerts extends APIResource {
   ): PagePromise<ProjectSpendAlertsPage, ProjectSpendAlert>;
   list(
     projectID: string,
-    query?: QueryOptions<SpendAlertListParams> | null | undefined,
+    query?: QueryOptions<SpendAlertListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ProjectSpendAlertsPage, ProjectSpendAlert>;
   list(

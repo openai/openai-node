@@ -109,7 +109,7 @@ export class Users extends APIResource {
   list(projectID: string, options?: LegacyRequestOptions): PagePromise<ProjectUsersPage, ProjectUser>;
   list(
     projectID: string,
-    query?: QueryOptions<UserListParams> | null | undefined,
+    query?: QueryOptions<UserListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ProjectUsersPage, ProjectUser>;
   list(

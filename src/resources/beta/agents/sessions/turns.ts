@@ -55,7 +55,7 @@ export class Turns extends APIResource {
   list(sessionID: string, options?: LegacyRequestOptions): PagePromise<TurnsPage, Turn>;
   list(
     sessionID: string,
-    query?: QueryOptions<TurnListParams> | null | undefined,
+    query?: QueryOptions<TurnListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<TurnsPage, Turn>;
   list(

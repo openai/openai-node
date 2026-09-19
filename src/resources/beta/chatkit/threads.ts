@@ -48,7 +48,7 @@ export class Threads extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<ChatKitThreadsPage, ChatKitThread>;
   list(
-    query?: QueryOptions<ThreadListParams> | null | undefined,
+    query?: QueryOptions<ThreadListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ChatKitThreadsPage, ChatKitThread>;
   list(
@@ -118,7 +118,7 @@ export class Threads extends APIResource {
   >;
   listItems(
     threadID: string,
-    query?: QueryOptions<ThreadListItemsParams> | null | undefined,
+    query?: QueryOptions<ThreadListItemsParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<
     ChatKitThreadItemListDataPage,

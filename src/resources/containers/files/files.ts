@@ -60,7 +60,7 @@ export class Files extends APIResource {
   ): PagePromise<FileListResponsesPage, FileListResponse>;
   list(
     containerID: string,
-    query?: QueryOptions<FileListParams> | null | undefined,
+    query?: QueryOptions<FileListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<FileListResponsesPage, FileListResponse>;
   list(

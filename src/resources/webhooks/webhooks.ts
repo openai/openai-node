@@ -86,7 +86,7 @@ export class Webhooks extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<WebhookEndpointsPage, WebhookEndpoint>;
   list(
-    query?: QueryOptions<WebhookListParams> | null | undefined,
+    query?: QueryOptions<WebhookListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<WebhookEndpointsPage, WebhookEndpoint>;
   list(

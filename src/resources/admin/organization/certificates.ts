@@ -55,7 +55,7 @@ export class Certificates extends APIResource {
   retrieve(certificateID: string, options?: LegacyRequestOptions): APIPromise<Certificate>;
   retrieve(
     certificateID: string,
-    query?: QueryOptions<CertificateRetrieveParams> | null | undefined,
+    query?: QueryOptions<CertificateRetrieveParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): APIPromise<Certificate>;
   retrieve(
@@ -116,7 +116,7 @@ export class Certificates extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<CertificateListResponsesPage, CertificateListResponse>;
   list(
-    query?: QueryOptions<CertificateListParams> | null | undefined,
+    query?: QueryOptions<CertificateListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<CertificateListResponsesPage, CertificateListResponse>;
   list(

@@ -36,7 +36,7 @@ export class Messages extends APIResource {
   ): PagePromise<ChatCompletionStoreMessagesPage, CompletionsAPI.ChatCompletionStoreMessage>;
   list(
     completionID: string,
-    query?: QueryOptions<MessageListParams> | null | undefined,
+    query?: QueryOptions<MessageListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ChatCompletionStoreMessagesPage, CompletionsAPI.ChatCompletionStoreMessage>;
   list(

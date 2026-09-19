@@ -85,7 +85,7 @@ export class VectorStores extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<VectorStoresPage, VectorStore>;
   list(
-    query?: QueryOptions<VectorStoreListParams> | null | undefined,
+    query?: QueryOptions<VectorStoreListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<VectorStoresPage, VectorStore>;
   list(

@@ -62,7 +62,7 @@ export class AdminAPIKeys extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<AdminAPIKeysPage, AdminAPIKey>;
   list(
-    query?: QueryOptions<AdminAPIKeyListParams> | null | undefined,
+    query?: QueryOptions<AdminAPIKeyListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<AdminAPIKeysPage, AdminAPIKey>;
   list(

@@ -46,7 +46,7 @@ export class Videos extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<VideosPage, Video>;
   list(
-    query?: QueryOptions<VideoListParams> | null | undefined,
+    query?: QueryOptions<VideoListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<VideosPage, Video>;
   list(
@@ -104,7 +104,7 @@ export class Videos extends APIResource {
   downloadContent(videoID: string, options?: LegacyRequestOptions): APIPromise<Response>;
   downloadContent(
     videoID: string,
-    query?: QueryOptions<VideoDownloadContentParams> | null | undefined,
+    query?: QueryOptions<VideoDownloadContentParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): APIPromise<Response>;
   downloadContent(

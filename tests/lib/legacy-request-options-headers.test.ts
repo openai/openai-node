@@ -20,10 +20,13 @@ function createClient() {
 
 const restrictedHeaders: { name: string; headers: HeadersLike }[] = [
   { name: 'project record', headers: { 'OpenAI-Project': 'proj_other' } },
+  { name: 'underscored project record', headers: { oPeNaI_pRoJeCt: 'proj_other' } },
   { name: 'organization record with mixed casing', headers: { 'oPeNaI-OrGaNiZaTiOn': 'org_other' } },
+  { name: 'underscored organization Headers', headers: new Headers({ OpenAI_Organization: 'org_other' }) },
   { name: 'authorization Headers', headers: new Headers({ Authorization: 'Bearer synthetic-other' }) },
   { name: 'API key tuples', headers: [['api-key', 'synthetic-other']] },
   { name: 'authorization removal', headers: { Authorization: null } },
+  { name: 'underscored project tuple removal', headers: [['OpenAI_Project', null]] },
   {
     name: 'own iterable protocol',
     headers: Object.defineProperty(new Headers(), Symbol.iterator, {
@@ -31,6 +34,10 @@ const restrictedHeaders: { name: string; headers: HeadersLike }[] = [
     }),
   },
   { name: 'project removal in normalized headers', headers: buildHeaders([{ 'OpenAI-Project': null }]) },
+  {
+    name: 'underscored organization removal in normalized headers',
+    headers: buildHeaders([{ OpenAI_Organization: null }]),
+  },
   {
     name: 'duplicate project values',
     headers: [

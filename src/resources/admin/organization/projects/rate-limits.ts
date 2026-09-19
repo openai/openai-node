@@ -35,7 +35,7 @@ export class RateLimits extends APIResource {
   ): PagePromise<ProjectRateLimitsPage, ProjectRateLimit>;
   listRateLimits(
     projectID: string,
-    query?: QueryOptions<RateLimitListRateLimitsParams> | null | undefined,
+    query?: QueryOptions<RateLimitListRateLimitsParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ProjectRateLimitsPage, ProjectRateLimit>;
   listRateLimits(

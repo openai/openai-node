@@ -86,7 +86,7 @@ export class Vaults extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<VaultsPage, Vault>;
   list(
-    query?: QueryOptions<VaultListParams> | null | undefined,
+    query?: QueryOptions<VaultListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<VaultsPage, Vault>;
   list(

@@ -68,7 +68,7 @@ export class Invites extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<InvitesPage, Invite>;
   list(
-    query?: QueryOptions<InviteListParams> | null | undefined,
+    query?: QueryOptions<InviteListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<InvitesPage, Invite>;
   list(

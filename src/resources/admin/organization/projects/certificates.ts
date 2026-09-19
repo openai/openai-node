@@ -35,7 +35,7 @@ export class Certificates extends APIResource {
   ): PagePromise<CertificateListResponsesPage, CertificateListResponse>;
   list(
     projectID: string,
-    query?: QueryOptions<CertificateListParams> | null | undefined,
+    query?: QueryOptions<CertificateListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<CertificateListResponsesPage, CertificateListResponse>;
   list(

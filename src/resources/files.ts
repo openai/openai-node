@@ -67,7 +67,7 @@ export class Files extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<FileObjectsPage, FileObject>;
   list(
-    query?: QueryOptions<FileListParams> | null | undefined,
+    query?: QueryOptions<FileListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<FileObjectsPage, FileObject>;
   list(

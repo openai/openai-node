@@ -50,7 +50,7 @@ export class Containers extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<ContainerListResponsesPage, ContainerListResponse>;
   list(
-    query?: QueryOptions<ContainerListParams> | null | undefined,
+    query?: QueryOptions<ContainerListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ContainerListResponsesPage, ContainerListResponse>;
   list(

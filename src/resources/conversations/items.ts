@@ -63,7 +63,7 @@ export class Items extends APIResource {
   ): PagePromise<ConversationItemsPage, ConversationItem>;
   list(
     conversationID: string,
-    query?: QueryOptions<ItemListParams> | null | undefined,
+    query?: QueryOptions<ItemListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ConversationItemsPage, ConversationItem>;
   list(

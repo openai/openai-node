@@ -56,7 +56,7 @@ export class Artifacts extends APIResource {
   list(sessionID: string, options?: LegacyRequestOptions): PagePromise<SessionArtifactsPage, SessionArtifact>;
   list(
     sessionID: string,
-    query?: QueryOptions<ArtifactListParams> | null | undefined,
+    query?: QueryOptions<ArtifactListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<SessionArtifactsPage, SessionArtifact>;
   list(

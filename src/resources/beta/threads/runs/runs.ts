@@ -124,7 +124,7 @@ export class Runs extends APIResource {
   list(threadID: string, options?: LegacyRequestOptions): PagePromise<RunsPage, Run>;
   list(
     threadID: string,
-    query?: QueryOptions<RunListParams> | null | undefined,
+    query?: QueryOptions<RunListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<RunsPage, Run>;
   list(

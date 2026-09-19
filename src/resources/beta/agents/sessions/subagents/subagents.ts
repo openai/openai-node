@@ -65,7 +65,7 @@ export class Subagents extends APIResource {
   list(sessionID: string, options?: LegacyRequestOptions): PagePromise<SubagentsPage, AgentsAPI.Subagent>;
   list(
     sessionID: string,
-    query?: QueryOptions<SubagentListParams> | null | undefined,
+    query?: QueryOptions<SubagentListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<SubagentsPage, AgentsAPI.Subagent>;
   list(

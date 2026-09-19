@@ -69,7 +69,7 @@ export class Evals extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<EvalListResponsesPage, EvalListResponse>;
   list(
-    query?: QueryOptions<EvalListParams> | null | undefined,
+    query?: QueryOptions<EvalListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<EvalListResponsesPage, EvalListResponse>;
   list(

@@ -120,7 +120,7 @@ export class Credentials extends APIResource {
   list(vaultID: string, options?: LegacyRequestOptions): PagePromise<CredentialsPage, Credential>;
   list(
     vaultID: string,
-    query?: QueryOptions<CredentialListParams> | null | undefined,
+    query?: QueryOptions<CredentialListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<CredentialsPage, Credential>;
   list(

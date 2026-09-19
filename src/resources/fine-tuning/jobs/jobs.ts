@@ -79,7 +79,7 @@ export class Jobs extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<FineTuningJobsPage, FineTuningJob>;
   list(
-    query?: QueryOptions<JobListParams> | null | undefined,
+    query?: QueryOptions<JobListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<FineTuningJobsPage, FineTuningJob>;
   list(
@@ -139,7 +139,7 @@ export class Jobs extends APIResource {
   ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent>;
   listEvents(
     fineTuningJobID: string,
-    query?: QueryOptions<JobListEventsParams> | null | undefined,
+    query?: QueryOptions<JobListEventsParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent>;
   listEvents(

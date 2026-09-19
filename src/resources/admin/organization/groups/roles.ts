@@ -73,7 +73,7 @@ export class Roles extends APIResource {
   list(groupID: string, options?: LegacyRequestOptions): PagePromise<RoleListResponsesPage, RoleListResponse>;
   list(
     groupID: string,
-    query?: QueryOptions<RoleListParams> | null | undefined,
+    query?: QueryOptions<RoleListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<RoleListResponsesPage, RoleListResponse>;
   list(

@@ -147,7 +147,7 @@ export class Completions extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<ChatCompletionsPage, ChatCompletion>;
   list(
-    query?: QueryOptions<ChatCompletionListParams> | null | undefined,
+    query?: QueryOptions<ChatCompletionListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ChatCompletionsPage, ChatCompletion>;
   list(

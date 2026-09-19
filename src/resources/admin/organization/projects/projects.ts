@@ -213,7 +213,7 @@ export class Projects extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<ProjectsPage, Project>;
   list(
-    query?: QueryOptions<ProjectListParams> | null | undefined,
+    query?: QueryOptions<ProjectListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ProjectsPage, Project>;
   list(

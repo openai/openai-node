@@ -113,7 +113,7 @@ export class Groups extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<GroupsPage, Group>;
   list(
-    query?: QueryOptions<GroupListParams> | null | undefined,
+    query?: QueryOptions<GroupListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<GroupsPage, Group>;
   list(

@@ -85,13 +85,15 @@ export function normalizeRequestOptionsForQuery(
     const headers = buildHeaders([normalized.headers]);
     const names = [...headers.values.keys(), ...headers.nulls];
     if (
-      names.some(
-        (name) =>
-          isSensitiveHeader(name) ||
-          name === 'openai-organization' ||
-          name === 'openai-project' ||
-          name === 'host',
-      )
+      names.some((name) => {
+        const canonical = name.toLowerCase().split('_').join('-');
+        return (
+          isSensitiveHeader(canonical) ||
+          canonical === 'openai-organization' ||
+          canonical === 'openai-project' ||
+          canonical === 'host'
+        );
+      })
     ) {
       throw new TypeError('Pass security-sensitive headers in the explicit request options argument.');
     }

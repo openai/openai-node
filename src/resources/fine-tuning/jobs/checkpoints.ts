@@ -33,7 +33,7 @@ export class Checkpoints extends APIResource {
   ): PagePromise<FineTuningJobCheckpointsPage, FineTuningJobCheckpoint>;
   list(
     fineTuningJobID: string,
-    query?: QueryOptions<CheckpointListParams> | null | undefined,
+    query?: QueryOptions<CheckpointListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<FineTuningJobCheckpointsPage, FineTuningJobCheckpoint>;
   list(

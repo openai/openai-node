@@ -143,7 +143,7 @@ export class Sessions extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession>;
   list(
-    query?: QueryOptions<SessionListParams> | null | undefined,
+    query?: QueryOptions<SessionListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession>;
   list(

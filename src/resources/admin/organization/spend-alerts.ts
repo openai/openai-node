@@ -104,7 +104,7 @@ export class SpendAlerts extends APIResource {
    */
   list(options?: LegacyRequestOptions): PagePromise<OrganizationSpendAlertsPage, OrganizationSpendAlert>;
   list(
-    query?: QueryOptions<SpendAlertListParams> | null | undefined,
+    query?: QueryOptions<SpendAlertListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<OrganizationSpendAlertsPage, OrganizationSpendAlert>;
   list(

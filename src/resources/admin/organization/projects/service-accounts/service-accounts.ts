@@ -112,7 +112,7 @@ export class ServiceAccounts extends APIResource {
   ): PagePromise<ProjectServiceAccountsPage, ProjectServiceAccount>;
   list(
     projectID: string,
-    query?: QueryOptions<ServiceAccountListParams> | null | undefined,
+    query?: QueryOptions<ServiceAccountListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ProjectServiceAccountsPage, ProjectServiceAccount>;
   list(

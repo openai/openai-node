@@ -56,7 +56,7 @@ export class APIKeys extends APIResource {
   list(projectID: string, options?: LegacyRequestOptions): PagePromise<ProjectAPIKeysPage, ProjectAPIKey>;
   list(
     projectID: string,
-    query?: QueryOptions<APIKeyListParams> | null | undefined,
+    query?: QueryOptions<APIKeyListParams> | LegacyRequestOptions | null | undefined,
     options?: RequestOptions,
   ): PagePromise<ProjectAPIKeysPage, ProjectAPIKey>;
   list(
