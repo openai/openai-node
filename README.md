@@ -603,6 +603,21 @@ For more information on support for Amazon Bedrock, see [docs/bedrock.md](docs/b
 
 ## Advanced Usage
 
+### GET query parameters and request options
+
+Pass query parameters and request options separately:
+
+```ts
+await client.files.list({ limit: 10 }, { headers: { 'X-Request-Tag': 'example' } });
+```
+
+GET methods with unambiguous optional query parameters also accept legacy options-only calls,
+such as `client.files.list({ timeout: 5000 })`. These calls support `headers`, `maxRetries`,
+`timeout`, `signal`, `idempotencyKey`, and `query`. Authentication, tenant, and host headers,
+including header removals, require the explicit request options argument. Mixing query
+parameters and options in one object throws. For `responses.retrieve`, pass `stream` in
+the query argument rather than inside `options.query`.
+
 ### Accessing raw Response data (e.g., headers)
 
 The "raw" `Response` returned by `fetch()` can be accessed through the `.asResponse()` method on the `APIPromise` type that all methods return.
