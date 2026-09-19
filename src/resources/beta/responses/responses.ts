@@ -11,6 +11,11 @@ import { CursorPage } from '../../../core/pagination';
 import { Stream } from '../../../core/streaming';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 export class Responses extends APIResource {
@@ -73,24 +78,46 @@ export class Responses extends APIResource {
    */
   retrieve(
     responseID: string,
-    params?: ResponseRetrieveParamsNonStreaming,
+    params?: QueryOptions<ResponseRetrieveParamsNonStreaming>,
     options?: RequestOptions,
   ): APIPromise<BetaResponse>;
   retrieve(
     responseID: string,
-    params: ResponseRetrieveParamsStreaming,
+    params: QueryOptions<ResponseRetrieveParamsStreaming>,
     options?: RequestOptions,
   ): APIPromise<Stream<BetaResponseStreamEvent>>;
+  retrieve(responseID: string, options?: LegacyRequestOptions & { stream?: never }): APIPromise<BetaResponse>;
   retrieve(
     responseID: string,
-    params?: ResponseRetrieveParamsBase | undefined,
+    options?: LegacyRequestOptions,
+  ): APIPromise<Stream<BetaResponseStreamEvent> | BetaResponse>;
+  retrieve(
+    responseID: string,
+    params?: QueryOptions<ResponseRetrieveParamsBase> | undefined,
     options?: RequestOptions,
   ): APIPromise<Stream<BetaResponseStreamEvent> | BetaResponse>;
   retrieve(
     responseID: string,
-    params: ResponseRetrieveParams | undefined = {},
+    params: ResponseRetrieveParamsBase | LegacyRequestOptions | undefined = {},
     options?: RequestOptions,
   ): APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>> {
+    const normalizedOptions = normalizeRequestOptionsForQuery(
+      params,
+      ['include', 'include_obfuscation', 'starting_after', 'stream', 'betas'],
+      options,
+    );
+    if (normalizedOptions !== undefined) {
+      options = normalizedOptions;
+      if (options.query != null) {
+        // Match the object spread used to combine query values with the beta URL parameter.
+        options.query = { ...options.query };
+        if ('stream' in options.query && options.query.stream !== undefined) {
+          throw new TypeError('Pass stream in the query argument, not in options.query.');
+        }
+      }
+      params = {};
+    }
+    params = params as ResponseRetrieveParams | undefined;
     const { betas, ...query } = params ?? {};
     return this._client.get(path`/responses/${responseID}?beta=true`, {
       query,

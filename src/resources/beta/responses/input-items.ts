@@ -6,6 +6,11 @@ import { BetaResponseItemsPage } from './responses';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 export class InputItems extends APIResource {
@@ -24,9 +29,28 @@ export class InputItems extends APIResource {
    */
   list(
     responseID: string,
-    params: InputItemListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<BetaResponseItemsPage, ResponsesAPI.BetaResponseItem>;
+  list(
+    responseID: string,
+    params?: QueryOptions<InputItemListParams> | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<BetaResponseItemsPage, ResponsesAPI.BetaResponseItem>;
+  list(
+    responseID: string,
+    params: InputItemListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<BetaResponseItemsPage, ResponsesAPI.BetaResponseItem> {
+    const normalizedOptions = normalizeRequestOptionsForQuery(
+      params,
+      ['after', 'include', 'limit', 'order', 'betas'],
+      options,
+    );
+    if (normalizedOptions !== undefined) {
+      options = normalizedOptions;
+      params = {};
+    }
+    params = params as InputItemListParams | null | undefined;
     const { betas, ...query } = params ?? {};
     return this._client.getAPIList(
       path`/responses/${responseID}/input_items?beta=true`,
