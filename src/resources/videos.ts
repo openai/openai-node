@@ -6,6 +6,11 @@ import { ConversationCursorPage, type ConversationCursorPageParams, PagePromise 
 import { type Uploadable } from '../core/uploads';
 import { buildHeaders } from '../internal/headers';
 import { RequestOptions } from '../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../internal/legacy-query-options';
 import { maybeMultipartFormRequestOptions, multipartFormRequestOptions } from '../internal/uploads';
 import { path } from '../internal/utils/path';
 
@@ -39,10 +44,25 @@ export class Videos extends APIResource {
    *
    * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
+  list(options?: LegacyRequestOptions): PagePromise<VideosPage, Video>;
   list(
-    query: VideoListParams | null | undefined = {},
+    query?: QueryOptions<VideoListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<VideosPage, Video>;
+  list(
+    query: VideoListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<VideosPage, Video> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as VideoListParams | null | undefined;
     return this._client.getAPIList('/videos', ConversationCursorPage<Video>, {
       query,
       ...options,
@@ -81,11 +101,27 @@ export class Videos extends APIResource {
    *
    * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
+  downloadContent(videoID: string, options?: LegacyRequestOptions): APIPromise<Response>;
   downloadContent(
     videoID: string,
-    query: VideoDownloadContentParams | null | undefined = {},
+    query?: QueryOptions<VideoDownloadContentParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): APIPromise<Response>;
+  downloadContent(
+    videoID: string,
+    query: VideoDownloadContentParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<Response> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['variant'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as VideoDownloadContentParams | null | undefined;
     return this._client.get(path`/videos/${videoID}/content`, {
       query,
       ...options,

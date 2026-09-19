@@ -19,6 +19,11 @@ import { CursorPage } from '../../core/pagination';
 import { Stream } from '../../core/streaming';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../internal/legacy-query-options';
 import { path } from '../../internal/utils/path';
 
 export interface ParsedResponseOutputText<ParsedT> extends ResponseOutputText {
@@ -126,6 +131,8 @@ export class Responses extends APIResource {
 
   /**
    * Retrieves a model response with the given ID.
+   * Pass `stream` in the query argument; options-only calls reject `options.query.stream`.
+   * A second argument typed as `RequestOptions` may stream, so its return type includes `Stream`.
    *
    * @example
    * ```ts
@@ -136,24 +143,46 @@ export class Responses extends APIResource {
    */
   retrieve(
     responseID: string,
-    query?: ResponseRetrieveParamsNonStreaming,
+    query?: QueryOptions<ResponseRetrieveParamsNonStreaming>,
     options?: RequestOptions,
   ): APIPromise<Response>;
   retrieve(
     responseID: string,
-    query: ResponseRetrieveParamsStreaming,
+    query: QueryOptions<ResponseRetrieveParamsStreaming>,
     options?: RequestOptions,
   ): APIPromise<Stream<ResponseStreamEvent>>;
+  retrieve(responseID: string, options?: LegacyRequestOptions & { stream?: never }): APIPromise<Response>;
   retrieve(
     responseID: string,
-    query?: ResponseRetrieveParamsBase | undefined,
+    options?: LegacyRequestOptions,
+  ): APIPromise<Stream<ResponseStreamEvent> | Response>;
+  retrieve(
+    responseID: string,
+    query?: QueryOptions<ResponseRetrieveParamsBase> | LegacyRequestOptions | undefined,
     options?: RequestOptions,
   ): APIPromise<Stream<ResponseStreamEvent> | Response>;
   retrieve(
     responseID: string,
-    query: ResponseRetrieveParams | undefined = {},
+    query: ResponseRetrieveParamsBase | LegacyRequestOptions | undefined = {},
     options?: RequestOptions,
   ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['include', 'include_obfuscation', 'starting_after', 'stream'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      if (typeof options.query === 'object' && options.query !== null && !Array.isArray(options.query)) {
+        // Validate and send the same query values, including fields supplied by getters.
+        options.query = { ...options.query };
+        if ('stream' in options.query && options.query.stream !== undefined) {
+          throw new TypeError('Pass stream in the query argument, not in options.query.');
+        }
+      }
+      query = {};
+    }
+    query = query as ResponseRetrieveParams | undefined;
     return (
       this._client.get(path`/responses/${responseID}`, {
         query,
@@ -6785,7 +6814,7 @@ export namespace ResponseOutputText {
  */
 export interface ResponseOutputTextAnnotationAddedEvent {
   /**
-   * An annotation that applies to a span of output text.
+   * The annotation object being added. (See annotation schema for details.)
    */
   annotation:
     | ResponseOutputTextAnnotationAddedEvent.FileCitation
@@ -10305,10 +10334,9 @@ export namespace Tool {
     background?: 'transparent' | 'opaque' | 'auto';
 
     /**
-     * Control how much effort the model will exert to match the style and features,
-     * especially facial features, of input images. This parameter is only supported
-     * for `gpt-image-1` and `gpt-image-1.5` and later models, unsupported for
-     * `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.
+     * Controls fidelity to the original input image(s). This parameter is supported
+     * for GPT image models that support input fidelity. `gpt-image-2` and
+     * `gpt-image-2-2026-04-21` ignore this parameter.
      */
     input_fidelity?: 'high' | 'low' | null;
 

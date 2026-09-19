@@ -36,6 +36,11 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core
 import { Stream } from '../../../../core/streaming';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { AssistantStream, RunCreateParamsBaseStream } from '../../../../lib/AssistantStream';
 import { pollAssistantRun } from '../../../../lib/assistant-run-polling';
 import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
@@ -116,11 +121,27 @@ export class Runs extends APIResource {
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
+  list(threadID: string, options?: LegacyRequestOptions): PagePromise<RunsPage, Run>;
   list(
     threadID: string,
-    query: RunListParams | null | undefined = {},
+    query?: QueryOptions<RunListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<RunsPage, Run>;
+  list(
+    threadID: string,
+    query: RunListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<RunsPage, Run> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'before', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as RunListParams | null | undefined;
     return this._client.getAPIList(path`/threads/${threadID}/runs`, CursorPage<Run>, {
       query,
       ...options,

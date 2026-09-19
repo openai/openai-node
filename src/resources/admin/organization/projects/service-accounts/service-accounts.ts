@@ -10,6 +10,11 @@ import {
   PagePromise,
 } from '../../../../../core/pagination';
 import { RequestOptions } from '../../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../../internal/legacy-query-options';
 import { path } from '../../../../../internal/utils/path';
 
 export class ServiceAccounts extends APIResource {
@@ -103,9 +108,28 @@ export class ServiceAccounts extends APIResource {
    */
   list(
     projectID: string,
-    query: ServiceAccountListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<ProjectServiceAccountsPage, ProjectServiceAccount>;
+  list(
+    projectID: string,
+    query?: QueryOptions<ServiceAccountListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ProjectServiceAccountsPage, ProjectServiceAccount>;
+  list(
+    projectID: string,
+    query: ServiceAccountListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ProjectServiceAccountsPage, ProjectServiceAccount> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ServiceAccountListParams | null | undefined;
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/service_accounts`,
       ConversationCursorPage<ProjectServiceAccount>,

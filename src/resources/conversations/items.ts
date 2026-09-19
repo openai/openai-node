@@ -10,6 +10,11 @@ import {
   PagePromise,
 } from '../../core/pagination';
 import { RequestOptions } from '../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../internal/legacy-query-options';
 import { path } from '../../internal/utils/path';
 
 /**
@@ -54,9 +59,28 @@ export class Items extends APIResource {
    */
   list(
     conversationID: string,
-    query: ItemListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<ConversationItemsPage, ConversationItem>;
+  list(
+    conversationID: string,
+    query?: QueryOptions<ItemListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ConversationItemsPage, ConversationItem>;
+  list(
+    conversationID: string,
+    query: ItemListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ConversationItemsPage, ConversationItem> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'include', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ItemListParams | null | undefined;
     return this._client.getAPIList(
       path`/conversations/${conversationID}/items`,
       ConversationCursorPage<ConversationItem>,

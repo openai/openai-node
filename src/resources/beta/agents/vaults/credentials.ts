@@ -7,6 +7,11 @@ import { APIPromise } from '../../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Credentials extends APIResource {
@@ -112,11 +117,27 @@ export class Credentials extends APIResource {
    * }
    * ```
    */
+  list(vaultID: string, options?: LegacyRequestOptions): PagePromise<CredentialsPage, Credential>;
   list(
     vaultID: string,
-    query: CredentialListParams | null | undefined = {},
+    query?: QueryOptions<CredentialListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<CredentialsPage, Credential>;
+  list(
+    vaultID: string,
+    query: CredentialListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<CredentialsPage, Credential> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order', 'status'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as CredentialListParams | null | undefined;
     return this._client.getAPIList(path`/vaults/${vaultID}/credentials`, CursorPage<Credential>, {
       query,
       ...options,
@@ -219,8 +240,7 @@ export namespace CredentialAuth {
     mcp_server_url: string;
 
     /**
-     * Configuration used to refresh an MCP OAuth access token, excluding secret
-     * values.
+     * Public refresh metadata without refresh tokens or OAuth client secrets.
      */
     refresh: VaultCredentialAuthResourceMcpOauth.Refresh | null;
 
@@ -232,8 +252,7 @@ export namespace CredentialAuth {
 
   export namespace VaultCredentialAuthResourceMcpOauth {
     /**
-     * Configuration used to refresh an MCP OAuth access token, excluding secret
-     * values.
+     * Public refresh metadata without refresh tokens or OAuth client secrets.
      */
     export interface Refresh {
       /**
@@ -338,14 +357,14 @@ export namespace CredentialAuthCreateParam {
     expires_at?: string | null;
 
     /**
-     * Configuration for refreshing the access token of an MCP OAuth credential.
+     * Optional refresh configuration for an HTTPS OAuth token endpoint.
      */
     refresh?: CreateVaultCredentialAuthParamMcpOauth.Refresh | null;
   }
 
   export namespace CreateVaultCredentialAuthParamMcpOauth {
     /**
-     * Configuration for refreshing the access token of an MCP OAuth credential.
+     * Optional refresh configuration for an HTTPS OAuth token endpoint.
      */
     export interface Refresh {
       /**
@@ -473,14 +492,14 @@ export namespace CredentialAuthRotateParam {
     expires_at?: string | null;
 
     /**
-     * Updates to an MCP credential's existing OAuth refresh configuration.
+     * Optional write-only refresh-token and client-secret updates.
      */
     refresh?: RotateVaultCredentialAuthParamMcpOauth.Refresh | null;
   }
 
   export namespace RotateVaultCredentialAuthParamMcpOauth {
     /**
-     * Updates to an MCP credential's existing OAuth refresh configuration.
+     * Optional write-only refresh-token and client-secret updates.
      */
     export interface Refresh {
       /**
@@ -496,8 +515,7 @@ export namespace CredentialAuthRotateParam {
       scope?: string | null;
 
       /**
-       * Client-secret updates that preserve the credential's OAuth authentication
-       * method.
+       * Client-secret updates for the existing token endpoint authentication method.
        */
       token_endpoint_auth?: CredentialsAPI.McpOauthTokenEndpointAuthRotateParam | null;
     }

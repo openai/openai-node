@@ -6,6 +6,11 @@ import { RolesPage } from '../roles';
 import { APIPromise } from '../../../../core/api-promise';
 import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../../../core/pagination';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Roles extends APIResource {
@@ -83,11 +88,27 @@ export class Roles extends APIResource {
    * }
    * ```
    */
+  list(projectID: string, options?: LegacyRequestOptions): PagePromise<RolesPage, RolesAPI.Role>;
   list(
     projectID: string,
-    query: RoleListParams | null | undefined = {},
+    query?: QueryOptions<RoleListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<RolesPage, RolesAPI.Role>;
+  list(
+    projectID: string,
+    query: RoleListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<RolesPage, RolesAPI.Role> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as RoleListParams | null | undefined;
     return this._client.getAPIList(path`/projects/${projectID}/roles`, NextCursorPage<RolesAPI.Role>, {
       query,
       ...options,

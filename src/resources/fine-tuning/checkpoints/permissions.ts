@@ -9,6 +9,11 @@ import {
   PagePromise,
 } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 /**
@@ -56,9 +61,28 @@ export class Permissions extends APIResource {
    */
   retrieve(
     fineTunedModelCheckpoint: string,
-    query: PermissionRetrieveParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): APIPromise<PermissionRetrieveResponse>;
+  retrieve(
+    fineTunedModelCheckpoint: string,
+    query?: QueryOptions<PermissionRetrieveParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): APIPromise<PermissionRetrieveResponse>;
+  retrieve(
+    fineTunedModelCheckpoint: string,
+    query: PermissionRetrieveParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<PermissionRetrieveResponse> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order', 'project_id'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as PermissionRetrieveParams | null | undefined;
     return this._client.get(path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, {
       query,
       ...options,
@@ -85,9 +109,28 @@ export class Permissions extends APIResource {
    */
   list(
     fineTunedModelCheckpoint: string,
-    query: PermissionListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<PermissionListResponsesPage, PermissionListResponse>;
+  list(
+    fineTunedModelCheckpoint: string,
+    query?: QueryOptions<PermissionListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<PermissionListResponsesPage, PermissionListResponse>;
+  list(
+    fineTunedModelCheckpoint: string,
+    query: PermissionListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<PermissionListResponsesPage, PermissionListResponse> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order', 'project_id'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as PermissionListParams | null | undefined;
     return this._client.getAPIList(
       path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`,
       ConversationCursorPage<PermissionListResponse>,

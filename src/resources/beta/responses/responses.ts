@@ -11,6 +11,11 @@ import { CursorPage } from '../../../core/pagination';
 import { Stream } from '../../../core/streaming';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 export class Responses extends APIResource {
@@ -73,24 +78,46 @@ export class Responses extends APIResource {
    */
   retrieve(
     responseID: string,
-    params?: ResponseRetrieveParamsNonStreaming,
+    params?: QueryOptions<ResponseRetrieveParamsNonStreaming>,
     options?: RequestOptions,
   ): APIPromise<BetaResponse>;
   retrieve(
     responseID: string,
-    params: ResponseRetrieveParamsStreaming,
+    params: QueryOptions<ResponseRetrieveParamsStreaming>,
     options?: RequestOptions,
   ): APIPromise<Stream<BetaResponseStreamEvent>>;
+  retrieve(responseID: string, options?: LegacyRequestOptions & { stream?: never }): APIPromise<BetaResponse>;
   retrieve(
     responseID: string,
-    params?: ResponseRetrieveParamsBase | undefined,
+    options?: LegacyRequestOptions,
+  ): APIPromise<Stream<BetaResponseStreamEvent> | BetaResponse>;
+  retrieve(
+    responseID: string,
+    params?: QueryOptions<ResponseRetrieveParamsBase> | LegacyRequestOptions | undefined,
     options?: RequestOptions,
   ): APIPromise<Stream<BetaResponseStreamEvent> | BetaResponse>;
   retrieve(
     responseID: string,
-    params: ResponseRetrieveParams | undefined = {},
+    params: ResponseRetrieveParamsBase | LegacyRequestOptions | undefined = {},
     options?: RequestOptions,
   ): APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>> {
+    const normalizedOptions = normalizeRequestOptionsForQuery(
+      params,
+      ['include', 'include_obfuscation', 'starting_after', 'stream', 'betas'],
+      options,
+    );
+    if (normalizedOptions !== undefined) {
+      options = normalizedOptions;
+      if (options.query != null) {
+        // Match the object spread used to combine query values with the beta URL parameter.
+        options.query = { ...options.query };
+        if ('stream' in options.query && options.query.stream !== undefined) {
+          throw new TypeError('Pass stream in the query argument, not in options.query.');
+        }
+      }
+      params = {};
+    }
+    params = params as ResponseRetrieveParams | undefined;
     const { betas, ...query } = params ?? {};
     return this._client.get(path`/responses/${responseID}?beta=true`, {
       query,
@@ -9310,7 +9337,7 @@ export namespace BetaResponseOutputText {
  */
 export interface BetaResponseOutputTextAnnotationAddedEvent {
   /**
-   * An annotation that applies to a span of output text.
+   * The annotation object being added. (See annotation schema for details.)
    */
   annotation:
     | BetaResponseOutputTextAnnotationAddedEvent.FileCitation
@@ -13454,10 +13481,9 @@ export namespace BetaTool {
     background?: 'transparent' | 'opaque' | 'auto';
 
     /**
-     * Control how much effort the model will exert to match the style and features,
-     * especially facial features, of input images. This parameter is only supported
-     * for `gpt-image-1` and `gpt-image-1.5` and later models, unsupported for
-     * `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.
+     * Controls fidelity to the original input image(s). This parameter is supported
+     * for GPT image models that support input fidelity. `gpt-image-2` and
+     * `gpt-image-2-2026-04-21` ignore this parameter.
      */
     input_fidelity?: 'high' | 'low' | null;
 

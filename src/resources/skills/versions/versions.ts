@@ -7,6 +7,11 @@ import { APIPromise } from '../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { type Uploadable } from '../../../core/uploads';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { maybeMultipartFormRequestOptions } from '../../../internal/uploads';
 import { path } from '../../../internal/utils/path';
 
@@ -47,11 +52,27 @@ export class Versions extends APIResource {
   /**
    * List skill versions for a skill.
    */
+  list(skillID: string, options?: LegacyRequestOptions): PagePromise<SkillVersionsPage, SkillVersion>;
   list(
     skillID: string,
-    query: VersionListParams | null | undefined = {},
+    query?: QueryOptions<VersionListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<SkillVersionsPage, SkillVersion>;
+  list(
+    skillID: string,
+    query: VersionListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<SkillVersionsPage, SkillVersion> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as VersionListParams | null | undefined;
     return this._client.getAPIList(path`/skills/${skillID}/versions`, CursorPage<SkillVersion>, {
       query,
       ...options,

@@ -13,6 +13,11 @@ import {
 import { APIPromise } from '../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 /**
@@ -72,10 +77,25 @@ export class Jobs extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<FineTuningJobsPage, FineTuningJob>;
   list(
-    query: JobListParams | null | undefined = {},
+    query?: QueryOptions<JobListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<FineTuningJobsPage, FineTuningJob>;
+  list(
+    query: JobListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FineTuningJobsPage, FineTuningJob> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'metadata'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as JobListParams | null | undefined;
     return this._client.getAPIList('/fine_tuning/jobs', CursorPage<FineTuningJob>, {
       query,
       ...options,
@@ -115,9 +135,28 @@ export class Jobs extends APIResource {
    */
   listEvents(
     fineTuningJobID: string,
-    query: JobListEventsParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent>;
+  listEvents(
+    fineTuningJobID: string,
+    query?: QueryOptions<JobListEventsParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent>;
+  listEvents(
+    fineTuningJobID: string,
+    query: JobListEventsParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as JobListEventsParams | null | undefined;
     return this._client.getAPIList(
       path`/fine_tuning/jobs/${fineTuningJobID}/events`,
       CursorPage<FineTuningJobEvent>,

@@ -21,6 +21,11 @@ import {
   PagePromise,
 } from '../../../../core/pagination';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Users extends APIResource {
@@ -70,10 +75,25 @@ export class Users extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<OrganizationUsersPage, OrganizationUser>;
   list(
-    query: UserListParams | null | undefined = {},
+    query?: QueryOptions<UserListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<OrganizationUsersPage, OrganizationUser>;
+  list(
+    query: UserListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<OrganizationUsersPage, OrganizationUser> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'emails', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as UserListParams | null | undefined;
     return this._client.getAPIList('/organization/users', ConversationCursorPage<OrganizationUser>, {
       query,
       ...options,

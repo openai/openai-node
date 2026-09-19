@@ -3,6 +3,11 @@
 import { APIResource } from '../../../core/resource';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 /**
@@ -24,9 +29,28 @@ export class Checkpoints extends APIResource {
    */
   list(
     fineTuningJobID: string,
-    query: CheckpointListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<FineTuningJobCheckpointsPage, FineTuningJobCheckpoint>;
+  list(
+    fineTuningJobID: string,
+    query?: QueryOptions<CheckpointListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<FineTuningJobCheckpointsPage, FineTuningJobCheckpoint>;
+  list(
+    fineTuningJobID: string,
+    query: CheckpointListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FineTuningJobCheckpointsPage, FineTuningJobCheckpoint> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as CheckpointListParams | null | undefined;
     return this._client.getAPIList(
       path`/fine_tuning/jobs/${fineTuningJobID}/checkpoints`,
       CursorPage<FineTuningJobCheckpoint>,

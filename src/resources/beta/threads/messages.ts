@@ -7,6 +7,11 @@ import { APIPromise } from '../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 /**
@@ -63,11 +68,27 @@ export class Messages extends APIResource {
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
+  list(threadID: string, options?: LegacyRequestOptions): PagePromise<MessagesPage, Message>;
   list(
     threadID: string,
-    query: MessageListParams | null | undefined = {},
+    query?: QueryOptions<MessageListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<MessagesPage, Message>;
+  list(
+    threadID: string,
+    query: MessageListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<MessagesPage, Message> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'before', 'limit', 'order', 'run_id'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as MessageListParams | null | undefined;
     return this._client.getAPIList(path`/threads/${threadID}/messages`, CursorPage<Message>, {
       query,
       ...options,

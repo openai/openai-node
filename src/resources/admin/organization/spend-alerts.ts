@@ -8,6 +8,11 @@ import {
   PagePromise,
 } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 export class SpendAlerts extends APIResource {
@@ -97,10 +102,25 @@ export class SpendAlerts extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<OrganizationSpendAlertsPage, OrganizationSpendAlert>;
   list(
-    query: SpendAlertListParams | null | undefined = {},
+    query?: QueryOptions<SpendAlertListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<OrganizationSpendAlertsPage, OrganizationSpendAlert>;
+  list(
+    query: SpendAlertListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<OrganizationSpendAlertsPage, OrganizationSpendAlert> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'before', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as SpendAlertListParams | null | undefined;
     return this._client.getAPIList(
       '/organization/spend_alerts',
       ConversationCursorPage<OrganizationSpendAlert>,

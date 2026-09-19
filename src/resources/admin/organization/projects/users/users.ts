@@ -21,6 +21,11 @@ import {
   PagePromise,
 } from '../../../../../core/pagination';
 import { RequestOptions } from '../../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../../internal/legacy-query-options';
 import { path } from '../../../../../internal/utils/path';
 
 export class Users extends APIResource {
@@ -101,11 +106,27 @@ export class Users extends APIResource {
    * }
    * ```
    */
+  list(projectID: string, options?: LegacyRequestOptions): PagePromise<ProjectUsersPage, ProjectUser>;
   list(
     projectID: string,
-    query: UserListParams | null | undefined = {},
+    query?: QueryOptions<UserListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ProjectUsersPage, ProjectUser>;
+  list(
+    projectID: string,
+    query: UserListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ProjectUsersPage, ProjectUser> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as UserListParams | null | undefined;
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/users`,
       ConversationCursorPage<ProjectUser>,

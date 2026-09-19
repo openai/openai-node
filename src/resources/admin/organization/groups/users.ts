@@ -4,6 +4,11 @@ import { APIResource } from '../../../../core/resource';
 import { APIPromise } from '../../../../core/api-promise';
 import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../../../core/pagination';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Users extends APIResource {
@@ -66,9 +71,28 @@ export class Users extends APIResource {
    */
   list(
     groupID: string,
-    query: UserListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<OrganizationGroupUsersPage, OrganizationGroupUser>;
+  list(
+    groupID: string,
+    query?: QueryOptions<UserListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<OrganizationGroupUsersPage, OrganizationGroupUser>;
+  list(
+    groupID: string,
+    query: UserListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<OrganizationGroupUsersPage, OrganizationGroupUser> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as UserListParams | null | undefined;
     return this._client.getAPIList(
       path`/organization/groups/${groupID}/users`,
       NextCursorPage<OrganizationGroupUser>,

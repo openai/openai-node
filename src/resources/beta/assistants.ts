@@ -10,6 +10,11 @@ import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../internal/legacy-query-options';
 import { path } from '../../internal/utils/path';
 import { AssistantStream } from '../../lib/AssistantStream';
 
@@ -63,10 +68,25 @@ export class Assistants extends APIResource {
    *
    * @deprecated
    */
+  list(options?: LegacyRequestOptions): PagePromise<AssistantsPage, Assistant>;
   list(
-    query: AssistantListParams | null | undefined = {},
+    query?: QueryOptions<AssistantListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<AssistantsPage, Assistant>;
+  list(
+    query: AssistantListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<AssistantsPage, Assistant> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'before', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as AssistantListParams | null | undefined;
     return this._client.getAPIList('/assistants', CursorPage<Assistant>, {
       query,
       ...options,

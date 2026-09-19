@@ -5,6 +5,11 @@ import * as ResponsesAPI from './responses';
 import { ResponseItemsPage } from './responses';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { RequestOptions } from '../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../internal/legacy-query-options';
 import { path } from '../../internal/utils/path';
 
 export class InputItems extends APIResource {
@@ -23,9 +28,28 @@ export class InputItems extends APIResource {
    */
   list(
     responseID: string,
-    query: InputItemListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<ResponseItemsPage, ResponsesAPI.ResponseItem>;
+  list(
+    responseID: string,
+    query?: QueryOptions<InputItemListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ResponseItemsPage, ResponsesAPI.ResponseItem>;
+  list(
+    responseID: string,
+    query: InputItemListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ResponseItemsPage, ResponsesAPI.ResponseItem> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'include', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as InputItemListParams | null | undefined;
     return this._client.getAPIList(
       path`/responses/${responseID}/input_items`,
       CursorPage<ResponsesAPI.ResponseItem>,

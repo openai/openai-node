@@ -8,6 +8,11 @@ import {
   PagePromise,
 } from '../../../../core/pagination';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class APIKeys extends APIResource {
@@ -48,11 +53,27 @@ export class APIKeys extends APIResource {
    * }
    * ```
    */
+  list(projectID: string, options?: LegacyRequestOptions): PagePromise<ProjectAPIKeysPage, ProjectAPIKey>;
   list(
     projectID: string,
-    query: APIKeyListParams | null | undefined = {},
+    query?: QueryOptions<APIKeyListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ProjectAPIKeysPage, ProjectAPIKey>;
+  list(
+    projectID: string,
+    query: APIKeyListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ProjectAPIKeysPage, ProjectAPIKey> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'owner_project_access'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as APIKeyListParams | null | undefined;
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/api_keys`,
       ConversationCursorPage<ProjectAPIKey>,

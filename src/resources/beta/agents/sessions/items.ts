@@ -6,6 +6,11 @@ import { AgentSessionItemsPage } from '../agents';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Items extends APIResource {
@@ -26,9 +31,28 @@ export class Items extends APIResource {
    */
   list(
     sessionID: string,
-    query: ItemListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<AgentSessionItemsPage, AgentsAPI.AgentSessionItem>;
+  list(
+    sessionID: string,
+    query?: QueryOptions<ItemListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<AgentSessionItemsPage, AgentsAPI.AgentSessionItem>;
+  list(
+    sessionID: string,
+    query: ItemListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<AgentSessionItemsPage, AgentsAPI.AgentSessionItem> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ItemListParams | null | undefined;
     return this._client.getAPIList(
       path`/agents/sessions/${sessionID}/items`,
       CursorPage<AgentsAPI.AgentSessionItem>,

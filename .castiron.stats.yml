@@ -1,8 +1,10 @@
 schema_version: 1
-generation_id: cf39b884-c151-4a66-8ed9-78f1e22f6551
+generation_id: edd8564f-49f3-4374-95fd-71bb3e76c5df
+# Schema hashes track the API reference merged from main; codegen fields retain
+# this promotion's generated baseline.
 openapi_spec_hash: f7fd2b85cc9e2a36081f6cb53f30c8a2
 openapi_transformed_spec_hash: a3654d3731ba3243f13e363457727d4f
-config_hash: b7f9b3bb0748c65e400fe18195f7c0ea
-codegen_sha: 8f8881d25eb65d7d502997127cb783e7bf8d0d9f
-codegen_hash: 49525caa34df782d25482af3ee20bebee2e9e9bbad2f09f9152197b895a73685
-public_codegen_sha: f2c53c230e39853e918d7ec71708412ee97a7bb8
+config_hash: aaaa47e4b5e2e071e92723b91f510a6b
+codegen_sha: ad3352e16161814a2dcfcd23f72b0056ba01c7c6
+codegen_hash: 88da26ea186b74f71343f523f57c1cc4f248d82bc6860407caf759e225f11ce8
+public_codegen_sha: f99a84f25566ec60860f3aaba01ab257db60dec1

@@ -5,6 +5,11 @@ import * as CompletionsAPI from './completions';
 import { ChatCompletionStoreMessagesPage } from './completions';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 /**
@@ -27,9 +32,28 @@ export class Messages extends APIResource {
    */
   list(
     completionID: string,
-    query: MessageListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<ChatCompletionStoreMessagesPage, CompletionsAPI.ChatCompletionStoreMessage>;
+  list(
+    completionID: string,
+    query?: QueryOptions<MessageListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ChatCompletionStoreMessagesPage, CompletionsAPI.ChatCompletionStoreMessage>;
+  list(
+    completionID: string,
+    query: MessageListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ChatCompletionStoreMessagesPage, CompletionsAPI.ChatCompletionStoreMessage> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as MessageListParams | null | undefined;
     return this._client.getAPIList(
       path`/chat/completions/${completionID}/messages`,
       CursorPage<CompletionsAPI.ChatCompletionStoreMessage>,

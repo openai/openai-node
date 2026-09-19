@@ -30,6 +30,11 @@ import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, Page, PagePromise } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../internal/legacy-query-options';
 import { path } from '../../internal/utils/path';
 
 export class VectorStores extends APIResource {
@@ -78,10 +83,25 @@ export class VectorStores extends APIResource {
   /**
    * Returns a list of vector stores.
    */
+  list(options?: LegacyRequestOptions): PagePromise<VectorStoresPage, VectorStore>;
   list(
-    query: VectorStoreListParams | null | undefined = {},
+    query?: QueryOptions<VectorStoreListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<VectorStoresPage, VectorStore>;
+  list(
+    query: VectorStoreListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<VectorStoresPage, VectorStore> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'before', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as VectorStoreListParams | null | undefined;
     return this._client.getAPIList('/vector_stores', CursorPage<VectorStore>, {
       query,
       ...options,

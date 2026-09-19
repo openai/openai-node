@@ -6,6 +6,11 @@ import { APIPromise } from '../../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Templates extends APIResource {
@@ -91,10 +96,25 @@ export class Templates extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<EnvironmentTemplatesPage, EnvironmentTemplate>;
   list(
-    query: TemplateListParams | null | undefined = {},
+    query?: QueryOptions<TemplateListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<EnvironmentTemplatesPage, EnvironmentTemplate>;
+  list(
+    query: TemplateListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<EnvironmentTemplatesPage, EnvironmentTemplate> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as TemplateListParams | null | undefined;
     return this._client.getAPIList('/agents/environments/templates', CursorPage<EnvironmentTemplate>, {
       query,
       ...options,
@@ -358,12 +378,13 @@ export interface TemplateCreateParams {
   name?: string | null;
 
   /**
-   * Network access for an OpenAI-hosted environment.
+   * Network access policy for the environment. Defaults to disabled for GA requests
+   * and enabled for alpha/beta requests.
    */
   network?: TemplateCreateParams.Network | null;
 
   /**
-   * Packages to install in an OpenAI-hosted environment.
+   * Packages to install in the environment. Defaults to empty package lists.
    */
   packages?: TemplateCreateParams.Packages | null;
 
@@ -386,7 +407,8 @@ export interface TemplateCreateParams {
 
 export namespace TemplateCreateParams {
   /**
-   * Network access for an OpenAI-hosted environment.
+   * Network access policy for the environment. Defaults to disabled for GA requests
+   * and enabled for alpha/beta requests.
    */
   export interface Network {
     /**
@@ -405,7 +427,7 @@ export namespace TemplateCreateParams {
   }
 
   /**
-   * Packages to install in an OpenAI-hosted environment.
+   * Packages to install in the environment. Defaults to empty package lists.
    */
   export interface Packages {
     /**
@@ -447,12 +469,14 @@ export interface TemplateUpdateParams {
   name?: string | null;
 
   /**
-   * Network access for an OpenAI-hosted environment.
+   * Network access available after setup completes. Omit to preserve the current
+   * policy, or pass `null` to reset to disabled for GA requests or enabled for
+   * alpha/beta requests.
    */
   network?: TemplateUpdateParams.Network | null;
 
   /**
-   * Packages to install in an OpenAI-hosted environment.
+   * Packages installed before the runtime network policy applies.
    */
   packages?: TemplateUpdateParams.Packages | null;
 
@@ -474,7 +498,9 @@ export interface TemplateUpdateParams {
 
 export namespace TemplateUpdateParams {
   /**
-   * Network access for an OpenAI-hosted environment.
+   * Network access available after setup completes. Omit to preserve the current
+   * policy, or pass `null` to reset to disabled for GA requests or enabled for
+   * alpha/beta requests.
    */
   export interface Network {
     /**
@@ -493,7 +519,7 @@ export namespace TemplateUpdateParams {
   }
 
   /**
-   * Packages to install in an OpenAI-hosted environment.
+   * Packages installed before the runtime network policy applies.
    */
   export interface Packages {
     /**

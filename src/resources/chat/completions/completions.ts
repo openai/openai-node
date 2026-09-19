@@ -10,6 +10,11 @@ import { APIPromise } from '../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { Stream } from '../../../core/streaming';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 import { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
@@ -140,10 +145,25 @@ export class Completions extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<ChatCompletionsPage, ChatCompletion>;
   list(
-    query: ChatCompletionListParams | null | undefined = {},
+    query?: QueryOptions<ChatCompletionListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ChatCompletionsPage, ChatCompletion>;
+  list(
+    query: ChatCompletionListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ChatCompletionsPage, ChatCompletion> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'metadata', 'model', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ChatCompletionListParams | null | undefined;
     return this._client.getAPIList('/chat/completions', CursorPage<ChatCompletion>, {
       query,
       ...options,
@@ -2211,8 +2231,11 @@ export interface ChatCompletionCreateParamsBase {
   parallel_tool_calls?: boolean;
 
   /**
-   * Static predicted output content, such as the content of a text file that is
-   * being regenerated.
+   * Configuration for a
+   * [Predicted Output](https://developers.openai.com/api/docs/guides/predicted-outputs),
+   * which can greatly improve response times when large parts of the model response
+   * are known ahead of time. This is most common when you are regenerating a file
+   * with only minor changes to most of the content.
    */
   prediction?: ChatCompletionPredictionContent | null;
 

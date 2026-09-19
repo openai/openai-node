@@ -25,6 +25,11 @@ import {
 import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { RequestOptions } from '../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../internal/legacy-query-options';
 import { path } from '../../internal/utils/path';
 
 /**
@@ -62,10 +67,25 @@ export class Evals extends APIResource {
   /**
    * List evaluations for a project.
    */
+  list(options?: LegacyRequestOptions): PagePromise<EvalListResponsesPage, EvalListResponse>;
   list(
-    query: EvalListParams | null | undefined = {},
+    query?: QueryOptions<EvalListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<EvalListResponsesPage, EvalListResponse>;
+  list(
+    query: EvalListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<EvalListResponsesPage, EvalListResponse> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order', 'order_by'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as EvalListParams | null | undefined;
     return this._client.getAPIList('/evals', CursorPage<EvalListResponse>, {
       query,
       ...options,

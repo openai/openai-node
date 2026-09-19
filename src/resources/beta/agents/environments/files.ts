@@ -5,6 +5,11 @@ import { APIPromise } from '../../../../core/api-promise';
 import { PagePromise, TokenPage, type TokenPageParams } from '../../../../core/pagination';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Files extends APIResource {
@@ -56,9 +61,28 @@ export class Files extends APIResource {
    */
   list(
     environmentID: string,
-    query: FileListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<EnvironmentFilesPage, EnvironmentFile>;
+  list(
+    environmentID: string,
+    query?: QueryOptions<FileListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<EnvironmentFilesPage, EnvironmentFile>;
+  list(
+    environmentID: string,
+    query: FileListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<EnvironmentFilesPage, EnvironmentFile> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['limit', 'order', 'path', 'page'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as FileListParams | null | undefined;
     return this._client.getAPIList(
       path`/agents/environments/${environmentID}/files`,
       TokenPage<EnvironmentFile>,

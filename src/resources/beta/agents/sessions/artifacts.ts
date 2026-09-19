@@ -5,6 +5,11 @@ import { APIPromise } from '../../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Artifacts extends APIResource {
@@ -48,11 +53,27 @@ export class Artifacts extends APIResource {
    * }
    * ```
    */
+  list(sessionID: string, options?: LegacyRequestOptions): PagePromise<SessionArtifactsPage, SessionArtifact>;
   list(
     sessionID: string,
-    query: ArtifactListParams | null | undefined = {},
+    query?: QueryOptions<ArtifactListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<SessionArtifactsPage, SessionArtifact>;
+  list(
+    sessionID: string,
+    query: ArtifactListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<SessionArtifactsPage, SessionArtifact> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'environment_id', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ArtifactListParams | null | undefined;
     return this._client.getAPIList(
       path`/agents/sessions/${sessionID}/artifacts`,
       CursorPage<SessionArtifact>,

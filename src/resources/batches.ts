@@ -6,6 +6,11 @@ import * as Shared from './shared';
 import { APIPromise } from '../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../core/pagination';
 import { RequestOptions } from '../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../internal/legacy-query-options';
 import { path } from '../internal/utils/path';
 
 /**
@@ -29,10 +34,25 @@ export class Batches extends APIResource {
   /**
    * List your organization's batches.
    */
+  list(options?: LegacyRequestOptions): PagePromise<BatchesPage, Batch>;
   list(
-    query: BatchListParams | null | undefined = {},
+    query?: QueryOptions<BatchListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<BatchesPage, Batch>;
+  list(
+    query: BatchListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<BatchesPage, Batch> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as BatchListParams | null | undefined;
     return this._client.getAPIList('/batches', CursorPage<Batch>, {
       query,
       ...options,

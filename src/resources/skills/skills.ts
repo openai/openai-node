@@ -19,6 +19,11 @@ import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { type Uploadable } from '../../core/uploads';
 import { RequestOptions } from '../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../internal/legacy-query-options';
 import { maybeMultipartFormRequestOptions } from '../../internal/uploads';
 import { path } from '../../internal/utils/path';
 
@@ -59,10 +64,25 @@ export class Skills extends APIResource {
   /**
    * List all skills for the current project.
    */
+  list(options?: LegacyRequestOptions): PagePromise<SkillsPage, Skill>;
   list(
-    query: SkillListParams | null | undefined = {},
+    query?: QueryOptions<SkillListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<SkillsPage, Skill>;
+  list(
+    query: SkillListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<SkillsPage, Skill> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as SkillListParams | null | undefined;
     return this._client.getAPIList('/skills', CursorPage<Skill>, {
       query,
       ...options,

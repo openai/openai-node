@@ -9,6 +9,11 @@ import {
   PagePromise,
 } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 export class Certificates extends APIResource {
@@ -47,11 +52,27 @@ export class Certificates extends APIResource {
    *   );
    * ```
    */
+  retrieve(certificateID: string, options?: LegacyRequestOptions): APIPromise<Certificate>;
   retrieve(
     certificateID: string,
-    query: CertificateRetrieveParams | null | undefined = {},
+    query?: QueryOptions<CertificateRetrieveParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): APIPromise<Certificate>;
+  retrieve(
+    certificateID: string,
+    query: CertificateRetrieveParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<Certificate> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['include'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as CertificateRetrieveParams | null | undefined;
     return this._client.get(path`/organization/certificates/${certificateID}`, {
       query,
       ...options,
@@ -93,10 +114,25 @@ export class Certificates extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<CertificateListResponsesPage, CertificateListResponse>;
   list(
-    query: CertificateListParams | null | undefined = {},
+    query?: QueryOptions<CertificateListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<CertificateListResponsesPage, CertificateListResponse>;
+  list(
+    query: CertificateListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<CertificateListResponsesPage, CertificateListResponse> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as CertificateListParams | null | undefined;
     return this._client.getAPIList(
       '/organization/certificates',
       ConversationCursorPage<CertificateListResponse>,

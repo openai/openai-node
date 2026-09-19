@@ -4,6 +4,11 @@ import { APIResource } from '../../../core/resource';
 import { APIPromise } from '../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 export class AdminAPIKeys extends APIResource {
@@ -55,10 +60,25 @@ export class AdminAPIKeys extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<AdminAPIKeysPage, AdminAPIKey>;
   list(
-    query: AdminAPIKeyListParams | null | undefined = {},
+    query?: QueryOptions<AdminAPIKeyListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<AdminAPIKeysPage, AdminAPIKey>;
+  list(
+    query: AdminAPIKeyListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<AdminAPIKeysPage, AdminAPIKey> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as AdminAPIKeyListParams | null | undefined;
     return this._client.getAPIList('/organization/admin_api_keys', CursorPage<AdminAPIKey>, {
       query,
       ...options,

@@ -6,6 +6,11 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../core/paginati
 import { type Uploadable } from '../core/uploads';
 import { buildHeaders } from '../internal/headers';
 import { RequestOptions } from '../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../internal/legacy-query-options';
 import { multipartFormRequestOptions } from '../internal/uploads';
 import { waitForFileProcessing } from '../lib/file-processing';
 import { path } from '../internal/utils/path';
@@ -60,10 +65,25 @@ export class Files extends APIResource {
   /**
    * Returns a list of files.
    */
+  list(options?: LegacyRequestOptions): PagePromise<FileObjectsPage, FileObject>;
   list(
-    query: FileListParams | null | undefined = {},
+    query?: QueryOptions<FileListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<FileObjectsPage, FileObject>;
+  list(
+    query: FileListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FileObjectsPage, FileObject> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order', 'purpose'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as FileListParams | null | undefined;
     return this._client.getAPIList('/files', CursorPage<FileObject>, {
       query,
       ...options,

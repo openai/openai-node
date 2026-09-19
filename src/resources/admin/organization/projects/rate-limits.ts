@@ -8,6 +8,11 @@ import {
   PagePromise,
 } from '../../../../core/pagination';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class RateLimits extends APIResource {
@@ -26,9 +31,28 @@ export class RateLimits extends APIResource {
    */
   listRateLimits(
     projectID: string,
-    query: RateLimitListRateLimitsParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<ProjectRateLimitsPage, ProjectRateLimit>;
+  listRateLimits(
+    projectID: string,
+    query?: QueryOptions<RateLimitListRateLimitsParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ProjectRateLimitsPage, ProjectRateLimit>;
+  listRateLimits(
+    projectID: string,
+    query: RateLimitListRateLimitsParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ProjectRateLimitsPage, ProjectRateLimit> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'before', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as RateLimitListRateLimitsParams | null | undefined;
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/rate_limits`,
       ConversationCursorPage<ProjectRateLimit>,

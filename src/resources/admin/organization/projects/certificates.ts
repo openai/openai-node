@@ -8,6 +8,11 @@ import {
   PagePromise,
 } from '../../../../core/pagination';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Certificates extends APIResource {
@@ -26,9 +31,28 @@ export class Certificates extends APIResource {
    */
   list(
     projectID: string,
-    query: CertificateListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<CertificateListResponsesPage, CertificateListResponse>;
+  list(
+    projectID: string,
+    query?: QueryOptions<CertificateListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<CertificateListResponsesPage, CertificateListResponse>;
+  list(
+    projectID: string,
+    query: CertificateListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<CertificateListResponsesPage, CertificateListResponse> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as CertificateListParams | null | undefined;
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/certificates`,
       ConversationCursorPage<CertificateListResponse>,

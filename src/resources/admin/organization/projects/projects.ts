@@ -119,6 +119,11 @@ import {
   PagePromise,
 } from '../../../../core/pagination';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Projects extends APIResource {
@@ -206,10 +211,25 @@ export class Projects extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<ProjectsPage, Project>;
   list(
-    query: ProjectListParams | null | undefined = {},
+    query?: QueryOptions<ProjectListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ProjectsPage, Project>;
+  list(
+    query: ProjectListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ProjectsPage, Project> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'include_archived', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ProjectListParams | null | undefined;
     return this._client.getAPIList('/organization/projects', ConversationCursorPage<Project>, {
       query,
       ...options,

@@ -8,6 +8,11 @@ import {
   PagePromise,
 } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 export class Invites extends APIResource {
@@ -61,10 +66,25 @@ export class Invites extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<InvitesPage, Invite>;
   list(
-    query: InviteListParams | null | undefined = {},
+    query?: QueryOptions<InviteListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<InvitesPage, Invite>;
+  list(
+    query: InviteListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<InvitesPage, Invite> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as InviteListParams | null | undefined;
     return this._client.getAPIList('/organization/invites', ConversationCursorPage<Invite>, {
       query,
       ...options,

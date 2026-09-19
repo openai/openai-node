@@ -10,6 +10,11 @@ import {
 } from '../../../core/pagination';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 export class Threads extends APIResource {
@@ -41,10 +46,25 @@ export class Threads extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<ChatKitThreadsPage, ChatKitThread>;
   list(
-    query: ThreadListParams | null | undefined = {},
+    query?: QueryOptions<ThreadListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ChatKitThreadsPage, ChatKitThread>;
+  list(
+    query: ThreadListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ChatKitThreadsPage, ChatKitThread> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'before', 'limit', 'order', 'user'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ThreadListParams | null | undefined;
     return this._client.getAPIList('/chatkit/threads', ConversationCursorPage<ChatKitThread>, {
       query,
       ...options,
@@ -86,7 +106,32 @@ export class Threads extends APIResource {
    */
   listItems(
     threadID: string,
-    query: ThreadListItemsParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<
+    ChatKitThreadItemListDataPage,
+    | ChatKitThreadUserMessageItem
+    | ChatKitThreadAssistantMessageItem
+    | ChatKitWidgetItem
+    | ChatKitThreadItemList.ChatKitClientToolCall
+    | ChatKitThreadItemList.ChatKitTask
+    | ChatKitThreadItemList.ChatKitTaskGroup
+  >;
+  listItems(
+    threadID: string,
+    query?: QueryOptions<ThreadListItemsParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<
+    ChatKitThreadItemListDataPage,
+    | ChatKitThreadUserMessageItem
+    | ChatKitThreadAssistantMessageItem
+    | ChatKitWidgetItem
+    | ChatKitThreadItemList.ChatKitClientToolCall
+    | ChatKitThreadItemList.ChatKitTask
+    | ChatKitThreadItemList.ChatKitTaskGroup
+  >;
+  listItems(
+    threadID: string,
+    query: ThreadListItemsParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<
     ChatKitThreadItemListDataPage,
@@ -97,6 +142,16 @@ export class Threads extends APIResource {
     | ChatKitThreadItemList.ChatKitTask
     | ChatKitThreadItemList.ChatKitTaskGroup
   > {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'before', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ThreadListItemsParams | null | undefined;
     return this._client.getAPIList(
       path`/chatkit/threads/${threadID}/items`,
       ConversationCursorPage<

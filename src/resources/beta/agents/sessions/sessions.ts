@@ -32,6 +32,11 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core
 import { Stream } from '../../../../core/streaming';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Sessions extends APIResource {
@@ -136,10 +141,25 @@ export class Sessions extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession>;
   list(
-    query: SessionListParams | null | undefined = {},
+    query?: QueryOptions<SessionListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession>;
+  list(
+    query: SessionListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'agent_id', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as SessionListParams | null | undefined;
     return this._client.getAPIList('/agents/sessions', CursorPage<AgentsAPI.AgentSession>, {
       query,
       ...options,
@@ -191,7 +211,10 @@ export interface SessionCreateParamsBase {
   agent_id?: string;
 
   /**
-   * Initial input submitted when creating a session.
+   * Initial input to submit when the session is created. A string is shorthand for a
+   * single user message. Required when `environment.type` is `none`, or when
+   * `stream` is `true` for an environment that is not `self_hosted`; optional for
+   * self-hosted and non-streaming execution environments.
    */
   input?: string | Array<AgentsAPI.AgentSessionInputMessageParam> | null;
 
@@ -230,12 +253,13 @@ export namespace SessionCreateParams {
     model?: string;
 
     /**
-     * Explicit configuration for creating and coordinating subagents.
+     * Configuration for creating and coordinating subagents.
      */
     multi_agent?: AgentsAPI.MultiAgentConfigParam | null;
 
     /**
-     * Reasoning configuration for the agent.
+     * Configuration for model reasoning. Omit to keep the current settings; pass
+     * `null` to reset to the model's default effort.
      */
     reasoning?: AgentsAPI.AgentReasoningParam | null;
 
@@ -309,7 +333,7 @@ export namespace SessionUpdateParams {
     reasoning?: Agent.Reasoning;
 
     /**
-     * The service tier used for model requests.
+     * Omit to keep the current tier. Null resets it to auto.
      *
      * - `auto` - Selects the service tier automatically.
      * - `default` - Uses the default service tier.
@@ -326,7 +350,7 @@ export namespace SessionUpdateParams {
      */
     export interface Reasoning {
       /**
-       * The amount of reasoning effort the model should use.
+       * Omit to keep the current effort. Null selects the model's default effort.
        */
       effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
     }

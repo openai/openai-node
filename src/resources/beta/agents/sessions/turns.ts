@@ -6,6 +6,11 @@ import { APIPromise } from '../../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Turns extends APIResource {
@@ -47,11 +52,27 @@ export class Turns extends APIResource {
    * }
    * ```
    */
+  list(sessionID: string, options?: LegacyRequestOptions): PagePromise<TurnsPage, Turn>;
   list(
     sessionID: string,
-    query: TurnListParams | null | undefined = {},
+    query?: QueryOptions<TurnListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<TurnsPage, Turn>;
+  list(
+    sessionID: string,
+    query: TurnListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<TurnsPage, Turn> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as TurnListParams | null | undefined;
     return this._client.getAPIList(path`/agents/sessions/${sessionID}/turns`, CursorPage<Turn>, {
       query,
       ...options,
@@ -90,7 +111,7 @@ export interface Turn {
   created_at: number;
 
   /**
-   * A customer-safe error describing why a session request failed.
+   * A customer-safe error. Non-null only for a failed turn.
    */
   error: AgentsAPI.SessionTurnError | null;
 
@@ -127,7 +148,8 @@ export interface Turn {
   subagent_id: string | null;
 
   /**
-   * Recorded token usage for a session or turn. Usage is best effort and may change.
+   * Best-effort token usage for the turn, or null if unknown. Recorded usage may
+   * change.
    */
   usage: AgentsAPI.TokenUsage | null;
 }

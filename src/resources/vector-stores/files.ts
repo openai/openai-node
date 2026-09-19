@@ -6,6 +6,11 @@ import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, Page, PagePromise } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../internal/legacy-query-options';
 import { Uploadable } from '../../uploads';
 import { pollVectorStoreFile } from '../../lib/vector-store-polling';
 import { path } from '../../internal/utils/path';
@@ -63,9 +68,28 @@ export class Files extends APIResource {
    */
   list(
     vectorStoreID: string,
-    query: FileListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<VectorStoreFilesPage, VectorStoreFile>;
+  list(
+    vectorStoreID: string,
+    query?: QueryOptions<FileListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<VectorStoreFilesPage, VectorStoreFile>;
+  list(
+    vectorStoreID: string,
+    query: FileListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<VectorStoreFilesPage, VectorStoreFile> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'before', 'filter', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as FileListParams | null | undefined;
     return this._client.getAPIList(path`/vector_stores/${vectorStoreID}/files`, CursorPage<VectorStoreFile>, {
       query,
       ...options,

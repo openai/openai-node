@@ -18,6 +18,11 @@ import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../internal/legacy-query-options';
 import { path } from '../../internal/utils/path';
 
 export class Containers extends APIResource {
@@ -43,10 +48,25 @@ export class Containers extends APIResource {
   /**
    * List Containers
    */
+  list(options?: LegacyRequestOptions): PagePromise<ContainerListResponsesPage, ContainerListResponse>;
   list(
-    query: ContainerListParams | null | undefined = {},
+    query?: QueryOptions<ContainerListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ContainerListResponsesPage, ContainerListResponse>;
+  list(
+    query: ContainerListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ContainerListResponsesPage, ContainerListResponse> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'name', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ContainerListParams | null | undefined;
     return this._client.getAPIList('/containers', CursorPage<ContainerListResponse>, {
       query,
       ...options,

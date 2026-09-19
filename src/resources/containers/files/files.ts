@@ -8,6 +8,11 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { type Uploadable } from '../../../core/uploads';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { maybeMultipartFormRequestOptions } from '../../../internal/uploads';
 import { path } from '../../../internal/utils/path';
 
@@ -51,9 +56,28 @@ export class Files extends APIResource {
    */
   list(
     containerID: string,
-    query: FileListParams | null | undefined = {},
+    options?: LegacyRequestOptions,
+  ): PagePromise<FileListResponsesPage, FileListResponse>;
+  list(
+    containerID: string,
+    query?: QueryOptions<FileListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<FileListResponsesPage, FileListResponse>;
+  list(
+    containerID: string,
+    query: FileListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FileListResponsesPage, FileListResponse> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as FileListParams | null | undefined;
     return this._client.getAPIList(path`/containers/${containerID}/files`, CursorPage<FileListResponse>, {
       query,
       ...options,

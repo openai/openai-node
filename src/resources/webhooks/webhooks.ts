@@ -9,6 +9,11 @@ import { EventTypes } from './event-types';
 import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { RequestOptions } from '../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../internal/legacy-query-options';
 import { path } from '../../internal/utils/path';
 
 export class Webhooks extends APIResource {
@@ -79,10 +84,25 @@ export class Webhooks extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<WebhookEndpointsPage, WebhookEndpoint>;
   list(
-    query: WebhookListParams | null | undefined = {},
+    query?: QueryOptions<WebhookListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<WebhookEndpointsPage, WebhookEndpoint>;
+  list(
+    query: WebhookListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<WebhookEndpointsPage, WebhookEndpoint> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as WebhookListParams | null | undefined;
     return this._client.getAPIList('/webhook_endpoints', CursorPage<WebhookEndpoint>, {
       query,
       ...options,

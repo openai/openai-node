@@ -11,6 +11,11 @@ import { APIPromise } from '../../../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../../core/pagination';
 import { buildHeaders } from '../../../../../internal/headers';
 import { RequestOptions } from '../../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../../internal/legacy-query-options';
 import { path } from '../../../../../internal/utils/path';
 
 export class Subagents extends APIResource {
@@ -57,11 +62,27 @@ export class Subagents extends APIResource {
    * }
    * ```
    */
+  list(sessionID: string, options?: LegacyRequestOptions): PagePromise<SubagentsPage, AgentsAPI.Subagent>;
   list(
     sessionID: string,
-    query: SubagentListParams | null | undefined = {},
+    query?: QueryOptions<SubagentListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<SubagentsPage, AgentsAPI.Subagent>;
+  list(
+    sessionID: string,
+    query: SubagentListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<SubagentsPage, AgentsAPI.Subagent> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as SubagentListParams | null | undefined;
     return this._client.getAPIList(
       path`/agents/sessions/${sessionID}/subagents`,
       CursorPage<AgentsAPI.Subagent>,

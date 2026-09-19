@@ -17,6 +17,11 @@ import {
 import { APIPromise } from '../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 import { path } from '../../../internal/utils/path';
 
 /**
@@ -56,11 +61,27 @@ export class Runs extends APIResource {
   /**
    * Get a list of runs for an evaluation.
    */
+  list(evalID: string, options?: LegacyRequestOptions): PagePromise<RunListResponsesPage, RunListResponse>;
   list(
     evalID: string,
-    query: RunListParams | null | undefined = {},
+    query?: QueryOptions<RunListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<RunListResponsesPage, RunListResponse>;
+  list(
+    evalID: string,
+    query: RunListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<RunListResponsesPage, RunListResponse> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order', 'status'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as RunListParams | null | undefined;
     return this._client.getAPIList(path`/evals/${evalID}/runs`, CursorPage<RunListResponse>, {
       query,
       ...options,

@@ -8,6 +8,11 @@ import {
   PagePromise,
 } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../internal/legacy-query-options';
 
 /**
  * List user actions and configuration changes within this organization.
@@ -24,10 +29,36 @@ export class AuditLogs extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<AuditLogListResponsesPage, AuditLogListResponse>;
   list(
-    query: AuditLogListParams | null | undefined = {},
+    query?: QueryOptions<AuditLogListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<AuditLogListResponsesPage, AuditLogListResponse>;
+  list(
+    query: AuditLogListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<AuditLogListResponsesPage, AuditLogListResponse> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      [
+        'actor_emails',
+        'actor_ids',
+        'after',
+        'before',
+        'effective_at',
+        'event_types',
+        'limit',
+        'project_ids',
+        'resource_ids',
+        'tenant_only',
+      ],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as AuditLogListParams | null | undefined;
     return this._client.getAPIList('/organization/audit_logs', ConversationCursorPage<AuditLogListResponse>, {
       query,
       ...options,

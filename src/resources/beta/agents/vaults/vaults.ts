@@ -25,6 +25,11 @@ import { APIPromise } from '../../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
+import {
+  normalizeRequestOptionsForQuery,
+  type LegacyRequestOptions,
+  type QueryOptions,
+} from '../../../../internal/legacy-query-options';
 import { path } from '../../../../internal/utils/path';
 
 export class Vaults extends APIResource {
@@ -79,10 +84,25 @@ export class Vaults extends APIResource {
    * }
    * ```
    */
+  list(options?: LegacyRequestOptions): PagePromise<VaultsPage, Vault>;
   list(
-    query: VaultListParams | null | undefined = {},
+    query?: QueryOptions<VaultListParams> | LegacyRequestOptions | null | undefined,
+    options?: RequestOptions,
+  ): PagePromise<VaultsPage, Vault>;
+  list(
+    query: VaultListParams | LegacyRequestOptions | null | undefined = {},
     options?: RequestOptions,
   ): PagePromise<VaultsPage, Vault> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit', 'order', 'status'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as VaultListParams | null | undefined;
     return this._client.getAPIList('/vaults', CursorPage<Vault>, {
       query,
       ...options,
