@@ -38,6 +38,16 @@ export {
   type DataRetentionUpdateParams,
 } from './data-retention';
 export {
+  ExternalStorage,
+  type AwsExternalStorageProvider,
+  type AzureExternalStorageProvider,
+  type ExternalStorageConfiguration,
+  type ExternalStorageDeleted,
+  type ExternalStorageCreateParams,
+  type ExternalStorageListParams,
+  type ExternalStorageConfigurationsPage,
+} from './external-storage';
+export {
   Groups,
   type Group,
   type GroupUpdateResponse,

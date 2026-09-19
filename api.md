@@ -1068,6 +1068,23 @@ Methods:
 
 ## Organization
 
+### ExternalStorage
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/external-storage.ts">AwsExternalStorageProvider</a></code>
+- <code><a href="./src/resources/admin/organization/external-storage.ts">AzureExternalStorageProvider</a></code>
+- <code><a href="./src/resources/admin/organization/external-storage.ts">ExternalStorageConfiguration</a></code>
+- <code><a href="./src/resources/admin/organization/external-storage.ts">ExternalStorageDeleted</a></code>
+
+Methods:
+
+- <code title="post /organization/external_storage">client.admin.organization.externalStorage.<a href="./src/resources/admin/organization/external-storage.ts">create</a>({ ...params }) -> ExternalStorageConfiguration</code>
+- <code title="get /organization/external_storage/{external_storage_id}">client.admin.organization.externalStorage.<a href="./src/resources/admin/organization/external-storage.ts">retrieve</a>(externalStorageID) -> ExternalStorageConfiguration</code>
+- <code title="get /organization/external_storage">client.admin.organization.externalStorage.<a href="./src/resources/admin/organization/external-storage.ts">list</a>({ ...params }) -> ExternalStorageConfigurationsPage</code>
+- <code title="delete /organization/external_storage/{external_storage_id}">client.admin.organization.externalStorage.<a href="./src/resources/admin/organization/external-storage.ts">delete</a>(externalStorageID) -> ExternalStorageDeleted</code>
+- <code title="post /organization/external_storage/{external_storage_id}/validate">client.admin.organization.externalStorage.<a href="./src/resources/admin/organization/external-storage.ts">validate</a>(externalStorageID) -> ExternalStorageConfiguration</code>
+
 ### AuditLogs
 
 Types:
