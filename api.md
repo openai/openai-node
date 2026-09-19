@@ -435,6 +435,7 @@ Types:
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentFailedEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentPendingEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentReadyEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentResetEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentState</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionErrorEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEvent</a></code>

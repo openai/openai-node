@@ -1357,6 +1357,42 @@ export interface AgentSessionEnvironmentReadyEvent {
 }
 
 /**
+ * Emitted after a hosted sandbox is replaced. Conversation history survives;
+ * changes to the previous sandbox's files and processes do not.
+ */
+export interface AgentSessionEnvironmentResetEvent {
+  /**
+   * The stable environment ID, retained across sandbox replacements.
+   */
+  environment_id: string;
+
+  /**
+   * The unique ID of the event.
+   */
+  event_id: string;
+
+  /**
+   * Monotonically increasing reset number. Repeated notifications share this number.
+   */
+  reset_count: number;
+
+  /**
+   * The ID of the session associated with the event.
+   */
+  session_id: string;
+
+  /**
+   * The associated turn, when applicable.
+   */
+  turn_id: string | null;
+
+  /**
+   * The type of the object. Always `agent.session.environment.reset`.
+   */
+  type: 'agent.session.environment.reset';
+}
+
+/**
  * The current state of a session environment.
  */
 export interface AgentSessionEnvironmentState {
@@ -1440,6 +1476,7 @@ export interface AgentSessionErrorEvent {
 export type AgentSessionEvent =
   | AgentSessionErrorEvent
   | AgentSessionEnvironmentReadyEvent
+  | AgentSessionEnvironmentResetEvent
   | AgentOutputCommandExecutionOutputDeltaEvent
   | AgentSessionCreatedEvent
   | AgentSessionTurnCreatedEvent
@@ -4740,6 +4777,7 @@ export declare namespace Agents {
     type AgentSessionEnvironmentFailedEvent as AgentSessionEnvironmentFailedEvent,
     type AgentSessionEnvironmentPendingEvent as AgentSessionEnvironmentPendingEvent,
     type AgentSessionEnvironmentReadyEvent as AgentSessionEnvironmentReadyEvent,
+    type AgentSessionEnvironmentResetEvent as AgentSessionEnvironmentResetEvent,
     type AgentSessionEnvironmentState as AgentSessionEnvironmentState,
     type AgentSessionErrorEvent as AgentSessionErrorEvent,
     type AgentSessionEvent as AgentSessionEvent,
