@@ -30,6 +30,113 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 export class Sessions extends APIResource {
   subagents: SubagentsAPI.Subagents = new SubagentsAPI.Subagents(this._client);
   artifacts: ArtifactsAPI.Artifacts = new ArtifactsAPI.Artifacts(this._client);
@@ -128,9 +235,101 @@ export class Sessions extends APIResource {
    * ```
    */
   list(
-    query: SessionListParams | null | undefined = {},
+    query?:
+      | (SessionListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession>;
+  list(
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession>;
+  list(
+    query:
+      | SessionListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'agent_id', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as SessionListParams | null | undefined;
     return this._client.getAPIList('/agents/sessions', CursorPage<AgentsAPI.AgentSession>, {
       query,
       ...options,
@@ -182,7 +381,10 @@ export interface SessionCreateParamsBase {
   agent_id?: string;
 
   /**
-   * Initial input submitted when creating a session.
+   * Initial input to submit when the session is created. A string is shorthand for a
+   * single user message. Required when `environment.type` is `none`, or when
+   * `stream` is `true` for an environment that is not `self_hosted`; optional for
+   * self-hosted and non-streaming execution environments.
    */
   input?: string | Array<AgentsAPI.AgentSessionInputMessageParam> | null;
 
@@ -221,12 +423,13 @@ export namespace SessionCreateParams {
     model?: string;
 
     /**
-     * Explicit configuration for creating and coordinating subagents.
+     * Configuration for creating and coordinating subagents.
      */
     multi_agent?: AgentsAPI.MultiAgentConfigParam | null;
 
     /**
-     * Reasoning configuration for the agent.
+     * Configuration for model reasoning. Omit to keep the current settings; pass
+     * `null` to reset to the model's default effort.
      */
     reasoning?: AgentsAPI.AgentReasoningParam | null;
 
@@ -300,7 +503,7 @@ export namespace SessionUpdateParams {
     reasoning?: Agent.Reasoning;
 
     /**
-     * The service tier used for model requests.
+     * Omit to keep the current tier. Null resets it to auto.
      *
      * - `auto` - Selects the service tier automatically.
      * - `default` - Uses the default service tier.
@@ -317,7 +520,7 @@ export namespace SessionUpdateParams {
      */
     export interface Reasoning {
       /**
-       * The amount of reasoning effort the model should use.
+       * Omit to keep the current effort. Null selects the model's default effort.
        */
       effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
     }
