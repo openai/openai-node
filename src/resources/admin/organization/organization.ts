@@ -33,6 +33,17 @@ import {
 } from './certificates';
 import * as DataRetentionAPI from './data-retention';
 import { DataRetention, DataRetentionUpdateParams, OrganizationDataRetention } from './data-retention';
+import * as ExternalStorageAPI from './external-storage';
+import {
+  AwsExternalStorageProvider,
+  AzureExternalStorageProvider,
+  ExternalStorage,
+  ExternalStorageConfiguration,
+  ExternalStorageConfigurationsPage,
+  ExternalStorageCreateParams,
+  ExternalStorageDeleted,
+  ExternalStorageListParams,
+} from './external-storage';
 import * as InvitesAPI from './invites';
 import {
   Invite,
@@ -128,6 +139,7 @@ import {
 } from './users/users';
 
 export class Organization extends APIResource {
+  externalStorage: ExternalStorageAPI.ExternalStorage = new ExternalStorageAPI.ExternalStorage(this._client);
   auditLogs: AuditLogsAPI.AuditLogs = new AuditLogsAPI.AuditLogs(this._client);
   adminAPIKeys: AdminAPIKeysAPI.AdminAPIKeys = new AdminAPIKeysAPI.AdminAPIKeys(this._client);
   usage: UsageAPI.Usage = new UsageAPI.Usage(this._client);
@@ -142,6 +154,7 @@ export class Organization extends APIResource {
   projects: ProjectsAPI.Projects = new ProjectsAPI.Projects(this._client);
 }
 
+Organization.ExternalStorage = ExternalStorage;
 Organization.AuditLogs = AuditLogs;
 Organization.AdminAPIKeys = AdminAPIKeys;
 Organization.Usage = Usage;
@@ -156,6 +169,17 @@ Organization.Certificates = Certificates;
 Organization.Projects = Projects;
 
 export declare namespace Organization {
+  export {
+    ExternalStorage as ExternalStorage,
+    type AwsExternalStorageProvider as AwsExternalStorageProvider,
+    type AzureExternalStorageProvider as AzureExternalStorageProvider,
+    type ExternalStorageConfiguration as ExternalStorageConfiguration,
+    type ExternalStorageDeleted as ExternalStorageDeleted,
+    type ExternalStorageConfigurationsPage as ExternalStorageConfigurationsPage,
+    type ExternalStorageCreateParams as ExternalStorageCreateParams,
+    type ExternalStorageListParams as ExternalStorageListParams,
+  };
+
   export {
     AuditLogs as AuditLogs,
     type AuditLogListResponse as AuditLogListResponse,
