@@ -1,5 +1,21 @@
 # Changelog
 
+## [7.20.0](https://github.com/openai/openai-node/compare/v7.19.0...v7.20.0) (2026-09-19)
+
+
+### Features
+
+* **api:** add environment-variable vault credentials ([#2768](https://github.com/openai/openai-node/issues/2768)) ([fbccf12](https://github.com/openai/openai-node/commit/fbccf120361a4fd61be8b7e491d9b1cdb920fb45))
+* **api:** add external storage configuration management ([#2773](https://github.com/openai/openai-node/issues/2773)) ([7e89b62](https://github.com/openai/openai-node/commit/7e89b629067e22901a1ad3da4c134442f118da7f))
+* **api:** add safety case retrieval ([#2774](https://github.com/openai/openai-node/issues/2774)) ([d357e64](https://github.com/openai/openai-node/commit/d357e647e79e82a871417cab8d6529287e3b4a76))
+* **api:** add safety warning and deactivation webhook events ([#2772](https://github.com/openai/openai-node/issues/2772)) ([91c7fb5](https://github.com/openai/openai-node/commit/91c7fb534132fce3a9c8ca3650e31401629be7c0))
+* **api:** add SIP media security to incoming call events ([#2770](https://github.com/openai/openai-node/issues/2770)) ([db9a57b](https://github.com/openai/openai-node/commit/db9a57bd901a9a0f50002fbe5ee5b79e7b220c73))
+
+
+### Bug Fixes
+
+* **api:** Preserve request options in legacy GET calls ([#2771](https://github.com/openai/openai-node/issues/2771)) ([541eee3](https://github.com/openai/openai-node/commit/541eee3536eb39c24b324a68dc451752c710c2ee))
+
 ## [7.19.0](https://github.com/openai/openai-node/compare/v7.18.0...v7.19.0) (2026-09-18)
 
 
