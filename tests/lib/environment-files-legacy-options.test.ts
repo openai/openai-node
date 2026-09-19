@@ -14,7 +14,7 @@ function createClient() {
 
 test('environment files accept literal and reusable legacy request options without serializing them', async () => {
   const { client, fetch } = createClient();
-  const options: OpenAI.RequestOptions = { headers: { 'x-legacy-test': 'preserved' }, maxRetries: 0 };
+  const options: OpenAI.RequestOptions = { headers: { 'x-legacy-test': 'preserved' } };
   const page = client.beta.agents.environments.files.list('env_test', options);
   compareType<typeof page, PagePromise<EnvironmentFilesPage, EnvironmentFile>>(true);
 

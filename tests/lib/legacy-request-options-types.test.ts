@@ -12,7 +12,7 @@ test('accepts reusable RequestOptions in supported legacy GET calls', async () =
       return Response.json({ object: 'response', id: 'resp_test', output: [], data: [], has_more: false });
     },
   });
-  const options: OpenAI.RequestOptions = { headers: { 'x-legacy-test': 'preserved' }, maxRetries: 0 };
+  const options: OpenAI.RequestOptions = { headers: { 'x-legacy-test': 'preserved' } };
   const response = client.responses.retrieve('resp_test', options);
   compareType<typeof response, APIPromise<OpenAI.Responses.Response>>(true);
 

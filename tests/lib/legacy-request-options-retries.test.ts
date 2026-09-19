@@ -1,20 +1,57 @@
-import OpenAI, { InternalServerError, RateLimitError } from 'openai';
+import OpenAI, { RateLimitError } from 'openai';
 import { vi } from 'vitest';
 
-test.each([-1, '-1', '2', 0.5, Number.NaN, Infinity, -Infinity, Number.MAX_SAFE_INTEGER + 1, 2 ** 54, null])(
-  'rejects legacy maxRetries=%s before dispatch',
+test.each([0, 1, 2, Number.MAX_SAFE_INTEGER, -1, '-1', 0.5, Number.NaN, Infinity, null])(
+  'rejects legacy retry controls (%s) before dispatch',
   (maxRetries) => {
     const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ data: [] }));
     const client = new OpenAI({ apiKey: 'synthetic', fetch });
     const options = { maxRetries };
 
-    // @ts-expect-error Deliberately exercise invalid values from untyped query data at the public boundary.
-    expect(() => client.files.list(options)).toThrow(/maxRetries/u);
+    // @ts-expect-error Retry controls require the explicit request options argument.
+    expect(() => client.files.list(options)).toThrow(/explicit request options argument/u);
     expect(fetch).not.toHaveBeenCalled();
   },
 );
 
-test.each([0, 1, 2])('exhausts a valid legacy retry budget of %s', async (maxRetries) => {
+test('rejects retry controls in reusable legacy options across GET surfaces', () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ data: [] }));
+  const client = new OpenAI({ apiKey: 'synthetic', fetch });
+  const options: OpenAI.RequestOptions = {
+    headers: { 'X-Test': 'retry' },
+    maxRetries: Number.MAX_SAFE_INTEGER,
+  };
+
+  for (const request of [
+    () => client.files.list(options),
+    () => client.responses.retrieve('resp_test', options),
+    () => client.beta.assistants.list(options),
+    () => client.beta.agents.environments.files.list('env_test', options),
+  ]) {
+    expect(request).toThrow(/explicit request options argument/u);
+  }
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test('rejects legacy retry getters before reading or dispatching', () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ data: [] }));
+  const client = new OpenAI({ apiKey: 'synthetic', fetch });
+  let reads = 0;
+  const options: OpenAI.RequestOptions = {
+    headers: { 'X-Test': 'retry' },
+    get maxRetries() {
+      reads += 1;
+      return Number.MAX_SAFE_INTEGER;
+    },
+  };
+
+  expect(() => client.files.list(options)).toThrow(/explicit request options argument/u);
+
+  expect(reads).toBe(0);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test.each([0, 1, 2])('exhausts an explicit retry budget of %s', async (maxRetries) => {
   const fetch = vi.fn<typeof globalThis.fetch>(async () =>
     Response.json(
       { error: { message: 'synthetic rate limit' } },
@@ -26,43 +63,18 @@ test.each([0, 1, 2])('exhausts a valid legacy retry budget of %s', async (maxRet
   );
   const client = new OpenAI({ apiKey: 'synthetic', fetch });
 
-  await expect(client.files.list({ maxRetries })).rejects.toThrow(RateLimitError);
+  await expect(client.files.list({}, { maxRetries })).rejects.toThrow(RateLimitError);
 
   expect(fetch).toHaveBeenCalledTimes(maxRetries + 1);
 });
 
-test('accepts the largest safe retry budget without imposing an arbitrary cap', async () => {
+test('preserves large explicitly configured retry budgets', async () => {
   const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ data: [] }));
   const client = new OpenAI({ apiKey: 'synthetic', fetch });
 
-  await client.files.list({ maxRetries: Number.MAX_SAFE_INTEGER });
+  await client.files.list({}, { maxRetries: Number.MAX_SAFE_INTEGER });
 
   expect(fetch).toHaveBeenCalledTimes(1);
-});
-
-test('validates and consumes the same retry budget snapshot', async () => {
-  const fetch = vi.fn<typeof globalThis.fetch>(async () =>
-    Response.json(
-      { error: { message: 'synthetic unavailable' } },
-      {
-        status: 503,
-        headers: { 'retry-after-ms': '0' },
-      },
-    ),
-  );
-  const client = new OpenAI({ apiKey: 'synthetic', fetch });
-  let reads = 0;
-  const options = {
-    get maxRetries() {
-      reads += 1;
-      return reads === 1 ? 1 : -1;
-    },
-  };
-
-  await expect(client.files.list(options)).rejects.toThrow(InternalServerError);
-
-  expect(reads).toBe(1);
-  expect(fetch).toHaveBeenCalledTimes(2);
 });
 
 test.each([{}, { maxRetries: undefined }])('preserves an omitted legacy retry budget', async (options) => {
@@ -77,7 +89,6 @@ test.each([{}, { maxRetries: undefined }])('preserves an omitted legacy retry bu
   );
   const client = new OpenAI({ apiKey: 'synthetic', maxRetries: 1, fetch });
 
-  // @ts-expect-error Explicit undefined exercises JavaScript callers under exactOptionalPropertyTypes.
   await expect(client.files.list({ ...options, headers: { 'X-Test': 'retry' } })).rejects.toThrow(
     RateLimitError,
   );
