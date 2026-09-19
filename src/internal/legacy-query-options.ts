@@ -1,6 +1,8 @@
+import { OpenAIError } from '../core/error';
 import { buildHeaders } from './headers';
 import type { RequestOptions } from './request-options';
 import { isSensitiveHeader } from './utils/log';
+import { validatePositiveInteger } from './utils/values';
 
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
@@ -44,6 +46,7 @@ export type QueryOptions<Query> = Query & {
  * Recognizes legacy options-only GET calls and snapshots their supported fields.
  * Mixed query/options objects, transport overrides, and security-sensitive headers
  * require the explicit request options argument and throw before dispatch.
+ * Legacy retry budgets must be non-negative safe integers.
  */
 export function normalizeRequestOptionsForQuery(
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This function parses the caller-supplied query/options boundary, including JavaScript callers.
@@ -81,6 +84,12 @@ export function normalizeRequestOptionsForQuery(
       return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
     }),
   );
+  if (normalized.maxRetries !== undefined) {
+    validatePositiveInteger('maxRetries', normalized.maxRetries);
+    if (!Number.isSafeInteger(normalized.maxRetries)) {
+      throw new OpenAIError('maxRetries must be a safe integer');
+    }
+  }
   if (normalized.headers !== undefined && normalized.headers !== null) {
     const headers = buildHeaders([normalized.headers]);
     const names = [...headers.values.keys(), ...headers.nulls];
