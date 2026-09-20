@@ -119,6 +119,21 @@ describe('toFile', () => {
     expect(file.name).toEqual('audio.mp3');
   });
 
+  it.each([
+    ['report%20name.txt', 'report name.txt'],
+    ['r%C3%A9sum%C3%A9.txt', 'résumé.txt'],
+  ])('decodes the URL filename %s for a Response', async (encoded, expected) => {
+    const response = mockResponse({
+      url: `https://example.com/files/${encoded}?download=1`,
+      content: new Blob(['contents'], { type: 'text/plain' }),
+    });
+    const file = await toFile(response);
+
+    expect(file.name).toBe(expected);
+    expect(file.type).toBe('text/plain');
+    await expect(file.text()).resolves.toBe('contents');
+  });
+
   it('falls back to unknown_file when a Response has no URL', async () => {
     const file = await toFile(new Response('audio contents'));
     expect(file.name).toEqual('unknown_file');

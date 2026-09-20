@@ -74,6 +74,12 @@ describe('streaming upload metadata', () => {
   test.each([
     [{ name: '/tmp/named.jsonl' }, 'named.jsonl'],
     [{ url: 'https://example.com/files/audio.wav' }, 'audio.wav'],
+    [{ url: 'https://example.com/files/report%20name.txt' }, 'report name.txt'],
+    [{ url: 'https://example.com/files/r%C3%A9sum%C3%A9.txt' }, 'résumé.txt'],
+    [{ url: 'https://example.com/files/nested%2Freport.txt' }, 'report.txt'],
+    [{ url: 'https://example.com/files/nested%5Creport.txt' }, 'report.txt'],
+    [{ url: 'https://example.com/files/%E9.txt?download=1#section' }, '%E9.txt'],
+    [{ name: 'report%20name.txt' }, 'report%20name.txt'],
     [{ filename: 'C:\\recordings\\audio.wav' }, 'audio.wav'],
     [{ path: '/tmp/stream.bin' }, 'stream.bin'],
     [{ name: '', path: '/tmp/fallback.bin' }, 'fallback.bin'],
