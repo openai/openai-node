@@ -101,14 +101,14 @@ importers:
         specifier: npm:typescript@4.9.5
         version: typescript@4.9.5
       ultracite:
-        specifier: 7.11.0
-        version: 7.11.0(oxfmt@0.67.0)(oxlint@1.82.0)
+        specifier: 7.11.1
+        version: 7.11.1(oxfmt@0.67.0)(oxlint@1.82.0)
       undici:
         specifier: 8.10.2
         version: 8.10.2
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@types/node@26.4.1)(vite@8.1.5(@types/node@26.4.1)(yaml@2.9.0))
+        version: 4.1.11(@types/node@26.4.1)(vite@8.1.5(@types/node@26.4.1)(yaml@2.9.1))
       ws:
         specifier: ^8.21.0
         version: 8.21.3
@@ -617,6 +617,13 @@ packages:
 
   '@napi-rs/wasm-runtime@1.2.3':
     resolution: {integrity: sha512-UMduMbqO5s5zF2NkNacMT/yK5Y5QiKvWr2+50bzIIxFDwVJ2h49b+oyjaCGPhJxd2/gC2x39EHv/gHVuu36x2Q==}
+    engines: {node: ^20.19.0 || ^22.13.0 || >=23.5.0}
+    peerDependencies:
+      '@emnapi/core': ^1.7.1 || ^2.0.0-alpha.4
+      '@emnapi/runtime': ^1.7.1 || ^2.0.0-alpha.4
+
+  '@napi-rs/wasm-runtime@1.2.4':
+    resolution: {integrity: sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=23.5.0}
     peerDependencies:
       '@emnapi/core': ^1.7.1 || ^2.0.0-alpha.4
@@ -1244,6 +1251,9 @@ packages:
 
   '@tybys/wasm-util@0.10.3':
     resolution: {integrity: sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg==}
+
+  '@tybys/wasm-util@0.10.4':
+    resolution: {integrity: sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A==}
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -2517,8 +2527,8 @@ packages:
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
-  magicast@0.5.4:
-    resolution: {integrity: sha512-llBEhWm1SacoRwgHUoQJYtwp4PBLF4faQi5TCpIGyGs9n4y5+juI0tDgyKIfpqxckRHaHzouUEph3THklWh03w==}
+  magicast@0.5.5:
+    resolution: {integrity: sha512-UicdXN8zQ3JHlxVq+28afMXPr1z7WNY6+7EJnzTdQWkTAlMLF5fNCCKxJHBQwGaNGR11581EiQmQzx73+MvszA==}
 
   make-dir@4.0.0:
     resolution: {integrity: sha512-hXdUTZYIVOt1Ex//jAQi+wTZZpUpwBj/0QsOzqegb3rGMMeJiSEu5xLHnYfBrRV4RH2+OCSOO95Is/7x1WJ4bw==}
@@ -2601,8 +2611,8 @@ packages:
   mz@2.7.0:
     resolution: {integrity: sha512-z81GNO7nnYMEhrGh9LeymoE4+Yr0Wn5McHIZMK5cfQCl+NDX08sCZgUc9/6MHni9IWuFLm1Z3HTCXu2z9fN62Q==}
 
-  nanoid@3.3.18:
-    resolution: {integrity: sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==}
+  nanoid@3.3.19:
+    resolution: {integrity: sha512-Y2tUNy4ouw6tq5oDSKeQYGOyhkUBhNOcGV/02KC+6kd9eDGqdZd++mjMiIDilrBYvjEnCYvVtsuHCuP+okSfug==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
@@ -2647,8 +2657,8 @@ packages:
     resolution: {integrity: sha512-9qny7Z9DsQU8Ou39ERsPU4OZQlSTP47ShQzuKZ6PRXpYLtIFgl/DEBYEXKlvcEa+9tHVcK8CF81Y2V72qaZhWA==}
     engines: {node: '>=18'}
 
-  nypm@0.6.9:
-    resolution: {integrity: sha512-zxlE2yvSWZWmHcNdT3+5zV2lrCogeE9YOklHrR3dFjqutq5wO7GFDYLFDRXLsYnJzwvy/im9fYoxePvS0VTW0w==}
+  nypm@0.6.10:
+    resolution: {integrity: sha512-W72Hrj1petq+b3Hk2aAC+9zswetlIFTnDW4s5djseZh2nYqBbyQLOtj472HwcbcWykPBUW1WpWpjOd4nK6gMRw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -2885,8 +2895,8 @@ packages:
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
-  react-is@19.2.8:
-    resolution: {integrity: sha512-s5un28nYxKJw5gvUHyW5PCC28CvBqLu9r3cWgzHT4Vo/5fqqkFcdRYsGcKf50WMPpjjFZS5d76fn3YCo2njKwQ==}
+  react-is@19.3.0:
+    resolution: {integrity: sha512-UpMYezM4v5/18F28aC66AEsjXIgE02kyEMH6yLdgLXu/UTfa1Ntwck/nNLrbqJsEXW7gPb0coNO9FQse9WTovA==}
 
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
@@ -3234,8 +3244,8 @@ packages:
     engines: {node: '>=0.8.0'}
     hasBin: true
 
-  ultracite@7.11.0:
-    resolution: {integrity: sha512-HJByeIoO4Lhcing1k2sabI7BCHRqeMztXGYZm4Zcir7NXvidXLwDgLNZgSR4w3oPKPgx7CRTqzJitt/oPR34NA==}
+  ultracite@7.11.1:
+    resolution: {integrity: sha512-NHqXD/fpNpLyAWCU3AOfRppVvXtxVk0D+oWrEOUXOveAiQCoyCnx+vL34Fa/rnFPY2piYfdqNhghp/J04uQ6JQ==}
     hasBin: true
     peerDependencies:
       '@biomejs/biome': ^2.5.0
@@ -3449,8 +3459,8 @@ packages:
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
 
-  yaml@2.9.0:
-    resolution: {integrity: sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==}
+  yaml@2.9.1:
+    resolution: {integrity: sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==}
     engines: {node: '>= 14.6'}
     hasBin: true
 
@@ -4245,11 +4255,11 @@ snapshots:
       '@tybys/wasm-util': 0.10.3
     optional: true
 
-  '@napi-rs/wasm-runtime@1.2.3(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
+  '@napi-rs/wasm-runtime@1.2.4(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
       '@emnapi/core': 1.11.1
       '@emnapi/runtime': 1.11.1
-      '@tybys/wasm-util': 0.10.3
+      '@tybys/wasm-util': 0.10.4
     optional: true
 
   '@nodelib/fs.scandir@2.1.5':
@@ -4485,7 +4495,7 @@ snapshots:
     dependencies:
       '@emnapi/core': 1.11.1
       '@emnapi/runtime': 1.11.1
-      '@napi-rs/wasm-runtime': 1.2.3(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
+      '@napi-rs/wasm-runtime': 1.2.4(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
     optional: true
 
   '@rolldown/binding-win32-arm64-msvc@1.1.5':
@@ -4639,6 +4649,11 @@ snapshots:
   '@tsconfig/node16@1.0.4': {}
 
   '@tybys/wasm-util@0.10.3':
+    dependencies:
+      tslib: 2.8.1
+    optional: true
+
+  '@tybys/wasm-util@0.10.4':
     dependencies:
       tslib: 2.8.1
     optional: true
@@ -4830,13 +4845,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.1
 
-  '@vitest/mocker@4.1.11(vite@8.1.5(@types/node@26.4.1)(yaml@2.9.0))':
+  '@vitest/mocker@4.1.11(vite@8.1.5(@types/node@26.4.1)(yaml@2.9.1))':
     dependencies:
       '@vitest/spy': 4.1.11
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 8.1.5(@types/node@26.4.1)(yaml@2.9.0)
+      vite: 8.1.5(@types/node@26.4.1)(yaml@2.9.1)
 
   '@vitest/pretty-format@4.1.11':
     dependencies:
@@ -5381,7 +5396,7 @@ snapshots:
     dependencies:
       fast-glob: 3.3.3
       pkg-types: 1.3.1
-      yaml: 2.9.0
+      yaml: 2.9.1
 
   foreground-child@3.3.1:
     dependencies:
@@ -6081,7 +6096,7 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  magicast@0.5.4:
+  magicast@0.5.5:
     dependencies:
       '@babel/parser': 7.29.8
       '@babel/types': 7.29.8
@@ -6156,7 +6171,7 @@ snapshots:
       object-assign: 4.1.1
       thenify-all: 1.6.0
 
-  nanoid@3.3.18: {}
+  nanoid@3.3.19: {}
 
   napi-postinstall@0.3.4: {}
 
@@ -6192,7 +6207,7 @@ snapshots:
       path-key: 4.0.0
       unicorn-magic: 0.3.0
 
-  nypm@0.6.9:
+  nypm@0.6.10:
     dependencies:
       citty: 0.2.2
       pathe: 2.0.3
@@ -6369,7 +6384,7 @@ snapshots:
 
   postcss@8.5.23:
     dependencies:
-      nanoid: 3.3.18
+      nanoid: 3.3.19
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
@@ -6378,12 +6393,12 @@ snapshots:
       '@jest/schemas': 30.4.1
       ansi-styles: 5.2.0
       react-is-18: react-is@18.3.1
-      react-is-19: react-is@19.2.8
+      react-is-19: react-is@19.3.0
 
   pretty-format@30.5.1:
     dependencies:
       '@jest/react-is-18': react-is@18.3.1
-      '@jest/react-is-19': react-is@19.2.8
+      '@jest/react-is-19': react-is@19.3.0
       '@jest/schemas': 30.5.0
       ansi-styles: 5.2.0
 
@@ -6425,7 +6440,7 @@ snapshots:
 
   react-is@18.3.1: {}
 
-  react-is@19.2.8: {}
+  react-is@19.3.0: {}
 
   require-directory@2.1.1: {}
 
@@ -6762,7 +6777,7 @@ snapshots:
   uglify-js@3.19.3:
     optional: true
 
-  ultracite@7.11.0(oxfmt@0.67.0)(oxlint@1.82.0):
+  ultracite@7.11.1(oxfmt@0.67.0)(oxlint@1.82.0):
     dependencies:
       '@clack/prompts': 1.8.0
       cli-truncate: 6.1.1
@@ -6774,12 +6789,12 @@ snapshots:
       find-workspaces: 0.3.1
       jsonc-parser: 3.3.1
       log-update: 8.0.0
-      magicast: 0.5.4
-      nypm: 0.6.9
+      magicast: 0.5.5
+      nypm: 0.6.10
       resolve.exports: 2.0.3
       semver: 7.8.5
       string-width: 8.2.2
-      yaml: 2.9.0
+      yaml: 2.9.1
       zod: 4.5.4
     optionalDependencies:
       oxfmt: 0.67.0
@@ -6840,7 +6855,7 @@ snapshots:
 
   vary@1.1.2: {}
 
-  vite@8.1.5(@types/node@26.4.1)(yaml@2.9.0):
+  vite@8.1.5(@types/node@26.4.1)(yaml@2.9.1):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -6850,12 +6865,12 @@ snapshots:
     optionalDependencies:
       '@types/node': 26.4.1
       fsevents: 2.3.3
-      yaml: 2.9.0
+      yaml: 2.9.1
 
-  vitest@4.1.11(@types/node@26.4.1)(vite@8.1.5(@types/node@26.4.1)(yaml@2.9.0)):
+  vitest@4.1.11(@types/node@26.4.1)(vite@8.1.5(@types/node@26.4.1)(yaml@2.9.1)):
     dependencies:
       '@vitest/expect': 4.1.11
-      '@vitest/mocker': 4.1.11(vite@8.1.5(@types/node@26.4.1)(yaml@2.9.0))
+      '@vitest/mocker': 4.1.11(vite@8.1.5(@types/node@26.4.1)(yaml@2.9.1))
       '@vitest/pretty-format': 4.1.11
       '@vitest/runner': 4.1.11
       '@vitest/snapshot': 4.1.11
@@ -6872,7 +6887,7 @@ snapshots:
       tinyexec: 1.3.0
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.1
-      vite: 8.1.5(@types/node@26.4.1)(yaml@2.9.0)
+      vite: 8.1.5(@types/node@26.4.1)(yaml@2.9.1)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 26.4.1
@@ -6932,7 +6947,7 @@ snapshots:
 
   yallist@3.1.1: {}
 
-  yaml@2.9.0: {}
+  yaml@2.9.1: {}
 
   yargs-parser@20.2.9: {}
 
