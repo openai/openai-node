@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.22.0](https://github.com/openai/openai-node/compare/v7.21.0...v7.22.0) (2026-09-22)
+
+
+### Features
+
+* **api:** add GPT-6 Sol and Luna model identifiers ([#2790](https://github.com/openai/openai-node/issues/2790)) ([cff2135](https://github.com/openai/openai-node/commit/cff2135ff75c54d04be256d19d99fad8ca4a9d3b))
+
 ## [7.21.0](https://github.com/openai/openai-node/compare/v7.20.0...v7.21.0) (2026-09-22)
 
 
