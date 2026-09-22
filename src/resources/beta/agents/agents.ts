@@ -3155,7 +3155,8 @@ export namespace EnvironmentParam {
   }
 
   /**
-   * An OpenAI-hosted environment, optionally based on a reusable template.
+   * An existing OpenAI-hosted environment or new inline/template-based hosted
+   * configuration.
    */
   export interface EnvironmentParamOpenAIHosted {
     /**

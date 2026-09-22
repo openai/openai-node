@@ -1525,6 +1525,7 @@ export interface BetaResponse {
     | 'gpt-daybreak-blue-latest'
     | 'gpt-daybreak-red-latest'
     | 'gpt-5.6-cyber'
+    | 'gpt-rosalind-research'
     | (string & {});
 
   /**
@@ -12106,6 +12107,7 @@ export namespace BetaResponsesClientEvent {
       | 'gpt-daybreak-blue-latest'
       | 'gpt-daybreak-red-latest'
       | 'gpt-5.6-cyber'
+      | 'gpt-rosalind-research'
       | (string & {});
 
     /**
@@ -14350,6 +14352,7 @@ export interface ResponseCreateParamsBase {
     | 'gpt-daybreak-blue-latest'
     | 'gpt-daybreak-red-latest'
     | 'gpt-5.6-cyber'
+    | 'gpt-rosalind-research'
     | (string & {});
 
   /**
@@ -15022,6 +15025,7 @@ export interface ResponseCompactParams {
     | 'gpt-daybreak-blue-latest'
     | 'gpt-daybreak-red-latest'
     | 'gpt-5.6-cyber'
+    | 'gpt-rosalind-research'
     | (string & {})
     | null;
 
