@@ -11,6 +11,13 @@ import {
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -134,11 +141,14 @@ export class Certificates extends APIResource {
    * ```
    */
   create(body: CertificateCreateParams, options?: RequestOptions): APIPromise<Certificate> {
-    return this._client.post('/organization/certificates', {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      '/organization/certificates',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -253,11 +263,14 @@ export class Certificates extends APIResource {
       query = {};
     }
     query = query as CertificateRetrieveParams | null | undefined;
-    return this._client.get(path`/organization/certificates/${certificateID}`, {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/certificates/${certificateID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -276,11 +289,14 @@ export class Certificates extends APIResource {
     body: CertificateUpdateParams,
     options?: RequestOptions,
   ): APIPromise<Certificate> {
-    return this._client.post(path`/organization/certificates/${certificateID}`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/certificates/${certificateID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -393,7 +409,11 @@ export class Certificates extends APIResource {
     return this._client.getAPIList(
       '/organization/certificates',
       ConversationCursorPage<CertificateListResponse>,
-      { query, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -411,10 +431,13 @@ export class Certificates extends APIResource {
    * ```
    */
   delete(certificateID: string, options?: RequestOptions): APIPromise<CertificateDeleteResponse> {
-    return this._client.delete(path`/organization/certificates/${certificateID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      path`/organization/certificates/${certificateID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -436,12 +459,16 @@ export class Certificates extends APIResource {
     body: CertificateActivateParams,
     options?: RequestOptions,
   ): PagePromise<CertificateActivateResponsesPage, CertificateActivateResponse> {
-    return this._client.getAPIList('/organization/certificates/activate', Page<CertificateActivateResponse>, {
-      body,
-      method: 'post',
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.getAPIList(
+      '/organization/certificates/activate',
+      Page<CertificateActivateResponse>,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        method: 'post',
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -466,7 +493,12 @@ export class Certificates extends APIResource {
     return this._client.getAPIList(
       '/organization/certificates/deactivate',
       Page<CertificateDeactivateResponse>,
-      { body, method: 'post', ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        method: 'post',
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 }

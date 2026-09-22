@@ -5,12 +5,22 @@ import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Cases extends APIResource {
   /**
    * Get a safety case by ID.
    */
   retrieve(id: string, options?: RequestOptions): APIPromise<SafetyCase> {
-    return this._client.get(path`/safety/cases/${id}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.get(
+      path`/safety/cases/${id}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 

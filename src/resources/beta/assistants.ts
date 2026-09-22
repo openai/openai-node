@@ -13,6 +13,13 @@ import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 import { AssistantStream } from '../../lib/AssistantStream';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -130,12 +137,15 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   create(body: AssistantCreateParams, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.post('/assistants', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      '/assistants',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -144,11 +154,14 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   retrieve(assistantID: string, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.get(path`/assistants/${assistantID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/assistants/${assistantID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -157,12 +170,15 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   update(assistantID: string, body: AssistantUpdateParams, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.post(path`/assistants/${assistantID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/assistants/${assistantID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -266,12 +282,16 @@ export class Assistants extends APIResource {
       query = {};
     }
     query = query as AssistantListParams | null | undefined;
-    return this._client.getAPIList('/assistants', CursorPage<Assistant>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/assistants',
+      CursorPage<Assistant>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -280,11 +300,14 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   delete(assistantID: string, options?: RequestOptions): APIPromise<AssistantDeleted> {
-    return this._client.delete(path`/assistants/${assistantID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/assistants/${assistantID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

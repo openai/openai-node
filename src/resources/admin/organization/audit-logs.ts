@@ -9,6 +9,13 @@ import {
 } from '../../../core/pagination';
 import { RequestOptions } from '../../../internal/request-options';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -238,11 +245,15 @@ export class AuditLogs extends APIResource {
       query = {};
     }
     query = query as AuditLogListParams | null | undefined;
-    return this._client.getAPIList('/organization/audit_logs', ConversationCursorPage<AuditLogListResponse>, {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.getAPIList(
+      '/organization/audit_logs',
+      ConversationCursorPage<AuditLogListResponse>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

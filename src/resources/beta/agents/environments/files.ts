@@ -7,6 +7,13 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Files extends APIResource {
   /**
    * Copies inline bytes or a Files API file into a connected execution environment.
@@ -31,12 +38,15 @@ export class Files extends APIResource {
     body: FileCreateParams,
     options?: RequestOptions,
   ): APIPromise<EnvironmentFile> {
-    return this._client.post(path`/agents/environments/${environmentID}/files`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/agents/environments/${environmentID}/files`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -62,12 +72,12 @@ export class Files extends APIResource {
     return this._client.getAPIList(
       path`/agents/environments/${environmentID}/files`,
       TokenPage<EnvironmentFile>,
-      {
+      resolveResourceRequestOptions(options, (options) => ({
         query,
         ...options,
         headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
         __security: { bearerAuth: true },
-      },
+      })),
     );
   }
 }

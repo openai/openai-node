@@ -486,6 +486,7 @@ export class OpenAI {
       continueRequest?: <T>(operation: () => Promise<T>) => Promise<T>;
     }
   >();
+  static #sanitizedLoggers = new globalThis.WeakSet<Logger>();
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
@@ -606,7 +607,7 @@ export class OpenAI {
     this.baseURL = options.baseURL!;
     this.#explicitDataResidency = residencyBaseURL !== undefined || inheritedResidencySelection;
     this.timeout = options.timeout ?? OpenAI.DEFAULT_TIMEOUT; /* 10 minutes */
-    this.logger = options.logger ?? console;
+    this.logger = this.#sanitizeLogger(options.logger ?? console);
     const defaultLogLevel = 'warn';
     // Set default logLevel early so that we can log a warning in parseLogLevel.
     this.logLevel = defaultLogLevel;
@@ -615,7 +616,7 @@ export class OpenAI {
       parseLogLevel(readEnv('OPENAI_LOG'), "process.env['OPENAI_LOG']", this) ??
       defaultLogLevel;
     this.fetchOptions = options.fetchOptions;
-    this.maxRetries = options.maxRetries ?? 2;
+    this.maxRetries = this.#normalizeRetries(options.maxRetries);
     this.fetch = options.fetch ?? Shims.getDefaultFetch();
     this.#encoder = Opts.FallbackEncoder;
 
@@ -940,6 +941,341 @@ export class OpenAI {
     return url.toString();
   }
 
+  #normalizeRetries(value: unknown): number {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 2;
+  }
+
+  #isSensitiveLogKey(key: string): boolean {
+    const normalized = key.replace(/[^a-z0-9]/gi, '').toLowerCase();
+    return /authorization|authentication|cookie|session|signature|assertion|connectionstring|devicecode|codeverifier|accountkey|mtlskey|proxyauth|(?:api|access|secret|private|security|refresh|id|bearer|aws|azure|openai|admin|client|proxy|auth)[a-z0-9]*(?:key|token|secret|password|passwd|pwd|credential|auth)|^(?:auth|key|sig|sas|jwt|bearer|pfx|p12)$|(?:sid|token|secret|password|passwd|pwd|credential|passphrase|apikey|accesskey|privatekey|username)s?$/.test(
+      normalized,
+    );
+  }
+
+  #sanitizeLogValue(value: unknown, seen: WeakMap<object, unknown>): unknown {
+    const maxDepth = 64;
+    const maxValues = 4096;
+    const redactString = (entry: string): string =>
+      entry
+        .replace(/((?:[a-z][a-z0-9+.-]*:)?\/\/)([^/\s?#]*@)(?=[^/\s?#]+)/gi, '$1[REDACTED]@')
+        .replace(/(^|[\s(=])([^/\s]+:[^/\s]*@)(?=[^/\s@]+)/gi, '$1[REDACTED]@')
+        .replace(/(^|[\s,;])([a-z][a-z0-9_-]*)(\s*:\s*)([^\r\n,;]+)/gi, (match, prefix, key, separator) =>
+          this.#isSensitiveLogKey(key) ? `${prefix}${key}${separator}[REDACTED]` : match,
+        )
+        .replace(/(^|[?&#;])([^=&;\s?#/]+)=([^&;\s#]+)/g, (match, separator, key) => {
+          let decoded = key;
+          try {
+            decoded = globalThis.decodeURIComponent(key);
+          } catch {}
+          return this.#isSensitiveLogKey(decoded) ? `${separator}${key}=[REDACTED]` : match;
+        });
+    const getLogString = (entry: unknown): string | undefined => {
+      try {
+        return globalThis.String.prototype.valueOf.call(entry);
+      } catch {
+        return undefined;
+      }
+    };
+    const isSensitiveLogLabel = (entry: unknown): boolean => {
+      const label = getLogString(entry);
+      if (label !== undefined) return this.#isSensitiveLogKey(label);
+      try {
+        return entry instanceof globalThis.String;
+      } catch {
+        return true;
+      }
+    };
+
+    type PendingLogValue = {
+      value: unknown;
+      depth: number;
+      assign: (sanitized: unknown) => void;
+    };
+    type LogPropertyDescriptor = {
+      descriptor: PropertyDescriptor | undefined;
+      failed: boolean;
+    };
+    const pending: PendingLogValue[] = [];
+    const pendingMaps: Array<{
+      map: Map<unknown, unknown>;
+      entries: Array<[unknown, unknown]>;
+    }> = [];
+    let sanitizedValue: unknown;
+
+    const getOwnLogDescriptor = (entry: object, key: PropertyKey): LogPropertyDescriptor => {
+      try {
+        return {
+          descriptor: globalThis.Object.getOwnPropertyDescriptor(entry, key),
+          failed: false,
+        };
+      } catch {
+        return { descriptor: undefined, failed: true };
+      }
+    };
+
+    const enqueue = (entry: unknown, depth: number, assign: (sanitized: unknown) => void): void => {
+      if (depth > maxDepth || pending.length >= maxValues) {
+        assign('[REDACTED]');
+        return;
+      }
+      pending.push({ value: entry, depth, assign });
+    };
+
+    enqueue(value, 0, (entry) => {
+      sanitizedValue = entry;
+    });
+
+    for (let cursor = 0; cursor < pending.length; cursor += 1) {
+      const { value: current, depth, assign } = pending[cursor]!;
+
+      if (typeof current === 'string') {
+        assign(redactString(current));
+        continue;
+      }
+      // Functions can carry inspection hooks; symbols can expose secret descriptions.
+      if (typeof current === 'function' || typeof current === 'symbol') {
+        assign('[REDACTED]');
+        continue;
+      }
+      if (typeof current !== 'object' || current === null) {
+        assign(current);
+        continue;
+      }
+
+      const previous = seen.get(current);
+      if (previous !== undefined) {
+        assign(previous);
+        continue;
+      }
+
+      // Brand checks and native operations can throw for caller-provided proxies.
+      try {
+        const boxedString = getLogString(current);
+        if (boxedString !== undefined) {
+          const sanitized = new globalThis.String(redactString(boxedString));
+          seen.set(current, sanitized);
+          assign(sanitized);
+          continue;
+        }
+        // Proxies and counterfeit String objects cannot expose their native payload.
+        // Do not let their indexed characters bypass whole-string redaction.
+        if (current instanceof globalThis.String) {
+          seen.set(current, '[REDACTED]');
+          assign('[REDACTED]');
+          continue;
+        }
+
+        const RuntimeHeaders = globalThis.Headers;
+        if (typeof RuntimeHeaders === 'function' && current instanceof RuntimeHeaders) {
+          const sanitized = new RuntimeHeaders();
+          seen.set(current, sanitized);
+          assign(sanitized);
+          RuntimeHeaders.prototype.forEach.call(current, (entry: string, key: string) => {
+            sanitized.set(key, this.#isSensitiveLogKey(key) ? '[REDACTED]' : redactString(entry));
+          });
+          continue;
+        }
+
+        if (current instanceof URL) {
+          const sanitized = new URL(URL.prototype.toString.call(current));
+          seen.set(current, sanitized);
+          assign(sanitized);
+          if (sanitized.username) sanitized.username = '[REDACTED]';
+          if (sanitized.password) sanitized.password = '[REDACTED]';
+          for (const [key] of sanitized.searchParams) {
+            if (this.#isSensitiveLogKey(key)) sanitized.searchParams.set(key, '[REDACTED]');
+          }
+          if (sanitized.hash) sanitized.hash = redactString(sanitized.hash);
+          continue;
+        }
+
+        if (Array.isArray(current)) {
+          const lengthDescriptor = getOwnLogDescriptor(current, 'length');
+          if (
+            lengthDescriptor.failed ||
+            !lengthDescriptor.descriptor ||
+            !('value' in lengthDescriptor.descriptor) ||
+            typeof lengthDescriptor.descriptor.value !== 'number'
+          ) {
+            seen.set(current, '[REDACTED]');
+            assign('[REDACTED]');
+            continue;
+          }
+
+          const sanitized: unknown[] = [];
+          seen.set(current, sanitized);
+          assign(sanitized);
+          const limit = Math.min(lengthDescriptor.descriptor.value, maxValues);
+          const firstDescriptor = getOwnLogDescriptor(current, '0');
+          const firstKey =
+            !firstDescriptor.failed && firstDescriptor.descriptor && 'value' in firstDescriptor.descriptor
+              ? firstDescriptor.descriptor.value
+              : undefined;
+          for (let index = 0; index < limit; index += 1) {
+            const property = index === 0 ? firstDescriptor : getOwnLogDescriptor(current, `${index}`);
+            if (property.failed) {
+              sanitized[index] = '[REDACTED]';
+              continue;
+            }
+            const descriptor = property.descriptor;
+            if (!descriptor?.enumerable) continue;
+            if (
+              index === 1 &&
+              (firstDescriptor.failed ||
+                (firstDescriptor.descriptor && !('value' in firstDescriptor.descriptor)) ||
+                isSensitiveLogLabel(firstKey))
+            ) {
+              sanitized[index] = '[REDACTED]';
+              continue;
+            }
+            if (!('value' in descriptor)) {
+              sanitized[index] = '[REDACTED]';
+              continue;
+            }
+            enqueue(descriptor.value, depth + 1, (entry) => {
+              sanitized[index] = entry;
+            });
+          }
+          sanitized.length = limit;
+          if (lengthDescriptor.descriptor.value > limit) sanitized[limit] = '[REDACTED]';
+          continue;
+        }
+
+        if (current instanceof globalThis.Map) {
+          const sanitized = new globalThis.Map<unknown, unknown>();
+          const entries: Array<[unknown, unknown]> = [];
+          pendingMaps.push({ map: sanitized, entries });
+          seen.set(current, sanitized);
+          assign(sanitized);
+          globalThis.Map.prototype.forEach.call(current, (entry: unknown, key: unknown) => {
+            const pair: [unknown, unknown] = ['[REDACTED]', '[REDACTED]'];
+            entries.push(pair);
+            enqueue(key, depth + 1, (safeKey) => {
+              // Unsupported values must not expose the original object as a key.
+              if (
+                typeof safeKey !== 'function' &&
+                typeof safeKey !== 'symbol' &&
+                !(typeof key === 'object' && key !== null && safeKey === key)
+              ) {
+                pair[0] = safeKey;
+              }
+            });
+            if (isSensitiveLogLabel(key)) {
+              return;
+            }
+            enqueue(entry, depth + 1, (safeEntry) => {
+              pair[1] = safeEntry;
+            });
+          });
+          continue;
+        }
+
+        if (current instanceof globalThis.Set) {
+          const sanitized = new globalThis.Set<unknown>();
+          seen.set(current, sanitized);
+          assign(sanitized);
+          globalThis.Set.prototype.forEach.call(current, (entry: unknown) => {
+            enqueue(entry, depth + 1, (safeEntry) => {
+              sanitized.add(safeEntry);
+            });
+          });
+          continue;
+        }
+
+        if (current instanceof globalThis.Date) {
+          assign(new globalThis.Date(globalThis.Date.prototype.getTime.call(current)));
+          continue;
+        }
+
+        const RuntimeReadableStream = (globalThis as any).ReadableStream;
+        if (
+          (typeof RuntimeReadableStream === 'function' && current instanceof RuntimeReadableStream) ||
+          current instanceof globalThis.ArrayBuffer ||
+          globalThis.ArrayBuffer.isView(current)
+        ) {
+          // Opaque payloads may carry credentials or custom inspection hooks.
+          // Redact their log representation without reading or consuming them.
+          seen.set(current, '[REDACTED]');
+          assign('[REDACTED]');
+          continue;
+        }
+
+        let keys: PropertyKey[];
+        try {
+          keys = globalThis.Reflect.ownKeys(current);
+        } catch {
+          seen.set(current, '[REDACTED]');
+          assign('[REDACTED]');
+          continue;
+        }
+
+        const sanitized: Record<string, unknown> = {};
+        seen.set(current, sanitized);
+        assign(sanitized);
+        for (const key of keys) {
+          if (typeof key !== 'string') continue;
+          const property = getOwnLogDescriptor(current, key);
+          if (property.failed) {
+            sanitized[key] = '[REDACTED]';
+            continue;
+          }
+          const descriptor = property.descriptor;
+          if (!descriptor?.enumerable) continue;
+          if (this.#isSensitiveLogKey(key)) {
+            sanitized[key] = '[REDACTED]';
+            continue;
+          }
+          if (!('value' in descriptor)) {
+            sanitized[key] = '[REDACTED]';
+            continue;
+          }
+          enqueue(descriptor.value, depth + 1, (safeEntry) => {
+            sanitized[key] = safeEntry;
+          });
+        }
+      } catch {
+        seen.set(current, '[REDACTED]');
+        assign('[REDACTED]');
+      }
+    }
+
+    // Populate in input order after both keys and values have been sanitized.
+    // Budget fallbacks can assign immediately while earlier entries are queued.
+    for (const { map, entries } of pendingMaps) {
+      for (const [key, entry] of entries) map.set(key, entry);
+    }
+
+    return sanitizedValue;
+  }
+  #sanitizeLogger(logger: Logger): Logger {
+    if (OpenAI.#sanitizedLoggers.has(logger)) return logger;
+
+    const sanitized = new globalThis.Proxy(Object.create(null) as Logger, {
+      get: (_facade, property) => {
+        const value = globalThis.Reflect.get(logger, property, logger);
+        if (typeof value !== 'function') return value;
+        if (
+          typeof property !== 'string' ||
+          !['debug', 'info', 'warn', 'error', 'trace', 'log'].includes(property)
+        ) {
+          return value.bind(logger);
+        }
+
+        return (...args: unknown[]) => {
+          const seen = new WeakMap<object, unknown>();
+          return globalThis.Reflect.apply(
+            value,
+            logger,
+            args.map((entry) => this.#sanitizeLogValue(entry, seen)),
+          );
+        };
+      },
+      set: (_facade, property, value) => globalThis.Reflect.set(logger, property, value, logger),
+    });
+    OpenAI.#sanitizedLoggers.add(sanitized);
+    return sanitized;
+  }
+
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
    * Function-based credentials are resolved later, when building authentication
@@ -1190,9 +1526,11 @@ export class OpenAI {
     retryOfRequestLogID: string | undefined,
   ): Promise<APIResponseProps> {
     const options = await optionsInput;
-    const maxRetries = options.maxRetries ?? this.maxRetries;
+    const maxRetries = this.#normalizeRetries(options.maxRetries ?? this.maxRetries);
     if (retriesRemaining == null) {
       retriesRemaining = maxRetries;
+    } else {
+      retriesRemaining = Math.min(this.#normalizeRetries(retriesRemaining), maxRetries);
     }
 
     const x509Authentication = this.#x509Authentication;
@@ -1712,7 +2050,7 @@ export class OpenAI {
       timeoutMillis < 0 ||
       timeoutMillis > 60 * 1000
     ) {
-      const maxRetries = options.maxRetries ?? this.maxRetries;
+      const maxRetries = this.#normalizeRetries(options.maxRetries ?? this.maxRetries);
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
     const x509Authentication = this.#x509Authentication;

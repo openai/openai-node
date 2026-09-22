@@ -5,12 +5,22 @@ import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Alerts extends APIResource {
   /**
    * Get a safety alert belonging to the authenticated API project.
    */
   retrieve(id: string, options?: RequestOptions): APIPromise<SafetyAlert> {
-    return this._client.get(path`/safety/alerts/${id}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.get(
+      path`/safety/alerts/${id}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 

@@ -11,6 +11,13 @@ import {
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -148,7 +155,12 @@ export class Permissions extends APIResource {
     return this._client.getAPIList(
       path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`,
       Page<PermissionCreateResponse>,
-      { body, method: 'post', ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        method: 'post',
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -260,11 +272,14 @@ export class Permissions extends APIResource {
       query = {};
     }
     query = query as PermissionRetrieveParams | null | undefined;
-    return this._client.get(path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -386,7 +401,11 @@ export class Permissions extends APIResource {
     return this._client.getAPIList(
       path`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`,
       ConversationCursorPage<PermissionListResponse>,
-      { query, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -417,7 +436,10 @@ export class Permissions extends APIResource {
     const { fine_tuned_model_checkpoint } = params;
     return this._client.delete(
       path`/fine_tuning/checkpoints/${fine_tuned_model_checkpoint}/permissions/${permissionID}`,
-      { ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 }

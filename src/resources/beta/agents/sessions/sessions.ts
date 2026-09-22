@@ -34,6 +34,13 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -179,13 +186,16 @@ export class Sessions extends APIResource {
     body: SessionCreateParams,
     options?: RequestOptions,
   ): APIPromise<AgentsAPI.AgentSession> | APIPromise<Stream<AgentsAPI.AgentSessionEvent>> {
-    return this._client.post('/agents/sessions', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      stream: body.stream ?? false,
-      __security: { bearerAuth: true },
-    }) as APIPromise<AgentsAPI.AgentSession> | APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
+    return this._client.post(
+      '/agents/sessions',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        stream: body.stream ?? false,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<AgentsAPI.AgentSession> | APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
   }
 
   /**
@@ -199,11 +209,14 @@ export class Sessions extends APIResource {
    * ```
    */
   retrieve(sessionID: string, options?: RequestOptions): APIPromise<AgentsAPI.AgentSession> {
-    return this._client.get(path`/agents/sessions/${sessionID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/agents/sessions/${sessionID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -222,12 +235,15 @@ export class Sessions extends APIResource {
     body: SessionUpdateParams | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<AgentsAPI.AgentSession> {
-    return this._client.post(path`/agents/sessions/${sessionID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/agents/sessions/${sessionID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -339,12 +355,16 @@ export class Sessions extends APIResource {
       query = {};
     }
     query = query as SessionListParams | null | undefined;
-    return this._client.getAPIList('/agents/sessions', CursorPage<AgentsAPI.AgentSession>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/agents/sessions',
+      CursorPage<AgentsAPI.AgentSession>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -361,11 +381,14 @@ export class Sessions extends APIResource {
    * ```
    */
   delete(sessionID: string, options?: RequestOptions): APIPromise<AgentsAPI.AgentSessionDeleted> {
-    return this._client.delete(path`/agents/sessions/${sessionID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/agents/sessions/${sessionID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

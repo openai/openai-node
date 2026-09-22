@@ -304,21 +304,27 @@ describe('response debug logging', () => {
     expect(JSON.stringify(logger.debug.mock.calls)).not.toContain('synthetic-secret');
   });
 
-  test('keeps non-JSON request bodies unchanged', async () => {
+  test('sanitizes multipart diagnostics without changing the request body', async () => {
     const logger = createLogger();
-    const body = new FormData();
+    const body = Object.assign(new FormData(), { apiKey: 'synthetic-multipart-api-key' });
     body.set('ordinary', 'synthetic multipart content');
-    const fetch = vi.fn(async () => Response.json({ ok: true }));
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ ok: true }));
     const client = new OpenAI({ apiKey: 'synthetic-api-key', logLevel: 'debug', logger, fetch });
 
     await client.post('/example', { body });
 
     expect(fetch).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body }));
+    expect(fetch.mock.calls[0]?.[1]?.body).toBe(body);
     expect(logger.debug).toHaveBeenCalledWith(
       expect.stringContaining('sending request'),
-      expect.objectContaining({ options: expect.objectContaining({ body }) }),
+      expect.objectContaining({
+        options: expect.objectContaining({ body: { apiKey: '[REDACTED]' } }),
+      }),
     );
     expect(body.get('ordinary')).toBe('synthetic multipart content');
+    expect(body.apiKey).toBe('synthetic-multipart-api-key');
+    expect(JSON.stringify(logger.debug.mock.calls)).not.toContain('synthetic-multipart-api-key');
+    expect(JSON.stringify(logger.debug.mock.calls)).not.toContain('synthetic multipart content');
   });
 
   test('masks malformed URL strings in diagnostics without changing the response', async () => {
@@ -457,9 +463,11 @@ describe('response debug logging', () => {
     expect(Object.prototype).not.toHaveProperty('signing_secret');
   });
 
-  test('keeps raw binary response objects unchanged', async () => {
+  test('sanitizes raw response diagnostics without changing or consuming the response', async () => {
     const logger = createLogger();
-    const raw = new Response('synthetic binary data');
+    const raw = Object.assign(new Response('synthetic binary data'), {
+      apiKey: 'synthetic-response-api-key',
+    });
     const client = new OpenAI({
       apiKey: 'synthetic-api-key',
       logLevel: 'debug',
@@ -470,8 +478,12 @@ describe('response debug logging', () => {
     expect(await client.get('/example', { __binaryResponse: true })).toBe(raw);
     expect(logger.debug).toHaveBeenCalledWith(
       expect.stringContaining('response parsed'),
-      expect.objectContaining({ body: raw }),
+      expect.objectContaining({ body: { apiKey: '[REDACTED]' } }),
     );
     expect(raw.bodyUsed).toBe(false);
+    expect(raw.apiKey).toBe('synthetic-response-api-key');
+    expect(JSON.stringify(logger.debug.mock.calls)).not.toContain('synthetic-response-api-key');
+    expect(JSON.stringify(logger.debug.mock.calls)).not.toContain('synthetic binary data');
+    expect(await raw.text()).toBe('synthetic binary data');
   });
 });

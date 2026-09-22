@@ -27,6 +27,13 @@ import { type RunnableToolFunctionWithContext } from '../../../lib/RunnableFunct
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -185,12 +192,15 @@ export class Completions extends APIResource {
     body: ChatCompletionCreateParams,
     options?: RequestOptions,
   ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
-    return this._client.post('/chat/completions', {
-      body,
-      ...options,
-      stream: body.stream ?? false,
-      __security: { bearerAuth: true },
-    }) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
+    return this._client.post(
+      '/chat/completions',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        stream: body.stream ?? false,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
   }
 
   /**
@@ -204,10 +214,10 @@ export class Completions extends APIResource {
    * ```
    */
   retrieve(completionID: string, options?: RequestOptions): APIPromise<ChatCompletion> {
-    return this._client.get(path`/chat/completions/${completionID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/chat/completions/${completionID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -228,11 +238,14 @@ export class Completions extends APIResource {
     body: ChatCompletionUpdateParams,
     options?: RequestOptions,
   ): APIPromise<ChatCompletion> {
-    return this._client.post(path`/chat/completions/${completionID}`, {
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/chat/completions/${completionID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -343,11 +356,15 @@ export class Completions extends APIResource {
       query = {};
     }
     query = query as ChatCompletionListParams | null | undefined;
-    return this._client.getAPIList('/chat/completions', CursorPage<ChatCompletion>, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/chat/completions',
+      CursorPage<ChatCompletion>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -361,10 +378,10 @@ export class Completions extends APIResource {
    * ```
    */
   delete(completionID: string, options?: RequestOptions): APIPromise<ChatCompletionDeleted> {
-    return this._client.delete(path`/chat/completions/${completionID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/chat/completions/${completionID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   parse<Params extends ChatCompletionParseParams, ParsedT = ExtractParsedContentFromParams<Params>>(

@@ -8,6 +8,13 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -132,11 +139,14 @@ export class Turns extends APIResource {
    */
   retrieve(turnID: string, params: TurnRetrieveParams, options?: RequestOptions): APIPromise<Turn> {
     const { session_id } = params;
-    return this._client.get(path`/agents/sessions/${session_id}/turns/${turnID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/agents/sessions/${session_id}/turns/${turnID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -253,12 +263,16 @@ export class Turns extends APIResource {
       query = {};
     }
     query = query as TurnListParams | null | undefined;
-    return this._client.getAPIList(path`/agents/sessions/${sessionID}/turns`, CursorPage<Turn>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      path`/agents/sessions/${sessionID}/turns`,
+      CursorPage<Turn>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

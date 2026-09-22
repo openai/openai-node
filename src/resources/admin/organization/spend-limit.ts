@@ -4,6 +4,13 @@ import { APIResource } from '../../../core/resource';
 import { APIPromise } from '../../../core/api-promise';
 import { RequestOptions } from '../../../internal/request-options';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class SpendLimit extends APIResource {
   /**
    * Get the organization's hard spend limit.
@@ -15,10 +22,13 @@ export class SpendLimit extends APIResource {
    * ```
    */
   retrieve(options?: RequestOptions): APIPromise<OrganizationSpendLimit> {
-    return this._client.get('/organization/spend_limit', {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/spend_limit',
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -35,11 +45,14 @@ export class SpendLimit extends APIResource {
    * ```
    */
   update(body: SpendLimitUpdateParams, options?: RequestOptions): APIPromise<OrganizationSpendLimit> {
-    return this._client.post('/organization/spend_limit', {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      '/organization/spend_limit',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -52,10 +65,13 @@ export class SpendLimit extends APIResource {
    * ```
    */
   delete(options?: RequestOptions): APIPromise<OrganizationSpendLimitDeleted> {
-    return this._client.delete('/organization/spend_limit', {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      '/organization/spend_limit',
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

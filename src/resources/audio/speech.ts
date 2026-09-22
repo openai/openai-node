@@ -5,6 +5,13 @@ import { APIPromise } from '../../core/api-promise';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Turn audio into text or text into audio.
  */
@@ -27,13 +34,16 @@ export class Speech extends APIResource {
    * ```
    */
   create(body: SpeechCreateParams, options?: RequestOptions): APIPromise<Response> {
-    return this._client.post('/audio/speech', {
-      body,
-      ...options,
-      headers: buildHeaders([{ Accept: 'application/octet-stream' }, options?.headers]),
-      __security: { bearerAuth: true },
-      __binaryResponse: true,
-    });
+    return this._client.post(
+      '/audio/speech',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ Accept: 'application/octet-stream' }, options?.headers]),
+        __security: { bearerAuth: true },
+        __binaryResponse: true,
+      })),
+    );
   }
 }
 

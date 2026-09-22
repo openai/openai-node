@@ -20,6 +20,13 @@ import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -134,17 +141,24 @@ export class Containers extends APIResource {
    * Create Container
    */
   create(body: ContainerCreateParams, options?: RequestOptions): APIPromise<ContainerCreateResponse> {
-    return this._client.post('/containers', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/containers',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Retrieve Container
    */
   retrieve(containerID: string, options?: RequestOptions): APIPromise<ContainerRetrieveResponse> {
-    return this._client.get(path`/containers/${containerID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/containers/${containerID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -246,22 +260,29 @@ export class Containers extends APIResource {
       query = {};
     }
     query = query as ContainerListParams | null | undefined;
-    return this._client.getAPIList('/containers', CursorPage<ContainerListResponse>, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/containers',
+      CursorPage<ContainerListResponse>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Delete Container
    */
   delete(containerID: string, options?: RequestOptions): APIPromise<void> {
-    return this._client.delete(path`/containers/${containerID}`, {
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/containers/${containerID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

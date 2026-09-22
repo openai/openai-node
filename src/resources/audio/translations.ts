@@ -8,6 +8,13 @@ import { type Uploadable } from '../../core/uploads';
 import { RequestOptions } from '../../internal/request-options';
 import { multipartFormRequestOptions } from '../../internal/uploads';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Turn audio into text or text into audio.
  */
@@ -39,9 +46,11 @@ export class Translations extends APIResource {
   ): APIPromise<TranslationCreateResponse | string> {
     return this._client.post(
       '/audio/translations',
-      multipartFormRequestOptions(
-        { body, ...options, __metadata: { model: body.model }, __security: { bearerAuth: true } },
-        this._client,
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions(
+          { body, ...options, __metadata: { model: body.model }, __security: { bearerAuth: true } },
+          this._client,
+        ),
       ),
     );
   }

@@ -11,6 +11,13 @@ import { buildHeaders } from '../../../../../../internal/headers';
 import { RequestOptions } from '../../../../../../internal/request-options';
 import { path } from '../../../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Turns extends APIResource {
   items: ItemsAPI.Items = new ItemsAPI.Items(this._client);
 
@@ -32,11 +39,14 @@ export class Turns extends APIResource {
    */
   retrieve(turnID: string, params: TurnRetrieveParams, options?: RequestOptions): APIPromise<TurnsAPI.Turn> {
     const { session_id, subagent_id } = params;
-    return this._client.get(path`/agents/sessions/${session_id}/subagents/${subagent_id}/turns/${turnID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/agents/sessions/${session_id}/subagents/${subagent_id}/turns/${turnID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -63,12 +73,12 @@ export class Turns extends APIResource {
     return this._client.getAPIList(
       path`/agents/sessions/${session_id}/subagents/${subagentID}/turns`,
       CursorPage<TurnsAPI.Turn>,
-      {
+      resolveResourceRequestOptions(options, (options) => ({
         query,
         ...options,
         headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
         __security: { bearerAuth: true },
-      },
+      })),
     );
   }
 }

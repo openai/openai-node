@@ -6,6 +6,13 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -126,11 +133,14 @@ export class AdminAPIKeys extends APIResource {
    * ```
    */
   create(body: AdminAPIKeyCreateParams, options?: RequestOptions): APIPromise<AdminAPIKeyCreateResponse> {
-    return this._client.post('/organization/admin_api_keys', {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      '/organization/admin_api_keys',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -145,10 +155,13 @@ export class AdminAPIKeys extends APIResource {
    * ```
    */
   retrieve(keyID: string, options?: RequestOptions): APIPromise<AdminAPIKey> {
-    return this._client.get(path`/organization/admin_api_keys/${keyID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/admin_api_keys/${keyID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -258,11 +271,15 @@ export class AdminAPIKeys extends APIResource {
       query = {};
     }
     query = query as AdminAPIKeyListParams | null | undefined;
-    return this._client.getAPIList('/organization/admin_api_keys', CursorPage<AdminAPIKey>, {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.getAPIList(
+      '/organization/admin_api_keys',
+      CursorPage<AdminAPIKey>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -277,10 +294,13 @@ export class AdminAPIKeys extends APIResource {
    * ```
    */
   delete(keyID: string, options?: RequestOptions): APIPromise<AdminAPIKeyDeleteResponse> {
-    return this._client.delete(path`/organization/admin_api_keys/${keyID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      path`/organization/admin_api_keys/${keyID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

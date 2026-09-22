@@ -6,6 +6,13 @@ import { type Uploadable } from '../core/uploads';
 import { RequestOptions } from '../internal/request-options';
 import { multipartFormRequestOptions } from '../internal/uploads';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class ContentProvenanceChecks extends APIResource {
   /**
    * Check whether an image or audio file contains known OpenAI provenance signals.
@@ -24,7 +31,9 @@ export class ContentProvenanceChecks extends APIResource {
   ): APIPromise<ContentProvenanceCheck> {
     return this._client.post(
       '/content_provenance_checks',
-      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      ),
     );
   }
 }

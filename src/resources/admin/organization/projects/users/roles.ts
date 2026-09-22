@@ -8,6 +8,13 @@ import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../..
 import { RequestOptions } from '../../../../../internal/request-options';
 import { path } from '../../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Roles extends APIResource {
   /**
    * Assigns a project role to a user within a project.
@@ -23,11 +30,14 @@ export class Roles extends APIResource {
    */
   create(userID: string, params: RoleCreateParams, options?: RequestOptions): APIPromise<RoleCreateResponse> {
     const { project_id, ...body } = params;
-    return this._client.post(path`/projects/${project_id}/users/${userID}/roles`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/projects/${project_id}/users/${userID}/roles`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -48,10 +58,13 @@ export class Roles extends APIResource {
     options?: RequestOptions,
   ): APIPromise<RoleRetrieveResponse> {
     const { project_id, user_id } = params;
-    return this._client.get(path`/projects/${project_id}/users/${user_id}/roles/${roleID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/projects/${project_id}/users/${user_id}/roles/${roleID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -77,7 +90,11 @@ export class Roles extends APIResource {
     return this._client.getAPIList(
       path`/projects/${project_id}/users/${userID}/roles`,
       NextCursorPage<RoleListResponse>,
-      { query, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -95,10 +112,13 @@ export class Roles extends APIResource {
    */
   delete(roleID: string, params: RoleDeleteParams, options?: RequestOptions): APIPromise<RoleDeleteResponse> {
     const { project_id, user_id } = params;
-    return this._client.delete(path`/projects/${project_id}/users/${user_id}/roles/${roleID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      path`/projects/${project_id}/users/${user_id}/roles/${roleID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

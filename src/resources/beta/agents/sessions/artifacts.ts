@@ -7,6 +7,13 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -134,11 +141,14 @@ export class Artifacts extends APIResource {
     options?: RequestOptions,
   ): APIPromise<SessionArtifact> {
     const { session_id } = params;
-    return this._client.get(path`/agents/sessions/${session_id}/artifacts/${artifactID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/agents/sessions/${session_id}/artifacts/${artifactID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -257,12 +267,12 @@ export class Artifacts extends APIResource {
     return this._client.getAPIList(
       path`/agents/sessions/${sessionID}/artifacts`,
       CursorPage<SessionArtifact>,
-      {
+      resolveResourceRequestOptions(options, (options) => ({
         query,
         ...options,
         headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
         __security: { bearerAuth: true },
-      },
+      })),
     );
   }
 
@@ -286,11 +296,14 @@ export class Artifacts extends APIResource {
     options?: RequestOptions,
   ): APIPromise<SessionArtifactDeleted> {
     const { session_id } = params;
-    return this._client.delete(path`/agents/sessions/${session_id}/artifacts/${artifactID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/agents/sessions/${session_id}/artifacts/${artifactID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -312,15 +325,18 @@ export class Artifacts extends APIResource {
    */
   content(artifactID: string, params: ArtifactContentParams, options?: RequestOptions): APIPromise<Response> {
     const { session_id } = params;
-    return this._client.get(path`/agents/sessions/${session_id}/artifacts/${artifactID}/content`, {
-      ...options,
-      headers: buildHeaders([
-        { 'OpenAI-Beta': 'agents=v1', Accept: 'application/octet-stream' },
-        options?.headers,
-      ]),
-      __security: { bearerAuth: true },
-      __binaryResponse: true,
-    });
+    return this._client.get(
+      path`/agents/sessions/${session_id}/artifacts/${artifactID}/content`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([
+          { 'OpenAI-Beta': 'agents=v1', Accept: 'application/octet-stream' },
+          options?.headers,
+        ]),
+        __security: { bearerAuth: true },
+        __binaryResponse: true,
+      })),
+    );
   }
 }
 

@@ -22,6 +22,13 @@ import { RequestOptions } from '../../internal/request-options';
 import { maybeMultipartFormRequestOptions } from '../../internal/uploads';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -149,18 +156,24 @@ export class Skills extends APIResource {
    * Get a skill by its ID.
    */
   retrieve(skillID: string, options?: RequestOptions): APIPromise<Skill> {
-    return this._client.get(path`/skills/${skillID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.get(
+      path`/skills/${skillID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
    * Update the default version pointer for a skill.
    */
   update(skillID: string, body: SkillUpdateParams, options?: RequestOptions): APIPromise<Skill> {
-    return this._client.post(path`/skills/${skillID}`, {
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/skills/${skillID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -262,18 +275,25 @@ export class Skills extends APIResource {
       query = {};
     }
     query = query as SkillListParams | null | undefined;
-    return this._client.getAPIList('/skills', CursorPage<Skill>, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/skills',
+      CursorPage<Skill>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Delete a skill by its ID.
    */
   delete(skillID: string, options?: RequestOptions): APIPromise<DeletedSkill> {
-    return this._client.delete(path`/skills/${skillID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.delete(
+      path`/skills/${skillID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 

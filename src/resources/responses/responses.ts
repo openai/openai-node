@@ -73,6 +73,13 @@ export interface ParsedResponse<ParsedT> extends Response {
 
 export type ResponseParseParams = ResponseCreateParamsNonStreaming;
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -219,12 +226,15 @@ export class Responses extends APIResource {
     options?: RequestOptions,
   ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
     return (
-      this._client.post('/responses', {
-        body,
-        ...options,
-        stream: body.stream ?? false,
-        __security: { bearerAuth: true },
-      }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
+      this._client.post(
+        '/responses',
+        resolveResourceRequestOptions(options, (options) => ({
+          body,
+          ...options,
+          stream: body.stream ?? false,
+          __security: { bearerAuth: true },
+        })),
+      ) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
         addOutputText(rsp as Response);
@@ -405,12 +415,15 @@ export class Responses extends APIResource {
     }
     query = query as ResponseRetrieveParams | undefined;
     return (
-      this._client.get(path`/responses/${responseID}`, {
-        query,
-        ...options,
-        stream: query?.stream ?? false,
-        __security: { bearerAuth: true },
-      }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
+      this._client.get(
+        path`/responses/${responseID}`,
+        resolveResourceRequestOptions(options, (options) => ({
+          query,
+          ...options,
+          stream: query?.stream ?? false,
+          __security: { bearerAuth: true },
+        })),
+      ) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
     )._thenUnwrap((rsp) => {
       if ('object' in rsp && rsp.object === 'response') {
         addOutputText(rsp as Response);
@@ -431,11 +444,14 @@ export class Responses extends APIResource {
    * ```
    */
   delete(responseID: string, options?: RequestOptions): APIPromise<void> {
-    return this._client.delete(path`/responses/${responseID}`, {
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/responses/${responseID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   parse<Params extends ResponseCreateParamsWithTools, ParsedT = ExtractParsedContentFromParams<Params>>(
@@ -470,10 +486,10 @@ export class Responses extends APIResource {
    * ```
    */
   cancel(responseID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.post(path`/responses/${responseID}/cancel`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/responses/${responseID}/cancel`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -492,7 +508,14 @@ export class Responses extends APIResource {
    * ```
    */
   compact(body: ResponseCompactParams, options?: RequestOptions): APIPromise<CompactedResponse> {
-    return this._client.post('/responses/compact', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/responses/compact',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 
