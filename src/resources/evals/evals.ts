@@ -27,6 +27,13 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagin
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -149,21 +156,38 @@ export class Evals extends APIResource {
    * the [Evals guide](https://developers.openai.com/api/docs/guides/evals).
    */
   create(body: EvalCreateParams, options?: RequestOptions): APIPromise<EvalCreateResponse> {
-    return this._client.post('/evals', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/evals',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Get an evaluation by ID.
    */
   retrieve(evalID: string, options?: RequestOptions): APIPromise<EvalRetrieveResponse> {
-    return this._client.get(path`/evals/${evalID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.get(
+      path`/evals/${evalID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
    * Update certain properties of an evaluation.
    */
   update(evalID: string, body: EvalUpdateParams, options?: RequestOptions): APIPromise<EvalUpdateResponse> {
-    return this._client.post(path`/evals/${evalID}`, { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      path`/evals/${evalID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -265,18 +289,25 @@ export class Evals extends APIResource {
       query = {};
     }
     query = query as EvalListParams | null | undefined;
-    return this._client.getAPIList('/evals', CursorPage<EvalListResponse>, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/evals',
+      CursorPage<EvalListResponse>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Delete an evaluation.
    */
   delete(evalID: string, options?: RequestOptions): APIPromise<EvalDeleteResponse> {
-    return this._client.delete(path`/evals/${evalID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.delete(
+      path`/evals/${evalID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 

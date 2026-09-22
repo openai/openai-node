@@ -14,6 +14,13 @@ import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -159,12 +166,15 @@ export class Responses extends APIResource {
     body: ResponseCreateParams,
     options?: RequestOptions,
   ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
-    return this._client.post('/responses', {
-      body,
-      ...options,
-      stream: body.stream ?? false,
-      __security: { bearerAuth: true },
-    }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
+    return this._client.post(
+      '/responses',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        stream: body.stream ?? false,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
   /**
@@ -337,12 +347,15 @@ export class Responses extends APIResource {
       query = {};
     }
     query = query as ResponseRetrieveParams | undefined;
-    return this._client.get(path`/responses/${responseID}`, {
-      query,
-      ...options,
-      stream: query?.stream ?? false,
-      __security: { bearerAuth: true },
-    }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
+    return this._client.get(
+      path`/responses/${responseID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        stream: query?.stream ?? false,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
   /**
@@ -356,11 +369,14 @@ export class Responses extends APIResource {
    * ```
    */
   delete(responseID: string, options?: RequestOptions): APIPromise<void> {
-    return this._client.delete(path`/responses/${responseID}`, {
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/responses/${responseID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -376,10 +392,10 @@ export class Responses extends APIResource {
    * ```
    */
   cancel(responseID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.post(path`/responses/${responseID}/cancel`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/responses/${responseID}/cancel`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -398,7 +414,14 @@ export class Responses extends APIResource {
    * ```
    */
   compact(body: ResponseCompactParams, options?: RequestOptions): APIPromise<CompactedResponse> {
-    return this._client.post('/responses/compact', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/responses/compact',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 
@@ -11432,6 +11455,7 @@ export interface ResponseCompactParams {
     | 'gpt-5.1'
     | 'gpt-5.1-2025-11-13'
     | 'gpt-5.1-codex'
+    | 'gpt-5.1-mini'
     | 'gpt-5.1-chat-latest'
     | 'gpt-5'
     | 'gpt-5-mini'
@@ -11497,7 +11521,6 @@ export interface ResponseCompactParams {
     | 'gpt-3.5-turbo-1106'
     | 'gpt-3.5-turbo-0125'
     | 'gpt-3.5-turbo-16k-0613'
-    | 'gpt-5.1-mini'
     | 'o1-pro'
     | 'o1-pro-2025-03-19'
     | 'o3-pro'

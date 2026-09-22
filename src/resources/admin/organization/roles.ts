@@ -6,6 +6,13 @@ import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../..
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -126,11 +133,14 @@ export class Roles extends APIResource {
    * ```
    */
   create(body: RoleCreateParams, options?: RequestOptions): APIPromise<Role> {
-    return this._client.post('/organization/roles', {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      '/organization/roles',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -144,10 +154,13 @@ export class Roles extends APIResource {
    * ```
    */
   retrieve(roleID: string, options?: RequestOptions): APIPromise<Role> {
-    return this._client.get(path`/organization/roles/${roleID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/roles/${roleID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -161,11 +174,14 @@ export class Roles extends APIResource {
    * ```
    */
   update(roleID: string, body: RoleUpdateParams, options?: RequestOptions): APIPromise<Role> {
-    return this._client.post(path`/organization/roles/${roleID}`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/roles/${roleID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -275,11 +291,15 @@ export class Roles extends APIResource {
       query = {};
     }
     query = query as RoleListParams | null | undefined;
-    return this._client.getAPIList('/organization/roles', NextCursorPage<Role>, {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.getAPIList(
+      '/organization/roles',
+      NextCursorPage<Role>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -293,10 +313,13 @@ export class Roles extends APIResource {
    * ```
    */
   delete(roleID: string, options?: RequestOptions): APIPromise<RoleDeleteResponse> {
-    return this._client.delete(path`/organization/roles/${roleID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      path`/organization/roles/${roleID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

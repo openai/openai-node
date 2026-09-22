@@ -10,6 +10,13 @@ import {
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -233,7 +240,11 @@ export class Certificates extends APIResource {
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/certificates`,
       ConversationCursorPage<CertificateListResponse>,
-      { query, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -261,7 +272,12 @@ export class Certificates extends APIResource {
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/certificates/activate`,
       Page<CertificateActivateResponse>,
-      { body, method: 'post', ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        method: 'post',
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -288,7 +304,12 @@ export class Certificates extends APIResource {
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/certificates/deactivate`,
       Page<CertificateDeactivateResponse>,
-      { body, method: 'post', ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        method: 'post',
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 }

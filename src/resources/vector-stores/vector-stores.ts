@@ -32,6 +32,13 @@ import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -147,23 +154,29 @@ export class VectorStores extends APIResource {
    * Create a vector store.
    */
   create(body: VectorStoreCreateParams, options?: RequestOptions): APIPromise<VectorStore> {
-    return this._client.post('/vector_stores', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      '/vector_stores',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Retrieves a vector store.
    */
   retrieve(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStore> {
-    return this._client.get(path`/vector_stores/${vectorStoreID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/vector_stores/${vectorStoreID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -174,12 +187,15 @@ export class VectorStores extends APIResource {
     body: VectorStoreUpdateParams,
     options?: RequestOptions,
   ): APIPromise<VectorStore> {
-    return this._client.post(path`/vector_stores/${vectorStoreID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/vector_stores/${vectorStoreID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -281,23 +297,30 @@ export class VectorStores extends APIResource {
       query = {};
     }
     query = query as VectorStoreListParams | null | undefined;
-    return this._client.getAPIList('/vector_stores', CursorPage<VectorStore>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/vector_stores',
+      CursorPage<VectorStore>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Delete a vector store.
    */
   delete(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStoreDeleted> {
-    return this._client.delete(path`/vector_stores/${vectorStoreID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/vector_stores/${vectorStoreID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -312,13 +335,13 @@ export class VectorStores extends APIResource {
     return this._client.getAPIList(
       path`/vector_stores/${vectorStoreID}/search`,
       Page<VectorStoreSearchResponse>,
-      {
+      resolveResourceRequestOptions(options, (options) => ({
         body,
         method: 'post',
         ...options,
         headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
         __security: { bearerAuth: true },
-      },
+      })),
     );
   }
 }

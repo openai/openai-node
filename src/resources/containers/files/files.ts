@@ -11,6 +11,13 @@ import { RequestOptions } from '../../../internal/request-options';
 import { maybeMultipartFormRequestOptions } from '../../../internal/uploads';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -134,7 +141,12 @@ export class Files extends APIResource {
   ): APIPromise<FileCreateResponse> {
     return this._client.post(
       path`/containers/${containerID}/files`,
-      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        maybeMultipartFormRequestOptions(
+          { body, ...options, __security: { bearerAuth: true } },
+          this._client,
+        ),
+      ),
     );
   }
 
@@ -147,10 +159,10 @@ export class Files extends APIResource {
     options?: RequestOptions,
   ): APIPromise<FileRetrieveResponse> {
     const { container_id } = params;
-    return this._client.get(path`/containers/${container_id}/files/${fileID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/containers/${container_id}/files/${fileID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -255,11 +267,15 @@ export class Files extends APIResource {
       query = {};
     }
     query = query as FileListParams | null | undefined;
-    return this._client.getAPIList(path`/containers/${containerID}/files`, CursorPage<FileListResponse>, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      path`/containers/${containerID}/files`,
+      CursorPage<FileListResponse>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -267,11 +283,14 @@ export class Files extends APIResource {
    */
   delete(fileID: string, params: FileDeleteParams, options?: RequestOptions): APIPromise<void> {
     const { container_id } = params;
-    return this._client.delete(path`/containers/${container_id}/files/${fileID}`, {
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/containers/${container_id}/files/${fileID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

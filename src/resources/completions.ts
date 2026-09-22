@@ -7,6 +7,13 @@ import { APIPromise } from '../core/api-promise';
 import { Stream } from '../core/streaming';
 import { RequestOptions } from '../internal/request-options';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
  */
@@ -35,12 +42,15 @@ export class Completions extends APIResource {
     body: CompletionCreateParams,
     options?: RequestOptions,
   ): APIPromise<Completion> | APIPromise<Stream<Completion>> {
-    return this._client.post('/completions', {
-      body,
-      ...options,
-      stream: body.stream ?? false,
-      __security: { bearerAuth: true },
-    }) as APIPromise<Completion> | APIPromise<Stream<Completion>>;
+    return this._client.post(
+      '/completions',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        stream: body.stream ?? false,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<Completion> | APIPromise<Stream<Completion>>;
   }
 }
 

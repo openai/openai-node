@@ -8,6 +8,13 @@ import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Use Uploads to upload large files in multiple parts.
  */
@@ -38,7 +45,14 @@ export class Uploads extends APIResource {
    * Returns the Upload object with status `pending`.
    */
   create(body: UploadCreateParams, options?: RequestOptions): APIPromise<Upload> {
-    return this._client.post('/uploads', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/uploads',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -47,10 +61,10 @@ export class Uploads extends APIResource {
    * Returns the Upload object with status `cancelled`.
    */
   cancel(uploadID: string, options?: RequestOptions): APIPromise<Upload> {
-    return this._client.post(path`/uploads/${uploadID}/cancel`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/uploads/${uploadID}/cancel`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -71,11 +85,14 @@ export class Uploads extends APIResource {
    * object.
    */
   complete(uploadID: string, body: UploadCompleteParams, options?: RequestOptions): APIPromise<Upload> {
-    return this._client.post(path`/uploads/${uploadID}/complete`, {
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/uploads/${uploadID}/complete`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

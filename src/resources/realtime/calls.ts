@@ -9,6 +9,13 @@ import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 import { encodedMultipartFormRequestOptions } from '../../internal/multipart-encoding';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Calls extends APIResource {
   /**
    * Create a new Realtime API call over WebRTC and receive the SDP answer needed to
@@ -24,20 +31,22 @@ export class Calls extends APIResource {
   create(body: CallCreateParams, options?: RequestOptions): APIPromise<Response> {
     return this._client.post(
       '/realtime/calls',
-      encodedMultipartFormRequestOptions(
-        {
-          body,
-          ...options,
-          headers: buildHeaders([{ Accept: 'application/sdp' }, options?.headers]),
-          __security: { bearerAuth: true },
-          __binaryResponse: true,
-        },
-        this._client,
-        {
-          sdp: { content_type: 'application/sdp', json: false },
-          session: { content_type: 'application/json', json: true },
-        },
-        'sdp',
+      resolveResourceRequestOptions(options, (options) =>
+        encodedMultipartFormRequestOptions(
+          {
+            body,
+            ...options,
+            headers: buildHeaders([{ Accept: 'application/sdp' }, options?.headers]),
+            __security: { bearerAuth: true },
+            __binaryResponse: true,
+          },
+          this._client,
+          {
+            sdp: { content_type: 'application/sdp', json: false },
+            session: { content_type: 'application/json', json: true },
+          },
+          'sdp',
+        ),
       ),
     );
   }
@@ -54,12 +63,15 @@ export class Calls extends APIResource {
    * ```
    */
   accept(callID: string, body: CallAcceptParams, options?: RequestOptions): APIPromise<void> {
-    return this._client.post(path`/realtime/calls/${callID}/accept`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/realtime/calls/${callID}/accept`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -71,11 +83,14 @@ export class Calls extends APIResource {
    * ```
    */
   hangup(callID: string, options?: RequestOptions): APIPromise<void> {
-    return this._client.post(path`/realtime/calls/${callID}/hangup`, {
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/realtime/calls/${callID}/hangup`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -89,12 +104,15 @@ export class Calls extends APIResource {
    * ```
    */
   refer(callID: string, body: CallReferParams, options?: RequestOptions): APIPromise<void> {
-    return this._client.post(path`/realtime/calls/${callID}/refer`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/realtime/calls/${callID}/refer`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -110,12 +128,15 @@ export class Calls extends APIResource {
     body: CallRejectParams | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<void> {
-    return this._client.post(path`/realtime/calls/${callID}/reject`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/realtime/calls/${callID}/reject`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

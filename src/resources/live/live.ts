@@ -19,6 +19,13 @@ import { ConnectClientEvent, ConnectServerEvent, Sideband, SidebandConnectParams
 import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Live extends APIResource {
   sideband: SidebandAPI.Sideband = new SidebandAPI.Sideband(this._client);
   forks: ForksAPI.Forks = new ForksAPI.Forks(this._client);
@@ -37,7 +44,14 @@ export class Live extends APIResource {
    * ```
    */
   create(body: LiveCreateParams, options?: RequestOptions): APIPromise<LiveCreateResponse> {
-    return this._client.post('/live/sessions', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/live/sessions',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

@@ -4,6 +4,13 @@ import { APIResource } from '../core/resource';
 import { APIPromise } from '../core/api-promise';
 import { RequestOptions } from '../internal/request-options';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Get a vector representation of a given input that can be easily consumed by machine learning models and algorithms.
  */
@@ -21,7 +28,14 @@ export class Embeddings extends APIResource {
    * ```
    */
   create(body: EmbeddingCreateParams, options?: RequestOptions): APIPromise<CreateEmbeddingResponse> {
-    return this._client.post('/embeddings', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/embeddings',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

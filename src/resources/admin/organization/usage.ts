@@ -5,6 +5,13 @@ import * as UsageAPI from './usage';
 import { APIPromise } from '../../../core/api-promise';
 import { RequestOptions } from '../../../internal/request-options';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Usage extends APIResource {
   /**
    * Get audio speeches usage details for the organization.
@@ -21,11 +28,14 @@ export class Usage extends APIResource {
     query: UsageAudioSpeechesParams,
     options?: RequestOptions,
   ): APIPromise<UsageAudioSpeechesResponse> {
-    return this._client.get('/organization/usage/audio_speeches', {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/usage/audio_speeches',
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -43,11 +53,14 @@ export class Usage extends APIResource {
     query: UsageAudioTranscriptionsParams,
     options?: RequestOptions,
   ): APIPromise<UsageAudioTranscriptionsResponse> {
-    return this._client.get('/organization/usage/audio_transcriptions', {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/usage/audio_transcriptions',
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -65,11 +78,14 @@ export class Usage extends APIResource {
     query: UsageCodeInterpreterSessionsParams,
     options?: RequestOptions,
   ): APIPromise<UsageCodeInterpreterSessionsResponse> {
-    return this._client.get('/organization/usage/code_interpreter_sessions', {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/usage/code_interpreter_sessions',
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -84,11 +100,14 @@ export class Usage extends APIResource {
    * ```
    */
   completions(query: UsageCompletionsParams, options?: RequestOptions): APIPromise<UsageCompletionsResponse> {
-    return this._client.get('/organization/usage/completions', {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/usage/completions',
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -103,11 +122,14 @@ export class Usage extends APIResource {
    * ```
    */
   costs(query: UsageCostsParams, options?: RequestOptions): APIPromise<UsageCostsResponse> {
-    return this._client.get('/organization/costs', {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/costs',
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -122,11 +144,14 @@ export class Usage extends APIResource {
    * ```
    */
   embeddings(query: UsageEmbeddingsParams, options?: RequestOptions): APIPromise<UsageEmbeddingsResponse> {
-    return this._client.get('/organization/usage/embeddings', {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/usage/embeddings',
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -144,11 +169,14 @@ export class Usage extends APIResource {
     query: UsageFileSearchCallsParams,
     options?: RequestOptions,
   ): APIPromise<UsageFileSearchCallsResponse> {
-    return this._client.get('/organization/usage/file_search_calls', {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/usage/file_search_calls',
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -163,11 +191,14 @@ export class Usage extends APIResource {
    * ```
    */
   images(query: UsageImagesParams, options?: RequestOptions): APIPromise<UsageImagesResponse> {
-    return this._client.get('/organization/usage/images', {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/usage/images',
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -182,11 +213,14 @@ export class Usage extends APIResource {
    * ```
    */
   moderations(query: UsageModerationsParams, options?: RequestOptions): APIPromise<UsageModerationsResponse> {
-    return this._client.get('/organization/usage/moderations', {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/usage/moderations',
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -204,11 +238,14 @@ export class Usage extends APIResource {
     query: UsageVectorStoresParams,
     options?: RequestOptions,
   ): APIPromise<UsageVectorStoresResponse> {
-    return this._client.get('/organization/usage/vector_stores', {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/usage/vector_stores',
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -226,11 +263,14 @@ export class Usage extends APIResource {
     query: UsageWebSearchCallsParams,
     options?: RequestOptions,
   ): APIPromise<UsageWebSearchCallsResponse> {
-    return this._client.get('/organization/usage/web_search_calls', {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/usage/web_search_calls',
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

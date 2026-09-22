@@ -8,6 +8,13 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -131,12 +138,15 @@ export class Templates extends APIResource {
     body: TemplateCreateParams | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<EnvironmentTemplate> {
-    return this._client.post('/agents/environments/templates', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      '/agents/environments/templates',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -153,11 +163,14 @@ export class Templates extends APIResource {
    * ```
    */
   retrieve(environmentTemplateID: string, options?: RequestOptions): APIPromise<EnvironmentTemplate> {
-    return this._client.get(path`/agents/environments/templates/${environmentTemplateID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/agents/environments/templates/${environmentTemplateID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -178,12 +191,15 @@ export class Templates extends APIResource {
     body: TemplateUpdateParams | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<EnvironmentTemplate> {
-    return this._client.post(path`/agents/environments/templates/${environmentTemplateID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/agents/environments/templates/${environmentTemplateID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -294,12 +310,16 @@ export class Templates extends APIResource {
       query = {};
     }
     query = query as TemplateListParams | null | undefined;
-    return this._client.getAPIList('/agents/environments/templates', CursorPage<EnvironmentTemplate>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/agents/environments/templates',
+      CursorPage<EnvironmentTemplate>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -316,11 +336,14 @@ export class Templates extends APIResource {
    * ```
    */
   delete(environmentTemplateID: string, options?: RequestOptions): APIPromise<EnvironmentTemplateDeleted> {
-    return this._client.delete(path`/agents/environments/templates/${environmentTemplateID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/agents/environments/templates/${environmentTemplateID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

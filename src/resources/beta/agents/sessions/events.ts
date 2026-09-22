@@ -8,6 +8,13 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Events extends APIResource {
   /**
    * Submits message, cancellation, or tool-result events to a managed agent session.
@@ -39,19 +46,22 @@ export class Events extends APIResource {
    */
   create(sessionID: string, params: EventCreateParams, options?: RequestOptions): APIPromise<void> {
     const { 'Idempotency-Key': idempotencyKey, ...body } = params;
-    return this._client.post(path`/agents/sessions/${sessionID}/events`, {
-      body,
-      ...options,
-      headers: buildHeaders([
-        {
-          'OpenAI-Beta': 'agents=v1',
-          Accept: '*/*',
-          ...(idempotencyKey != null ? { 'Idempotency-Key': idempotencyKey } : undefined),
-        },
-        options?.headers,
-      ]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/agents/sessions/${sessionID}/events`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([
+          {
+            'OpenAI-Beta': 'agents=v1',
+            Accept: '*/*',
+            ...(idempotencyKey != null ? { 'Idempotency-Key': idempotencyKey } : undefined),
+          },
+          options?.headers,
+        ]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -67,12 +77,18 @@ export class Events extends APIResource {
    * ```
    */
   stream(sessionID: string, options?: RequestOptions): APIPromise<Stream<AgentsAPI.AgentSessionEvent>> {
-    return this._client.get(path`/agents/sessions/${sessionID}/events`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1', Accept: 'text/event-stream' }, options?.headers]),
-      stream: true,
-      __security: { bearerAuth: true },
-    }) as APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
+    return this._client.get(
+      path`/agents/sessions/${sessionID}/events`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([
+          { 'OpenAI-Beta': 'agents=v1', Accept: 'text/event-stream' },
+          options?.headers,
+        ]),
+        stream: true,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
   }
 }
 

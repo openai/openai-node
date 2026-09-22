@@ -8,6 +8,13 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagin
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -132,7 +139,14 @@ export class Webhooks extends APIResource {
    * ```
    */
   create(body: WebhookCreateParams, options?: RequestOptions): APIPromise<WebhookEndpointWithSecret> {
-    return this._client.post('/webhook_endpoints', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/webhook_endpoints',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -146,10 +160,10 @@ export class Webhooks extends APIResource {
    * ```
    */
   retrieve(webhookEndpointID: string, options?: RequestOptions): APIPromise<WebhookEndpoint> {
-    return this._client.get(path`/webhook_endpoints/${webhookEndpointID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/webhook_endpoints/${webhookEndpointID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -165,11 +179,14 @@ export class Webhooks extends APIResource {
     body: WebhookUpdateParams | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<WebhookEndpoint> {
-    return this._client.post(path`/webhook_endpoints/${webhookEndpointID}`, {
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/webhook_endpoints/${webhookEndpointID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -279,11 +296,15 @@ export class Webhooks extends APIResource {
       query = {};
     }
     query = query as WebhookListParams | null | undefined;
-    return this._client.getAPIList('/webhook_endpoints', CursorPage<WebhookEndpoint>, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/webhook_endpoints',
+      CursorPage<WebhookEndpoint>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -297,10 +318,10 @@ export class Webhooks extends APIResource {
    * ```
    */
   delete(webhookEndpointID: string, options?: RequestOptions): APIPromise<DeletedWebhookEndpoint> {
-    return this._client.delete(path`/webhook_endpoints/${webhookEndpointID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/webhook_endpoints/${webhookEndpointID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -317,11 +338,14 @@ export class Webhooks extends APIResource {
     body: WebhookRotateSecretParams | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<WebhookEndpointWithSecret> {
-    return this._client.post(path`/webhook_endpoints/${webhookEndpointID}/rotate_secret`, {
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/webhook_endpoints/${webhookEndpointID}/rotate_secret`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -340,11 +364,14 @@ export class Webhooks extends APIResource {
     body: WebhookTestParams,
     options?: RequestOptions,
   ): APIPromise<WebhookEndpointTestResult> {
-    return this._client.post(path`/webhook_endpoints/${webhookEndpointID}/test`, {
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/webhook_endpoints/${webhookEndpointID}/test`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   unwrap(body: string): UnwrapWebhookEvent {

@@ -15,6 +15,13 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -146,7 +153,14 @@ export class Jobs extends APIResource {
    * ```
    */
   create(body: JobCreateParams, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post('/fine_tuning/jobs', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/fine_tuning/jobs',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -162,10 +176,10 @@ export class Jobs extends APIResource {
    * ```
    */
   retrieve(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.get(path`/fine_tuning/jobs/${fineTuningJobID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/fine_tuning/jobs/${fineTuningJobID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -275,11 +289,15 @@ export class Jobs extends APIResource {
       query = {};
     }
     query = query as JobListParams | null | undefined;
-    return this._client.getAPIList('/fine_tuning/jobs', CursorPage<FineTuningJob>, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/fine_tuning/jobs',
+      CursorPage<FineTuningJob>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -293,10 +311,10 @@ export class Jobs extends APIResource {
    * ```
    */
   cancel(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/cancel`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/fine_tuning/jobs/${fineTuningJobID}/cancel`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -414,7 +432,11 @@ export class Jobs extends APIResource {
     return this._client.getAPIList(
       path`/fine_tuning/jobs/${fineTuningJobID}/events`,
       CursorPage<FineTuningJobEvent>,
-      { query, ...options, __security: { bearerAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
     );
   }
 
@@ -429,10 +451,10 @@ export class Jobs extends APIResource {
    * ```
    */
   pause(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/pause`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/fine_tuning/jobs/${fineTuningJobID}/pause`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -446,10 +468,10 @@ export class Jobs extends APIResource {
    * ```
    */
   resume(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/resume`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/fine_tuning/jobs/${fineTuningJobID}/resume`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 

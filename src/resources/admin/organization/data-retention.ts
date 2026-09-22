@@ -4,6 +4,13 @@ import { APIResource } from '../../../core/resource';
 import { APIPromise } from '../../../core/api-promise';
 import { RequestOptions } from '../../../internal/request-options';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class DataRetention extends APIResource {
   /**
    * Retrieves organization data retention controls.
@@ -15,10 +22,13 @@ export class DataRetention extends APIResource {
    * ```
    */
   retrieve(options?: RequestOptions): APIPromise<OrganizationDataRetention> {
-    return this._client.get('/organization/data_retention', {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      '/organization/data_retention',
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -33,11 +43,14 @@ export class DataRetention extends APIResource {
    * ```
    */
   update(body: DataRetentionUpdateParams, options?: RequestOptions): APIPromise<OrganizationDataRetention> {
-    return this._client.post('/organization/data_retention', {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      '/organization/data_retention',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

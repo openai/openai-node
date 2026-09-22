@@ -10,6 +10,13 @@ import {
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -136,11 +143,14 @@ export class SpendAlerts extends APIResource {
    * ```
    */
   create(body: SpendAlertCreateParams, options?: RequestOptions): APIPromise<OrganizationSpendAlert> {
-    return this._client.post('/organization/spend_alerts', {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      '/organization/spend_alerts',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -155,10 +165,13 @@ export class SpendAlerts extends APIResource {
    * ```
    */
   retrieve(alertID: string, options?: RequestOptions): APIPromise<OrganizationSpendAlert> {
-    return this._client.get(path`/organization/spend_alerts/${alertID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/spend_alerts/${alertID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -186,11 +199,14 @@ export class SpendAlerts extends APIResource {
     body: SpendAlertUpdateParams,
     options?: RequestOptions,
   ): APIPromise<OrganizationSpendAlert> {
-    return this._client.post(path`/organization/spend_alerts/${alertID}`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/spend_alerts/${alertID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -303,7 +319,11 @@ export class SpendAlerts extends APIResource {
     return this._client.getAPIList(
       '/organization/spend_alerts',
       ConversationCursorPage<OrganizationSpendAlert>,
-      { query, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -319,10 +339,13 @@ export class SpendAlerts extends APIResource {
    * ```
    */
   delete(alertID: string, options?: RequestOptions): APIPromise<OrganizationSpendAlertDeleted> {
-    return this._client.delete(path`/organization/spend_alerts/${alertID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      path`/organization/spend_alerts/${alertID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

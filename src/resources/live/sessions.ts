@@ -7,6 +7,13 @@ import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Sessions extends APIResource {
   /**
    * Accept an incoming SIP call. Supply session with type live, the model, and
@@ -23,12 +30,15 @@ export class Sessions extends APIResource {
    * ```
    */
   accept(sessionID: string, body: SessionAcceptParams, options?: RequestOptions): APIPromise<void> {
-    return this._client.post(path`/live/sessions/${sessionID}/accept`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/live/sessions/${sessionID}/accept`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -44,12 +54,15 @@ export class Sessions extends APIResource {
    * ```
    */
   downloadRecording(sessionID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.get(path`/live/sessions/${sessionID}/content`, {
-      ...options,
-      headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
-      __security: { bearerAuth: true },
-      __binaryResponse: true,
-    });
+    return this._client.get(
+      path`/live/sessions/${sessionID}/content`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+        __security: { bearerAuth: true },
+        __binaryResponse: true,
+      })),
+    );
   }
 
   /**
@@ -68,11 +81,14 @@ export class Sessions extends APIResource {
     body: SessionForkParams,
     options?: RequestOptions,
   ): APIPromise<SessionForkResponse> {
-    return this._client.post(path`/live/sessions/${sessionID}/fork`, {
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/live/sessions/${sessionID}/fork`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -84,11 +100,14 @@ export class Sessions extends APIResource {
    * ```
    */
   hangup(sessionID: string, options?: RequestOptions): APIPromise<void> {
-    return this._client.post(path`/live/sessions/${sessionID}/hangup`, {
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/live/sessions/${sessionID}/hangup`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -103,12 +122,15 @@ export class Sessions extends APIResource {
    * ```
    */
   refer(sessionID: string, body: SessionReferParams, options?: RequestOptions): APIPromise<void> {
-    return this._client.post(path`/live/sessions/${sessionID}/refer`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/live/sessions/${sessionID}/refer`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -123,12 +145,15 @@ export class Sessions extends APIResource {
    * ```
    */
   reject(sessionID: string, body: SessionRejectParams, options?: RequestOptions): APIPromise<void> {
-    return this._client.post(path`/live/sessions/${sessionID}/reject`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/live/sessions/${sessionID}/reject`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ Accept: '*/*' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

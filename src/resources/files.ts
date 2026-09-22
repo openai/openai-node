@@ -9,6 +9,13 @@ import { RequestOptions } from '../internal/request-options';
 import { multipartFormRequestOptions } from '../internal/uploads';
 import { path } from '../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -152,7 +159,9 @@ export class Files extends APIResource {
   create(body: FileCreateParams, options?: RequestOptions): APIPromise<FileObject> {
     return this._client.post(
       '/files',
-      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      ),
     );
   }
 
@@ -160,7 +169,10 @@ export class Files extends APIResource {
    * Returns information about a specific file.
    */
   retrieve(fileID: string, options?: RequestOptions): APIPromise<FileObject> {
-    return this._client.get(path`/files/${fileID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.get(
+      path`/files/${fileID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -262,30 +274,40 @@ export class Files extends APIResource {
       query = {};
     }
     query = query as FileListParams | null | undefined;
-    return this._client.getAPIList('/files', CursorPage<FileObject>, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/files',
+      CursorPage<FileObject>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Delete a file and remove it from all vector stores.
    */
   delete(fileID: string, options?: RequestOptions): APIPromise<FileDeleted> {
-    return this._client.delete(path`/files/${fileID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.delete(
+      path`/files/${fileID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
    * Returns a response containing the contents of the specified file.
    */
   content(fileID: string, options?: RequestOptions): APIPromise<Response> {
-    return this._client.get(path`/files/${fileID}/content`, {
-      ...options,
-      headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
-      __security: { bearerAuth: true },
-      __binaryResponse: true,
-    });
+    return this._client.get(
+      path`/files/${fileID}/content`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+        __security: { bearerAuth: true },
+        __binaryResponse: true,
+      })),
+    );
   }
 }
 

@@ -7,15 +7,15 @@ import * as CasesAPI from './cases';
 import { Cases, SafetyCase } from './cases';
 
 export class Safety extends APIResource {
-  alerts: AlertsAPI.Alerts = new AlertsAPI.Alerts(this._client);
   cases: CasesAPI.Cases = new CasesAPI.Cases(this._client);
+  alerts: AlertsAPI.Alerts = new AlertsAPI.Alerts(this._client);
 }
 
-Safety.Alerts = Alerts;
 Safety.Cases = Cases;
+Safety.Alerts = Alerts;
 
 export declare namespace Safety {
-  export { Alerts as Alerts, type SafetyAlert as SafetyAlert };
-
   export { Cases as Cases, type SafetyCase as SafetyCase };
+
+  export { Alerts as Alerts, type SafetyAlert as SafetyAlert };
 }

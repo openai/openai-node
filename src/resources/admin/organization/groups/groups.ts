@@ -32,6 +32,13 @@ import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../..
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -154,11 +161,14 @@ export class Groups extends APIResource {
    * ```
    */
   create(body: GroupCreateParams, options?: RequestOptions): APIPromise<Group> {
-    return this._client.post('/organization/groups', {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      '/organization/groups',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -173,10 +183,13 @@ export class Groups extends APIResource {
    * ```
    */
   retrieve(groupID: string, options?: RequestOptions): APIPromise<Group> {
-    return this._client.get(path`/organization/groups/${groupID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/groups/${groupID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -195,11 +208,14 @@ export class Groups extends APIResource {
     body: GroupUpdateParams,
     options?: RequestOptions,
   ): APIPromise<GroupUpdateResponse> {
-    return this._client.post(path`/organization/groups/${groupID}`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/groups/${groupID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -309,11 +325,15 @@ export class Groups extends APIResource {
       query = {};
     }
     query = query as GroupListParams | null | undefined;
-    return this._client.getAPIList('/organization/groups', NextCursorPage<Group>, {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.getAPIList(
+      '/organization/groups',
+      NextCursorPage<Group>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -327,10 +347,13 @@ export class Groups extends APIResource {
    * ```
    */
   delete(groupID: string, options?: RequestOptions): APIPromise<GroupDeleteResponse> {
-    return this._client.delete(path`/organization/groups/${groupID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      path`/organization/groups/${groupID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

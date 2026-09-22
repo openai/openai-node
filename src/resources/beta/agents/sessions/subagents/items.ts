@@ -8,6 +8,13 @@ import { buildHeaders } from '../../../../../internal/headers';
 import { RequestOptions } from '../../../../../internal/request-options';
 import { path } from '../../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Items extends APIResource {
   /**
    * Lists this subagent's own items across all of its turns. See
@@ -33,12 +40,12 @@ export class Items extends APIResource {
     return this._client.getAPIList(
       path`/agents/sessions/${session_id}/subagents/${subagentID}/items`,
       CursorPage<AgentsAPI.AgentSessionItem>,
-      {
+      resolveResourceRequestOptions(options, (options) => ({
         query,
         ...options,
         headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
         __security: { bearerAuth: true },
-      },
+      })),
     );
   }
 }

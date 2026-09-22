@@ -10,6 +10,13 @@ import {
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -233,7 +240,11 @@ export class RateLimits extends APIResource {
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/rate_limits`,
       ConversationCursorPage<ProjectRateLimit>,
-      { query, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -255,11 +266,14 @@ export class RateLimits extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ProjectRateLimit> {
     const { project_id, ...body } = params;
-    return this._client.post(path`/organization/projects/${project_id}/rate_limits/${rateLimitID}`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/projects/${project_id}/rate_limits/${rateLimitID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

@@ -19,6 +19,13 @@ import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../..
 import { RequestOptions } from '../../../../../internal/request-options';
 import { path } from '../../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -142,11 +149,14 @@ export class Groups extends APIResource {
    * ```
    */
   create(projectID: string, body: GroupCreateParams, options?: RequestOptions): APIPromise<ProjectGroup> {
-    return this._client.post(path`/organization/projects/${projectID}/groups`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/projects/${projectID}/groups`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -163,11 +173,14 @@ export class Groups extends APIResource {
    */
   retrieve(groupID: string, params: GroupRetrieveParams, options?: RequestOptions): APIPromise<ProjectGroup> {
     const { project_id, ...query } = params;
-    return this._client.get(path`/organization/projects/${project_id}/groups/${groupID}`, {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/projects/${project_id}/groups/${groupID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -285,7 +298,11 @@ export class Groups extends APIResource {
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/groups`,
       NextCursorPage<ProjectGroup>,
-      { query, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -307,10 +324,13 @@ export class Groups extends APIResource {
     options?: RequestOptions,
   ): APIPromise<GroupDeleteResponse> {
     const { project_id } = params;
-    return this._client.delete(path`/organization/projects/${project_id}/groups/${groupID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      path`/organization/projects/${project_id}/groups/${groupID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 
