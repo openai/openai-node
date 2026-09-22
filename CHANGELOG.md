@@ -1,5 +1,22 @@
 # Changelog
 
+## [7.21.0](https://github.com/openai/openai-node/compare/v7.20.0...v7.21.0) (2026-09-22)
+
+
+### Features
+
+* **api:** add session environment reset events ([#2777](https://github.com/openai/openai-node/issues/2777)) ([5de2360](https://github.com/openai/openai-node/commit/5de2360474aba30a3176ba2dde9ac5e55783efb5))
+
+
+### Bug Fixes
+
+* **api:** preserve model choices and improve request handling ([#2787](https://github.com/openai/openai-node/issues/2787)) ([a4a4396](https://github.com/openai/openai-node/commit/a4a439633e41880108624460c62bf13fd94c171b))
+
+
+### Chores
+
+* **api:** document response management resources ([#2775](https://github.com/openai/openai-node/issues/2775)) ([0472fb3](https://github.com/openai/openai-node/commit/0472fb3d9979c238c552da4a7403fe4631e3707b))
+
 ## [7.20.0](https://github.com/openai/openai-node/compare/v7.19.0...v7.20.0) (2026-09-19)
 
 
