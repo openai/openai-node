@@ -103,6 +103,7 @@ export function maybeParseResponse<
  * namespaced functions by both namespace and name.
  *
  * Incomplete or nonterminal responses keep their parsed values as `null`, and
+ * only messages with a `final_answer` or absent/null phase have their text parsed.
  * `output_parsed` returns the first successfully parsed output-text item.
  */
 export function parseResponse<
@@ -116,11 +117,12 @@ export function parseResponse<
         return shouldParse ? parseToolCall(params, item) : { ...item, parsed_arguments: null };
       }
       if (item.type === 'message') {
+        const shouldParseMessage = shouldParse && (item.phase == null || item.phase === 'final_answer');
         const content: ParsedContent<ParsedT>[] = item.content.map((content) => {
           if (content.type === 'output_text') {
             return {
               ...content,
-              parsed: shouldParse ? parseTextFormat(params, content.text) : null,
+              parsed: shouldParseMessage ? parseTextFormat(params, content.text) : null,
             };
           }
 
