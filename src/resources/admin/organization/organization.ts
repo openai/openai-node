@@ -43,6 +43,7 @@ import {
   ExternalStorageCreateParams,
   ExternalStorageDeleted,
   ExternalStorageListParams,
+  GcpExternalStorageProvider,
 } from './external-storage';
 import * as InvitesAPI from './invites';
 import {
@@ -264,6 +265,7 @@ export declare namespace Organization {
     type AzureExternalStorageProvider as AzureExternalStorageProvider,
     type ExternalStorageConfiguration as ExternalStorageConfiguration,
     type ExternalStorageDeleted as ExternalStorageDeleted,
+    type GcpExternalStorageProvider as GcpExternalStorageProvider,
     type ExternalStorageConfigurationsPage as ExternalStorageConfigurationsPage,
     type ExternalStorageCreateParams as ExternalStorageCreateParams,
     type ExternalStorageListParams as ExternalStorageListParams,
