@@ -7,6 +7,13 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Manage and run evals in the OpenAI platform.
  */
@@ -20,10 +27,10 @@ export class OutputItems extends APIResource {
     options?: RequestOptions,
   ): APIPromise<OutputItemRetrieveResponse> {
     const { eval_id, run_id } = params;
-    return this._client.get(path`/evals/${eval_id}/runs/${run_id}/output_items/${outputItemID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/evals/${eval_id}/runs/${run_id}/output_items/${outputItemID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -38,7 +45,11 @@ export class OutputItems extends APIResource {
     return this._client.getAPIList(
       path`/evals/${eval_id}/runs/${runID}/output_items`,
       CursorPage<OutputItemListResponse>,
-      { query, ...options, __security: { bearerAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
     );
   }
 }

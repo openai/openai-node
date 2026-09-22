@@ -10,6 +10,13 @@ import {
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -136,10 +143,13 @@ export class APIKeys extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ProjectAPIKey> {
     const { project_id } = params;
-    return this._client.get(path`/organization/projects/${project_id}/api_keys/${apiKeyID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/projects/${project_id}/api_keys/${apiKeyID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -257,7 +267,11 @@ export class APIKeys extends APIResource {
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/api_keys`,
       ConversationCursorPage<ProjectAPIKey>,
-      { query, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -282,10 +296,13 @@ export class APIKeys extends APIResource {
     options?: RequestOptions,
   ): APIPromise<APIKeyDeleteResponse> {
     const { project_id } = params;
-    return this._client.delete(path`/organization/projects/${project_id}/api_keys/${apiKeyID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      path`/organization/projects/${project_id}/api_keys/${apiKeyID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

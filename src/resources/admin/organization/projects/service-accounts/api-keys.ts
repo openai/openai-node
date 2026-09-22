@@ -5,6 +5,13 @@ import { APIPromise } from '../../../../../core/api-promise';
 import { RequestOptions } from '../../../../../internal/request-options';
 import { path } from '../../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class APIKeys extends APIResource {
   /**
    * Creates an API key for a service account in the project.
@@ -26,7 +33,11 @@ export class APIKeys extends APIResource {
     const { project_id, ...body } = params;
     return this._client.post(
       path`/organization/projects/${project_id}/service_accounts/${serviceAccountID}/api_keys`,
-      { body, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 }

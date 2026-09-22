@@ -121,6 +121,13 @@ import {
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -258,11 +265,14 @@ export class Projects extends APIResource {
    * ```
    */
   create(body: ProjectCreateParams, options?: RequestOptions): APIPromise<Project> {
-    return this._client.post('/organization/projects', {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      '/organization/projects',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -277,10 +287,13 @@ export class Projects extends APIResource {
    * ```
    */
   retrieve(projectID: string, options?: RequestOptions): APIPromise<Project> {
-    return this._client.get(path`/organization/projects/${projectID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/projects/${projectID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -295,11 +308,14 @@ export class Projects extends APIResource {
    * ```
    */
   update(projectID: string, body: ProjectUpdateParams, options?: RequestOptions): APIPromise<Project> {
-    return this._client.post(path`/organization/projects/${projectID}`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/projects/${projectID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -409,11 +425,15 @@ export class Projects extends APIResource {
       query = {};
     }
     query = query as ProjectListParams | null | undefined;
-    return this._client.getAPIList('/organization/projects', ConversationCursorPage<Project>, {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.getAPIList(
+      '/organization/projects',
+      ConversationCursorPage<Project>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -429,10 +449,13 @@ export class Projects extends APIResource {
    * ```
    */
   archive(projectID: string, options?: RequestOptions): APIPromise<Project> {
-    return this._client.post(path`/organization/projects/${projectID}/archive`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/projects/${projectID}/archive`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

@@ -13,6 +13,13 @@ import { buildHeaders } from '../../../../../internal/headers';
 import { RequestOptions } from '../../../../../internal/request-options';
 import { path } from '../../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -143,11 +150,14 @@ export class Subagents extends APIResource {
     options?: RequestOptions,
   ): APIPromise<AgentsAPI.Subagent> {
     const { session_id } = params;
-    return this._client.get(path`/agents/sessions/${session_id}/subagents/${subagentID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/agents/sessions/${session_id}/subagents/${subagentID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -266,12 +276,12 @@ export class Subagents extends APIResource {
     return this._client.getAPIList(
       path`/agents/sessions/${sessionID}/subagents`,
       CursorPage<AgentsAPI.Subagent>,
-      {
+      resolveResourceRequestOptions(options, (options) => ({
         query,
         ...options,
         headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
         __security: { bearerAuth: true },
-      },
+      })),
     );
   }
 }

@@ -27,6 +27,13 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -147,12 +154,15 @@ export class Vaults extends APIResource {
    * ```
    */
   create(body: VaultCreateParams | null | undefined = {}, options?: RequestOptions): APIPromise<Vault> {
-    return this._client.post('/vaults', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      '/vaults',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -167,11 +177,14 @@ export class Vaults extends APIResource {
    * ```
    */
   retrieve(vaultID: string, options?: RequestOptions): APIPromise<Vault> {
-    return this._client.get(path`/vaults/${vaultID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/vaults/${vaultID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -282,12 +295,16 @@ export class Vaults extends APIResource {
       query = {};
     }
     query = query as VaultListParams | null | undefined;
-    return this._client.getAPIList('/vaults', CursorPage<Vault>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/vaults',
+      CursorPage<Vault>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -302,11 +319,14 @@ export class Vaults extends APIResource {
    * ```
    */
   delete(vaultID: string, options?: RequestOptions): APIPromise<VaultDeleted> {
-    return this._client.delete(path`/vaults/${vaultID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/vaults/${vaultID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

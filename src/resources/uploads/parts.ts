@@ -7,6 +7,13 @@ import { RequestOptions } from '../../internal/request-options';
 import { multipartFormRequestOptions } from '../../internal/uploads';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Use Uploads to upload large files in multiple parts.
  */
@@ -28,7 +35,9 @@ export class Parts extends APIResource {
   create(uploadID: string, body: PartCreateParams, options?: RequestOptions): APIPromise<UploadPart> {
     return this._client.post(
       path`/uploads/${uploadID}/parts`,
-      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      ),
     );
   }
 }

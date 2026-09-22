@@ -41,6 +41,13 @@ import { pollAssistantRun } from '../../../../lib/assistant-run-polling';
 import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -178,15 +185,18 @@ export class Runs extends APIResource {
     options?: RequestOptions,
   ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
     const { include, ...body } = params;
-    return this._client.post(path`/threads/${threadID}/runs`, {
-      query: { include },
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      stream: params.stream ?? false,
-      __synthesizeEventData: true,
-      __security: { bearerAuth: true },
-    }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
+    return this._client.post(
+      path`/threads/${threadID}/runs`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query: { include },
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        stream: params.stream ?? false,
+        __synthesizeEventData: true,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
   /**
@@ -196,11 +206,14 @@ export class Runs extends APIResource {
    */
   retrieve(runID: string, params: RunRetrieveParams, options?: RequestOptions): APIPromise<Run> {
     const { thread_id } = params;
-    return this._client.get(path`/threads/${thread_id}/runs/${runID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/threads/${thread_id}/runs/${runID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -210,12 +223,15 @@ export class Runs extends APIResource {
    */
   update(runID: string, params: RunUpdateParams, options?: RequestOptions): APIPromise<Run> {
     const { thread_id, ...body } = params;
-    return this._client.post(path`/threads/${thread_id}/runs/${runID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/threads/${thread_id}/runs/${runID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -322,12 +338,16 @@ export class Runs extends APIResource {
       query = {};
     }
     query = query as RunListParams | null | undefined;
-    return this._client.getAPIList(path`/threads/${threadID}/runs`, CursorPage<Run>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      path`/threads/${threadID}/runs`,
+      CursorPage<Run>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -337,11 +357,14 @@ export class Runs extends APIResource {
    */
   cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<Run> {
     const { thread_id } = params;
-    return this._client.post(path`/threads/${thread_id}/runs/${runID}/cancel`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/threads/${thread_id}/runs/${runID}/cancel`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -420,14 +443,17 @@ export class Runs extends APIResource {
     options?: RequestOptions,
   ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
     const { thread_id, ...body } = params;
-    return this._client.post(path`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      stream: params.stream ?? false,
-      __synthesizeEventData: true,
-      __security: { bearerAuth: true },
-    }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
+    return this._client.post(
+      path`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        stream: params.stream ?? false,
+        __synthesizeEventData: true,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
   /**

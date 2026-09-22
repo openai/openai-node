@@ -528,7 +528,7 @@ test.each(['ordinary', 'provider'] as const)(
     expect(logged).not.toContain('synthetic-path-api-secret');
     expect(logged).not.toContain('synthetic-path-token');
     expect(logged).not.toContain('synthetic-path-fragment');
-    expect(logged).toContain('/models?api_key=***&x_session_token=***&view=public');
+    expect(logged).toContain('/models?api_key=[REDACTED]&x_session_token=[REDACTED]&view=public');
   },
 );
 

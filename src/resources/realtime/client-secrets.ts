@@ -7,6 +7,13 @@ import * as ResponsesAPI from '../responses/responses';
 import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class ClientSecrets extends APIResource {
   /**
    * Create a Realtime client secret with an associated session configuration.
@@ -32,11 +39,14 @@ export class ClientSecrets extends APIResource {
    * ```
    */
   create(body: ClientSecretCreateParams, options?: RequestOptions): APIPromise<ClientSecretCreateResponse> {
-    return this._client.post('/realtime/client_secrets', {
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      '/realtime/client_secrets',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

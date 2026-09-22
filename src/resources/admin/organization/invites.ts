@@ -10,6 +10,13 @@ import {
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -132,11 +139,14 @@ export class Invites extends APIResource {
    * ```
    */
   create(body: InviteCreateParams, options?: RequestOptions): APIPromise<Invite> {
-    return this._client.post('/organization/invites', {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      '/organization/invites',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -151,10 +161,13 @@ export class Invites extends APIResource {
    * ```
    */
   retrieve(inviteID: string, options?: RequestOptions): APIPromise<Invite> {
-    return this._client.get(path`/organization/invites/${inviteID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/invites/${inviteID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -264,11 +277,15 @@ export class Invites extends APIResource {
       query = {};
     }
     query = query as InviteListParams | null | undefined;
-    return this._client.getAPIList('/organization/invites', ConversationCursorPage<Invite>, {
-      query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.getAPIList(
+      '/organization/invites',
+      ConversationCursorPage<Invite>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -283,10 +300,13 @@ export class Invites extends APIResource {
    * ```
    */
   delete(inviteID: string, options?: RequestOptions): APIPromise<InviteDeleteResponse> {
-    return this._client.delete(path`/organization/invites/${inviteID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      path`/organization/invites/${inviteID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

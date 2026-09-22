@@ -6,6 +6,13 @@ import * as ResponsesAPI from './responses';
 import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Create and manage model responses.
  */
@@ -25,11 +32,14 @@ export class InputTokens extends APIResource {
     body: InputTokenCountParams | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<InputTokenCountResponse> {
-    return this._client.post('/responses/input_tokens', {
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      '/responses/input_tokens',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

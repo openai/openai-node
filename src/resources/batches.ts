@@ -8,6 +8,13 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../core/paginati
 import { RequestOptions } from '../internal/request-options';
 import { path } from '../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -123,14 +130,24 @@ export class Batches extends APIResource {
    * Creates and executes a batch from an uploaded file of requests
    */
   create(body: BatchCreateParams, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.post('/batches', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/batches',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Retrieves a batch.
    */
   retrieve(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.get(path`/batches/${batchID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.get(
+      path`/batches/${batchID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -232,11 +249,15 @@ export class Batches extends APIResource {
       query = {};
     }
     query = query as BatchListParams | null | undefined;
-    return this._client.getAPIList('/batches', CursorPage<Batch>, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/batches',
+      CursorPage<Batch>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -245,10 +266,10 @@ export class Batches extends APIResource {
    * (if any) available in the output file.
    */
   cancel(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.post(path`/batches/${batchID}/cancel`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/batches/${batchID}/cancel`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 

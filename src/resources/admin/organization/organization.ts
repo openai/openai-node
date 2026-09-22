@@ -139,7 +139,6 @@ import {
 } from './users/users';
 
 export class Organization extends APIResource {
-  externalStorage: ExternalStorageAPI.ExternalStorage = new ExternalStorageAPI.ExternalStorage(this._client);
   auditLogs: AuditLogsAPI.AuditLogs = new AuditLogsAPI.AuditLogs(this._client);
   adminAPIKeys: AdminAPIKeysAPI.AdminAPIKeys = new AdminAPIKeysAPI.AdminAPIKeys(this._client);
   usage: UsageAPI.Usage = new UsageAPI.Usage(this._client);
@@ -148,13 +147,13 @@ export class Organization extends APIResource {
   groups: GroupsAPI.Groups = new GroupsAPI.Groups(this._client);
   roles: RolesAPI.Roles = new RolesAPI.Roles(this._client);
   dataRetention: DataRetentionAPI.DataRetention = new DataRetentionAPI.DataRetention(this._client);
+  externalStorage: ExternalStorageAPI.ExternalStorage = new ExternalStorageAPI.ExternalStorage(this._client);
   spendLimit: SpendLimitAPI.SpendLimit = new SpendLimitAPI.SpendLimit(this._client);
   spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
   projects: ProjectsAPI.Projects = new ProjectsAPI.Projects(this._client);
 }
 
-Organization.ExternalStorage = ExternalStorage;
 Organization.AuditLogs = AuditLogs;
 Organization.AdminAPIKeys = AdminAPIKeys;
 Organization.Usage = Usage;
@@ -163,23 +162,13 @@ Organization.Users = Users;
 Organization.Groups = Groups;
 Organization.Roles = Roles;
 Organization.DataRetention = DataRetention;
+Organization.ExternalStorage = ExternalStorage;
 Organization.SpendLimit = SpendLimit;
 Organization.SpendAlerts = SpendAlerts;
 Organization.Certificates = Certificates;
 Organization.Projects = Projects;
 
 export declare namespace Organization {
-  export {
-    ExternalStorage as ExternalStorage,
-    type AwsExternalStorageProvider as AwsExternalStorageProvider,
-    type AzureExternalStorageProvider as AzureExternalStorageProvider,
-    type ExternalStorageConfiguration as ExternalStorageConfiguration,
-    type ExternalStorageDeleted as ExternalStorageDeleted,
-    type ExternalStorageConfigurationsPage as ExternalStorageConfigurationsPage,
-    type ExternalStorageCreateParams as ExternalStorageCreateParams,
-    type ExternalStorageListParams as ExternalStorageListParams,
-  };
-
   export {
     AuditLogs as AuditLogs,
     type AuditLogListResponse as AuditLogListResponse,
@@ -267,6 +256,17 @@ export declare namespace Organization {
     DataRetention as DataRetention,
     type OrganizationDataRetention as OrganizationDataRetention,
     type DataRetentionUpdateParams as DataRetentionUpdateParams,
+  };
+
+  export {
+    ExternalStorage as ExternalStorage,
+    type AwsExternalStorageProvider as AwsExternalStorageProvider,
+    type AzureExternalStorageProvider as AzureExternalStorageProvider,
+    type ExternalStorageConfiguration as ExternalStorageConfiguration,
+    type ExternalStorageDeleted as ExternalStorageDeleted,
+    type ExternalStorageConfigurationsPage as ExternalStorageConfigurationsPage,
+    type ExternalStorageCreateParams as ExternalStorageCreateParams,
+    type ExternalStorageListParams as ExternalStorageListParams,
   };
 
   export {

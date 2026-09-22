@@ -12,6 +12,13 @@ import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -130,11 +137,14 @@ export class Threads extends APIResource {
    * ```
    */
   retrieve(threadID: string, options?: RequestOptions): APIPromise<ChatKitThread> {
-    return this._client.get(path`/chatkit/threads/${threadID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/chatkit/threads/${threadID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -244,12 +254,16 @@ export class Threads extends APIResource {
       query = {};
     }
     query = query as ThreadListParams | null | undefined;
-    return this._client.getAPIList('/chatkit/threads', ConversationCursorPage<ChatKitThread>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/chatkit/threads',
+      ConversationCursorPage<ChatKitThread>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -263,11 +277,14 @@ export class Threads extends APIResource {
    * ```
    */
   delete(threadID: string, options?: RequestOptions): APIPromise<ThreadDeleteResponse> {
-    return this._client.delete(path`/chatkit/threads/${threadID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/chatkit/threads/${threadID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -416,12 +433,12 @@ export class Threads extends APIResource {
         | ChatKitThreadItemList.ChatKitTask
         | ChatKitThreadItemList.ChatKitTaskGroup
       >,
-      {
+      resolveResourceRequestOptions(options, (options) => ({
         query,
         ...options,
         headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
         __security: { bearerAuth: true },
-      },
+      })),
     );
   }
 }

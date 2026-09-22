@@ -41,7 +41,7 @@ describe('debug()', () => {
       expect.stringContaining('[log_'),
       expect.objectContaining({
         headers: expect.objectContaining({
-          authorization: '***',
+          authorization: '[REDACTED]',
         }),
       }),
     );
@@ -61,7 +61,7 @@ describe('debug()', () => {
       expect.stringContaining('[log_'),
       expect.objectContaining({
         headers: expect.objectContaining({
-          authorization: '***',
+          authorization: '[REDACTED]',
         }),
       }),
     );
@@ -88,7 +88,7 @@ describe('debug()', () => {
       expect.stringContaining('[log_'),
       expect.objectContaining({
         headers: expect.objectContaining({
-          authorization: '***',
+          authorization: '[REDACTED]',
         }),
       }),
     );
@@ -118,7 +118,7 @@ describe('debug()', () => {
       expect.stringContaining('[log_'),
       expect.objectContaining({
         headers: expect.objectContaining({
-          authorization: '***',
+          authorization: '[REDACTED]',
         }),
       }),
     );

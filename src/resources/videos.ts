@@ -9,6 +9,13 @@ import { RequestOptions } from '../internal/request-options';
 import { maybeMultipartFormRequestOptions, multipartFormRequestOptions } from '../internal/uploads';
 import { path } from '../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -128,7 +135,9 @@ export class Videos extends APIResource {
   create(body: VideoCreateParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       '/videos',
-      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      ),
     );
   }
 
@@ -138,7 +147,10 @@ export class Videos extends APIResource {
    * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   retrieve(videoID: string, options?: RequestOptions): APIPromise<Video> {
-    return this._client.get(path`/videos/${videoID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.get(
+      path`/videos/${videoID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -242,11 +254,15 @@ export class Videos extends APIResource {
       query = {};
     }
     query = query as VideoListParams | null | undefined;
-    return this._client.getAPIList('/videos', ConversationCursorPage<Video>, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      '/videos',
+      ConversationCursorPage<Video>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -255,7 +271,10 @@ export class Videos extends APIResource {
    * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   delete(videoID: string, options?: RequestOptions): APIPromise<VideoDeleteResponse> {
-    return this._client.delete(path`/videos/${videoID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.delete(
+      path`/videos/${videoID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -269,7 +288,9 @@ export class Videos extends APIResource {
   ): APIPromise<VideoCreateCharacterResponse> {
     return this._client.post(
       '/videos/characters',
-      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      ),
     );
   }
 
@@ -379,13 +400,16 @@ export class Videos extends APIResource {
       query = {};
     }
     query = query as VideoDownloadContentParams | null | undefined;
-    return this._client.get(path`/videos/${videoID}/content`, {
-      query,
-      ...options,
-      headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
-      __security: { bearerAuth: true },
-      __binaryResponse: true,
-    });
+    return this._client.get(
+      path`/videos/${videoID}/content`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+        __security: { bearerAuth: true },
+        __binaryResponse: true,
+      })),
+    );
   }
 
   /**
@@ -397,7 +421,9 @@ export class Videos extends APIResource {
   edit(body: VideoEditParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       '/videos/edits',
-      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      ),
     );
   }
 
@@ -409,7 +435,9 @@ export class Videos extends APIResource {
   extend(body: VideoExtendParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       '/videos/extensions',
-      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      ),
     );
   }
 
@@ -419,10 +447,10 @@ export class Videos extends APIResource {
    * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   getCharacter(characterID: string, options?: RequestOptions): APIPromise<VideoGetCharacterResponse> {
-    return this._client.get(path`/videos/characters/${characterID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/videos/characters/${characterID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -433,7 +461,12 @@ export class Videos extends APIResource {
   remix(videoID: string, body: VideoRemixParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       path`/videos/${videoID}/remix`,
-      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        maybeMultipartFormRequestOptions(
+          { body, ...options, __security: { bearerAuth: true } },
+          this._client,
+        ),
+      ),
     );
   }
 }

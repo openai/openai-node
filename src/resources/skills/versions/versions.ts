@@ -10,6 +10,13 @@ import { RequestOptions } from '../../../internal/request-options';
 import { maybeMultipartFormRequestOptions } from '../../../internal/uploads';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -145,10 +152,10 @@ export class Versions extends APIResource {
     options?: RequestOptions,
   ): APIPromise<SkillVersion> {
     const { skill_id } = params;
-    return this._client.get(path`/skills/${skill_id}/versions/${version}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/skills/${skill_id}/versions/${version}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -253,11 +260,15 @@ export class Versions extends APIResource {
       query = {};
     }
     query = query as VersionListParams | null | undefined;
-    return this._client.getAPIList(path`/skills/${skillID}/versions`, CursorPage<SkillVersion>, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      path`/skills/${skillID}/versions`,
+      CursorPage<SkillVersion>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -269,10 +280,10 @@ export class Versions extends APIResource {
     options?: RequestOptions,
   ): APIPromise<DeletedSkillVersion> {
     const { skill_id } = params;
-    return this._client.delete(path`/skills/${skill_id}/versions/${version}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/skills/${skill_id}/versions/${version}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 

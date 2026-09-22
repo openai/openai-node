@@ -4,6 +4,13 @@ import { APIResource } from '../core/resource';
 import { APIPromise } from '../core/api-promise';
 import { RequestOptions } from '../internal/request-options';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Given text and/or image inputs, classifies if those inputs are potentially harmful.
  */
@@ -14,7 +21,14 @@ export class Moderations extends APIResource {
    * [moderation guide](https://developers.openai.com/api/docs/guides/moderation).
    */
   create(body: ModerationCreateParams, options?: RequestOptions): APIPromise<ModerationCreateResponse> {
-    return this._client.post('/moderations', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/moderations',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

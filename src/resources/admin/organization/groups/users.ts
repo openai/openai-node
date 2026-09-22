@@ -6,6 +6,13 @@ import { NextCursorPage, type NextCursorPageParams, PagePromise } from '../../..
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -127,11 +134,14 @@ export class Users extends APIResource {
    * ```
    */
   create(groupID: string, body: UserCreateParams, options?: RequestOptions): APIPromise<UserCreateResponse> {
-    return this._client.post(path`/organization/groups/${groupID}/users`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/groups/${groupID}/users`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -152,10 +162,13 @@ export class Users extends APIResource {
     options?: RequestOptions,
   ): APIPromise<UserRetrieveResponse> {
     const { group_id } = params;
-    return this._client.get(path`/organization/groups/${group_id}/users/${userID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/groups/${group_id}/users/${userID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -273,7 +286,11 @@ export class Users extends APIResource {
     return this._client.getAPIList(
       path`/organization/groups/${groupID}/users`,
       NextCursorPage<OrganizationGroupUser>,
-      { query, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -291,10 +308,13 @@ export class Users extends APIResource {
    */
   delete(userID: string, params: UserDeleteParams, options?: RequestOptions): APIPromise<UserDeleteResponse> {
     const { group_id } = params;
-    return this._client.delete(path`/organization/groups/${group_id}/users/${userID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      path`/organization/groups/${group_id}/users/${userID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

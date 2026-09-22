@@ -12,6 +12,13 @@ import {
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -132,12 +139,15 @@ export class Items extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ConversationItemList> {
     const { include, ...body } = params;
-    return this._client.post(path`/conversations/${conversationID}/items`, {
-      query: { include },
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/conversations/${conversationID}/items`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query: { include },
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -149,11 +159,14 @@ export class Items extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ConversationItem> {
     const { conversation_id, ...query } = params;
-    return this._client.get(path`/conversations/${conversation_id}/items/${itemID}`, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/conversations/${conversation_id}/items/${itemID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -261,7 +274,11 @@ export class Items extends APIResource {
     return this._client.getAPIList(
       path`/conversations/${conversationID}/items`,
       ConversationCursorPage<ConversationItem>,
-      { query, ...options, __security: { bearerAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
     );
   }
 
@@ -274,10 +291,10 @@ export class Items extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ConversationsAPI.Conversation> {
     const { conversation_id } = params;
-    return this._client.delete(path`/conversations/${conversation_id}/items/${itemID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/conversations/${conversation_id}/items/${itemID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 

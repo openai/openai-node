@@ -19,6 +19,13 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Environments extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this._client);
   templates: TemplatesAPI.Templates = new TemplatesAPI.Templates(this._client);
@@ -37,11 +44,14 @@ export class Environments extends APIResource {
    * ```
    */
   retrieve(environmentID: string, options?: RequestOptions): APIPromise<EnvironmentInfo> {
-    return this._client.get(path`/agents/environments/${environmentID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/agents/environments/${environmentID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 
