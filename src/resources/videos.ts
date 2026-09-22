@@ -567,6 +567,12 @@ export interface VideoCreateError {
    */
   message: string;
 
+  /**
+   * The Retry-After and Retry-After-Ms headers returned with the original error, if
+   * any.
+   */
+  headers?: { [key: string]: string };
+
   misalignment?: VideoCreateError.Misalignment;
 }
 

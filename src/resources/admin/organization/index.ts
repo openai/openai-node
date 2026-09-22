@@ -43,6 +43,7 @@ export {
   type AzureExternalStorageProvider,
   type ExternalStorageConfiguration,
   type ExternalStorageDeleted,
+  type GcpExternalStorageProvider,
   type ExternalStorageCreateParams,
   type ExternalStorageListParams,
   type ExternalStorageConfigurationsPage,
