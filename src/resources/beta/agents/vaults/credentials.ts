@@ -187,8 +187,7 @@ export class Credentials extends APIResource {
   }
 
   /**
-   * Rotates a vault credential's write-only secret and returns only credential
-   * metadata. See
+   * Updates credential metadata or rotates its write-only secret. See
    * [vaults](https://developers.openai.com/api/docs/guides/agents-api/tools/vaults).
    *
    * @example
@@ -196,10 +195,7 @@ export class Credentials extends APIResource {
    * const credential =
    *   await client.beta.agents.vaults.credentials.update(
    *     'credential_id',
-   *     {
-   *       vault_id: 'vault_id',
-   *       auth: { type: 'mcp_oauth' },
-   *     },
+   *     { vault_id: 'vault_id' },
    *   );
    * ```
    */
@@ -396,6 +392,11 @@ export interface Credential {
    * The Unix timestamp, in seconds, when the credential was created.
    */
   created_at: number;
+
+  /**
+   * Application-defined key-value pairs associated with this credential.
+   */
+  metadata: { [key: string]: string };
 
   /**
    * The human-readable name of the credential.
@@ -1002,6 +1003,12 @@ export interface CredentialCreateParams {
    * trimming.
    */
   name: string;
+
+  /**
+   * Up to 16 string key-value pairs, with keys up to 64 and values up to 512
+   * characters. Defaults to an empty map.
+   */
+  metadata?: { [key: string]: string };
 }
 
 export interface CredentialRetrieveParams {
@@ -1021,7 +1028,14 @@ export interface CredentialUpdateParams {
    * Body param: Replacement values for the credential's existing authentication
    * method.
    */
-  auth: CredentialAuthRotateParam;
+  auth?: CredentialAuthRotateParam;
+
+  /**
+   * Body param: Replaces all metadata. Omit to preserve it, or pass {} to clear it.
+   * Up to 16 string key-value pairs, with keys up to 64 and values up to 512
+   * characters.
+   */
+  metadata?: { [key: string]: string };
 }
 
 export interface CredentialListParams extends Omit<CursorPageParams, 'limit'> {
