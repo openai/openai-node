@@ -50,6 +50,7 @@ function response(output: Output[] = [], outputText?: string): Response {
   return {
     id: 'resp_123',
     object: 'response',
+    access_programs: null,
     created_at: 1,
     error: null,
     incomplete_details: null,

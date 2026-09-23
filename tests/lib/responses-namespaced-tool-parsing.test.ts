@@ -50,6 +50,7 @@ function responseFixture(output: Response['output'], incomplete = false): Respon
   return {
     id: 'resp_synthetic',
     object: 'response',
+    access_programs: null,
     created_at: 0,
     status: incomplete ? 'incomplete' : 'completed',
     model: 'gpt-5.5',

@@ -1376,6 +1376,8 @@ export interface BetaResponse {
    */
   id: string;
 
+  access_programs: BetaResponse.AccessPrograms | null;
+
   /**
    * Unix timestamp (in seconds) of when this Response was created.
    */
@@ -1799,6 +1801,13 @@ export interface BetaResponse {
 }
 
 export namespace BetaResponse {
+  export interface AccessPrograms {
+    /**
+     * The effective Cyber access program used for this response.
+     */
+    cyber: 'standard' | 'daybreak_blue' | 'daybreak_red';
+  }
+
   /**
    * Details about why the response is incomplete.
    */
@@ -11905,6 +11914,11 @@ export namespace BetaResponsesClientEvent {
     type: 'response.create';
 
     /**
+     * Domain-specific access programs to use for this request.
+     */
+    access_programs?: ResponseCreate.AccessPrograms;
+
+    /**
      * Whether to run the model response in the background.
      * [Learn more](https://developers.openai.com/api/docs/guides/background).
      */
@@ -12354,6 +12368,25 @@ export namespace BetaResponsesClientEvent {
   }
 
   export namespace ResponseCreate {
+    /**
+     * Domain-specific access programs to use for this request.
+     */
+    export interface AccessPrograms {
+      /**
+       * The Cyber access program to use for this request. Supported values are
+       * `standard`, `daybreak_blue`, and `daybreak_red`. If omitted, the API resolves
+       * the program from the model's Cyber tier and your organization and project
+       * access, subject to model-specific eligibility restrictions. By default, models
+       * without a Cyber tier use Standard. Blue-tier models use Daybreak Blue when
+       * authorized; otherwise they fall back to Standard unless the model requires
+       * Daybreak access. Red-tier models use Daybreak Red and require authorization.
+       * Requests that require unavailable Daybreak access return 403. An implicit
+       * Standard fallback is represented by null in the response's access_programs
+       * field, rather than an explicit Standard selection.
+       */
+      cyber?: 'standard' | 'daybreak_blue' | 'daybreak_red';
+    }
+
     export interface ContextManagement {
       /**
        * The context management entry type. Currently only 'compaction' is supported.
@@ -14161,6 +14194,11 @@ export type ResponseCreateParams = ResponseCreateParamsNonStreaming | ResponseCr
 
 export interface ResponseCreateParamsBase {
   /**
+   * Body param: Domain-specific access programs to use for this request.
+   */
+  access_programs?: ResponseCreateParams.AccessPrograms;
+
+  /**
    * Body param: Whether to run the model response in the background.
    * [Learn more](https://developers.openai.com/api/docs/guides/background).
    */
@@ -14612,6 +14650,25 @@ export interface ResponseCreateParamsBase {
 }
 
 export namespace ResponseCreateParams {
+  /**
+   * Domain-specific access programs to use for this request.
+   */
+  export interface AccessPrograms {
+    /**
+     * The Cyber access program to use for this request. Supported values are
+     * `standard`, `daybreak_blue`, and `daybreak_red`. If omitted, the API resolves
+     * the program from the model's Cyber tier and your organization and project
+     * access, subject to model-specific eligibility restrictions. By default, models
+     * without a Cyber tier use Standard. Blue-tier models use Daybreak Blue when
+     * authorized; otherwise they fall back to Standard unless the model requires
+     * Daybreak access. Red-tier models use Daybreak Red and require authorization.
+     * Requests that require unavailable Daybreak access return 403. An implicit
+     * Standard fallback is represented by null in the response's access_programs
+     * field, rather than an explicit Standard selection.
+     */
+    cyber?: 'standard' | 'daybreak_blue' | 'daybreak_red';
+  }
+
   export interface ContextManagement {
     /**
      * The context management entry type. Currently only 'compaction' is supported.
