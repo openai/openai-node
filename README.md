@@ -901,4 +901,7 @@ for lifecycle, deprecation, and release rules.
 
 ## Contributing
 
-See [the contributing documentation](./.github/CONTRIBUTING.md).
+Please share bug reports and feature requests through [GitHub issues](https://github.com/openai/openai-node/issues).
+Pull requests are limited to repository collaborators; we do not accept pull requests from non-collaborators.
+See [CONTRIBUTING.md](./.github/CONTRIBUTING.md) for the contribution policy and development guide.
+For security vulnerabilities, follow [SECURITY.md](.github/SECURITY.md).
