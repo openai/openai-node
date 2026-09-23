@@ -1,5 +1,18 @@
 # Changelog
 
+## [7.23.0](https://github.com/openai/openai-node/compare/v7.22.0...v7.23.0) (2026-09-23)
+
+
+### Features
+
+* **api:** add GCP external storage support ([#2794](https://github.com/openai/openai-node/issues/2794)) ([7cd0629](https://github.com/openai/openai-node/commit/7cd0629a8897b34df07d12fe1ec76050cce5a5a0))
+* **api:** add GPT-Rosalind research model ([#2792](https://github.com/openai/openai-node/issues/2792)) ([d0e6fcd](https://github.com/openai/openai-node/commit/d0e6fcd686dfe5415df110a83e4923abadb8419c))
+
+
+### Chores
+
+* **api:** document exact Chat Completions seed bounds ([#2796](https://github.com/openai/openai-node/issues/2796)) ([13b844f](https://github.com/openai/openai-node/commit/13b844fad0b6a7206fb81fe8b7285593119488ac))
+
 ## [7.22.0](https://github.com/openai/openai-node/compare/v7.21.0...v7.22.0) (2026-09-22)
 
 
