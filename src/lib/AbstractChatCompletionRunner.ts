@@ -292,6 +292,18 @@ export class AbstractChatCompletionRunner<
         total.completion_tokens += usage.completion_tokens;
         total.prompt_tokens += usage.prompt_tokens;
         total.total_tokens += usage.total_tokens;
+        for (const key of ['completion_tokens_details', 'prompt_tokens_details'] as const) {
+          const details = usage[key];
+          if (details) {
+            // SAFETY: Both token detail types contain only optional numeric counts.
+            const totalDetails = (total[key] ??= {}) as Record<string, number>;
+            for (const [name, count] of Object.entries(details)) {
+              if (count !== undefined) {
+                totalDetails[name] = (totalDetails[name] ?? 0) + count;
+              }
+            }
+          }
+        }
       }
     }
     return total;
