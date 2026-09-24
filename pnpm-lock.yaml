@@ -54,7 +54,7 @@ importers:
         version: 5.1.1
       fast-check:
         specifier: ^4.9.0
-        version: 4.9.0
+        version: 4.10.0
       fast-glob:
         specifier: ^3.3.2
         version: 3.3.3
@@ -1933,8 +1933,8 @@ packages:
     resolution: {integrity: sha512-hIS4idWWai69NezIdRt2xFVofaF4j+6INOpJlVOLDO8zXGpUVEVzIYk12UUi2JzjEzWL3IOAxcTubgz9Po0yXw==}
     engines: {node: '>= 18'}
 
-  fast-check@4.9.0:
-    resolution: {integrity: sha512-7ms6T7SybUev/PQITciI0yLM2pOSFy5zpG8Ty7tQofcVaQUvrMXp6CBwqF6fThLCLOrfBtuHAtwq6Yu4XPCllg==}
+  fast-check@4.10.0:
+    resolution: {integrity: sha512-hhqQL+IJllZi3aM4TKvmCj3bywLEcycNTTLZeLhA9ttMxBrCqM07q7Di4kl+j9EWSTXvJH1+EpIgsDbF/+8H5Q==}
     engines: {node: '>=12.17.0'}
 
   fast-glob@3.3.3:
@@ -5313,7 +5313,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  fast-check@4.9.0:
+  fast-check@4.10.0:
     dependencies:
       pure-rand: 8.4.2
 
