@@ -1224,6 +1224,8 @@ export interface Response {
    */
   id: string;
 
+  access_programs: Response.AccessPrograms | null;
+
   /**
    * Unix timestamp (in seconds) of when this Response was created.
    */
@@ -1538,6 +1540,13 @@ export interface Response {
 }
 
 export namespace Response {
+  export interface AccessPrograms {
+    /**
+     * The effective Cyber access program used for this response.
+     */
+    cyber: 'standard' | 'daybreak_blue' | 'daybreak_red';
+  }
+
   /**
    * Details about why the response is incomplete.
    */
@@ -8850,6 +8859,11 @@ export namespace ResponsesClientEvent {
     type: 'response.create';
 
     /**
+     * Domain-specific access programs to use for this request.
+     */
+    access_programs?: ResponseCreate.AccessPrograms;
+
+    /**
      * Whether to run the model response in the background.
      * [Learn more](https://developers.openai.com/api/docs/guides/background).
      */
@@ -9185,6 +9199,25 @@ export namespace ResponsesClientEvent {
   }
 
   export namespace ResponseCreate {
+    /**
+     * Domain-specific access programs to use for this request.
+     */
+    export interface AccessPrograms {
+      /**
+       * The Cyber access program to use for this request. Supported values are
+       * `standard`, `daybreak_blue`, and `daybreak_red`. If omitted, the API resolves
+       * the program from the model's Cyber tier and your organization and project
+       * access, subject to model-specific eligibility restrictions. By default, models
+       * without a Cyber tier use Standard. Blue-tier models use Daybreak Blue when
+       * authorized; otherwise they fall back to Standard unless the model requires
+       * Daybreak access. Red-tier models use Daybreak Red and require authorization.
+       * Requests that require unavailable Daybreak access return 403. An implicit
+       * Standard fallback is represented by null in the response's access_programs
+       * field, rather than an explicit Standard selection.
+       */
+      cyber?: 'standard' | 'daybreak_blue' | 'daybreak_red';
+    }
+
     export interface ContextManagement {
       /**
        * The context management entry type. Currently only 'compaction' is supported.
@@ -10759,18 +10792,14 @@ export interface WebSearchPreviewTool {
   search_context_size?: 'low' | 'medium' | 'high';
 
   /**
-   * The approximate location of the user. If omitted or null, defaults to the United
-   * States. To avoid this fallback, pass `{"type": "approximate"}` without location
-   * fields. To localize results, provide the relevant location fields.
+   * The user's location.
    */
   user_location?: WebSearchPreviewTool.UserLocation | null;
 }
 
 export namespace WebSearchPreviewTool {
   /**
-   * The approximate location of the user. If omitted or null, defaults to the United
-   * States. To avoid this fallback, pass `{"type": "approximate"}` without location
-   * fields. To localize results, provide the relevant location fields.
+   * The user's location.
    */
   export interface UserLocation {
     /**
@@ -10831,9 +10860,7 @@ export interface WebSearchTool {
   search_context_size?: 'low' | 'medium' | 'high';
 
   /**
-   * The approximate location of the user. If omitted or null, defaults to the United
-   * States. To avoid this fallback, pass `{"type": "approximate"}` without location
-   * fields. To localize results, provide the relevant location fields.
+   * The approximate location of the user.
    */
   user_location?: WebSearchTool.UserLocation | null;
 }
@@ -10853,9 +10880,7 @@ export namespace WebSearchTool {
   }
 
   /**
-   * The approximate location of the user. If omitted or null, defaults to the United
-   * States. To avoid this fallback, pass `{"type": "approximate"}` without location
-   * fields. To localize results, provide the relevant location fields.
+   * The approximate location of the user.
    */
   export interface UserLocation {
     /**
@@ -10890,6 +10915,11 @@ export namespace WebSearchTool {
 export type ResponseCreateParams = ResponseCreateParamsNonStreaming | ResponseCreateParamsStreaming;
 
 export interface ResponseCreateParamsBase {
+  /**
+   * Domain-specific access programs to use for this request.
+   */
+  access_programs?: ResponseCreateParams.AccessPrograms;
+
   /**
    * Whether to run the model response in the background.
    * [Learn more](https://developers.openai.com/api/docs/guides/background).
@@ -11217,6 +11247,25 @@ export interface ResponseCreateParamsBase {
 }
 
 export namespace ResponseCreateParams {
+  /**
+   * Domain-specific access programs to use for this request.
+   */
+  export interface AccessPrograms {
+    /**
+     * The Cyber access program to use for this request. Supported values are
+     * `standard`, `daybreak_blue`, and `daybreak_red`. If omitted, the API resolves
+     * the program from the model's Cyber tier and your organization and project
+     * access, subject to model-specific eligibility restrictions. By default, models
+     * without a Cyber tier use Standard. Blue-tier models use Daybreak Blue when
+     * authorized; otherwise they fall back to Standard unless the model requires
+     * Daybreak access. Red-tier models use Daybreak Red and require authorization.
+     * Requests that require unavailable Daybreak access return 403. An implicit
+     * Standard fallback is represented by null in the response's access_programs
+     * field, rather than an explicit Standard selection.
+     */
+    cyber?: 'standard' | 'daybreak_blue' | 'daybreak_red';
+  }
+
   export interface ContextManagement {
     /**
      * The context management entry type. Currently only 'compaction' is supported.
