@@ -19,6 +19,7 @@ function responseEvents(
   const response: Response = {
     id: 'resp_background_example',
     object: 'response',
+    access_programs: null,
     created_at: 1,
     model: 'gpt-4o-2024-08-06',
     output: [],

@@ -26,6 +26,7 @@ function makeResponse(kind: 'message' | 'function_call' | 'refusal'): APIRespons
   return {
     id: 'resp_synthetic',
     object: 'response',
+    access_programs: null,
     created_at: 0,
     status: 'completed',
     error: null,
