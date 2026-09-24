@@ -16,6 +16,7 @@ function makeResponse(): APIResponse {
   return {
     id: 'resp_synthetic',
     object: 'response',
+    access_programs: null,
     created_at: 1,
     error: null,
     incomplete_details: null,
