@@ -10792,14 +10792,18 @@ export interface WebSearchPreviewTool {
   search_context_size?: 'low' | 'medium' | 'high';
 
   /**
-   * The user's location.
+   * The approximate location of the user. If omitted or null, defaults to the United
+   * States. To avoid this fallback, pass `{"type": "approximate"}` without location
+   * fields. To localize results, provide the relevant location fields.
    */
   user_location?: WebSearchPreviewTool.UserLocation | null;
 }
 
 export namespace WebSearchPreviewTool {
   /**
-   * The user's location.
+   * The approximate location of the user. If omitted or null, defaults to the United
+   * States. To avoid this fallback, pass `{"type": "approximate"}` without location
+   * fields. To localize results, provide the relevant location fields.
    */
   export interface UserLocation {
     /**
@@ -10860,7 +10864,9 @@ export interface WebSearchTool {
   search_context_size?: 'low' | 'medium' | 'high';
 
   /**
-   * The approximate location of the user.
+   * The approximate location of the user. If omitted or null, defaults to the United
+   * States. To avoid this fallback, pass `{"type": "approximate"}` without location
+   * fields. To localize results, provide the relevant location fields.
    */
   user_location?: WebSearchTool.UserLocation | null;
 }
@@ -10880,7 +10886,9 @@ export namespace WebSearchTool {
   }
 
   /**
-   * The approximate location of the user.
+   * The approximate location of the user. If omitted or null, defaults to the United
+   * States. To avoid this fallback, pass `{"type": "approximate"}` without location
+   * fields. To localize results, provide the relevant location fields.
    */
   export interface UserLocation {
     /**
