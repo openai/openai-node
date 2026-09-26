@@ -44,6 +44,7 @@ describe('resource credentials', () => {
         },
       },
       name: 'x',
+      metadata: { foo: 'string' },
     });
   });
 
@@ -69,7 +70,6 @@ describe('resource credentials', () => {
   test('update: only required params', async () => {
     const responsePromise = client.beta.agents.vaults.credentials.update('credential_id', {
       vault_id: 'vault_id',
-      auth: { type: 'mcp_oauth' },
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -93,6 +93,7 @@ describe('resource credentials', () => {
           token_endpoint_auth: { type: 'client_secret_basic', client_secret: 'client_secret' },
         },
       },
+      metadata: { foo: 'string' },
     });
   });
 

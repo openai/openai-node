@@ -62,10 +62,10 @@ export {
 } from './evals/evals';
 export {
   Files,
-  type FileContent,
   type FileDeleted,
   type FileObject,
   type FilePurpose,
+  type FileContent,
   type FileCreateParams,
   type FileListParams,
   type FileObjectsPage,

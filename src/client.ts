@@ -1830,10 +1830,10 @@ export declare namespace OpenAI {
 
   export {
     Files as Files,
-    type FileContent as FileContent,
     type FileDeleted as FileDeleted,
     type FileObject as FileObject,
     type FilePurpose as FilePurpose,
+    type FileContent as FileContent,
     type FileObjectsPage as FileObjectsPage,
     type FileCreateParams as FileCreateParams,
     type FileListParams as FileListParams,

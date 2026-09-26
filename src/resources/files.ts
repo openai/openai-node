@@ -313,8 +313,6 @@ export class Files extends APIResource {
 
 export type FileObjectsPage = CursorPage<FileObject>;
 
-export type FileContent = string;
-
 export interface FileDeleted {
   id: string;
 
@@ -397,6 +395,8 @@ export interface FileObject {
  */
 export type FilePurpose = 'assistants' | 'batch' | 'fine-tune' | 'vision' | 'user_data' | 'evals';
 
+export type FileContent = string;
+
 export interface FileCreateParams {
   /**
    * The File object (not file name) to be uploaded.
@@ -457,10 +457,10 @@ export interface FileListParams extends CursorPageParams {
 
 export declare namespace Files {
   export {
-    type FileContent as FileContent,
     type FileDeleted as FileDeleted,
     type FileObject as FileObject,
     type FilePurpose as FilePurpose,
+    type FileContent as FileContent,
     type FileObjectsPage as FileObjectsPage,
     type FileCreateParams as FileCreateParams,
     type FileListParams as FileListParams,
