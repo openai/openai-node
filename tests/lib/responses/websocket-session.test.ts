@@ -7,7 +7,8 @@ import OpenAI from 'openai';
 import { ResponsesWS } from 'openai/resources/responses/ws';
 import { ResponsesWebSocketSession } from 'openai/lib/responses/responses-websocket-session';
 import type { ResponsesWebSocketLane } from 'openai/lib/responses/responses-websocket-session';
-import type { Response, ResponsesServerEvent } from 'openai/resources/responses/responses';
+import { toResponseInputItems } from 'openai/lib/responses/ResponseInputItems';
+import type { CompactedResponse, Response, ResponsesServerEvent } from 'openai/resources/responses/responses';
 import { rawByteLength } from 'openai/internal/ws';
 import * as webSocketInternals from 'openai/internal/ws';
 import scenarios from './fixtures/websocket_scenarios.json';
@@ -362,6 +363,269 @@ test('routes interleaved lanes, preserves canceled waits, and detaches without c
     await expect(raw).resolves.toEqual(first);
   });
 });
+
+test('continues a generate:false warmup from its returned terminal ID on the same socket', async () => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane('warmup');
+    try {
+      const warming = once(peer, 'message');
+      const warmupRequest = { model: 'test-model', input: 'Remember Tuesday.', generate: false };
+      lane.create(warmupRequest);
+      const [warmupWire] = await warming;
+      expect(JSON.parse(String(warmupWire))).toEqual({
+        type: 'response.create',
+        stream_id: 'warmup',
+        model: 'test-model',
+        input: 'Remember Tuesday.',
+        generate: false,
+      });
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'warmup',
+          response: response('server_warmup'),
+        }),
+      );
+      const warmup = await lane.finalResponse();
+      expect(warmup.output).toEqual([]);
+
+      const continuing = once(peer, 'message');
+      lane.create({ model: 'test-model', input: 'Which day?', previous_response_id: warmup.id });
+      const [continuationWire] = await continuing;
+      expect(JSON.parse(String(continuationWire))).toEqual({
+        type: 'response.create',
+        stream_id: 'warmup',
+        model: 'test-model',
+        input: 'Which day?',
+        previous_response_id: 'server_warmup',
+      });
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'warmup',
+          response: response('server_answer'),
+        }),
+      );
+      expect(await lane.finalResponse()).toMatchObject({ id: 'server_answer', status: 'completed' });
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test('forks from a completed response while the source lane continues independently', async () => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const source = session.lane('source');
+    const fork = session.lane('fork');
+    try {
+      const original = once(peer, 'message');
+      source.create({ model: 'test-model', input: 'Choose a day.', store: false });
+      await original;
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'source',
+          response: response('server_parent'),
+        }),
+      );
+      const parent = await source.finalResponse();
+
+      const forking = once(peer, 'message');
+      fork.create({
+        model: 'test-model',
+        input: 'Try another answer.',
+        previous_response_id: parent.id,
+        store: false,
+      });
+      const [forkWire] = await forking;
+      expect(JSON.parse(String(forkWire))).toEqual({
+        type: 'response.create',
+        stream_id: 'fork',
+        model: 'test-model',
+        input: 'Try another answer.',
+        previous_response_id: 'server_parent',
+        store: false,
+      });
+      peer.send(
+        JSON.stringify({
+          type: 'response.created',
+          stream_id: 'fork',
+          response: response('server_fork', 'in_progress'),
+        }),
+      );
+      expect(await fork.receive()).toMatchObject({ type: 'response.created', stream_id: 'fork' });
+
+      const advancing = once(peer, 'message');
+      source.create({
+        model: 'test-model',
+        input: 'Continue.',
+        previous_response_id: parent.id,
+        store: false,
+      });
+      const [sourceWire] = await advancing;
+      expect(JSON.parse(String(sourceWire))).toEqual({
+        type: 'response.create',
+        stream_id: 'source',
+        model: 'test-model',
+        input: 'Continue.',
+        previous_response_id: 'server_parent',
+        store: false,
+      });
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'fork',
+          response: response('server_fork'),
+        }),
+      );
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'source',
+          response: response('server_source_next'),
+        }),
+      );
+      expect(await source.finalResponse()).toMatchObject({ id: 'server_source_next' });
+      expect(await fork.finalResponse()).toMatchObject({ id: 'server_fork' });
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test('sends the complete standalone compaction output on a new response chain', async () => {
+  const compaction = {
+    type: 'compaction' as const,
+    id: 'compaction_item',
+    encrypted_content: 'synthetic-opaque-compaction',
+    future_field: { preserve: [1, 'two'] },
+  };
+  const compacted: CompactedResponse = {
+    id: 'compaction_result',
+    created_at: 1,
+    object: 'response.compaction',
+    output: [
+      {
+        type: 'message',
+        id: 'message_retained',
+        role: 'assistant',
+        status: 'completed',
+        content: [{ type: 'output_text', text: 'Tuesday', annotations: [] }],
+      },
+      compaction,
+    ],
+    usage: {
+      input_tokens: 1,
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
+      output_tokens: 1,
+      output_tokens_details: { reasoning_tokens: 0 },
+      total_tokens: 2,
+    },
+  };
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    try {
+      const lane = session.lane('compacted');
+      const beginning = once(peer, 'message');
+      lane.create({ model: 'test-model', input: toResponseInputItems(compacted.output) });
+      const [wire] = await beginning;
+      expect(JSON.parse(String(wire))).toEqual({
+        type: 'response.create',
+        stream_id: 'compacted',
+        model: 'test-model',
+        input: compacted.output,
+      });
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'compacted',
+          response: response('server_fresh'),
+        }),
+      );
+      expect(await lane.finalResponse()).toMatchObject({ id: 'server_fresh', status: 'completed' });
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test.each([true, false])(
+  'restores on a new connection using caller-owned history: store=%s',
+  async (store) => {
+    await withSocket(async (connection, peer) => {
+      const session = new ResponsesWebSocketSession(connection, limits);
+      const initial = { type: 'message' as const, role: 'user' as const, content: 'Remember Tuesday.' };
+      try {
+        const lane = session.lane('turn');
+        const beginning = once(peer, 'message');
+        lane.create({ model: 'test-model', input: [initial], store });
+        await beginning;
+        peer.send(
+          JSON.stringify({
+            type: 'response.completed',
+            stream_id: 'turn',
+            response: {
+              ...response('server_previous'),
+              output: [
+                {
+                  type: 'message',
+                  id: 'message_answer',
+                  role: 'assistant',
+                  status: 'completed',
+                  content: [{ type: 'output_text', text: 'Tuesday.', annotations: [] }],
+                },
+              ],
+            },
+          }),
+        );
+        const previous = await lane.finalResponse();
+        session.close();
+        connection.close();
+        await withSocket(async (nextConnection, nextPeer) => {
+          const nextSession = new ResponsesWebSocketSession(nextConnection, limits);
+          try {
+            const followup = { type: 'message' as const, role: 'user' as const, content: 'Which day?' };
+            const input = store ? [followup] : toResponseInputItems([initial, ...previous.output, followup]);
+            const sending = once(nextPeer, 'message');
+            const nextLane = nextSession.lane('turn');
+            nextLane.create({
+              model: 'test-model',
+              input,
+              store,
+              ...(store ? { previous_response_id: previous.id } : {}),
+            });
+            const [wire] = await sending;
+            expect(JSON.parse(String(wire))).toEqual({
+              type: 'response.create',
+              stream_id: 'turn',
+              model: 'test-model',
+              input: store ? [followup] : [initial, ...previous.output, followup],
+              store,
+              ...(store ? { previous_response_id: 'server_previous' } : {}),
+            });
+            nextPeer.send(
+              JSON.stringify({
+                type: 'response.completed',
+                stream_id: 'turn',
+                response: response('server_restored'),
+              }),
+            );
+            expect(await nextLane.finalResponse()).toMatchObject({
+              id: 'server_restored',
+              status: 'completed',
+            });
+          } finally {
+            nextSession.close();
+          }
+        });
+      } finally {
+        session.close();
+      }
+    });
+  },
+);
 
 test('binds untyped create input to the default lane without accepting its stream_id', async () => {
   await withSocket(async (connection, peer) => {
