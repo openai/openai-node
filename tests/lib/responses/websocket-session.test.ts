@@ -8,7 +8,7 @@ import { ResponsesWS } from 'openai/resources/responses/ws';
 import { ResponsesWebSocketSession } from 'openai/lib/responses/responses-websocket-session';
 import type { ResponsesWebSocketLane } from 'openai/lib/responses/responses-websocket-session';
 import { toResponseInputItems } from 'openai/lib/responses/ResponseInputItems';
-import type { CompactedResponse, Response, ResponsesServerEvent } from 'openai/resources/responses/responses';
+import type { Response, ResponseInputItem, ResponsesServerEvent } from 'openai/resources/responses/responses';
 import { rawByteLength } from 'openai/internal/ws';
 import * as webSocketInternals from 'openai/internal/ws';
 import scenarios from './fixtures/websocket_scenarios.json';
@@ -502,28 +502,32 @@ test('sends the complete standalone compaction output on a new response chain', 
     encrypted_content: 'synthetic-opaque-compaction',
     future_field: { preserve: [1, 'two'] },
   };
-  const compacted: CompactedResponse = {
-    id: 'compaction_result',
-    created_at: 1,
-    object: 'response.compaction',
-    output: [
-      {
-        type: 'message',
-        id: 'message_retained',
-        role: 'assistant',
-        status: 'completed',
-        content: [{ type: 'output_text', text: 'Tuesday', annotations: [] }],
-      },
-      compaction,
-    ],
-    usage: {
-      input_tokens: 1,
-      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
-      output_tokens: 1,
-      output_tokens_details: { reasoning_tokens: 0 },
-      total_tokens: 2,
-    },
+  const userMessage = {
+    type: 'message' as const,
+    id: 'message_retained',
+    role: 'user' as const,
+    status: 'completed' as const,
+    content: [{ type: 'input_text' as const, text: 'Remember Tuesday.' }],
   };
+  const output: ResponseInputItem[] = [userMessage, compaction];
+  const client = new OpenAI({
+    apiKey: 'synthetic-key',
+    fetch: async () =>
+      globalThis.Response.json({
+        id: 'compaction_result',
+        created_at: 1,
+        object: 'response.compaction',
+        output,
+        usage: {
+          input_tokens: 1,
+          input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
+          output_tokens: 1,
+          output_tokens_details: { reasoning_tokens: 0 },
+          total_tokens: 2,
+        },
+      }),
+  });
+  const compacted = await client.responses.compact({ model: 'test-model', input: [userMessage] });
   await withSocket(async (connection, peer) => {
     const session = new ResponsesWebSocketSession(connection, limits);
     try {
@@ -535,7 +539,7 @@ test('sends the complete standalone compaction output on a new response chain', 
         type: 'response.create',
         stream_id: 'compacted',
         model: 'test-model',
-        input: compacted.output,
+        input: output,
       });
       peer.send(
         JSON.stringify({
