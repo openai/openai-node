@@ -1,5 +1,40 @@
 # Changelog
 
+## [7.24.0](https://github.com/openai/openai-node/compare/v7.23.0...v7.24.0) (2026-09-26)
+
+
+### Features
+
+* **api:** add Cyber access programs to Responses ([#2804](https://github.com/openai/openai-node/issues/2804)) ([51dbefe](https://github.com/openai/openai-node/commit/51dbefe2112753507e0de530215ff3e0063b0867))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump @arethetypeswrong/cli from 0.18.3 to 0.18.5 ([#2783](https://github.com/openai/openai-node/issues/2783)) ([64ba34f](https://github.com/openai/openai-node/commit/64ba34f598a1ee477de117eae22ca013cb60acdf))
+* **deps-dev:** bump @aws-sdk/credential-provider-node from 3.972.81 to 3.972.83 ([#2784](https://github.com/openai/openai-node/issues/2784)) ([8e02310](https://github.com/openai/openai-node/commit/8e0231061b7f92992ee8d82cbeb8c421234a0f36))
+* **deps-dev:** bump @cloudflare/workers-types from 5.20260906.1 to 5.20260911.1 in /ecosystem-tests/cloudflare-worker ([#2780](https://github.com/openai/openai-node/issues/2780)) ([648324d](https://github.com/openai/openai-node/commit/648324dadbf18b49f8e3fa21dd3f1ebcf461de30))
+* **deps-dev:** bump publint from 0.3.23 to 0.3.24 ([#2781](https://github.com/openai/openai-node/issues/2781)) ([b99cab7](https://github.com/openai/openai-node/commit/b99cab7ab8e09e693c4ce71f4f3b35d790239439))
+* **deps-dev:** bump ultracite from 7.11.0 to 7.11.1 ([#2785](https://github.com/openai/openai-node/issues/2785)) ([1743718](https://github.com/openai/openai-node/commit/17437186cf9ad5c1fdb1acb72d2562a7d9c211af))
+* **deps-dev:** bump wrangler from 4.129.0 to 4.131.1 in /ecosystem-tests/cloudflare-worker ([#2782](https://github.com/openai/openai-node/issues/2782)) ([361124c](https://github.com/openai/openai-node/commit/361124c96c0cc5111b735e5e6e0beee92c921fef))
+
+
+### Chores
+
+* **api:** clarify approximate web search location defaults ([#2802](https://github.com/openai/openai-node/issues/2802)) ([87a98d4](https://github.com/openai/openai-node/commit/87a98d4f3519dd6aa04974d27536f32a350f39f6))
+* **api:** clarify documented API error responses ([#2810](https://github.com/openai/openai-node/issues/2810)) ([1a17c2c](https://github.com/openai/openai-node/commit/1a17c2c42a09504c8aeaf29767e85ad8cebf62cd))
+* **api:** clarify Realtime modality array definitions ([#2803](https://github.com/openai/openai-node/issues/2803)) ([d454fe1](https://github.com/openai/openai-node/commit/d454fe1163eb9509e0cb6338e63b426ff165484a))
+* **api:** correct fine-tuning bounds and Realtime response reference ([#2799](https://github.com/openai/openai-node/issues/2799)) ([3ebc06e](https://github.com/openai/openai-node/commit/3ebc06e44d73426ba74ef859f943e9cfdcd0eec6))
+* **api:** document batch error responses ([#2807](https://github.com/openai/openai-node/issues/2807)) ([622f459](https://github.com/openai/openai-node/commit/622f4590c312d79abadc4693a61dab362afa8254))
+* **api:** document files and uploads error responses ([#2806](https://github.com/openai/openai-node/issues/2806)) ([3e1dfb1](https://github.com/openai/openai-node/commit/3e1dfb18e6b2b2678a417c2ac70171a1fe4f0007))
+* **api:** document fine-tuning and model errors ([#2809](https://github.com/openai/openai-node/issues/2809)) ([8e8f581](https://github.com/openai/openai-node/commit/8e8f5815a39f38033851ac1e17cc1622405aa0f3))
+* **api:** document Responses not-found errors ([#2805](https://github.com/openai/openai-node/issues/2805)) ([e92a268](https://github.com/openai/openai-node/commit/e92a26849f840cfecfb15f849cd49ac4201e11f8))
+* **api:** document stored chat completion errors ([#2808](https://github.com/openai/openai-node/issues/2808)) ([2a1a629](https://github.com/openai/openai-node/commit/2a1a629637be248d5afc45455c0091713d6fb44a))
+
+
+### Documentation
+
+* clarify collaborator-only pull request policy ([#2797](https://github.com/openai/openai-node/issues/2797)) ([764ceed](https://github.com/openai/openai-node/commit/764ceed82bc17919159ca4437c36bd3139354de1))
+
 ## [7.23.0](https://github.com/openai/openai-node/compare/v7.22.0...v7.23.0) (2026-09-23)
 
 
