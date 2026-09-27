@@ -155,3 +155,8 @@ rt.on('error', (err) => {
   console.error('Realtime error:', err);
 });
 ```
+
+## Realtime translation
+
+For Node.js translation sessions and draining final audio and transcripts, see
+[Realtime translation](realtime-translations.md).
