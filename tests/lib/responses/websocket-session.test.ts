@@ -159,6 +159,9 @@ test.each([
   ['non-string name', { type: 'function_call', id: 'fc', name: 123, call_id: 'c', arguments: '' }],
   ['custom non-string input', { type: 'custom_tool_call', id: 'fc', name: 'data', call_id: 'c', input: {} }],
   ['custom missing input', { type: 'custom_tool_call', id: 'fc', name: 'data', call_id: 'c' }],
+  ['future discriminator', { type: 'future_item', id: 'x' }],
+  ['Object prototype discriminator', { type: 'constructor', id: 'x' }],
+  ['non-string discriminator', { type: 123, id: 'x' }],
 ])('raw output with %s never enters a typed provisional snapshot', async (_label, item) => {
   await withSocket(async (connection, peer) => {
     const session = new ResponsesWebSocketSession(connection, limits);

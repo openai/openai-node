@@ -15,6 +15,39 @@ import type { ResponsesWebSocketEvent } from './responses-websocket-lane';
 /** Fields such as role or status can still be omitted on provisional wire items. */
 type ProvisionalOutputItem = Partial<ResponseOutputItem> & Pick<ResponseOutputItem, 'type'>;
 
+// Keep the raw boundary aligned with the generated discriminants. Future wire
+// items still belong to the raw lane and authoritative terminal event.
+const outputItemTypes = {
+  message: true,
+  file_search_call: true,
+  function_call: true,
+  function_call_output: true,
+  web_search_call: true,
+  computer_call: true,
+  computer_call_output: true,
+  reasoning: true,
+  program: true,
+  program_output: true,
+  tool_search_call: true,
+  tool_search_output: true,
+  additional_tools: true,
+  compaction: true,
+  image_generation_call: true,
+  code_interpreter_call: true,
+  local_shell_call: true,
+  local_shell_call_output: true,
+  shell_call: true,
+  shell_call_output: true,
+  apply_patch_call: true,
+  apply_patch_call_output: true,
+  mcp_call: true,
+  mcp_list_tools: true,
+  mcp_approval_request: true,
+  mcp_approval_response: true,
+  custom_tool_call: true,
+  custom_tool_call_output: true,
+} satisfies Record<ResponseOutputItem['type'], true>;
+
 /** Provisional output is never substituted for a completed, failed, or incomplete response. */
 export type ResponsesWebSocketAccumulatorState =
   | { phase: 'provisional'; snapshot: { output: ProvisionalOutputItem[]; output_text: string } }
@@ -81,11 +114,17 @@ export class ResponsesWebSocketAccumulator {
     this.#current = undefined;
   }
 
-  // Validate the scaffold that argument deltas extend. SSE starts with typed
-  // models, while raw WebSocket items can omit or corrupt these required fields.
+  // Validate the discriminant and scaffolds that argument deltas extend. Raw
+  // WebSocket items have not been decoded through the generated response union.
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Output from a raw lane event has not passed a tool schema. This is its opt-in accumulator boundary.
-  static #validateToolScaffold(item: unknown): void {
-    if (!isObj(item)) {
+  static #validateOutputScaffold(item: unknown): void {
+    if (
+      !isObj(item) ||
+      !hasOwn(item, 'type') ||
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- An unknown discriminator cannot satisfy the generated typed preview union.
+      typeof item['type'] !== 'string' ||
+      !hasOwn(outputItemTypes, item['type'])
+    ) {
       throw new OpenAIError('Invalid Responses WebSocket output item');
     }
     if (item['type'] === 'function_call' || item['type'] === 'custom_tool_call') {
@@ -107,7 +146,7 @@ export class ResponsesWebSocketAccumulator {
     switch (event.type) {
       case 'response.output_item.added':
       case 'response.output_item.done': {
-        ResponsesWebSocketAccumulator.#validateToolScaffold(event.item);
+        ResponsesWebSocketAccumulator.#validateOutputScaffold(event.item);
         break;
       }
       case 'response.function_call_arguments.delta':
@@ -170,7 +209,7 @@ export class ResponsesWebSocketAccumulator {
     }
     if (output !== undefined) {
       for (const item of output) {
-        ResponsesWebSocketAccumulator.#validateToolScaffold(item);
+        ResponsesWebSocketAccumulator.#validateOutputScaffold(item);
       }
     }
     const snapshot = cloneValidatedResponse(this.#context, {
