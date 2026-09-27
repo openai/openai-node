@@ -188,13 +188,13 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
    * cleanup; a stalled close handshake is terminated and rejects the operation.
    */
   finish({ timeoutMs, signal }: { timeoutMs: number; signal?: AbortSignal | undefined }): Promise<void> {
+    if (this._finishPromise) {
+      return this._finishPromise;
+    }
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) {
       return Promise.reject(
         new Error('timeoutMs must be a positive finite WebSocket deadline of at most 2147483647.'),
       );
-    }
-    if (this._finishPromise) {
-      return this._finishPromise;
     }
     // oxlint-disable-next-line promise/avoid-new -- The existing socket dispatcher settles this completion; there is no second event reader.
     this._finishPromise = new Promise<void>((resolve, reject) => {

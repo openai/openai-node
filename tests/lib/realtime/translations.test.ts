@@ -154,7 +154,12 @@ describe('realtime translation WebSocket', () => {
       expect(() => connection.send({ type: 'session.input_audio_buffer.append', audio: 'AA==' })).toThrow(
         'input is closed',
       );
-      await finished;
+      const expiredCaller = connection.finish({ timeoutMs: 0, signal: AbortSignal.abort() });
+      await Promise.all([
+        expect(finished).resolves.toBeUndefined(),
+        expect(expiredCaller).resolves.toBeUndefined(),
+      ]);
+      expect(expiredCaller).toBe(finished);
       order.push('finished');
       expect(received).toEqual(trailing);
       expect(order.slice(-3)).toEqual(['session.closed', 'typed terminal', 'finished']);
