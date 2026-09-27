@@ -926,11 +926,13 @@ export class OpenAI {
     const baseURL = (!this.#baseURLOverridden() && defaultBaseURL) || this.baseURL;
     let url: URL;
     let baseQuery: Record<string, string> = {};
+    let baseParams: URLSearchParams | undefined;
     if (isAbsoluteURL(path)) {
       url = new URL(path);
     } else if (baseURL.includes('?')) {
       const base = new URL(baseURL);
-      baseQuery = Object.fromEntries(base.searchParams);
+      baseParams = new URLSearchParams(base.search);
+      baseQuery = Object.fromEntries(baseParams);
       base.search = '';
       base.hash = '';
       url = new URL(
@@ -942,12 +944,25 @@ export class OpenAI {
 
     const defaultQuery = this.defaultQuery();
     const pathQuery = Object.fromEntries(url.searchParams);
+    let overridingQuery: Record<string, unknown> | undefined;
     if (!isEmptyObj(baseQuery) || !isEmptyObj(defaultQuery) || !isEmptyObj(pathQuery)) {
-      query = { ...baseQuery, ...pathQuery, ...defaultQuery, ...query };
+      overridingQuery = { ...pathQuery, ...defaultQuery, ...query };
+      query = { ...baseQuery, ...overridingQuery };
     }
 
     if (typeof query === 'object' && query && !Array.isArray(query)) {
       url.search = this.stringifyQuery(query);
+      if (baseParams && overridingQuery) {
+        for (const key of new Set(baseParams.keys())) {
+          const values = baseParams.getAll(key);
+          if (values.length > 1 && !hasOwn(overridingQuery, key)) {
+            url.searchParams.delete(key);
+            for (const value of values) {
+              url.searchParams.append(key, value);
+            }
+          }
+        }
+      }
     }
 
     return url.toString();

@@ -6,7 +6,7 @@ import { ForksWS } from 'openai/resources/live/forks/ws';
 import { SidebandWS } from 'openai/resources/live/sideband/ws';
 
 describe.each(['primary', 'fork', 'sideband'] as const)('Live %s wire contract', (role) => {
-  test.each(['', '?tenant=sample'])(
+  test.each(['', '?tenant=sample&scope=read&scope=write&trace=old&trace=older'])(
     'starts and updates through a custom base URL (%s)',
     async (baseQuery) => {
       const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
@@ -30,10 +30,12 @@ describe.each(['primary', 'fork', 'sideband'] as const)('Live %s wire contract',
             role === 'primary' ? '' : `/stored%20%2F%3F%23%25/${role === 'fork' ? 'fork' : 'attach'}`;
           expect(target.pathname).toBe(`/v1/customer/live/sessions${suffix}`);
           expect(Object.fromEntries(target.searchParams)).toEqual({
-            ...(baseQuery ? { tenant: 'sample' } : {}),
+            ...(baseQuery ? { tenant: 'sample', scope: 'write' } : {}),
             trace: 'role-contract',
             ...(role === 'sideband' ? { graceful_close: 'true' } : {}),
           });
+          expect(target.searchParams.getAll('scope')).toEqual(baseQuery ? ['read', 'write'] : []);
+          expect(target.searchParams.getAll('trace')).toEqual(['role-contract']);
           expect(request.headers.authorization).toBe('Bearer ek_fake_live');
         } catch (error) {
           failures.push(error);

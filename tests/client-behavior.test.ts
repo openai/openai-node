@@ -40,7 +40,8 @@ describe('OpenAI client request behavior', () => {
     const fetch = vi.fn(async () => jsonResponse({ ok: true }));
     const client = new OpenAI({
       apiKey: 'test-key',
-      baseURL: 'https://example.test/v1/customer/?tenant=sample&cursor=base&remove=base',
+      baseURL:
+        'https://example.test/v1/customer/?tenant=sample&scope=read&scope=write&cursor=base&cursor=older&remove=base&remove=older',
       defaultQuery: { cursor: 'default', remove: 'default' },
       fetch,
     });
@@ -50,7 +51,7 @@ describe('OpenAI client request behavior', () => {
       }),
     ).resolves.toEqual({ ok: true });
     expect(fetch).toHaveBeenCalledWith(
-      'https://example.test/v1/customer/models?tenant=sample&cursor=request&encoded=%2F%3F',
+      'https://example.test/v1/customer/models?tenant=sample&cursor=request&encoded=%2F%3F&scope=read&scope=write',
       expect.objectContaining({ method: 'GET' }),
     );
   });
