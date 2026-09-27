@@ -924,18 +924,54 @@ export class OpenAI {
     defaultBaseURL?: string | undefined,
   ): string {
     const baseURL = (!this.#baseURLOverridden() && defaultBaseURL) || this.baseURL;
-    const url = isAbsoluteURL(path)
-      ? new URL(path)
-      : new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+    let url: URL;
+    let baseQuery: Record<string, string> = {};
+    let baseParams: URLSearchParams | undefined;
+    if (isAbsoluteURL(path)) {
+      url = new URL(path);
+    } else if (baseURL.includes('?')) {
+      const base = new URL(baseURL);
+      baseParams = new URLSearchParams(base.search);
+      baseQuery = Object.fromEntries(baseParams);
+      base.search = '';
+      base.hash = '';
+      url = new URL(
+        base.toString() + (base.pathname.endsWith('/') && path.startsWith('/') ? path.slice(1) : path),
+      );
+    } else {
+      url = new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+    }
 
     const defaultQuery = this.defaultQuery();
     const pathQuery = Object.fromEntries(url.searchParams);
-    if (!isEmptyObj(defaultQuery) || !isEmptyObj(pathQuery)) {
-      query = { ...pathQuery, ...defaultQuery, ...query };
+    let overridingQuery: Record<string, unknown> | undefined;
+    if (!isEmptyObj(baseQuery) || !isEmptyObj(defaultQuery) || !isEmptyObj(pathQuery)) {
+      overridingQuery = { ...pathQuery, ...defaultQuery, ...query };
+      query = { ...baseQuery, ...overridingQuery };
     }
 
     if (typeof query === 'object' && query && !Array.isArray(query)) {
       url.search = this.stringifyQuery(query);
+      if (baseParams && overridingQuery) {
+        const seen = new Set<string>();
+        const repeated = new Set<string>();
+        for (const key of baseParams.keys()) {
+          if (seen.has(key) && !hasOwn(overridingQuery, key)) {
+            repeated.add(key);
+          }
+          seen.add(key);
+        }
+        if (repeated.size) {
+          const merged = new URLSearchParams();
+          for (const [key, value] of url.searchParams) {
+            if (!repeated.has(key)) merged.append(key, value);
+          }
+          for (const [key, value] of baseParams) {
+            if (repeated.has(key)) merged.append(key, value);
+          }
+          url.search = merged.toString();
+        }
+      }
     }
 
     return url.toString();
