@@ -14,9 +14,12 @@ import { createX509TestLab } from '../../utils/x509-test-lab';
 
 const lab = createX509TestLab();
 
-async function withServer(run: (server: WebSocketServer, baseURL: string) => Promise<void>): Promise<void> {
+async function withServer(
+  run: (server: WebSocketServer, baseURL: string) => Promise<void>,
+  perMessageDeflate = false,
+): Promise<void> {
   const https = createServer({ cert: lab.server.certificate, key: lab.server.privateKey });
-  const server = new WebSocketServer({ server: https });
+  const server = new WebSocketServer({ server: https, perMessageDeflate });
   const listening = once(https, 'listening');
   https.listen(0, '127.0.0.1');
   await listening;
@@ -196,6 +199,48 @@ describe('realtime translation WebSocket', () => {
       expect(receivedSize).toBe(size);
     });
   }, 45_000);
+
+  test.each([
+    { label: 'default', options: {}, compression: '' },
+    { label: 'disabled', options: { perMessageDeflate: false }, compression: '' },
+    { label: 'explicitly enabled', options: { perMessageDeflate: true }, compression: 'permessage-deflate' },
+    {
+      label: 'configured with caller options',
+      options: { perMessageDeflate: { clientNoContextTakeover: true }, maxPayload: 32 * 1024 },
+      compression: 'permessage-deflate',
+    },
+  ])('negotiates translation compression only when requested: $label', async ({ options, compression }) => {
+    await withServer(async (server, baseURL) => {
+      const peerConnected = once(server, 'connection');
+      server.on('connection', (peer) =>
+        peer.on('message', () => {
+          peer.send(
+            JSON.stringify({
+              type: 'session.output_audio.delta',
+              event_id: 'audio',
+              delta: 'A'.repeat(16 * 1024),
+            }),
+          );
+          peer.send(JSON.stringify(terminal));
+        }),
+      );
+      const connection = await OpenAIRealtimeTranslationWS.create(
+        new OpenAI({ apiKey: 'synthetic-key', baseURL }),
+        {
+          model: 'translation-test',
+          options: { ca: lab.certificateAuthority, ...options },
+        },
+      );
+      await once(connection.socket.platformSocket, 'open');
+      const [peer] = await peerConnected;
+      const received: string[] = [];
+      connection.on('session.output_audio.delta', (event) => received.push(event.delta));
+      await connection.finish({ timeoutMs: 2000 });
+      expect(peer.extensions).toBe(compression);
+      expect(connection.socket.platformSocket.extensions).toBe(compression);
+      expect(received).toEqual(['A'.repeat(16 * 1024)]);
+    }, true);
+  });
 
   test('reports a normal peer close before any terminal or finish without losing the failure', async () => {
     await withServer(async (server, baseURL) => {

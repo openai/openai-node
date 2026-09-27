@@ -211,6 +211,7 @@ function buildTranslationURL(client: OpenAI, model: string): URL {
 /**
  * Node.js translation WebSocket. Install the optional `ws` peer dependency.
  * Wait for `socket` to open before sending. Events are never buffered or replayed.
+ * Compression is off by default; set `options.perMessageDeflate` to opt in.
  */
 // oxlint-disable-next-line unicorn/prefer-event-target -- Reuse the SDK typed emitter and its public on/off event contract.
 export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents> {
@@ -281,6 +282,7 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
     const options = {
       ...props.options,
       maxPayload: props.options?.maxPayload ?? 0,
+      perMessageDeflate: props.options?.perMessageDeflate ?? false,
       headers: Object.fromEntries(headers),
       followRedirects: false,
     };
