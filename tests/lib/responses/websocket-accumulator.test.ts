@@ -122,10 +122,49 @@ test('reconstructs text and tool arguments as provisional data while leaving raw
   if (firstItem?.type !== 'message' || !firstItem.content) {
     throw new Error('Expected message content');
   }
+  expect(accumulator.outputAt(0, { content_index: 0 })).toEqual(firstItem.content[0]);
+  expect(accumulator.outputAt(0, { summary_index: 0 })).toBeUndefined();
+  expect(accumulator.outputAt(1, { content_index: 0 })).toBeUndefined();
   firstItem.content.length = 0;
   expect(accumulator.outputAt(0)).not.toEqual(firstItem);
   accumulator.reset();
   expect(accumulator.outputAt(0)).toBeUndefined();
+});
+
+test('reading a reasoning part keeps earlier parts detached without materializing every summary', () => {
+  const acc = new ResponsesWebSocketAccumulator();
+  acc.add({ type: 'response.created', response: { id: 'r', output: [] } });
+  acc.add({
+    type: 'response.output_item.added',
+    output_index: 0,
+    item: { type: 'reasoning', id: 'reason', summary: [] },
+  });
+  for (let i = 0; i < 3; i += 1) {
+    acc.add({
+      type: 'response.reasoning_summary_part.added',
+      item_id: 'reason',
+      output_index: 0,
+      summary_index: i,
+      part: { type: 'summary_text', text: String(i) },
+    });
+  }
+  const retained = acc.outputAt(0, { summary_index: 0 });
+  expect(retained).toEqual({ type: 'summary_text', text: '0' });
+  acc.add({
+    type: 'response.reasoning_summary_text.delta',
+    item_id: 'reason',
+    output_index: 0,
+    summary_index: 0,
+    delta: ' then',
+  });
+  expect(retained).toEqual({ type: 'summary_text', text: '0' });
+  expect(acc.outputAt(0, { summary_index: 0 })).toEqual({ type: 'summary_text', text: '0 then' });
+  if (retained && 'text' in retained) {
+    retained.text = 'caller';
+  }
+  expect(acc.outputAt(0, { summary_index: 0 })).toMatchObject({ text: '0 then' });
+  expect(acc.outputAt(0, { summary_index: -1 })).toBeUndefined();
+  expect(acc.outputAt(0, { summary_index: 3 })).toBeUndefined();
 });
 
 test.each(['response.completed', 'response.failed', 'response.incomplete', 'error'])(

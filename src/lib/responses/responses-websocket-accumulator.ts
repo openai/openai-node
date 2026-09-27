@@ -9,11 +9,21 @@ import {
 } from '../../internal/responses/response-accumulator';
 import { hasOwn } from '../../internal/utils';
 import { isObj } from '../../internal/utils/values';
-import type { ResponseOutputItem } from '../../resources/responses/responses';
+import type {
+  ResponseOutputItem,
+  ResponseOutputMessage,
+  ResponseReasoningItem,
+} from '../../resources/responses/responses';
 import type { ResponsesWebSocketEvent } from './responses-websocket-lane';
 
 /** Fields such as role or status can still be omitted on provisional wire items. */
 type ProvisionalOutputItem = Partial<ResponseOutputItem> & Pick<ResponseOutputItem, 'type'>;
+type ProvisionalPart = Partial<
+  | ResponseOutputMessage['content'][number]
+  | NonNullable<ResponseReasoningItem['content']>[number]
+  | ResponseReasoningItem['summary'][number]
+>;
+type PartSelector = { content_index: number } | { summary_index: number };
 
 // Keep the raw boundary aligned with the generated discriminants. Future wire
 // items still belong to the raw lane and authoritative terminal event.
@@ -60,9 +70,10 @@ export type ResponsesWebSocketAccumulatorState =
  * Feed the raw events returned by lane.receive(). Use a separate instance per
  * lane. This helper never reads, sends, closes, or registers a listener on a
  * socket; raw events remain in the caller's hands. Tools remain output data.
- * Use outputAt(event.output_index) to read just the affected accumulated item
- * as output events arrive. Reading current materializes a detached copy of the
- * entire response, so request it only when a full snapshot is needed.
+ * Raw deltas give per-event progress. Use outputAt(event.output_index) when an
+ * item finishes, or pass its content_index/summary_index to read only a changed
+ * part. A full current or item read materializes its entire nested contents, so
+ * reserve those reads for when that complete snapshot is needed.
  *
  * A socket stream can omit the item/content scaffolding required for deltas.
  * Such a response is marked unavailable until the next creation or terminal
@@ -94,16 +105,38 @@ export class ResponsesWebSocketAccumulator {
   }
 
   /**
-   * Read one provisional item by its wire output_index, without visiting
-   * previously received output. The copy remains valid after further events
-   * and caller mutations cannot change the accumulator. Returns undefined
-   * outside provisional output (including unknown or malformed scaffolding).
+   * Read one provisional item by wire output_index, or just one message/
+   * reasoning part with its wire content_index/summary_index. Full item reads
+   * copy all parts; prefer a selector for progress on a growing item.
+   * Copies remain valid after further events, and cannot change the accumulator.
+   * Returns undefined for absent/mismatched parts or outside provisional output.
    */
-  outputAt(outputIndex: number): ProvisionalOutputItem | undefined {
+  outputAt(outputIndex: number): ProvisionalOutputItem | undefined;
+  outputAt(outputIndex: number, part: PartSelector): ProvisionalPart | undefined;
+  outputAt(outputIndex: number, part?: PartSelector): ProvisionalOutputItem | ProvisionalPart | undefined {
     if (this.#current?.phase !== 'provisional' || !Number.isInteger(outputIndex) || outputIndex < 0) {
       return undefined;
     }
-    return ResponsesWebSocketAccumulator.#copyOutput(this.#current.snapshot.output[outputIndex]);
+    const output = this.#current.snapshot.output[outputIndex];
+    if (!part) {
+      return ResponsesWebSocketAccumulator.#copyOutput(output);
+    }
+    if ('content_index' in part) {
+      if (
+        Number.isInteger(part.content_index) &&
+        part.content_index >= 0 &&
+        (output?.type === 'message' || output?.type === 'reasoning')
+      ) {
+        return ResponsesWebSocketAccumulator.#copyOutput(output.content?.[part.content_index]);
+      }
+    } else if (
+      Number.isInteger(part.summary_index) &&
+      part.summary_index >= 0 &&
+      output?.type === 'reasoning'
+    ) {
+      return ResponsesWebSocketAccumulator.#copyOutput(output.summary?.[part.summary_index]);
+    }
+    return undefined;
   }
 
   // Provisional output is made of parsed JSON containers and immutable scalars.
