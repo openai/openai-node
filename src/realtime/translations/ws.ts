@@ -210,7 +210,12 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
         headers.set(name.toLowerCase(), value);
       }
     }
-    const options = { ...props.options, headers: Object.fromEntries(headers), followRedirects: false };
+    const options = {
+      ...props.options,
+      maxPayload: props.options?.maxPayload ?? 0,
+      headers: Object.fromEntries(headers),
+      followRedirects: false,
+    };
     snapshotWebSocketCredentials(options);
     return new OpenAIRealtimeTranslationWS(url, options);
   }
@@ -367,6 +372,8 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
   }
 
   private _onClose = (code: number): void => {
+    const reportPrematureClose =
+      !this._terminalReceived && !this._failure && !this._finishPromise && this._closeTimer === undefined;
     this._inputClosed = true;
     this._transportClosed = true;
     clearTimeout(this._closeTimer);
@@ -382,6 +389,9 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
       );
     }
     this._settleFinish();
+    if (reportPrematureClose && this._failure) {
+      this._reportError(this._failure);
+    }
   };
 
   private _onAbort = (): void => {

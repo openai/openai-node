@@ -162,6 +162,48 @@ describe('realtime translation WebSocket', () => {
     });
   });
 
+  test('receives valid audio above the ws dependency default without an SDK payload cap', async () => {
+    await withServer(async (server, baseURL) => {
+      const size = 101 * 1024 * 1024;
+      server.on('connection', (peer) =>
+        peer.on('message', () => {
+          peer.send(
+            JSON.stringify({
+              type: 'session.output_audio.delta',
+              event_id: 'large',
+              delta: 'A'.repeat(size),
+            }),
+          );
+          peer.send(JSON.stringify(terminal));
+        }),
+      );
+      const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+      let receivedSize = 0;
+      connection.on('session.output_audio.delta', (event) => {
+        receivedSize = event.delta.length;
+        expect(event.delta[0]).toBe('A');
+        expect(event.delta[size - 1]).toBe('A');
+      });
+      await connection.finish({ timeoutMs: 30_000 });
+      expect(receivedSize).toBe(size);
+    });
+  }, 45_000);
+
+  test('reports a normal peer close before any terminal or finish without losing the failure', async () => {
+    await withServer(async (server, baseURL) => {
+      server.on('connection', (peer) => peer.on('message', () => peer.close(1000, 'test premature peer')));
+      const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+      const messages: string[] = [];
+      connection.on('error', (error) => messages.push(error.message));
+      const closed = once(connection.socket.platformSocket, 'close');
+      connection.send({ type: 'session.update', session: {} });
+      await closed;
+      expect(messages).toEqual([expect.stringContaining('before session.closed')]);
+      await expect(connection.finish({ timeoutMs: 2000 })).rejects.toThrow('before session.closed');
+      expect(messages).toHaveLength(1);
+    });
+  });
+
   test('unhandled API errors are reported while handled API errors still allow finishing', async () => {
     await withServer(async (_server, baseURL) => {
       const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
