@@ -251,6 +251,10 @@ test.each([
   ['function_call', 'response.function_call_arguments.done', { arguments: 123 }],
   ['function_call', 'response.function_call_arguments.done', { arguments: null }],
   ['function_call', 'response.function_call_arguments.done', {}],
+  ['mcp_call', 'response.mcp_call_arguments.delta', { delta: 123 }],
+  ['mcp_call', 'response.mcp_call_arguments.done', { arguments: 1 }],
+  ['mcp_call', 'response.mcp_call_arguments.done', { arguments: null }],
+  ['mcp_call', 'response.mcp_call_arguments.done', {}],
   ['custom_tool_call', 'response.custom_tool_call_input.delta', { delta: null }],
   ['custom_tool_call', 'response.custom_tool_call_input.done', { input: {} }],
   ['custom_tool_call', 'response.custom_tool_call_input.done', {}],
@@ -267,7 +271,15 @@ test.each([
           response: {
             id: 'r',
             output: [
-              { type: itemType, id: 'tool_1', call_id: 'call_1', name: 'as_data', arguments: '', input: '' },
+              {
+                type: itemType,
+                id: 'tool_1',
+                call_id: 'call_1',
+                name: 'as_data',
+                server_label: 'synthetic-mcp',
+                arguments: '',
+                input: '',
+              },
             ],
           },
         }),

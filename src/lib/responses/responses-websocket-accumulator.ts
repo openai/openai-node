@@ -199,6 +199,7 @@ export class ResponsesWebSocketAccumulator {
         break;
       }
       case 'response.function_call_arguments.delta':
+      case 'response.mcp_call_arguments.delta':
       case 'response.custom_tool_call_input.delta':
       case 'response.output_text.delta':
       case 'response.refusal.delta': {
@@ -208,7 +209,8 @@ export class ResponsesWebSocketAccumulator {
         }
         break;
       }
-      case 'response.function_call_arguments.done': {
+      case 'response.function_call_arguments.done':
+      case 'response.mcp_call_arguments.done': {
         // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A final raw argument payload must satisfy the field exposed by the provisional snapshot.
         if (typeof event.arguments !== 'string') {
           throw new OpenAIError('Invalid Responses WebSocket tool arguments');
