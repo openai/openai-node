@@ -924,14 +924,26 @@ export class OpenAI {
     defaultBaseURL?: string | undefined,
   ): string {
     const baseURL = (!this.#baseURLOverridden() && defaultBaseURL) || this.baseURL;
-    const url = isAbsoluteURL(path)
-      ? new URL(path)
-      : new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+    let url: URL;
+    let baseQuery: Record<string, string> = {};
+    if (isAbsoluteURL(path)) {
+      url = new URL(path);
+    } else if (baseURL.includes('?')) {
+      const base = new URL(baseURL);
+      baseQuery = Object.fromEntries(base.searchParams);
+      base.search = '';
+      base.hash = '';
+      url = new URL(
+        base.toString() + (base.pathname.endsWith('/') && path.startsWith('/') ? path.slice(1) : path),
+      );
+    } else {
+      url = new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+    }
 
     const defaultQuery = this.defaultQuery();
     const pathQuery = Object.fromEntries(url.searchParams);
-    if (!isEmptyObj(defaultQuery) || !isEmptyObj(pathQuery)) {
-      query = { ...pathQuery, ...defaultQuery, ...query };
+    if (!isEmptyObj(baseQuery) || !isEmptyObj(defaultQuery) || !isEmptyObj(pathQuery)) {
+      query = { ...baseQuery, ...pathQuery, ...defaultQuery, ...query };
     }
 
     if (typeof query === 'object' && query && !Array.isArray(query)) {

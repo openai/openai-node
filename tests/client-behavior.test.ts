@@ -36,6 +36,42 @@ async function observe(promise: Promise<unknown>): Promise<unknown> {
 }
 
 describe('OpenAI client request behavior', () => {
+  test('keeps base, endpoint, default, and request queries in precedence order', async () => {
+    const fetch = vi.fn(async () => jsonResponse({ ok: true }));
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      baseURL: 'https://example.test/v1/customer/?tenant=sample&cursor=base&remove=base',
+      defaultQuery: { cursor: 'default', remove: 'default' },
+      fetch,
+    });
+    await expect(
+      client.get('/models?cursor=endpoint&encoded=%2F%3F', {
+        query: { cursor: 'request', remove: undefined },
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledWith(
+      'https://example.test/v1/customer/models?tenant=sample&cursor=request&encoded=%2F%3F',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  test('never copies base URL parameters into an absolute request destination', async () => {
+    const fetch = vi.fn(async () => jsonResponse({ ok: true }));
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      baseURL: 'https://example.test/v1?tenant=base-only',
+      defaultQuery: { cursor: 'default' },
+      fetch,
+    });
+    await expect(client.get('https://other.example.test/models?source=endpoint')).resolves.toEqual({
+      ok: true,
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      'https://other.example.test/models?source=endpoint&cursor=default',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
   test('supports PUT requests through the public method helper', async () => {
     const fetch = vi.fn(async () => jsonResponse({ updated: true }));
     const client = new OpenAI({ apiKey: 'test-key', fetch });
