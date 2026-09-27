@@ -64,28 +64,24 @@ function parseEvent(data: string): RealtimeTranslationEvent {
 }
 
 function isCompleteTranslationSession(session: RealtimeTranslationEvent['session']): boolean {
+  if (typeof session !== 'object' || session === null || Array.isArray(session)) {
+    return false;
+  }
+  const audio = Object.getOwnPropertyDescriptor(session, 'audio')?.value;
   return (
-    typeof session === 'object' &&
-    session !== null &&
-    !Array.isArray(session) &&
-    'id' in session &&
-    typeof session.id === 'string' &&
-    'model' in session &&
-    typeof session.model === 'string' &&
-    'expires_at' in session &&
-    typeof session.expires_at === 'number' &&
-    'type' in session &&
-    session.type === 'translation' &&
-    'audio' in session &&
-    typeof session.audio === 'object' &&
-    session.audio !== null &&
-    !Array.isArray(session.audio)
+    typeof Object.getOwnPropertyDescriptor(session, 'id')?.value === 'string' &&
+    typeof Object.getOwnPropertyDescriptor(session, 'model')?.value === 'string' &&
+    typeof Object.getOwnPropertyDescriptor(session, 'expires_at')?.value === 'number' &&
+    Object.getOwnPropertyDescriptor(session, 'type')?.value === 'translation' &&
+    typeof audio === 'object' &&
+    audio !== null &&
+    !Array.isArray(audio)
   );
 }
 
 /** Check the required fields before exposing an envelope through a typed listener. */
 function isCompleteTranslationEvent(event: RealtimeTranslationEvent): boolean {
-  if (typeof event['event_id'] !== 'string') {
+  if (typeof Object.getOwnPropertyDescriptor(event, 'event_id')?.value !== 'string') {
     return false;
   }
   switch (event.type) {
@@ -95,22 +91,20 @@ function isCompleteTranslationEvent(event: RealtimeTranslationEvent): boolean {
     case 'session.input_transcript.delta':
     case 'session.output_transcript.delta':
     case 'session.output_audio.delta': {
-      return typeof event['delta'] === 'string';
+      return typeof Object.getOwnPropertyDescriptor(event, 'delta')?.value === 'string';
     }
     case 'session.created':
     case 'session.updated': {
-      return isCompleteTranslationSession(event['session']);
+      return isCompleteTranslationSession(Object.getOwnPropertyDescriptor(event, 'session')?.value);
     }
     case 'error': {
-      const { error } = event;
+      const error = Object.getOwnPropertyDescriptor(event, 'error')?.value;
       return (
         typeof error === 'object' &&
         error !== null &&
         !Array.isArray(error) &&
-        'message' in error &&
-        typeof error.message === 'string' &&
-        'type' in error &&
-        typeof error.type === 'string'
+        typeof Object.getOwnPropertyDescriptor(error, 'message')?.value === 'string' &&
+        typeof Object.getOwnPropertyDescriptor(error, 'type')?.value === 'string'
       );
     }
     default: {
@@ -321,12 +315,7 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
           // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Forward server error fields unchanged through the existing Realtime error wrapper.
           const apiErrorEvent = event as unknown as RealtimeErrorEvent;
           const error = new OpenAIRealtimeError('Translation API error.', apiErrorEvent);
-          if (this._hasListener('error')) {
-            this._emit('error', error);
-          } else {
-            error.message += " Bind an error listener, e.g. connection.on('error', (error) => ...).";
-            Promise.reject(error);
-          }
+          this._reportError(error);
         } else if (type !== 'error' && typed) {
           // SAFETY: The wire discriminator selects its listener; future event names remain visible on `event`.
           this._emit(type as Exclude<keyof TranslationEvents, 'event' | 'error'>, event as never);
@@ -347,8 +336,21 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
   private _onError = (): void => {
     const error = new OpenAIRealtimeError('Translation WebSocket transport failed.', null);
     this._fail(error);
-    this._emit('error', error);
+    // finish already rejects transport failures; don't report that same failure a second time.
+    if (this._hasListener('error') || !this._finishPromise) {
+      this._reportError(error);
+    }
   };
+
+  private _reportError(error: OpenAIRealtimeError): void {
+    if (this._hasListener('error')) {
+      this._emit('error', error);
+    } else {
+      error.message += " Bind an error listener, e.g. connection.on('error', (error) => ...).";
+      // oxlint-disable-next-line promise/no-promise-in-callback -- Match Realtime's explicit unhandled rejection contract when no SDK listener or completion operation observes the error.
+      Promise.reject(error);
+    }
+  }
 
   private _onClose = (code: number): void => {
     this._inputClosed = true;

@@ -136,6 +136,44 @@ describe('realtime translation WebSocket', () => {
     });
   });
 
+  test('reports a real TLS failure before finish when there is no SDK error listener', async () => {
+    await withServer(async (_server, baseURL) => {
+      const failures: unknown[] = [];
+      // SAFETY: Capture the deliberately unhandled rejection without producing an unrelated test-runner failure.
+      const rejected = vi.spyOn(Promise, 'reject').mockImplementation((error: unknown) => {
+        failures.push(error);
+        // SAFETY: This placeholder is never consumed; it prevents the test runner from receiving an unrelated rejection.
+        return Promise.resolve(undefined as never);
+      });
+      let connection: OpenAIRealtimeTranslationWS | undefined;
+      try {
+        // Do not trust this fixture's CA: exercise an actual TLS handshake failure before calling finish.
+        const created = await OpenAIRealtimeTranslationWS.create(
+          new OpenAI({ apiKey: 'synthetic-key', baseURL }),
+          {
+            model: 'translation-test',
+          },
+        );
+        connection = created;
+        // Unlike events.once, this does not turn an earlier socket error into another failure path.
+        // oxlint-disable-next-line promise/avoid-new -- Wait for transport closure even after the expected TLS error; events.once rejects on that error instead.
+        await new Promise<void>((resolve) => {
+          created.socket.platformSocket.once('close', () => resolve());
+        });
+        expect(failures).toHaveLength(1);
+        expect(failures[0]).toMatchObject({ name: 'OpenAIRealtimeError', error: undefined });
+        expect(String(failures[0])).toContain('Translation WebSocket transport failed.');
+        expect(String(failures[0])).toContain("on('error'");
+        expect(String(failures[0])).not.toContain('synthetic-key');
+      } finally {
+        rejected.mockRestore();
+        connection?.close();
+      }
+      // The first operation still observes the original failure if called after transport closure.
+      await expect(connection.finish({ timeoutMs: 1000 })).rejects.toThrow('transport failed');
+    });
+  });
+
   test.each([1000, 1001, 1005, 1008, 1011])(
     'recognizes peer close status %s after delivering the terminal',
     async (code) => {
@@ -185,6 +223,75 @@ describe('realtime translation WebSocket', () => {
       expect(raw).toEqual([...malformed, trailing, terminal]);
       expect(typedTerminal).toEqual(['terminal']);
       expect(transcripts).toEqual(['bonjour']);
+    });
+  });
+
+  test('inherited wire fields never dispatch typed events or end a session early', async () => {
+    await withServer(async (_server, baseURL) => {
+      const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+      const raw: unknown[] = [];
+      const typed: string[] = [];
+      connection.on('event', (event) => raw.push(event));
+      connection.on('session.closed', (event) => typed.push(event.event_id));
+      connection.on('session.output_transcript.delta', (event) => typed.push(event.delta));
+      connection.on('session.created', (event) => typed.push(event.session.id));
+      connection.on('error', (error) => typed.push(error.error?.type ?? 'transport'));
+      const session = { id: 's', audio: {}, expires_at: 1, model: 'm', type: 'translation' };
+      const samples = [
+        { key: 'event_id', value: 'inherited', frame: { type: 'session.closed' } },
+        {
+          key: 'delta',
+          value: 'inherited',
+          frame: { type: 'session.output_transcript.delta', event_id: 'delta' },
+        },
+        { key: 'session', value: session, frame: { type: 'session.created', event_id: 'session' } },
+        {
+          key: 'id',
+          value: 'inherited',
+          frame: {
+            type: 'session.created',
+            event_id: 'id',
+            session: { audio: {}, expires_at: 1, model: 'm', type: 'translation' },
+          },
+        },
+        {
+          key: 'error',
+          value: { type: 'test', message: 'inherited' },
+          frame: { type: 'error', event_id: 'error' },
+        },
+        {
+          key: 'message',
+          value: 'inherited',
+          frame: { type: 'error', event_id: 'message', error: { type: 'test' } },
+        },
+      ];
+      try {
+        for (const { key, value, frame } of samples) {
+          // Serialize first, so the fixture represents only actual peer fields.
+          const data = Buffer.from(JSON.stringify(frame));
+          const original = Object.getOwnPropertyDescriptor(Object.prototype, key);
+          try {
+            // oxlint-disable-next-line eslint/no-extend-native -- Exercise omitted wire fields in a polluted host; restore the exact descriptor immediately below.
+            Object.defineProperty(Object.prototype, key, { value, configurable: true, writable: true });
+            connection.socket.platformSocket.emit('message', data, false);
+          } finally {
+            if (original) {
+              // oxlint-disable-next-line eslint/no-extend-native -- Restore the original host descriptor after the deliberate pollution regression.
+              Object.defineProperty(Object.prototype, key, original);
+            } else {
+              Reflect.deleteProperty(Object.prototype, key);
+            }
+          }
+        }
+        const trailing = { type: 'session.output_transcript.delta', event_id: 'output', delta: 'bonjour' };
+        connection.socket.platformSocket.emit('message', Buffer.from(JSON.stringify(trailing)), false);
+        connection.socket.platformSocket.emit('message', Buffer.from(JSON.stringify(terminal)), false);
+        await connection.finish({ timeoutMs: 1000 });
+        expect(raw).toEqual([...samples.map(({ frame }) => frame), trailing, terminal]);
+        expect(typed).toEqual(['bonjour', 'terminal']);
+      } finally {
+        connection.close();
+      }
     });
   });
 
@@ -615,7 +722,8 @@ describe('translation connection authentication', () => {
         model: 'translation-test',
         options: { ca: lab.certificateAuthority, followRedirects: true },
       });
-      await once(connection.socket.platformSocket, 'error');
+      const error = await connection.emitted('error');
+      expect(error.message).toContain('transport failed');
       expect(redirected).toBe(false);
       await expect(connection.finish({ timeoutMs: 1000 })).rejects.toThrow('transport failed');
     } finally {
