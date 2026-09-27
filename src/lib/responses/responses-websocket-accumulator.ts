@@ -84,7 +84,11 @@ export class ResponsesWebSocketAccumulator {
         this.#start({ response: event.response });
         return;
       }
-      if (!isResponseOutputEvent(event) || this.#current?.phase === 'unavailable') {
+      if (
+        !isResponseOutputEvent(event) ||
+        this.#current?.phase === 'unavailable' ||
+        this.#current?.phase === 'terminal'
+      ) {
         return;
       }
       if (this.#current?.phase !== 'provisional') {

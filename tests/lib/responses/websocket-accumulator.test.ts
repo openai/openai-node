@@ -113,6 +113,9 @@ test.each(['response.completed', 'response.failed', 'response.incomplete', 'erro
         : { type, response: { id: 'resp_a', status: type.slice(9), custom: 'kept' }, stream_id: 'a' };
     accumulator.add(terminal);
     expect(accumulator.current).toEqual({ phase: 'terminal', event: terminal });
+    accumulator.add({ type: 'keepalive', sequence_number: 7 });
+    accumulator.add({ type: 'response.compaction.compacting', sequence_number: 8 });
+    expect(accumulator.current).toEqual({ phase: 'terminal', event: terminal });
     accumulator.reset();
     expect(accumulator.current).toBeUndefined();
   },
