@@ -26,13 +26,13 @@ test('raw WebSocket lifecycle and unscaffolded deltas are not SSE input', () => 
   ).toThrow("expected 'response.created'");
 });
 
-test('provisional message metadata is optional until the terminal response arrives', () => {
+test('unvalidated provisional metadata remains raw until the terminal response arrives', () => {
   const accumulator = new ResponsesWebSocketAccumulator();
   accumulator.add({ type: 'response.created', response: { id: 'r' } });
   accumulator.add({
     type: 'response.output_item.added',
     output_index: 0,
-    item: { type: 'message', id: 'm', content: [] },
+    item: { type: 'message', id: 'm', content: [], role: 1, status: { later: true } },
   });
   const state = accumulator.current;
   if (state?.phase !== 'provisional') {
@@ -42,9 +42,15 @@ test('provisional message metadata is optional until the terminal response arriv
   if (message?.type !== 'message') {
     throw new Error('Expected message');
   }
-  expectTypeOf(message.role).toEqualTypeOf<'assistant' | undefined>();
-  expectTypeOf(message.status).toEqualTypeOf<'in_progress' | 'completed' | 'incomplete' | undefined>();
-  expect(message).toEqual({ type: 'message', id: 'm', content: [] });
+  expectTypeOf(message.role).toEqualTypeOf<unknown>();
+  expectTypeOf(message.status).toEqualTypeOf<unknown>();
+  expect(message).toEqual({ type: 'message', id: 'm', content: [], role: 1, status: { later: true } });
+  const selected = accumulator.outputAt(0);
+  if (selected?.type !== 'message') {
+    throw new Error('Expected selected message');
+  }
+  expectTypeOf(selected.role).toEqualTypeOf<unknown>();
+  expect(selected).toEqual(message);
 });
 
 test('reconstructs text and tool arguments as provisional data while leaving raw input detached', () => {
@@ -119,7 +125,7 @@ test('reconstructs text and tool arguments as provisional data while leaving raw
   expect(accumulator.outputAt(-1)).toBeUndefined();
   expect(accumulator.outputAt(0.5)).toBeUndefined();
   expect(accumulator.outputAt(2)).toBeUndefined();
-  if (firstItem?.type !== 'message' || !firstItem.content) {
+  if (firstItem?.type !== 'message' || !Array.isArray(firstItem.content)) {
     throw new Error('Expected message content');
   }
   expect(accumulator.outputAt(0, { content_index: 0 })).toEqual(firstItem.content[0]);
@@ -159,12 +165,75 @@ test('reading a reasoning part keeps earlier parts detached without materializin
   });
   expect(retained).toEqual({ type: 'summary_text', text: '0' });
   expect(acc.outputAt(0, { summary_index: 0 })).toEqual({ type: 'summary_text', text: '0 then' });
-  if (retained && 'text' in retained) {
+  if (retained && typeof retained === 'object' && 'text' in retained) {
     retained.text = 'caller';
   }
   expect(acc.outputAt(0, { summary_index: 0 })).toMatchObject({ text: '0 then' });
   expect(acc.outputAt(0, { summary_index: -1 })).toBeUndefined();
   expect(acc.outputAt(0, { summary_index: 3 })).toBeUndefined();
+});
+
+test('reads and replaces just the changed annotation without copying its siblings', () => {
+  const accumulator = new ResponsesWebSocketAccumulator();
+  accumulator.add({
+    type: 'response.created',
+    response: {
+      id: 'r',
+      output: [
+        { type: 'message', id: 'm', content: [{ type: 'output_text', text: 'answer', annotations: [] }] },
+        {
+          type: 'reasoning',
+          id: 'reason',
+          content: [{ type: 'reasoning_text', text: 'thinking' }],
+          summary: [],
+        },
+      ],
+    },
+  });
+  const select = (annotation_index: number) =>
+    accumulator.outputAt(0, { content_index: 0, annotation_index });
+  let retained: unknown;
+  for (let index = 0; index < 32; index += 1) {
+    const annotation = {
+      type: 'url_citation',
+      url: `https://example.test/${index}`,
+      title: `Source ${index}`,
+    };
+    accumulator.add({
+      type: 'response.output_text.annotation.added',
+      output_index: 0,
+      item_id: 'm',
+      content_index: 0,
+      annotation_index: index,
+      annotation,
+    });
+    expect(select(index)).toEqual(annotation);
+    if (index === 0) {
+      retained = select(index);
+    }
+  }
+  expect(select(-1)).toBeUndefined();
+  expect(select(0.5)).toBeUndefined();
+  expect(select(32)).toBeUndefined();
+  expect(accumulator.outputAt(1, { content_index: 0, annotation_index: 0 })).toBeUndefined();
+  accumulator.add({
+    type: 'response.output_text.annotation.added',
+    output_index: 0,
+    item_id: 'm',
+    content_index: 0,
+    annotation_index: 0,
+    annotation: { type: 'file_citation', file_id: 'file_new' },
+  });
+  expect(retained).toEqual({ type: 'url_citation', url: 'https://example.test/0', title: 'Source 0' });
+  expect(select(0)).toEqual({ type: 'file_citation', file_id: 'file_new' });
+  const selected = select(0);
+  if (selected && typeof selected === 'object' && 'file_id' in selected) {
+    selected.file_id = 'caller';
+  }
+  expect(select(0)).toEqual({ type: 'file_citation', file_id: 'file_new' });
+  expect(select(31)).toMatchObject({ url: 'https://example.test/31' });
+  accumulator.add({ type: 'response.completed', response: { id: 'r', output: [] } });
+  expect(select(0)).toBeUndefined();
 });
 
 test.each(['response.completed', 'response.failed', 'response.incomplete', 'error'])(
@@ -234,6 +303,47 @@ test('derives omitted initial output text but respects explicitly supplied text'
   });
   accumulator.add({ type: 'response.created', response: { id: 'supplied', output, output_text: '' } });
   expect(accumulator.current).toMatchObject({ phase: 'provisional', snapshot: { output_text: '' } });
+});
+
+test('preserves explicit output_text across non-message completion as SSE does', () => {
+  const initial: Response = {
+    id: 'resp_scaffold',
+    object: 'response',
+    access_programs: null,
+    created_at: 1,
+    error: null,
+    incomplete_details: null,
+    instructions: null,
+    metadata: null,
+    model: 'gpt-5',
+    output: [{ type: 'function_call', id: 'fc_match', name: 'tool', call_id: 'call_match', arguments: '' }],
+    output_text: 'Explicit server text',
+    parallel_tool_calls: false,
+    status: 'in_progress',
+    temperature: null,
+    tool_choice: 'auto',
+    tools: [],
+    top_p: null,
+  };
+  const events: ResponseStreamEvent[] = [
+    { type: 'response.created', sequence_number: 0, response: initial },
+    {
+      type: 'response.output_item.done',
+      sequence_number: 1,
+      output_index: 0,
+      item: { type: 'function_call', id: 'fc_match', name: 'tool', call_id: 'call_match', arguments: '{}' },
+    },
+  ];
+  const socket = new ResponsesWebSocketAccumulator();
+  let sse: Response | undefined;
+  for (const event of events) {
+    sse = accumulateResponse(event, sse);
+    socket.add(event);
+    expect(socket.current).toEqual({
+      phase: 'provisional',
+      snapshot: { output: sse.output, output_text: sse.output_text },
+    });
+  }
 });
 
 test('shared scaffolded events produce identical provisional output over SSE and WebSocket', () => {

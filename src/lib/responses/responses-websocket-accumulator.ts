@@ -9,21 +9,17 @@ import {
 } from '../../internal/responses/response-accumulator';
 import { hasOwn } from '../../internal/utils';
 import { isObj } from '../../internal/utils/values';
-import type {
-  ResponseOutputItem,
-  ResponseOutputMessage,
-  ResponseReasoningItem,
-} from '../../resources/responses/responses';
+import type { ResponseOutputItem } from '../../resources/responses/responses';
 import type { ResponsesWebSocketEvent } from './responses-websocket-lane';
 
-/** Fields such as role or status can still be omitted on provisional wire items. */
-type ProvisionalOutputItem = Partial<ResponseOutputItem> & Pick<ResponseOutputItem, 'type'>;
-type ProvisionalPart = Partial<
-  | ResponseOutputMessage['content'][number]
-  | NonNullable<ResponseReasoningItem['content']>[number]
-  | ResponseReasoningItem['summary'][number]
->;
-type PartSelector = { content_index: number } | { summary_index: number };
+/** The discriminator is checked; other wire fields can be absent or not schema-valid yet. */
+type ProvisionalOutputItem = {
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- These are exactly the generated field names, but raw provisional values have deliberately not been schema-decoded.
+  [Type in ResponseOutputItem['type']]: { type: Type } & Partial<
+    Record<Exclude<keyof Extract<ResponseOutputItem, { type: Type }>, 'type'>, unknown>
+  >;
+}[ResponseOutputItem['type']];
+type PartSelector = { content_index: number; annotation_index?: number } | { summary_index: number };
 
 // Keep the raw boundary aligned with the generated discriminants. Future wire
 // items still belong to the raw lane and authoritative terminal event.
@@ -72,7 +68,8 @@ export type ResponsesWebSocketAccumulatorState =
  * socket; raw events remain in the caller's hands. Tools remain output data.
  * Raw deltas give per-event progress. Use outputAt(event.output_index) when an
  * item finishes, or pass its content_index/summary_index to read only a changed
- * part. A full current or item read materializes its entire nested contents, so
+ * part. For citations use content_index and annotation_index together. A full
+ * current, item, or part read materializes its entire nested contents, so
  * reserve those reads for when that complete snapshot is needed.
  *
  * A socket stream can omit the item/content scaffolding required for deltas.
@@ -106,37 +103,54 @@ export class ResponsesWebSocketAccumulator {
 
   /**
    * Read one provisional item by wire output_index, or just one message/
-   * reasoning part with its wire content_index/summary_index. Full item reads
-   * copy all parts; prefer a selector for progress on a growing item.
+   * reasoning part with its wire content_index/summary_index. Add annotation_index
+   * to content_index to read one raw citation. Full item and part reads copy all
+   * nested entries; prefer a selector for progress on a growing collection.
    * Copies remain valid after further events, and cannot change the accumulator.
    * Returns undefined for absent/mismatched parts or outside provisional output.
    */
   outputAt(outputIndex: number): ProvisionalOutputItem | undefined;
-  outputAt(outputIndex: number, part: PartSelector): ProvisionalPart | undefined;
-  outputAt(outputIndex: number, part?: PartSelector): ProvisionalOutputItem | ProvisionalPart | undefined {
-    if (this.#current?.phase !== 'provisional' || !Number.isInteger(outputIndex) || outputIndex < 0) {
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Raw socket parts and annotations are preserved, not schema-decoded. Requiring narrowing avoids an unproven public SDK contract.
+  outputAt(outputIndex: number, part: PartSelector): unknown;
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Only the generated output discriminator is validated; every raw nested value must remain unknown to callers.
+  outputAt(outputIndex: number, part?: PartSelector): unknown {
+    if (this.#current?.phase !== 'provisional') {
       return undefined;
     }
-    const output = this.#current.snapshot.output[outputIndex];
+    const output = ResponsesWebSocketAccumulator.#at(this.#current.snapshot.output, outputIndex);
     if (!part) {
       return ResponsesWebSocketAccumulator.#copyOutput(output);
     }
     if ('content_index' in part) {
-      if (
-        Number.isInteger(part.content_index) &&
-        part.content_index >= 0 &&
-        (output?.type === 'message' || output?.type === 'reasoning')
-      ) {
-        return ResponsesWebSocketAccumulator.#copyOutput(output.content?.[part.content_index]);
+      if (output?.type === 'message' || output?.type === 'reasoning') {
+        const content = ResponsesWebSocketAccumulator.#at(output.content, part.content_index);
+        if ('annotation_index' in part) {
+          return ResponsesWebSocketAccumulator.#copyOutput(
+            content?.type === 'output_text'
+              ? ResponsesWebSocketAccumulator.#at(content.annotations, part.annotation_index)
+              : undefined,
+          );
+        }
+        return ResponsesWebSocketAccumulator.#copyOutput(content);
       }
-    } else if (
-      Number.isInteger(part.summary_index) &&
-      part.summary_index >= 0 &&
-      output?.type === 'reasoning'
-    ) {
-      return ResponsesWebSocketAccumulator.#copyOutput(output.summary?.[part.summary_index]);
+    } else if (output?.type === 'reasoning') {
+      return ResponsesWebSocketAccumulator.#copyOutput(
+        ResponsesWebSocketAccumulator.#at(output.summary, part.summary_index),
+      );
     }
     return undefined;
+  }
+
+  // Validate the same index rules at every selector depth before copying only
+  // the selected entry. The caller-supplied wire scaffold may not be an array.
+  static #at<T extends readonly unknown[]>(
+    collection: T | undefined,
+    index: number | undefined,
+  ): T[number] | undefined {
+    if (!Array.isArray(collection) || index === undefined || !Number.isSafeInteger(index) || index < 0) {
+      return undefined;
+    }
+    return collection[index];
   }
 
   // Provisional output is made of parsed JSON containers and immutable scalars.

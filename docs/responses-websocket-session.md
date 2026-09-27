@@ -81,8 +81,22 @@ for (;;) {
     typeof event.summary_index === 'number'
   ) {
     const part = accumulator.outputAt(event.output_index, { summary_index: event.summary_index });
-    const summaryText = part && 'text' in part ? part.text : undefined;
+    const summaryText =
+      part && typeof part === 'object' && 'text' in part && typeof part.text === 'string'
+        ? part.text
+        : undefined;
     // Use summaryText in your application.
+  } else if (
+    event.type === 'response.output_text.annotation.added' &&
+    typeof event.output_index === 'number' &&
+    typeof event.content_index === 'number' &&
+    typeof event.annotation_index === 'number'
+  ) {
+    const annotation = accumulator.outputAt(event.output_index, {
+      content_index: event.content_index,
+      annotation_index: event.annotation_index,
+    });
+    // Inspect this raw citation without copying the part's other citations.
   } else if (
     event.type === 'response.content_part.done' &&
     typeof event.output_index === 'number' &&
@@ -111,13 +125,18 @@ for (;;) {
 `current` returns a detached full snapshot in phase `provisional`; if required
 scaffolding is missing, malformed or unrecognized, its phase is `unavailable`
 with an error. `outputAt()` returns `undefined` when no provisional item/part
-can be reconstructed. You can continue consuming raw events. A terminal event
+can be reconstructed. The output-item `type` is checked, but other provisional
+fields, parts and citations are raw values: check them before using them as
+typed data. For example, a message's `role` or `status` can be missing or
+different from a completed response. You can continue consuming raw events. A terminal event
 always changes the phase to `terminal` and preserves that event exactly: the
 helper never fills missing terminal output from partial results.
 
 Reading `current` copies the entire accumulated response. Reading `outputAt(index)`
 copies the whole item, including all its parts. For frequent updates consume the
-raw deltas or select just the affected part; request full snapshots only at
+raw deltas or select just the affected part. If a part has growing annotations,
+add `annotation_index` to its `content_index` selector to read just one entry;
+reading the whole part copies all its annotations. Request full snapshots only at
 meaningful boundaries. Call `reset()` for an explicit new turn; a new
 `response.created` also resets provisional state without affecting the lane.
 

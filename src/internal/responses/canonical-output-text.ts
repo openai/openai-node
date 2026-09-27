@@ -155,11 +155,11 @@ export function updateOutputText(
   nextText: string,
   contentIndex?: number,
 ): void {
-  if (context.deferOutputText) {
-    context.outputTextDirty = true;
+  if (previousText === nextText) {
     return;
   }
-  if (previousText === nextText) {
+  if (context.deferOutputText) {
+    context.outputTextDirty = true;
     return;
   }
 
