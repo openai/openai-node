@@ -151,6 +151,58 @@ test('caller-fed provisional output borrows no reader and leaves other lanes and
   });
 });
 
+test('idle and reset previews ignore non-output wire events but still reject unscaffolded output', async () => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane('preview');
+    const preview = new ResponsesWebSocketAccumulator();
+    const signal = AbortSignal.timeout(3000);
+    try {
+      for (const frame of [
+        { type: 'keepalive', sequence_number: 1, stream_id: 'preview' },
+        { type: 'response.compaction.compacting', sequence_number: 2, stream_id: 'preview' },
+        { type: 'response.future_event', extra: { visible: true }, stream_id: 'preview' },
+      ]) {
+        peer.send(JSON.stringify(frame));
+        // oxlint-disable-next-line eslint/no-await-in-loop -- The lane permits one reader, and each event must leave the idle preview unchanged.
+        const received = await lane.receive({ signal });
+        expect(received).toEqual(frame);
+        preview.add(received);
+        expect(preview.current).toBeUndefined();
+      }
+      peer.send(JSON.stringify({ type: 'response.created', response: { id: 'r' }, stream_id: 'preview' }));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toEqual({ phase: 'provisional', snapshot: { output: [], output_text: '' } });
+      preview.reset();
+      peer.send(JSON.stringify({ type: 'keepalive', sequence_number: 3, stream_id: 'preview' }));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toBeUndefined();
+      peer.send(
+        JSON.stringify({
+          type: 'response.output_text.delta',
+          item_id: 'missing',
+          output_index: 0,
+          content_index: 0,
+          delta: 'actual unscaffolded output',
+          stream_id: 'preview',
+        }),
+      );
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current?.phase).toBe('unavailable');
+      const terminal = {
+        type: 'response.completed',
+        response: { id: 'r', output: [] },
+        stream_id: 'preview',
+      };
+      peer.send(JSON.stringify(terminal));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toEqual({ phase: 'terminal', event: terminal });
+    } finally {
+      session.close();
+    }
+  });
+});
+
 test.each([
   ['missing arguments', { type: 'function_call', id: 'fc', name: 'data', call_id: 'c' }],
   ['numeric arguments', { type: 'function_call', id: 'fc', name: 'data', call_id: 'c', arguments: 1 }],

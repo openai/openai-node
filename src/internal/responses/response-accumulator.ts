@@ -1179,7 +1179,7 @@ function isResponseLifecycleEvent(event: { type: string }): event is ResponseLif
   }
 }
 
-function isIgnoredResponseEvent(event: ResponseAccumulatorEvent): event is ResponseIgnoredEvent {
+function isIgnoredResponseEvent(event: { type: string }): event is ResponseIgnoredEvent {
   switch (event.type) {
     case 'response.audio.delta':
     case 'response.audio.done':
@@ -1250,12 +1250,13 @@ function accumulateResponseOutput(
   return false;
 }
 
-/** Matches only the shared, non-lifecycle event shapes. Validation still occurs before mutation. */
+/** Matches shared events that can change output. Validation still occurs before mutation. */
 export function isResponseOutputEvent(event: { type: string }): event is ResponseOutputEvent {
   // SAFETY: Membership of the existing SSE tag set is checked before using shared output validators.
   return (
     supportedResponseEventTypes.has(event.type as ResponseAccumulatorEvent['type']) &&
-    !isResponseLifecycleEvent(event)
+    !isResponseLifecycleEvent(event) &&
+    !isIgnoredResponseEvent(event)
   );
 }
 
