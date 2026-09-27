@@ -242,6 +242,35 @@ describe('realtime translation WebSocket', () => {
     }, true);
   });
 
+  test.each([false, true])(
+    'closing while connecting is intentional cleanup (SDK error listener: %s)',
+    async (observeErrors) => {
+      await withServer(async (_server, baseURL) => {
+        const connection = await OpenAIRealtimeTranslationWS.create(
+          new OpenAI({ apiKey: 'synthetic-key', baseURL }),
+          { model: 'translation-test', options: { ca: lab.certificateAuthority } },
+        );
+        const failures: Error[] = [];
+        if (observeErrors) {
+          connection.on('error', (error) => failures.push(error));
+        }
+        expect(connection.socket.readyState).toBe(0);
+        // ws reports a transport error when a CONNECTING socket is closed.
+        // Wait for cleanup without node:events.once rejecting on that raw error.
+        // oxlint-disable-next-line promise/avoid-new -- No library promise waits past an expected raw ws error without rejecting.
+        const closed = new Promise<void>((resolve) => {
+          connection.socket.platformSocket.once('close', () => resolve());
+        });
+        connection.close();
+        connection.close();
+        await closed;
+        expect(failures).toEqual([]);
+        await expect(connection.finish({ timeoutMs: 1000 })).rejects.toThrow('closed before session.closed');
+        expect(connection.socket.platformSocket.listenerCount('message')).toBe(0);
+      });
+    },
+  );
+
   test('reports a normal peer close before any terminal or finish without losing the failure', async () => {
     await withServer(async (server, baseURL) => {
       server.on('connection', (peer) => peer.on('message', () => peer.close(1000, 'test premature peer')));

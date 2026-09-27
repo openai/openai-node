@@ -426,6 +426,11 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
   };
 
   private _onError = (cause: Error): void => {
+    // Closing before open also emits a ws error. The caller already requested
+    // cleanup; _onClose still records an incomplete drain for a later finish().
+    if (this._closeTimer !== undefined && !this._terminalReceived && !this._failure) {
+      return;
+    }
     const error = new OpenAIRealtimeError('Translation WebSocket transport failed.', null);
     Object.defineProperty(error, 'cause', { value: cause, writable: true, configurable: true });
     this._fail(error);
