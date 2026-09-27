@@ -7,6 +7,7 @@ import OpenAI from 'openai';
 import { ResponsesWS } from 'openai/resources/responses/ws';
 import { ResponsesWebSocketSession } from 'openai/lib/responses/responses-websocket-session';
 import type { ResponsesWebSocketLane } from 'openai/lib/responses/responses-websocket-session';
+import { ResponsesWebSocketAccumulator } from 'openai/lib/responses/responses-websocket-accumulator';
 import { toResponseInputItems } from 'openai/lib/responses/ResponseInputItems';
 import type { Response, ResponseInputItem, ResponsesServerEvent } from 'openai/resources/responses/responses';
 import { rawByteLength } from 'openai/internal/ws';
@@ -75,6 +76,80 @@ function response(id: string, status: Response['status'] = 'completed') {
     tools: [],
   };
 }
+
+test('caller-fed provisional output borrows no reader and leaves other lanes and raw events available', async () => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const previewLane = session.lane('preview');
+    const defaultLane = session.lane('default');
+    const preview = new ResponsesWebSocketAccumulator();
+    const raw: string[] = [];
+    connection.on('event', (event) => raw.push(event.type));
+    const signal = AbortSignal.timeout(3000);
+    try {
+      peer.send(JSON.stringify({ type: 'response.created', response: { id: 'p' }, stream_id: 'preview' }));
+      peer.send(
+        JSON.stringify({
+          type: 'response.output_item.added',
+          output_index: 0,
+          stream_id: 'preview',
+          item: {
+            type: 'function_call',
+            id: 'fc_preview',
+            name: 'never_run',
+            call_id: 'call_p',
+            arguments: '',
+          },
+        }),
+      );
+      peer.send(
+        JSON.stringify({
+          type: 'response.function_call_arguments.delta',
+          item_id: 'fc_preview',
+          output_index: 0,
+          delta: '{"preview":true}',
+          stream_id: 'preview',
+        }),
+      );
+      peer.send(
+        JSON.stringify({ type: 'response.completed', response: response('default'), stream_id: 'default' }),
+      );
+      preview.add(await previewLane.receive({ signal }));
+      preview.add(await previewLane.receive({ signal }));
+      preview.add(await previewLane.receive({ signal }));
+      expect(preview.current).toMatchObject({
+        phase: 'provisional',
+        snapshot: { output: [{ arguments: '{"preview":true}' }] },
+      });
+      expect(await defaultLane.finalResponse({ signal })).toMatchObject({ id: 'default', output: [] });
+      preview.reset();
+      expect(preview.current).toBeUndefined();
+      const terminal = {
+        type: 'response.failed',
+        response: { id: 'p', error: { message: 'synthetic failure' } },
+        stream_id: 'preview',
+      };
+      peer.send(JSON.stringify(terminal));
+      const rawTerminal = await previewLane.receive({ signal });
+      preview.add(rawTerminal);
+      expect(preview.current).toEqual({ phase: 'terminal', event: terminal });
+      expect(raw).toEqual([
+        'response.created',
+        'response.output_item.added',
+        'response.function_call_arguments.delta',
+        'response.completed',
+        'response.failed',
+      ]);
+      preview.reset();
+      peer.send(
+        JSON.stringify({ type: 'response.completed', response: response('next'), stream_id: 'preview' }),
+      );
+      expect(await previewLane.finalResponse({ signal })).toMatchObject({ id: 'next', output: [] });
+    } finally {
+      session.close();
+    }
+  });
+});
 
 test.each([null, 123, { toString: () => 'coerced' }])(
   'rejects non-string lane ID %j',
