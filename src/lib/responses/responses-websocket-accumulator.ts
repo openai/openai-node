@@ -66,6 +66,41 @@ export class ResponsesWebSocketAccumulator {
     }
   }
 
+  static #validateOutputEvent(event: Parameters<typeof accumulateWebSocketOutput>[0]): void {
+    switch (event.type) {
+      case 'response.output_item.added':
+      case 'response.output_item.done': {
+        ResponsesWebSocketAccumulator.#validateToolScaffold(event.item);
+        break;
+      }
+      case 'response.function_call_arguments.delta':
+      case 'response.custom_tool_call_input.delta': {
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The cloned raw event has not been schema-validated; do not coerce data into typed tool arguments.
+        if (typeof event.delta !== 'string') {
+          throw new OpenAIError('Invalid Responses WebSocket tool delta');
+        }
+        break;
+      }
+      case 'response.function_call_arguments.done': {
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- A final raw argument payload must satisfy the field exposed by the provisional snapshot.
+        if (typeof event.arguments !== 'string') {
+          throw new OpenAIError('Invalid Responses WebSocket tool arguments');
+        }
+        break;
+      }
+      case 'response.custom_tool_call_input.done': {
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Do not substitute omitted, null or object input for the typed text field.
+        if (typeof event.input !== 'string') {
+          throw new OpenAIError('Invalid Responses WebSocket custom tool input');
+        }
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+  }
+
   #start(event: { response?: unknown }): void {
     this.reset();
     if (!isObj(event.response)) {
@@ -122,10 +157,9 @@ export class ResponsesWebSocketAccumulator {
       if (this.#current?.phase !== 'provisional') {
         throw new OpenAIError("Cannot reconstruct WebSocket output before 'response.created'");
       }
-      if (event.type === 'response.output_item.added' || event.type === 'response.output_item.done') {
-        ResponsesWebSocketAccumulator.#validateToolScaffold(event.item);
-      }
-      accumulateWebSocketOutput(event, this.#current.snapshot, this.#context);
+      const outputEvent = structuredClone(event);
+      ResponsesWebSocketAccumulator.#validateOutputEvent(outputEvent);
+      accumulateWebSocketOutput(outputEvent, this.#current.snapshot, this.#context);
     } catch (error) {
       this.#current = {
         phase: 'unavailable',

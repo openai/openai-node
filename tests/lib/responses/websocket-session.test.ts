@@ -191,6 +191,50 @@ test.each([
   });
 });
 
+test.each([
+  ['function_call', 'response.function_call_arguments.delta', { delta: 123 }],
+  ['function_call', 'response.function_call_arguments.done', { arguments: 123 }],
+  ['function_call', 'response.function_call_arguments.done', { arguments: null }],
+  ['function_call', 'response.function_call_arguments.done', {}],
+  ['custom_tool_call', 'response.custom_tool_call_input.delta', { delta: null }],
+  ['custom_tool_call', 'response.custom_tool_call_input.done', { input: {} }],
+  ['custom_tool_call', 'response.custom_tool_call_input.done', {}],
+])('%s with invalid %s raw payload leaves the preview unavailable', async (itemType, type, payload) => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane();
+    const preview = new ResponsesWebSocketAccumulator();
+    const signal = AbortSignal.timeout(3000);
+    try {
+      peer.send(
+        JSON.stringify({
+          type: 'response.created',
+          response: {
+            id: 'r',
+            output: [
+              { type: itemType, id: 'tool_1', call_id: 'call_1', name: 'as_data', arguments: '', input: '' },
+            ],
+          },
+        }),
+      );
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current?.phase).toBe('provisional');
+      const invalid = { type, item_id: 'tool_1', output_index: 0, ...payload };
+      peer.send(JSON.stringify(invalid));
+      const raw = await lane.receive({ signal });
+      expect(raw).toEqual(invalid);
+      preview.add(raw);
+      expect(preview.current?.phase).toBe('unavailable');
+      const final = { type: 'response.incomplete', response: { id: 'r' } };
+      peer.send(JSON.stringify(final));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toEqual({ phase: 'terminal', event: final });
+    } finally {
+      session.close();
+    }
+  });
+});
+
 test.each([null, 123, { toString: () => 'coerced' }])(
   'rejects non-string lane ID %j',
   async (value: unknown) => {
