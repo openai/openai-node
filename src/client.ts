@@ -953,14 +953,23 @@ export class OpenAI {
     if (typeof query === 'object' && query && !Array.isArray(query)) {
       url.search = this.stringifyQuery(query);
       if (baseParams && overridingQuery) {
-        for (const key of new Set(baseParams.keys())) {
-          const values = baseParams.getAll(key);
-          if (values.length > 1 && !hasOwn(overridingQuery, key)) {
-            url.searchParams.delete(key);
-            for (const value of values) {
-              url.searchParams.append(key, value);
-            }
+        const seen = new Set<string>();
+        const repeated = new Set<string>();
+        for (const key of baseParams.keys()) {
+          if (seen.has(key) && !hasOwn(overridingQuery, key)) {
+            repeated.add(key);
           }
+          seen.add(key);
+        }
+        if (repeated.size) {
+          const merged = new URLSearchParams();
+          for (const [key, value] of url.searchParams) {
+            if (!repeated.has(key)) merged.append(key, value);
+          }
+          for (const [key, value] of baseParams) {
+            if (repeated.has(key)) merged.append(key, value);
+          }
+          url.search = merged.toString();
         }
       }
     }
