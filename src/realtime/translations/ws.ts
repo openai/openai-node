@@ -9,9 +9,11 @@ import { snapshotWebSocketCredentials } from '../../internal/ws';
 import { ReadyState } from '../../internal/ws-adapter';
 import { NodeWebSocket } from '../../internal/ws-adapter-node';
 import type {
+  RealtimeError,
   RealtimeErrorEvent,
   RealtimeTranslationClientEvent,
   RealtimeTranslationServerEvent,
+  RealtimeTranslationSession,
 } from '../../resources/realtime/realtime';
 import { isAzure, OpenAIRealtimeError } from '../internal-base';
 
@@ -63,54 +65,61 @@ function parseEvent(data: string): RealtimeTranslationEvent {
   return event as RealtimeTranslationEvent;
 }
 
-function isCompleteTranslationSession(session: RealtimeTranslationEvent['session']): boolean {
-  if (typeof session !== 'object' || session === null || Array.isArray(session)) {
-    return false;
-  }
-  const audio = Object.getOwnPropertyDescriptor(session, 'audio')?.value;
+type RequiredFields<T> = {
+  [Key in keyof T as T[Key] extends Required<T>[Key] ? Key : never]-?: (value: unknown) => boolean;
+};
+
+function isObject(value: unknown): value is object {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+function hasRequiredFields(value: unknown, fields: Record<string, (field: unknown) => boolean>): boolean {
   return (
-    typeof Object.getOwnPropertyDescriptor(session, 'id')?.value === 'string' &&
-    typeof Object.getOwnPropertyDescriptor(session, 'model')?.value === 'string' &&
-    typeof Object.getOwnPropertyDescriptor(session, 'expires_at')?.value === 'number' &&
-    Object.getOwnPropertyDescriptor(session, 'type')?.value === 'translation' &&
-    typeof audio === 'object' &&
-    audio !== null &&
-    !Array.isArray(audio)
+    isObject(value) &&
+    Object.entries(fields).every(([key, check]) => check(Object.getOwnPropertyDescriptor(value, key)?.value))
   );
 }
 
+const sessionFields = {
+  id: isString,
+  model: isString,
+  expires_at: (value: unknown) => typeof value === 'number',
+  type: (value: unknown) => value === 'translation',
+  audio: isObject,
+} satisfies RequiredFields<RealtimeTranslationSession>;
+
+const errorFields = { message: isString, type: isString } satisfies RequiredFields<RealtimeError>;
+const commonFields = { type: isString, event_id: isString };
+const deltaFields = { ...commonFields, delta: isString };
+const sessionEventFields = {
+  ...commonFields,
+  session: (value: unknown) => hasRequiredFields(value, sessionFields),
+};
+
+// Regeneration that adds an event or required field must also update its dispatcher.
+const translationEventFields = {
+  'session.closed': commonFields,
+  'session.input_transcript.delta': deltaFields,
+  'session.output_transcript.delta': deltaFields,
+  'session.output_audio.delta': deltaFields,
+  'session.created': sessionEventFields,
+  'session.updated': sessionEventFields,
+  error: { ...commonFields, error: (value: unknown) => hasRequiredFields(value, errorFields) },
+} satisfies {
+  [Event in RealtimeTranslationServerEvent as Event['type']]: RequiredFields<Event>;
+};
+
 /** Check the required fields before exposing an envelope through a typed listener. */
 function isCompleteTranslationEvent(event: RealtimeTranslationEvent): boolean {
-  if (typeof Object.getOwnPropertyDescriptor(event, 'event_id')?.value !== 'string') {
-    return false;
-  }
-  switch (event.type) {
-    case 'session.closed': {
-      return true;
-    }
-    case 'session.input_transcript.delta':
-    case 'session.output_transcript.delta':
-    case 'session.output_audio.delta': {
-      return typeof Object.getOwnPropertyDescriptor(event, 'delta')?.value === 'string';
-    }
-    case 'session.created':
-    case 'session.updated': {
-      return isCompleteTranslationSession(Object.getOwnPropertyDescriptor(event, 'session')?.value);
-    }
-    case 'error': {
-      const error = Object.getOwnPropertyDescriptor(event, 'error')?.value;
-      return (
-        typeof error === 'object' &&
-        error !== null &&
-        !Array.isArray(error) &&
-        typeof Object.getOwnPropertyDescriptor(error, 'message')?.value === 'string' &&
-        typeof Object.getOwnPropertyDescriptor(error, 'type')?.value === 'string'
-      );
-    }
-    default: {
-      return false;
-    }
-  }
+  // SAFETY: Only the above schema-checked map's own data properties can supply a validator.
+  const fields = Object.getOwnPropertyDescriptor(translationEventFields, event.type)?.value as
+    | Record<string, (field: unknown) => boolean>
+    | undefined;
+  return fields !== undefined && hasRequiredFields(event, fields);
 }
 
 function buildTranslationURL(client: OpenAI, model: string): URL {
@@ -291,9 +300,10 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
     if (this._terminalReceived) {
       return;
     }
+    const wireData = data.toString();
     let event: RealtimeTranslationEvent;
     try {
-      event = parseEvent(data.toString());
+      event = parseEvent(wireData);
     } catch (error) {
       // SAFETY: parseEvent only throws normalized, payload-free OpenAIRealtimeError instances.
       this._reportError(error as OpenAIRealtimeError);
@@ -308,7 +318,11 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
     }
     try {
       try {
-        this._emit('event', event);
+        // Raw listeners may mutate their event. Keep typed dispatch and finish
+        // anchored to the original validated wire event, including nested data.
+        if (this._hasListener('event')) {
+          this._emit('event', typed ? parseEvent(wireData) : event);
+        }
       } finally {
         if (type === 'error' && typed) {
           // SAFETY: The error envelope is preserved as server data, as for other Realtime events.

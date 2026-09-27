@@ -104,6 +104,64 @@ describe('realtime translation WebSocket', () => {
     });
   });
 
+  test('raw listeners cannot change validated typed payloads or close decisions', async () => {
+    await withServer(async (server, baseURL) => {
+      const frames = [
+        { type: 'session.output_transcript.delta', event_id: 'text', delta: 'bonjour' },
+        {
+          type: 'session.created',
+          event_id: 'created',
+          session: { id: 'sess', audio: {}, expires_at: 42, model: 'translation-test', type: 'translation' },
+        },
+        { type: 'error', event_id: 'api', error: { message: 'synthetic', type: 'test' } },
+        terminal,
+      ];
+      server.on('connection', (peer) =>
+        peer.on('message', () => {
+          for (const frame of frames) {
+            peer.send(JSON.stringify(frame));
+          }
+        }),
+      );
+      const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+      const typed: string[] = [];
+      connection.on('event', (event) => {
+        Reflect.deleteProperty(event, 'event_id');
+        if ('delta' in event) {
+          Reflect.deleteProperty(event, 'delta');
+        }
+        if ('session' in event && typeof event.session === 'object' && event.session !== null) {
+          Reflect.deleteProperty(event.session, 'model');
+        }
+        if ('error' in event && typeof event.error === 'object' && event.error !== null) {
+          Reflect.deleteProperty(event.error, 'type');
+        }
+        event.type = 'listener-mutated';
+      });
+      connection.on('session.output_transcript.delta', (event) =>
+        typed.push(event.type, event.event_id, event.delta),
+      );
+      connection.on('session.created', (event) =>
+        typed.push(event.type, event.event_id, event.session.model),
+      );
+      connection.on('error', (error) => typed.push(error.event_id ?? '', error.error?.type ?? ''));
+      connection.on('session.closed', (event) => typed.push(event.type, event.event_id));
+      await connection.finish({ timeoutMs: 2000 });
+      expect(typed).toEqual([
+        'session.output_transcript.delta',
+        'text',
+        'bonjour',
+        'session.created',
+        'created',
+        'translation-test',
+        'api',
+        'test',
+        'session.closed',
+        'terminal',
+      ]);
+    });
+  });
+
   test('unhandled API errors are reported while handled API errors still allow finishing', async () => {
     await withServer(async (_server, baseURL) => {
       const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
