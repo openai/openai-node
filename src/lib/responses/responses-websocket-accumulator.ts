@@ -176,8 +176,12 @@ export class ResponsesWebSocketAccumulator {
     ) {
       throw new OpenAIError('Invalid Responses WebSocket output item');
     }
-    if (item['type'] === 'function_call' || item['type'] === 'custom_tool_call') {
-      const field = item['type'] === 'function_call' ? 'arguments' : 'input';
+    if (
+      item['type'] === 'function_call' ||
+      item['type'] === 'custom_tool_call' ||
+      item['type'] === 'mcp_call'
+    ) {
+      const field = item['type'] === 'custom_tool_call' ? 'input' : 'arguments';
       if (
         !hasOwn(item, 'name') ||
         // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The caller feeds raw socket events; validate own required tool fields before exposing a typed snapshot.
@@ -187,6 +191,14 @@ export class ResponsesWebSocketAccumulator {
         typeof item[field] !== 'string'
       ) {
         throw new OpenAIError('Invalid Responses WebSocket tool scaffold');
+      }
+      if (
+        item['type'] === 'mcp_call' &&
+        (!hasOwn(item, 'server_label') ||
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The server identity on an MCP scaffold is raw data, not a generated decoded string.
+          typeof item['server_label'] !== 'string')
+      ) {
+        throw new OpenAIError('Invalid Responses WebSocket MCP server label');
       }
     }
   }

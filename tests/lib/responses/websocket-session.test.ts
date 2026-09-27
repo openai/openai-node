@@ -211,6 +211,25 @@ test.each([
   ['non-string name', { type: 'function_call', id: 'fc', name: 123, call_id: 'c', arguments: '' }],
   ['custom non-string input', { type: 'custom_tool_call', id: 'fc', name: 'data', call_id: 'c', input: {} }],
   ['custom missing input', { type: 'custom_tool_call', id: 'fc', name: 'data', call_id: 'c' }],
+  ['MCP missing arguments', { type: 'mcp_call', id: 'fc', name: 'data', server_label: 'synthetic' }],
+  [
+    'MCP numeric arguments',
+    { type: 'mcp_call', id: 'fc', name: 'data', server_label: 'synthetic', arguments: 1 },
+  ],
+  [
+    'MCP null arguments',
+    { type: 'mcp_call', id: 'fc', name: 'data', server_label: 'synthetic', arguments: null },
+  ],
+  ['MCP missing name', { type: 'mcp_call', id: 'fc', server_label: 'synthetic', arguments: '' }],
+  [
+    'MCP non-string name',
+    { type: 'mcp_call', id: 'fc', name: 123, server_label: 'synthetic', arguments: '' },
+  ],
+  ['MCP missing server label', { type: 'mcp_call', id: 'fc', name: 'data', arguments: '' }],
+  [
+    'MCP non-string server label',
+    { type: 'mcp_call', id: 'fc', name: 'data', server_label: false, arguments: '' },
+  ],
   ['future discriminator', { type: 'future_item', id: 'x' }],
   ['Object prototype discriminator', { type: 'constructor', id: 'x' }],
   ['non-string discriminator', { type: 123, id: 'x' }],
@@ -235,6 +254,14 @@ test.each([
       const rawAdded = await lane.receive({ signal });
       expect(rawAdded).toEqual(added);
       preview.add(rawAdded);
+      expect(preview.current?.phase).toBe('unavailable');
+      peer.send(JSON.stringify({ type: 'response.created', response: { id: 'r3' } }));
+      preview.add(await lane.receive({ signal }));
+      const done = { type: 'response.output_item.done', output_index: 0, item };
+      peer.send(JSON.stringify(done));
+      const rawDone = await lane.receive({ signal });
+      expect(rawDone).toEqual(done);
+      preview.add(rawDone);
       expect(preview.current?.phase).toBe('unavailable');
       const terminal = { type: 'response.failed', response: { id: 'r2', error: { message: 'synthetic' } } };
       peer.send(JSON.stringify(terminal));

@@ -81,7 +81,8 @@ for (;;) {
     typeof event.summary_index === 'number'
   ) {
     const part = accumulator.outputAt(event.output_index, { summary_index: event.summary_index });
-    // Use part?.text in your application.
+    const summaryText = part && 'text' in part ? part.text : undefined;
+    // Use summaryText in your application.
   } else if (
     event.type === 'response.content_part.done' &&
     typeof event.output_index === 'number' &&
