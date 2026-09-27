@@ -137,25 +137,48 @@ const sessionFields = {
   audio: (value: unknown) => hasOptionalFields(value, audioFields),
 } satisfies RequiredFields<RealtimeTranslationSession>;
 
-const errorFields = { message: isString, type: isString } satisfies RequiredFields<RealtimeError>;
+function isOptionalNullableString(value: unknown): boolean {
+  return value === undefined || value === null || isString(value);
+}
+
+function isOptionalNumber(value: unknown): boolean {
+  return value === undefined || typeof value === 'number';
+}
+
+const errorFields = {
+  message: isString,
+  type: isString,
+  code: isOptionalNullableString,
+  event_id: isOptionalNullableString,
+  param: isOptionalNullableString,
+} satisfies RequiredFields<Required<RealtimeError>>;
 const commonFields = { type: isString, event_id: isString };
-const deltaFields = { ...commonFields, delta: isString };
+const deltaFields = {
+  ...commonFields,
+  delta: isString,
+  elapsed_ms: (value: unknown) => value === null || isOptionalNumber(value),
+};
 const sessionEventFields = {
   ...commonFields,
   session: (value: unknown) => hasRequiredFields(value, sessionFields),
 };
 
-// Regeneration that adds an event or required field must also update its dispatcher.
+// Regeneration that adds an event or field must also update its dispatcher.
 const translationEventFields = {
   'session.closed': commonFields,
   'session.input_transcript.delta': deltaFields,
   'session.output_transcript.delta': deltaFields,
-  'session.output_audio.delta': deltaFields,
+  'session.output_audio.delta': {
+    ...deltaFields,
+    channels: isOptionalNumber,
+    format: (value: unknown) => value === undefined || value === 'pcm16',
+    sample_rate: isOptionalNumber,
+  },
   'session.created': sessionEventFields,
   'session.updated': sessionEventFields,
   error: { ...commonFields, error: (value: unknown) => hasRequiredFields(value, errorFields) },
 } satisfies {
-  [Event in RealtimeTranslationServerEvent as Event['type']]: RequiredFields<Event>;
+  [Event in RealtimeTranslationServerEvent as Event['type']]: RequiredFields<Required<Event>>;
 };
 
 /** Check the required fields before exposing an envelope through a typed listener. */

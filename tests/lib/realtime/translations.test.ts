@@ -272,6 +272,86 @@ describe('realtime translation WebSocket', () => {
     });
   });
 
+  test('typed audio, transcript and error events accept only their generated optional field values', async () => {
+    await withServer(async (server, baseURL) => {
+      const frames = [
+        { type: 'session.output_audio.delta', event_id: 'bad_rate', delta: 'AA==', sample_rate: 'invalid' },
+        { type: 'session.output_audio.delta', event_id: 'bad_channels', delta: 'AA==', channels: null },
+        { type: 'session.output_audio.delta', event_id: 'bad_format', delta: 'AA==', format: 'unknown' },
+        { type: 'session.input_transcript.delta', event_id: 'bad_input', delta: 'one', elapsed_ms: '200' },
+        { type: 'session.output_transcript.delta', event_id: 'bad_output', delta: 'un', elapsed_ms: [] },
+        { type: 'session.output_audio.delta', event_id: 'bad_elapsed', delta: 'AA==', elapsed_ms: true },
+        ...['code', 'event_id', 'param'].map((field) => ({
+          type: 'error',
+          event_id: `bad_${field}`,
+          error: { type: 'invalid_request_error', message: 'synthetic', [field]: 42 },
+        })),
+        {
+          type: 'session.output_audio.delta',
+          event_id: 'pcm',
+          delta: 'AA==',
+          channels: 1,
+          format: 'pcm16',
+          sample_rate: 24_000,
+          elapsed_ms: 0,
+        },
+        { type: 'session.output_audio.delta', event_id: 'audio_omitted', delta: 'AA==' },
+        { type: 'session.input_transcript.delta', event_id: 'input_null', delta: 'one', elapsed_ms: null },
+        { type: 'session.output_transcript.delta', event_id: 'output_zero', delta: 'un', elapsed_ms: 0 },
+        {
+          type: 'error',
+          event_id: 'error_nullable',
+          error: {
+            type: 'invalid_request_error',
+            message: 'synthetic',
+            code: null,
+            event_id: null,
+            param: null,
+          },
+        },
+        {
+          type: 'error',
+          event_id: 'error_strings',
+          error: {
+            type: 'invalid_request_error',
+            message: 'synthetic',
+            code: '',
+            event_id: 'source',
+            param: 'model',
+          },
+        },
+        terminal,
+      ];
+      server.on('connection', (peer) =>
+        peer.on('message', () => {
+          for (const frame of frames) {
+            peer.send(JSON.stringify(frame));
+          }
+        }),
+      );
+      const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+      const raw: unknown[] = [];
+      const typed: string[] = [];
+      connection.on('event', (event) => raw.push(event));
+      connection.on('session.output_audio.delta', (event) => typed.push(event.event_id));
+      connection.on('session.input_transcript.delta', (event) => typed.push(event.event_id));
+      connection.on('session.output_transcript.delta', (event) => typed.push(event.event_id));
+      connection.on('error', (event) => typed.push(event.event_id ?? 'transport'));
+      connection.on('session.closed', (event) => typed.push(event.event_id));
+      await connection.finish({ timeoutMs: 2000 });
+      expect(raw).toEqual(frames);
+      expect(typed).toEqual([
+        'pcm',
+        'audio_omitted',
+        'input_null',
+        'output_zero',
+        'error_nullable',
+        'error_strings',
+        'terminal',
+      ]);
+    });
+  });
+
   test('unhandled API errors are reported while handled API errors still allow finishing', async () => {
     await withServer(async (_server, baseURL) => {
       const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
