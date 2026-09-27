@@ -296,7 +296,7 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
       event = parseEvent(data.toString());
     } catch (error) {
       // SAFETY: parseEvent only throws normalized, payload-free OpenAIRealtimeError instances.
-      this._emit('error', error as OpenAIRealtimeError);
+      this._reportError(error as OpenAIRealtimeError);
       return;
     }
     const { type } = event;

@@ -136,6 +136,47 @@ describe('realtime translation WebSocket', () => {
     });
   });
 
+  test('reports unhandled malformed frames during finish and continues delivering valid output', async () => {
+    await withServer(async (server, baseURL) => {
+      server.on('connection', (peer) =>
+        peer.on('message', () => {
+          peer.send('private malformed content');
+          peer.send('{"type":42,"data":"private invalid content"}');
+          peer.send(
+            JSON.stringify({ type: 'session.output_transcript.delta', event_id: 'output', delta: 'bonjour' }),
+          );
+          peer.send(JSON.stringify(terminal));
+        }),
+      );
+      const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+      const raw: string[] = [];
+      const output: string[] = [];
+      connection.on('event', (event) => raw.push(event.type));
+      connection.on('session.output_transcript.delta', (event) => output.push(event.delta));
+      const errors: unknown[] = [];
+      // SAFETY: Capture the deliberate unhandled rejections without causing unrelated test-runner failures.
+      const rejected = vi.spyOn(Promise, 'reject').mockImplementation((error: unknown) => {
+        errors.push(error);
+        // SAFETY: No consumer awaits this placeholder; it isolates the SDK error-reporting boundary.
+        return Promise.resolve(undefined as never);
+      });
+      try {
+        await connection.finish({ timeoutMs: 2000 });
+        expect(errors).toHaveLength(2);
+        for (const error of errors) {
+          expect(error).toMatchObject({ name: 'OpenAIRealtimeError' });
+          expect(String(error)).toContain("on('error'");
+          expect(String(error)).not.toContain('private');
+        }
+        expect(raw).toEqual(['session.output_transcript.delta', 'session.closed']);
+        expect(output).toEqual(['bonjour']);
+      } finally {
+        rejected.mockRestore();
+        connection.close();
+      }
+    });
+  });
+
   test('reports a real TLS failure before finish when there is no SDK error listener', async () => {
     await withServer(async (_server, baseURL) => {
       const failures: unknown[] = [];
