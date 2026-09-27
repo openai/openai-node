@@ -27,7 +27,11 @@ starting the connection, before it opens. Attach listeners immediately and await
 `open` before sending.
 
 Use typed event listeners for audio and transcript deltas, or `event` to observe
-every server envelope, including future event types and API errors. `send()`
+every server envelope, including future event types and API errors. Incomplete
+known envelopes remain observable on `event`; only envelopes with the required
+fields reach their typed listener. Always attach an `error` listener: an API
+error without one is reported as an unhandled promise rejection, as in Realtime.
+`send()`
 accepts a typed client event, an object with a string `type`, or a raw JSON object
 with a string `type`. There is no automatic configuration, input buffering,
 reconnection, or replay.
@@ -43,6 +47,8 @@ the session or discard later output. An abort, timeout, or transport
 failure rejects. The same deadline includes transport cleanup. A stalled close
 handshake is forcibly terminated and rejects even if listeners already received
 `session.closed`. Transport listeners are released before `finish()` settles.
+An error close status also rejects after terminal delivery; normal closure,
+going away, and a close with no status are accepted.
 
 `connection.session.close()` sends only the protocol close. You can subsequently
 call `finish()` to await the terminal event. `connection.close()` closes the

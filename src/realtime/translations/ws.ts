@@ -63,6 +63,62 @@ function parseEvent(data: string): RealtimeTranslationEvent {
   return event as RealtimeTranslationEvent;
 }
 
+function isCompleteTranslationSession(session: RealtimeTranslationEvent['session']): boolean {
+  return (
+    typeof session === 'object' &&
+    session !== null &&
+    !Array.isArray(session) &&
+    'id' in session &&
+    typeof session.id === 'string' &&
+    'model' in session &&
+    typeof session.model === 'string' &&
+    'expires_at' in session &&
+    typeof session.expires_at === 'number' &&
+    'type' in session &&
+    session.type === 'translation' &&
+    'audio' in session &&
+    typeof session.audio === 'object' &&
+    session.audio !== null &&
+    !Array.isArray(session.audio)
+  );
+}
+
+/** Check the required fields before exposing an envelope through a typed listener. */
+function isCompleteTranslationEvent(event: RealtimeTranslationEvent): boolean {
+  if (typeof event['event_id'] !== 'string') {
+    return false;
+  }
+  switch (event.type) {
+    case 'session.closed': {
+      return true;
+    }
+    case 'session.input_transcript.delta':
+    case 'session.output_transcript.delta':
+    case 'session.output_audio.delta': {
+      return typeof event['delta'] === 'string';
+    }
+    case 'session.created':
+    case 'session.updated': {
+      return isCompleteTranslationSession(event['session']);
+    }
+    case 'error': {
+      const { error } = event;
+      return (
+        typeof error === 'object' &&
+        error !== null &&
+        !Array.isArray(error) &&
+        'message' in error &&
+        typeof error.message === 'string' &&
+        'type' in error &&
+        typeof error.type === 'string'
+      );
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
 function buildTranslationURL(client: OpenAI, model: string): URL {
   if (typeof model !== 'string' || !model) {
     throw new Error('A translation model is required.');
@@ -76,6 +132,7 @@ function buildTranslationURL(client: OpenAI, model: string): URL {
   if (url.searchParams.has('intent')) {
     throw new Error('Realtime translation does not accept an intent query parameter.');
   }
+  url.hash = '';
   url.protocol = 'wss:';
   return url;
 }
@@ -249,7 +306,8 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
       return;
     }
     const { type } = event;
-    const terminal = type === 'session.closed' && typeof event['event_id'] === 'string';
+    const typed = isCompleteTranslationEvent(event);
+    const terminal = type === 'session.closed' && typed;
     if (terminal) {
       this._inputClosed = true;
       this._terminalReceived = true;
@@ -258,12 +316,18 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
       try {
         this._emit('event', event);
       } finally {
-        if (type === 'error') {
+        if (type === 'error' && typed) {
           // SAFETY: The error envelope is preserved as server data, as for other Realtime events.
           // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Forward server error fields unchanged through the existing Realtime error wrapper.
           const apiErrorEvent = event as unknown as RealtimeErrorEvent;
-          this._emit('error', new OpenAIRealtimeError('Translation API error.', apiErrorEvent));
-        } else if (type !== 'event' && (type !== 'session.closed' || terminal)) {
+          const error = new OpenAIRealtimeError('Translation API error.', apiErrorEvent);
+          if (this._hasListener('error')) {
+            this._emit('error', error);
+          } else {
+            error.message += " Bind an error listener, e.g. connection.on('error', (error) => ...).";
+            Promise.reject(error);
+          }
+        } else if (type !== 'error' && typed) {
           // SAFETY: The wire discriminator selects its listener; future event names remain visible on `event`.
           this._emit(type as Exclude<keyof TranslationEvents, 'event' | 'error'>, event as never);
         }
@@ -295,7 +359,7 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
     this.socket.off('close', this._onClose);
     if (!this._terminalReceived) {
       this._failure ??= new OpenAIRealtimeError('Translation WebSocket closed before session.closed.', null);
-    } else if (code === 1006) {
+    } else if (code !== 1000 && code !== 1001 && code !== 1005) {
       this._failure ??= new OpenAIRealtimeError(
         'Translation transport closed abnormally after session.closed.',
         null,

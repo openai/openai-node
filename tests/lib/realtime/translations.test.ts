@@ -51,6 +51,114 @@ async function open(client: OpenAI): Promise<OpenAIRealtimeTranslationWS> {
 const terminal = { type: 'session.closed', event_id: 'terminal' };
 
 describe('realtime translation WebSocket', () => {
+  test('dispatches complete known events and keeps incomplete known or future envelopes raw', async () => {
+    await withServer(async (server, baseURL) => {
+      const session = {
+        id: 'sess_test',
+        audio: {},
+        expires_at: 1_800_000_000,
+        model: 'translation-test',
+        type: 'translation',
+      };
+      const frames = [
+        { type: 'session.input_transcript.delta', event_id: 'input', delta: 'hello' },
+        { type: 'session.input_transcript.delta', event_id: 42, delta: 'not typed' },
+        { type: 'session.output_transcript.delta', event_id: 'output', delta: 'bonjour' },
+        { type: 'session.output_transcript.delta', event_id: 'missing delta' },
+        { type: 'session.output_audio.delta', event_id: 'audio', delta: 'AA==' },
+        { type: 'session.output_audio.delta', event_id: 'bad delta', delta: null },
+        { type: 'session.created', event_id: 'created', session },
+        { type: 'session.created', event_id: 'missing session' },
+        { type: 'session.updated', event_id: 'updated', session },
+        {
+          type: 'session.updated',
+          event_id: 'missing required nested fields',
+          session: { type: 'translation' },
+        },
+        { type: 'error', event_id: 'valid', error: { message: 'synthetic', type: 'test' } },
+        { type: 'error', event_id: 'missing nested type', error: { message: 'bad' } },
+        { type: 'future.translation.event', content: 'preserved' },
+        terminal,
+      ];
+      server.on('connection', (peer) =>
+        peer.on('message', () => {
+          for (const frame of frames) {
+            peer.send(JSON.stringify(frame));
+          }
+        }),
+      );
+      const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+      const raw: unknown[] = [];
+      const typed: string[] = [];
+      connection.on('event', (event) => raw.push(event));
+      connection.on('session.input_transcript.delta', (event) => typed.push(event.delta));
+      connection.on('session.output_transcript.delta', (event) => typed.push(event.delta));
+      connection.on('session.output_audio.delta', (event) => typed.push(event.delta));
+      connection.on('session.created', (event) => typed.push(event.session?.id));
+      connection.on('session.updated', (event) => typed.push(event.session?.id));
+      connection.on('error', (error) => typed.push(error.error?.type ?? 'missing'));
+      connection.on('session.closed', (event) => typed.push(event.event_id));
+      await connection.finish({ timeoutMs: 2000 });
+      expect(raw).toEqual(frames);
+      expect(typed).toEqual(['hello', 'bonjour', 'AA==', 'sess_test', 'sess_test', 'test', 'terminal']);
+    });
+  });
+
+  test('unhandled API errors are reported while handled API errors still allow finishing', async () => {
+    await withServer(async (_server, baseURL) => {
+      const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+      const errors: unknown[] = [];
+      // SAFETY: As with the established Realtime error tests, capture the rejection without causing an unrelated unhandled rejection in the test runner.
+      const rejected = vi.spyOn(Promise, 'reject').mockImplementation((error: unknown) => {
+        errors.push(error);
+        // SAFETY: Nothing consumes this resolved placeholder; it only prevents test-runner unhandled rejections.
+        return Promise.resolve(undefined as never);
+      });
+      try {
+        const frame = { type: 'error', event_id: 'api-error', error: { type: 'test', message: 'synthetic' } };
+        connection.socket.platformSocket.emit('message', Buffer.from(JSON.stringify(frame)), false);
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatchObject({
+          name: 'OpenAIRealtimeError',
+          event_id: 'api-error',
+          error: frame.error,
+        });
+        expect(String(errors[0])).toContain("on('error'");
+        const handled: string[] = [];
+        connection.on('error', (error) => handled.push(error.event_id ?? 'missing'));
+        connection.socket.platformSocket.emit('message', Buffer.from(JSON.stringify(frame)), false);
+        expect(errors).toHaveLength(1);
+        expect(handled).toEqual(['api-error']);
+      } finally {
+        rejected.mockRestore();
+        connection.close();
+      }
+    });
+  });
+
+  test.each([1000, 1001, 1005, 1008, 1011])(
+    'recognizes peer close status %s after delivering the terminal',
+    async (code) => {
+      await withServer(async (server, baseURL) => {
+        server.on('connection', (peer) =>
+          peer.on('message', () => {
+            peer.send(JSON.stringify(terminal));
+            peer.close(code === 1005 ? undefined : code);
+          }),
+        );
+        const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+        const delivered: string[] = [];
+        connection.on('session.closed', (event) => delivered.push(event.event_id));
+        const finished = connection.finish({ timeoutMs: 2000 });
+        await (code === 1008 || code === 1011
+          ? expect(finished).rejects.toThrow('closed abnormally')
+          : expect(finished).resolves.toBeUndefined());
+        expect(delivered).toEqual(['terminal']);
+        expect(connection.socket.platformSocket.listenerCount('message')).toBe(0);
+      });
+    },
+  );
+
   test('incomplete terminal envelopes remain raw and do not discard subsequent translation output', async () => {
     await withServer(async (server, baseURL) => {
       const malformed = [
@@ -420,7 +528,7 @@ describe('translation connection authentication', () => {
       (baseURL) =>
         new OpenAI({
           apiKey: 'synthetic-key',
-          baseURL: `${baseURL}/custom?base=kept&model=base`,
+          baseURL: `${baseURL}/custom?base=kept&model=base#configuration`,
           defaultQuery: { routing: 'value', model: 'default' },
           organization: 'synthetic-org',
           project: 'synthetic-project',
