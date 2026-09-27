@@ -330,6 +330,92 @@ test.each([
 });
 
 test.each([
+  ['null content', { content: null }],
+  ['missing content', {}],
+  ['non-array content', { content: { type: 'output_text', text: 'not an array' } }],
+  ['null content part', { content: [null] }],
+  ['numeric text', { content: [{ type: 'output_text', text: 123, annotations: [] }] }],
+  ['missing text', { content: [{ type: 'output_text', annotations: [] }] }],
+])('message with %s cannot invalidate a later provisional output_text read', async (_label, fields) => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane();
+    const preview = new ResponsesWebSocketAccumulator();
+    const signal = AbortSignal.timeout(3000);
+    try {
+      const initial = {
+        type: 'response.created',
+        response: { id: 'r', output_text: 'from wire', output: [{ type: 'message', id: 'm', ...fields }] },
+      };
+      peer.send(JSON.stringify(initial));
+      const received = await lane.receive({ signal });
+      expect(received).toEqual(initial);
+      preview.add(received);
+      peer.send(
+        JSON.stringify({
+          type: 'response.output_item.added',
+          output_index: 1,
+          item: { type: 'message', id: 'later', content: [] },
+        }),
+      );
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current?.phase).toBe('unavailable');
+      const terminal = { type: 'response.failed', response: { id: 'r', error: { message: 'synthetic' } } };
+      peer.send(JSON.stringify(terminal));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toEqual({ phase: 'terminal', event: terminal });
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test.each(['response.content_part.added', 'response.content_part.done'])(
+  'raw numeric output_text in %s never becomes an aggregate string',
+  async (type) => {
+    await withSocket(async (connection, peer) => {
+      const session = new ResponsesWebSocketSession(connection, limits);
+      const lane = session.lane();
+      const preview = new ResponsesWebSocketAccumulator();
+      const signal = AbortSignal.timeout(3000);
+      try {
+        const original = { type: 'output_text', text: 'previous', annotations: [] };
+        peer.send(
+          JSON.stringify({
+            type: 'response.created',
+            response: { id: 'r', output: [{ type: 'message', id: 'm', content: [original] }] },
+          }),
+        );
+        preview.add(await lane.receive({ signal }));
+        const before = preview.current;
+        expect(before).toMatchObject({ phase: 'provisional', snapshot: { output_text: 'previous' } });
+        const frame = {
+          type,
+          item_id: 'm',
+          output_index: 0,
+          content_index: type === 'response.content_part.added' ? 1 : 0,
+          part: { type: 'output_text', text: 123, annotations: [] },
+        };
+        peer.send(JSON.stringify(frame));
+        const received = await lane.receive({ signal });
+        expect(received).toEqual(frame);
+        preview.add(received);
+        expect(preview.current?.phase).toBe('unavailable');
+        expect(before).toMatchObject({
+          snapshot: { output_text: 'previous', output: [{ content: [original] }] },
+        });
+        const terminal = { type: 'response.completed', response: { id: 'r' } };
+        peer.send(JSON.stringify(terminal));
+        preview.add(await lane.receive({ signal }));
+        expect(preview.current).toEqual({ phase: 'terminal', event: terminal });
+      } finally {
+        session.close();
+      }
+    });
+  },
+);
+
+test.each([
   ['output_text', 'response.output_text.delta', { delta: 1 }],
   ['output_text', 'response.output_text.done', { text: 1 }],
   ['output_text', 'response.output_text.done', { text: null }],

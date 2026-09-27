@@ -177,7 +177,7 @@ export class ResponsesWebSocketAccumulator {
     this.#current = undefined;
   }
 
-  // Validate the discriminant and scaffolds that argument deltas extend. Raw
+  // Validate the discriminant and scaffolds that deltas and canonical text use. Raw
   // WebSocket items have not been decoded through the generated response union.
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Output from a raw lane event has not passed a tool schema. This is its opt-in accumulator boundary.
   static #validateOutputScaffold(item: unknown): void {
@@ -189,6 +189,14 @@ export class ResponsesWebSocketAccumulator {
       !hasOwn(outputItemTypes, item['type'])
     ) {
       throw new OpenAIError('Invalid Responses WebSocket output item');
+    }
+    if (item['type'] === 'message') {
+      if (!Array.isArray(item['content'])) {
+        throw new OpenAIError('Invalid Responses WebSocket message content');
+      }
+      for (const part of item['content']) {
+        ResponsesWebSocketAccumulator.#validateContentPart(part);
+      }
     }
     if (
       item['type'] === 'function_call' ||
@@ -217,11 +225,28 @@ export class ResponsesWebSocketAccumulator {
     }
   }
 
+  // Check only fields used by canonicalization; other provisional metadata stays raw.
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Parts from the WebSocket wire are not schema-decoded, including within the initial output.
+  static #validateContentPart(part: unknown): void {
+    if (
+      !isObj(part) ||
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Raw output_text must not be silently coerced during a later provisional read.
+      (part['type'] === 'output_text' && typeof part['text'] !== 'string')
+    ) {
+      throw new OpenAIError('Invalid Responses WebSocket content part');
+    }
+  }
+
   static #validateOutputEvent(event: Parameters<typeof accumulateWebSocketOutput>[0]): void {
     switch (event.type) {
       case 'response.output_item.added':
       case 'response.output_item.done': {
         ResponsesWebSocketAccumulator.#validateOutputScaffold(event.item);
+        break;
+      }
+      case 'response.content_part.added':
+      case 'response.content_part.done': {
+        ResponsesWebSocketAccumulator.#validateContentPart(event.part);
         break;
       }
       case 'response.function_call_arguments.delta':
