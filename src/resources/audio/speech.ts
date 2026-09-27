@@ -82,6 +82,9 @@ export interface SpeechCreateParams {
     | 'verse'
     | 'marin'
     | 'cedar'
+    | 'fable'
+    | 'onyx'
+    | 'nova'
     | SpeechCreateParams.ID;
 
   /**
