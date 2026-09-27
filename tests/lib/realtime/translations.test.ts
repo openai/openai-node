@@ -179,12 +179,20 @@ describe('realtime translation WebSocket', () => {
       );
       const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
       let receivedSize = 0;
+      let rawSize = 0;
+      connection.on('event', (event) => {
+        if (event.type === 'session.output_audio.delta' && typeof event.delta === 'string') {
+          rawSize = event.delta.length;
+          event.delta = 'changed by raw listener';
+        }
+      });
       connection.on('session.output_audio.delta', (event) => {
         receivedSize = event.delta.length;
         expect(event.delta[0]).toBe('A');
         expect(event.delta[size - 1]).toBe('A');
       });
       await connection.finish({ timeoutMs: 30_000 });
+      expect(rawSize).toBe(size);
       expect(receivedSize).toBe(size);
     });
   }, 45_000);
@@ -362,7 +370,11 @@ describe('realtime translation WebSocket', () => {
           created.socket.platformSocket.once('close', () => resolve());
         });
         expect(failures).toHaveLength(1);
-        expect(failures[0]).toMatchObject({ name: 'OpenAIRealtimeError', error: undefined });
+        expect(failures[0]).toMatchObject({
+          name: 'OpenAIRealtimeError',
+          error: undefined,
+          cause: { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' },
+        });
         expect(String(failures[0])).toContain('Translation WebSocket transport failed.');
         expect(String(failures[0])).toContain("on('error'");
         expect(String(failures[0])).not.toContain('synthetic-key');
@@ -371,7 +383,7 @@ describe('realtime translation WebSocket', () => {
         connection?.close();
       }
       // The first operation still observes the original failure if called after transport closure.
-      await expect(connection.finish({ timeoutMs: 1000 })).rejects.toThrow('transport failed');
+      await expect(connection.finish({ timeoutMs: 1000 })).rejects.toBe(failures[0]);
     });
   });
 
@@ -657,6 +669,7 @@ describe('realtime translation WebSocket', () => {
       await withServer(async (server, baseURL) => {
         let connections = 0;
         const controller = new AbortController();
+        const reason = { operation: 'translation', kind: 'user-requested-cancellation' };
         server.on('connection', (peer) => {
           connections += 1;
           peer.on('message', () => {
@@ -664,17 +677,22 @@ describe('realtime translation WebSocket', () => {
               peer.close();
             }
             if (failure === 'abort') {
-              controller.abort();
+              controller.abort(reason);
             }
           });
         });
         const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
         const closed = once(connection.socket.platformSocket, 'close');
-        await expect(
-          connection.finish({ timeoutMs: failure === 'timeout' ? 25 : 2000, signal: controller.signal }),
-        ).rejects.toThrow(
+        const finish = connection.finish({
+          timeoutMs: failure === 'timeout' ? 25 : 2000,
+          signal: controller.signal,
+        });
+        await expect(finish).rejects.toThrow(
           { disconnect: 'before session.closed', timeout: 'Timed out', abort: 'aborted' }[failure],
         );
+        if (failure === 'abort') {
+          await expect(finish).rejects.toHaveProperty('cause', reason);
+        }
         await closed;
         expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
         expect(connection.socket.platformSocket.listenerCount('message')).toBe(0);
@@ -689,10 +707,11 @@ describe('realtime translation WebSocket', () => {
       server.on('connection', (peer) => peer.on('message', (data) => requests.push(data.toString())));
       const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
       const controller = new AbortController();
-      controller.abort();
-      await expect(connection.finish({ timeoutMs: 1000, signal: controller.signal })).rejects.toThrow(
-        'aborted',
-      );
+      const reason = new Error('Caller abandoned this synthetic operation.');
+      controller.abort(reason);
+      const finished = connection.finish({ timeoutMs: 1000, signal: controller.signal });
+      await expect(finished).rejects.toThrow('aborted');
+      await expect(finished).rejects.toHaveProperty('cause', reason);
       expect(requests).toEqual([]);
     });
   });
@@ -726,6 +745,32 @@ describe('realtime translation WebSocket', () => {
       expect(delivered).toEqual(['terminal']);
       const [code] = await closed;
       expect(code).toBe(1006);
+    });
+  });
+
+  test('reports a stalled post-terminal close without finish and retains its failure', async () => {
+    await withServer(async (server, baseURL) => {
+      server.on('connection', (peer) =>
+        peer.on('message', () => {
+          peer.send(JSON.stringify(terminal));
+          peer.pause();
+        }),
+      );
+      const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+      const failures: Error[] = [];
+      const delivered: string[] = [];
+      connection.on('session.closed', (event) => delivered.push(event.event_id));
+      connection.on('error', (error) => failures.push(error));
+      const closed = once(connection.socket.platformSocket, 'close');
+      connection.send({ type: 'session.update', session: {} });
+      const [code] = await closed;
+      expect(delivered).toEqual(['terminal']);
+      expect(code).toBe(1006);
+      expect(failures).toHaveLength(1);
+      expect(failures[0]?.message).toContain('Timed out closing');
+      await expect(connection.finish({ timeoutMs: 1000 })).rejects.toBe(failures[0]);
+      expect(failures).toHaveLength(1);
+      expect(connection.socket.platformSocket.listenerCount('message')).toBe(0);
     });
   });
 

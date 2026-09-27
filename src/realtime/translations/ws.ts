@@ -65,6 +65,27 @@ function parseEvent(data: string): RealtimeTranslationEvent {
   return event as RealtimeTranslationEvent;
 }
 
+/** Copies a freshly parsed JSON tree's containers, sharing its immutable string payloads. */
+function copyEvent(event: RealtimeTranslationEvent): RealtimeTranslationEvent {
+  const copy = { ...event };
+  const containers: object[] = [copy];
+  for (const container of containers) {
+    for (const [key, value] of Object.entries(container)) {
+      if (typeof value === 'object' && value !== null) {
+        const child = Array.isArray(value) ? [...value] : { ...value };
+        Object.defineProperty(container, key, {
+          value: child,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+        containers.push(child);
+      }
+    }
+  }
+  return copy;
+}
+
 type RequiredFields<T> = {
   [Key in keyof T as T[Key] extends Required<T>[Key] ? Key : never]-?: (value: unknown) => boolean;
 };
@@ -350,7 +371,7 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
         // Raw listeners may mutate their event. Keep typed dispatch and finish
         // anchored to the original validated wire event, including nested data.
         if (this._hasListener('event')) {
-          this._emit('event', typed ? parseEvent(wireData) : event);
+          this._emit('event', typed ? copyEvent(event) : event);
         }
       } finally {
         if (type === 'error' && typed) {
@@ -379,8 +400,9 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
     }
   };
 
-  private _onError = (): void => {
+  private _onError = (cause: Error): void => {
     const error = new OpenAIRealtimeError('Translation WebSocket transport failed.', null);
+    Object.defineProperty(error, 'cause', { value: cause, writable: true, configurable: true });
     this._fail(error);
     // finish already rejects transport failures; don't report that same failure a second time.
     if (this._hasListener('error') || !this._finishPromise) {
@@ -422,7 +444,13 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
   };
 
   private _onAbort = (): void => {
-    this._fail(new OpenAIRealtimeError('Translation finish was aborted.', null));
+    const error = new OpenAIRealtimeError('Translation finish was aborted.', null);
+    Object.defineProperty(error, 'cause', {
+      value: this._signal?.reason,
+      writable: true,
+      configurable: true,
+    });
+    this._fail(error);
   };
 
   private _fail(error: OpenAIRealtimeError): void {
@@ -456,7 +484,9 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
     }
     if (!this._finishPromise) {
       this._closeTimer = setTimeout(() => {
-        this._fail(new OpenAIRealtimeError('Timed out closing the translation transport.', null));
+        const error = new OpenAIRealtimeError('Timed out closing the translation transport.', null);
+        this._fail(error);
+        this._reportError(error);
       }, 1000);
       const timer: unknown = this._closeTimer;
       if (
