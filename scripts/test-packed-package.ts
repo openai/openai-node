@@ -198,6 +198,7 @@ const packedPackagePath = require('node:path');
         '  export interface ClientOptions {',
         '    followRedirects?: boolean | undefined;',
         '    headers?: Record<string, string> | undefined;',
+        '    maxPayload?: number | undefined;',
         '  }',
         '  export class WebSocket {',
         '    constructor(address: string | URL, options?: ClientOptions);',

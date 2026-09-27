@@ -204,6 +204,66 @@ describe('realtime translation WebSocket', () => {
     });
   });
 
+  test('incomplete optional audio settings remain raw; API errors include the validated reason', async () => {
+    await withServer(async (server, baseURL) => {
+      const session = { id: 'sess', model: 'test', type: 'translation', expires_at: 42 };
+      const malformed = [
+        { input: { transcription: {} } },
+        { input: { noise_reduction: {} } },
+        { input: { transcription: { model: 17 } } },
+        { input: { noise_reduction: { type: 42 } } },
+      ];
+      server.on('connection', (peer) =>
+        peer.on('message', () => {
+          for (const phase of ['created', 'updated']) {
+            for (const audio of malformed) {
+              peer.send(
+                JSON.stringify({
+                  type: `session.${phase}`,
+                  event_id: 'incomplete',
+                  session: { ...session, audio },
+                }),
+              );
+            }
+          }
+          peer.send(
+            JSON.stringify({
+              type: 'session.updated',
+              event_id: 'good',
+              session: {
+                ...session,
+                audio: { input: { transcription: { model: 'test' }, noise_reduction: null } },
+              },
+            }),
+          );
+          peer.send(
+            JSON.stringify({
+              type: 'error',
+              event_id: 'invalid',
+              error: {
+                type: 'invalid_request_error',
+                message: 'Invalid translation language.',
+              },
+            }),
+          );
+          peer.send(JSON.stringify(terminal));
+        }),
+      );
+      const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+      const raw: unknown[] = [];
+      const typed: string[] = [];
+      const errors: string[] = [];
+      connection.on('event', (event) => raw.push(event));
+      connection.on('session.created', (event) => typed.push(event.event_id));
+      connection.on('session.updated', (event) => typed.push(event.event_id));
+      connection.on('error', (error) => errors.push(error.message));
+      await connection.finish({ timeoutMs: 2000 });
+      expect(raw).toHaveLength(malformed.length * 2 + 3);
+      expect(typed).toEqual(['good']);
+      expect(errors).toEqual(['Translation API error: Invalid translation language.']);
+    });
+  });
+
   test('unhandled API errors are reported while handled API errors still allow finishing', async () => {
     await withServer(async (_server, baseURL) => {
       const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));

@@ -84,12 +84,36 @@ function hasRequiredFields(value: unknown, fields: Record<string, (field: unknow
   );
 }
 
+function hasOptionalFields(value: unknown, fields: Record<string, (field: unknown) => boolean>): boolean {
+  return (
+    isObject(value) &&
+    Object.entries(fields).every(([key, check]) => {
+      const field = Object.getOwnPropertyDescriptor(value, key);
+      return field === undefined || check(field.value);
+    })
+  );
+}
+
+const inputAudioFields = {
+  transcription: (value: unknown) => value === null || hasRequiredFields(value, { model: isString }),
+  noise_reduction: (value: unknown) =>
+    value === null ||
+    hasRequiredFields(value, {
+      type: (kind: unknown) => kind === 'near_field' || kind === 'far_field',
+    }),
+} satisfies RequiredFields<Required<RealtimeTranslationSession.Audio.Input>>;
+
+const audioFields = {
+  input: (value: unknown) => hasOptionalFields(value, inputAudioFields),
+  output: (value: unknown) => hasOptionalFields(value, { language: isString }),
+} satisfies RequiredFields<Required<RealtimeTranslationSession.Audio>>;
+
 const sessionFields = {
   id: isString,
   model: isString,
   expires_at: (value: unknown) => typeof value === 'number',
   type: (value: unknown) => value === 'translation',
-  audio: isObject,
+  audio: (value: unknown) => hasOptionalFields(value, audioFields),
 } satisfies RequiredFields<RealtimeTranslationSession>;
 
 const errorFields = { message: isString, type: isString } satisfies RequiredFields<RealtimeError>;
@@ -333,7 +357,10 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
           // SAFETY: The error envelope is preserved as server data, as for other Realtime events.
           // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Forward server error fields unchanged through the existing Realtime error wrapper.
           const apiErrorEvent = event as unknown as RealtimeErrorEvent;
-          const error = new OpenAIRealtimeError('Translation API error.', apiErrorEvent);
+          const error = new OpenAIRealtimeError(
+            `Translation API error: ${apiErrorEvent.error.message}`,
+            apiErrorEvent,
+          );
           this._reportError(error);
         } else if (type !== 'error' && typed) {
           // SAFETY: The wire discriminator selects its listener; future event names remain visible on `event`.
