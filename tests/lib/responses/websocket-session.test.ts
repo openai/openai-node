@@ -151,6 +151,46 @@ test('caller-fed provisional output borrows no reader and leaves other lanes and
   });
 });
 
+test.each([
+  ['missing arguments', { type: 'function_call', id: 'fc', name: 'data', call_id: 'c' }],
+  ['numeric arguments', { type: 'function_call', id: 'fc', name: 'data', call_id: 'c', arguments: 1 }],
+  ['null arguments', { type: 'function_call', id: 'fc', name: 'data', call_id: 'c', arguments: null }],
+  ['missing name', { type: 'function_call', id: 'fc', call_id: 'c', arguments: '' }],
+  ['non-string name', { type: 'function_call', id: 'fc', name: 123, call_id: 'c', arguments: '' }],
+  ['custom non-string input', { type: 'custom_tool_call', id: 'fc', name: 'data', call_id: 'c', input: {} }],
+  ['custom missing input', { type: 'custom_tool_call', id: 'fc', name: 'data', call_id: 'c' }],
+])('raw output with %s never enters a typed provisional snapshot', async (_label, item) => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane();
+    const preview = new ResponsesWebSocketAccumulator();
+    const signal = AbortSignal.timeout(3000);
+    try {
+      // Both lifecycle output and output-item frames cross the same raw boundary.
+      const created = { type: 'response.created', response: { id: 'r', output: [item] } };
+      peer.send(JSON.stringify(created));
+      const raw = await lane.receive({ signal });
+      expect(raw).toEqual(created);
+      preview.add(raw);
+      expect(preview.current?.phase).toBe('unavailable');
+      peer.send(JSON.stringify({ type: 'response.created', response: { id: 'r2' } }));
+      preview.add(await lane.receive({ signal }));
+      const added = { type: 'response.output_item.added', output_index: 0, item };
+      peer.send(JSON.stringify(added));
+      const rawAdded = await lane.receive({ signal });
+      expect(rawAdded).toEqual(added);
+      preview.add(rawAdded);
+      expect(preview.current?.phase).toBe('unavailable');
+      const terminal = { type: 'response.failed', response: { id: 'r2', error: { message: 'synthetic' } } };
+      peer.send(JSON.stringify(terminal));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toEqual({ phase: 'terminal', event: terminal });
+    } finally {
+      session.close();
+    }
+  });
+});
+
 test.each([null, 123, { toString: () => 'coerced' }])(
   'rejects non-string lane ID %j',
   async (value: unknown) => {

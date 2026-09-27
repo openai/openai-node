@@ -7,6 +7,7 @@ import {
   createResponseContext,
   isResponseOutputEvent,
 } from '../../internal/responses/response-accumulator';
+import { hasOwn } from '../../internal/utils';
 import { isObj } from '../../internal/utils/values';
 import type { ResponsesWebSocketEvent } from './responses-websocket-lane';
 
@@ -43,6 +44,28 @@ export class ResponsesWebSocketAccumulator {
     this.#current = undefined;
   }
 
+  // Validate the scaffold that argument deltas extend. SSE starts with typed
+  // models, while raw WebSocket items can omit or corrupt these required fields.
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Output from a raw lane event has not passed a tool schema. This is its opt-in accumulator boundary.
+  static #validateToolScaffold(item: unknown): void {
+    if (!isObj(item)) {
+      throw new OpenAIError('Invalid Responses WebSocket output item');
+    }
+    if (item['type'] === 'function_call' || item['type'] === 'custom_tool_call') {
+      const field = item['type'] === 'function_call' ? 'arguments' : 'input';
+      if (
+        !hasOwn(item, 'name') ||
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The caller feeds raw socket events; validate own required tool fields before exposing a typed snapshot.
+        typeof item['name'] !== 'string' ||
+        !hasOwn(item, field) ||
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Missing and numeric tool data cannot be extended as text.
+        typeof item[field] !== 'string'
+      ) {
+        throw new OpenAIError('Invalid Responses WebSocket tool scaffold');
+      }
+    }
+  }
+
   #start(event: { response?: unknown }): void {
     this.reset();
     if (!isObj(event.response)) {
@@ -56,6 +79,11 @@ export class ResponsesWebSocketAccumulator {
       (outputText !== undefined && typeof outputText !== 'string')
     ) {
       throw new OpenAIError('Invalid Responses WebSocket initial output');
+    }
+    if (output !== undefined) {
+      for (const item of output) {
+        ResponsesWebSocketAccumulator.#validateToolScaffold(item);
+      }
     }
     const snapshot = cloneValidatedResponse(this.#context, {
       output: output ?? [],
@@ -93,6 +121,9 @@ export class ResponsesWebSocketAccumulator {
       }
       if (this.#current?.phase !== 'provisional') {
         throw new OpenAIError("Cannot reconstruct WebSocket output before 'response.created'");
+      }
+      if (event.type === 'response.output_item.added' || event.type === 'response.output_item.done') {
+        ResponsesWebSocketAccumulator.#validateToolScaffold(event.item);
       }
       accumulateWebSocketOutput(event, this.#current.snapshot, this.#context);
     } catch (error) {
