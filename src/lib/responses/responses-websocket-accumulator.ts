@@ -60,7 +60,9 @@ export type ResponsesWebSocketAccumulatorState =
  * Feed the raw events returned by lane.receive(). Use a separate instance per
  * lane. This helper never reads, sends, closes, or registers a listener on a
  * socket; raw events remain in the caller's hands. Tools remain output data.
- * Reading current returns a detached copy.
+ * Use outputAt(event.output_index) to read just the affected accumulated item
+ * as output events arrive. Reading current materializes a detached copy of the
+ * entire response, so request it only when a full snapshot is needed.
  *
  * A socket stream can omit the item/content scaffolding required for deltas.
  * Such a response is marked unavailable until the next creation or terminal
@@ -74,6 +76,7 @@ export class ResponsesWebSocketAccumulator {
     | Exclude<ResponsesWebSocketAccumulatorState, { phase: 'provisional' }>
     | undefined;
 
+  /** Materialize the full state. For per-item progress prefer outputAt(). */
   get current(): ResponsesWebSocketAccumulatorState | undefined {
     if (this.#current?.phase === 'provisional') {
       if (this.#context.outputTextDirty) {
@@ -88,6 +91,19 @@ export class ResponsesWebSocketAccumulator {
       };
     }
     return structuredClone(this.#current);
+  }
+
+  /**
+   * Read one provisional item by its wire output_index, without visiting
+   * previously received output. The copy remains valid after further events
+   * and caller mutations cannot change the accumulator. Returns undefined
+   * outside provisional output (including unknown or malformed scaffolding).
+   */
+  outputAt(outputIndex: number): ProvisionalOutputItem | undefined {
+    if (this.#current?.phase !== 'provisional' || !Number.isInteger(outputIndex) || outputIndex < 0) {
+      return undefined;
+    }
+    return ResponsesWebSocketAccumulator.#copyOutput(this.#current.snapshot.output[outputIndex]);
   }
 
   // Provisional output is made of parsed JSON containers and immutable scalars.

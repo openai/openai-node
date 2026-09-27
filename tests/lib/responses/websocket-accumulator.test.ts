@@ -113,6 +113,19 @@ test('reconstructs text and tool arguments as provisional data while leaving raw
   }
   snapshot.snapshot.output.length = 0;
   expect(accumulator.current).toMatchObject({ snapshot: { output: [{ id: 'msg_1' }, { id: 'fc_1' }] } });
+  const firstItem = accumulator.outputAt(0);
+  expect(firstItem).toMatchObject({ id: 'msg_1', type: 'message' });
+  expect(accumulator.outputAt(1)).toMatchObject({ id: 'fc_1', type: 'function_call' });
+  expect(accumulator.outputAt(-1)).toBeUndefined();
+  expect(accumulator.outputAt(0.5)).toBeUndefined();
+  expect(accumulator.outputAt(2)).toBeUndefined();
+  if (firstItem?.type !== 'message' || !firstItem.content) {
+    throw new Error('Expected message content');
+  }
+  firstItem.content.length = 0;
+  expect(accumulator.outputAt(0)).not.toEqual(firstItem);
+  accumulator.reset();
+  expect(accumulator.outputAt(0)).toBeUndefined();
 });
 
 test.each(['response.completed', 'response.failed', 'response.incomplete', 'error'])(
@@ -128,12 +141,14 @@ test.each(['response.completed', 'response.failed', 'response.incomplete', 'erro
       delta: 'Must not be a final output',
     });
     expect(accumulator.current?.phase).toBe('unavailable');
+    expect(accumulator.outputAt(0)).toBeUndefined();
     const terminal: ResponsesWebSocketEvent =
       type === 'error'
         ? { type, error: { message: 'synthetic rejection' }, stream_id: 'a' }
         : { type, response: { id: 'resp_a', status: type.slice(9), custom: 'kept' }, stream_id: 'a' };
     accumulator.add(terminal);
     expect(accumulator.current).toEqual({ phase: 'terminal', event: terminal });
+    expect(accumulator.outputAt(0)).toBeUndefined();
     accumulator.add({ type: 'keepalive', sequence_number: 7 });
     accumulator.add({ type: 'response.compaction.compacting', sequence_number: 8 });
     expect(accumulator.current).toEqual({ phase: 'terminal', event: terminal });
@@ -252,9 +267,12 @@ test('shared scaffolded events produce identical provisional output over SSE and
   for (const event of events) {
     sse = accumulateResponse(event, sse);
     socket.add(event);
-    expect(socket.current).toEqual({
-      phase: 'provisional',
-      snapshot: { output: sse.output, output_text: sse.output_text },
-    });
+    if ('output_index' in event) {
+      expect(socket.outputAt(event.output_index)).toEqual(sse.output[event.output_index]);
+    }
   }
+  expect(socket.current).toEqual({
+    phase: 'provisional',
+    snapshot: { output: sse?.output, output_text: sse?.output_text },
+  });
 });
