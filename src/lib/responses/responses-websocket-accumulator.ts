@@ -35,7 +35,31 @@ export class ResponsesWebSocketAccumulator {
   #current: ResponsesWebSocketAccumulatorState | undefined;
 
   get current(): ResponsesWebSocketAccumulatorState | undefined {
+    if (this.#current?.phase === 'provisional') {
+      return {
+        phase: 'provisional',
+        snapshot: ResponsesWebSocketAccumulator.#copyOutput(this.#current.snapshot),
+      };
+    }
     return structuredClone(this.#current);
+  }
+
+  // Provisional output is made of parsed JSON containers and immutable scalars.
+  // Detach containers without flattening and copying the accumulated strings at
+  // each read. Error and terminal snapshots use structuredClone as before.
+  static #copyOutput<T>(value: T): T {
+    if (Array.isArray(value)) {
+      // SAFETY: Copying the array preserves every element's type and order.
+      return value.map((item) => ResponsesWebSocketAccumulator.#copyOutput(item)) as T;
+    }
+    if (isObj(value)) {
+      // SAFETY: Copying own data properties preserves the snapshot's JSON shape.
+      // fromEntries defines "__proto__" as an own property instead of invoking a setter.
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [key, ResponsesWebSocketAccumulator.#copyOutput(item)]),
+      ) as T;
+    }
+    return value;
   }
 
   /** Drop retained provisional and terminal state without affecting any lane. */
