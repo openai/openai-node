@@ -639,8 +639,12 @@ function accumulateOutputItemEvent(
       if (context.canonicalSnapshot === snapshot) {
         context.outputTextIndex.append(text.length);
       }
-      if (text && !context.deferOutputText) {
-        snapshot.output_text += text;
+      if (text) {
+        if (context.deferOutputText) {
+          context.outputTextDirty = true;
+        } else {
+          snapshot.output_text += text;
+        }
       }
       return true;
     }
@@ -759,7 +763,11 @@ function accumulateOutputTextEvent(
           event.output_index === snapshot.output.length - 1 &&
           event.content_index === output.content.length - 1
         ) {
-          if (!context.deferOutputText) {
+          if (context.deferOutputText) {
+            if (event.delta !== '') {
+              context.outputTextDirty = true;
+            }
+          } else {
             snapshot.output_text += event.delta;
           }
         } else {

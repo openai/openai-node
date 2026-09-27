@@ -42,7 +42,6 @@ export function ensureCanonicalOutputText(
 ): void {
   if (context.deferOutputText) {
     context.canonicalSnapshot = undefined;
-    context.outputTextDirty = true;
     return;
   }
   if (context.canonicalSnapshot === snapshot) {

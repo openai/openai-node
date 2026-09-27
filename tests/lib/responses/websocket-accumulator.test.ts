@@ -305,6 +305,76 @@ test('derives omitted initial output text but respects explicitly supplied text'
   expect(accumulator.current).toMatchObject({ phase: 'provisional', snapshot: { output_text: '' } });
 });
 
+test.each(['Server override', ''])(
+  'keeps explicit initial text %j until a message actually changes its contribution',
+  (outputText) => {
+    const accumulator = new ResponsesWebSocketAccumulator();
+    accumulator.add({
+      type: 'response.created',
+      response: {
+        id: 'r',
+        output_text: outputText,
+        output: [{ type: 'message', id: 'seed', content: [{ type: 'output_text', text: 'seed' }] }],
+      },
+    });
+    const unchanged: ResponsesWebSocketEvent[] = [
+      {
+        type: 'response.output_item.added',
+        output_index: 1,
+        item: { type: 'message', id: 'm', role: 'assistant', status: 'in_progress', content: [] },
+      },
+      {
+        type: 'response.content_part.added',
+        output_index: 1,
+        content_index: 0,
+        item_id: 'm',
+        part: { type: 'output_text', text: '', annotations: [] },
+      },
+      {
+        type: 'response.output_text.delta',
+        output_index: 1,
+        content_index: 0,
+        item_id: 'm',
+        delta: '',
+      },
+      {
+        type: 'response.output_text.done',
+        output_index: 1,
+        content_index: 0,
+        item_id: 'm',
+        text: '',
+      },
+      {
+        type: 'response.output_item.done',
+        output_index: 1,
+        item: {
+          type: 'message',
+          id: 'm',
+          role: 'assistant',
+          status: 'completed',
+          content: [{ type: 'output_text', text: '', annotations: [] }],
+        },
+      },
+    ];
+    for (const event of unchanged) {
+      accumulator.add(event);
+      expect(accumulator.current).toMatchObject({
+        phase: 'provisional',
+        snapshot: { output_text: outputText },
+      });
+    }
+    accumulator.add({
+      type: 'response.output_item.added',
+      output_index: 2,
+      item: { type: 'message', id: 'real', content: [{ type: 'output_text', text: ' answer' }] },
+    });
+    expect(accumulator.current).toMatchObject({
+      phase: 'provisional',
+      snapshot: { output_text: 'seed answer', output: [{ id: 'seed' }, { id: 'm' }, { id: 'real' }] },
+    });
+  },
+);
+
 test('preserves explicit output_text across non-message completion as SSE does', () => {
   const initial: Response = {
     id: 'resp_scaffold',
