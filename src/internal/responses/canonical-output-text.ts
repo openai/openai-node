@@ -8,6 +8,9 @@ export interface ResponseAccumulatorContext {
   canonicalSnapshot: ResponseOutputSnapshot | undefined;
   outputTextLengths: WeakMap<ResponseOutput, number>;
   outputTextIndex: OutputTextIndex;
+  /** Only the caller-fed WebSocket helper can defer the aggregate until a snapshot is read. */
+  deferOutputText?: boolean;
+  outputTextDirty?: boolean;
 }
 
 export function createCanonicalResponseContext(): ResponseAccumulatorContext {
@@ -37,6 +40,11 @@ export function ensureCanonicalOutputText(
   context: ResponseAccumulatorContext,
   snapshot: ResponseOutputSnapshot,
 ): void {
+  if (context.deferOutputText) {
+    context.canonicalSnapshot = undefined;
+    context.outputTextDirty = true;
+    return;
+  }
   if (context.canonicalSnapshot === snapshot) {
     return;
   }
@@ -82,6 +90,9 @@ export function updateCachedOutputTextLength(
   previousText: string,
   nextText: string,
 ): void {
+  if (context.deferOutputText) {
+    return;
+  }
   const length = context.outputTextLengths.get(output);
   if (length !== undefined) {
     const nextLength = length - previousText.length + nextText.length;
@@ -144,6 +155,10 @@ export function updateOutputText(
   nextText: string,
   contentIndex?: number,
 ): void {
+  if (context.deferOutputText) {
+    context.outputTextDirty = true;
+    return;
+  }
   if (previousText === nextText) {
     return;
   }

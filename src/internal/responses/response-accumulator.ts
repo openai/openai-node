@@ -639,7 +639,7 @@ function accumulateOutputItemEvent(
       if (context.canonicalSnapshot === snapshot) {
         context.outputTextIndex.append(text.length);
       }
-      if (text) {
+      if (text && !context.deferOutputText) {
         snapshot.output_text += text;
       }
       return true;
@@ -759,7 +759,9 @@ function accumulateOutputTextEvent(
           event.output_index === snapshot.output.length - 1 &&
           event.content_index === output.content.length - 1
         ) {
-          snapshot.output_text += event.delta;
+          if (!context.deferOutputText) {
+            snapshot.output_text += event.delta;
+          }
         } else {
           updateOutputText(
             context,

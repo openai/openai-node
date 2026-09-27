@@ -26,6 +26,27 @@ test('raw WebSocket lifecycle and unscaffolded deltas are not SSE input', () => 
   ).toThrow("expected 'response.created'");
 });
 
+test('provisional message metadata is optional until the terminal response arrives', () => {
+  const accumulator = new ResponsesWebSocketAccumulator();
+  accumulator.add({ type: 'response.created', response: { id: 'r' } });
+  accumulator.add({
+    type: 'response.output_item.added',
+    output_index: 0,
+    item: { type: 'message', id: 'm', content: [] },
+  });
+  const state = accumulator.current;
+  if (state?.phase !== 'provisional') {
+    throw new Error('Expected provisional output');
+  }
+  const [message] = state.snapshot.output;
+  if (message?.type !== 'message') {
+    throw new Error('Expected message');
+  }
+  expectTypeOf(message.role).toEqualTypeOf<'assistant' | undefined>();
+  expectTypeOf(message.status).toEqualTypeOf<'in_progress' | 'completed' | 'incomplete' | undefined>();
+  expect(message).toEqual({ type: 'message', id: 'm', content: [] });
+});
+
 test('reconstructs text and tool arguments as provisional data while leaving raw input detached', () => {
   const accumulator = new ResponsesWebSocketAccumulator();
   const created = { type: 'response.created', response: { id: 'resp_partial' } };

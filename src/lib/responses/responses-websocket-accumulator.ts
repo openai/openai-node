@@ -1,6 +1,6 @@
 import { OpenAIError } from '../../core/error';
 import type { ResponseOutputSnapshot } from '../../internal/responses/canonical-output-text';
-import { ensureCanonicalOutputText } from '../../internal/responses/canonical-output-text';
+import { ensureCanonicalOutputText, getOutputText } from '../../internal/responses/canonical-output-text';
 import {
   accumulateWebSocketOutput,
   cloneValidatedResponse,
@@ -9,11 +9,15 @@ import {
 } from '../../internal/responses/response-accumulator';
 import { hasOwn } from '../../internal/utils';
 import { isObj } from '../../internal/utils/values';
+import type { ResponseOutputItem } from '../../resources/responses/responses';
 import type { ResponsesWebSocketEvent } from './responses-websocket-lane';
+
+/** Fields such as role or status can still be omitted on provisional wire items. */
+type ProvisionalOutputItem = Partial<ResponseOutputItem> & Pick<ResponseOutputItem, 'type'>;
 
 /** Provisional output is never substituted for a completed, failed, or incomplete response. */
 export type ResponsesWebSocketAccumulatorState =
-  | { phase: 'provisional'; snapshot: ResponseOutputSnapshot }
+  | { phase: 'provisional'; snapshot: { output: ProvisionalOutputItem[]; output_text: string } }
   | { phase: 'unavailable'; error: Error }
   | { phase: 'terminal'; event: ResponsesWebSocketEvent };
 
@@ -32,10 +36,19 @@ export type ResponsesWebSocketAccumulatorState =
  */
 export class ResponsesWebSocketAccumulator {
   #context = createResponseContext();
-  #current: ResponsesWebSocketAccumulatorState | undefined;
+  #current:
+    | { phase: 'provisional'; snapshot: ResponseOutputSnapshot }
+    | Exclude<ResponsesWebSocketAccumulatorState, { phase: 'provisional' }>
+    | undefined;
 
   get current(): ResponsesWebSocketAccumulatorState | undefined {
     if (this.#current?.phase === 'provisional') {
+      if (this.#context.outputTextDirty) {
+        this.#current.snapshot.output_text = this.#current.snapshot.output
+          .map((output) => getOutputText(this.#context, output))
+          .join('');
+        this.#context.outputTextDirty = false;
+      }
       return {
         phase: 'provisional',
         snapshot: ResponsesWebSocketAccumulator.#copyOutput(this.#current.snapshot),
@@ -98,7 +111,9 @@ export class ResponsesWebSocketAccumulator {
         break;
       }
       case 'response.function_call_arguments.delta':
-      case 'response.custom_tool_call_input.delta': {
+      case 'response.custom_tool_call_input.delta':
+      case 'response.output_text.delta':
+      case 'response.refusal.delta': {
         // oxlint-disable-next-line anti-slop/no-runtime-typeof -- The cloned raw event has not been schema-validated; do not coerce data into typed tool arguments.
         if (typeof event.delta !== 'string') {
           throw new OpenAIError('Invalid Responses WebSocket tool delta');
@@ -116,6 +131,20 @@ export class ResponsesWebSocketAccumulator {
         // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Do not substitute omitted, null or object input for the typed text field.
         if (typeof event.input !== 'string') {
           throw new OpenAIError('Invalid Responses WebSocket custom tool input');
+        }
+        break;
+      }
+      case 'response.output_text.done': {
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Only actual wire text can replace the accumulated message text.
+        if (typeof event.text !== 'string') {
+          throw new OpenAIError('Invalid Responses WebSocket completed text');
+        }
+        break;
+      }
+      case 'response.refusal.done': {
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Refusals use their own finalized wire text field.
+        if (typeof event.refusal !== 'string') {
+          throw new OpenAIError('Invalid Responses WebSocket completed refusal');
         }
         break;
       }
@@ -151,6 +180,7 @@ export class ResponsesWebSocketAccumulator {
     if (outputText === undefined) {
       ensureCanonicalOutputText(this.#context, snapshot);
     }
+    this.#context.deferOutputText = true;
     this.#current = { phase: 'provisional', snapshot };
   }
 

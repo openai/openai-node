@@ -235,6 +235,51 @@ test.each([
   });
 });
 
+test.each([
+  ['output_text', 'response.output_text.delta', { delta: 1 }],
+  ['output_text', 'response.output_text.done', { text: 1 }],
+  ['output_text', 'response.output_text.done', { text: null }],
+  ['output_text', 'response.output_text.done', {}],
+  ['refusal', 'response.refusal.delta', { delta: 1 }],
+  ['refusal', 'response.refusal.done', { refusal: {} }],
+])('malformed %s %s stays raw instead of becoming message text', async (partType, type, payload) => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane();
+    const preview = new ResponsesWebSocketAccumulator();
+    const signal = AbortSignal.timeout(3000);
+    try {
+      const content =
+        partType === 'output_text'
+          ? { type: 'output_text', text: 'previous', annotations: [], logprobs: [] }
+          : { type: 'refusal', refusal: 'previous' };
+      peer.send(
+        JSON.stringify({
+          type: 'response.created',
+          response: {
+            id: 'r',
+            output: [
+              { type: 'message', id: 'm', role: 'assistant', status: 'in_progress', content: [content] },
+            ],
+          },
+        }),
+      );
+      preview.add(await lane.receive({ signal }));
+      const before = preview.current;
+      expect(before?.phase).toBe('provisional');
+      const frame = { type, item_id: 'm', output_index: 0, content_index: 0, ...payload };
+      peer.send(JSON.stringify(frame));
+      const raw = await lane.receive({ signal });
+      expect(raw).toEqual(frame);
+      preview.add(raw);
+      expect(preview.current?.phase).toBe('unavailable');
+      expect(before).toMatchObject({ snapshot: { output: [{ content: [content] }] } });
+    } finally {
+      session.close();
+    }
+  });
+});
+
 test.each([null, 123, { toString: () => 'coerced' }])(
   'rejects non-string lane ID %j',
   async (value: unknown) => {
