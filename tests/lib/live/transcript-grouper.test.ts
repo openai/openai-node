@@ -73,6 +73,72 @@ afterEach(() => vi.useRealTimers());
 
 describe('public Live transcript grouping', () => {
   it.each([
+    {
+      timing: 'assistant silence',
+      options: { assistantSilenceMs: 0.1 },
+      events: [
+        ['assistant', 'First', 0, 200],
+        ['assistant', 'Second', 201, 300],
+      ],
+      expected: [
+        ['assistant', 'First', 'inactivity'],
+        ['assistant', 'Second', 'manual'],
+      ],
+    },
+    {
+      timing: 'speaker separation',
+      options: { minTurnSeparationMs: 0.1 },
+      events: [
+        ['user', 'Question', 0, 200],
+        ['assistant', 'Answer', 200, 400],
+        ['user', 'More', 800, 1000],
+      ],
+      expected: [
+        ['user', 'Question', 'speaker_change'],
+        ['assistant', 'Answer', 'speaker_change'],
+        ['user', 'More', 'manual'],
+      ],
+    },
+    {
+      timing: 'backchannel isolation',
+      options: { minTurnSeparationMs: 0, backchannelIsolationMs: 0.1 },
+      events: [
+        ['user', 'Question', 0, 150],
+        ['assistant', 'okay', 100, 200],
+        ['user', ' More', 800, 1000],
+      ],
+      expected: [['user', 'Question More', 'manual']],
+    },
+  ])('resolves fractional $timing deadlines without blocking', ({ options, events, expected }) => {
+    // A synchronous non-progressing push also blocks Vitest's own timeout.
+    const result = spawnSync(
+      process.execPath,
+      [
+        '-e',
+        `
+        const assert = require('node:assert/strict');
+        const { TranscriptGrouper } = require(process.argv[1]);
+        const { options, events, expected } = JSON.parse(process.argv[2]);
+        const grouper = new TranscriptGrouper(options);
+        const closed = [];
+        grouper.on('segment.closed', ({ segment, reason }) => closed.push([segment.speaker, segment.text, reason]));
+        events.forEach(([speaker, delta, start_ms, end_ms], index) => grouper.push({
+          type: speaker === 'user' ? 'session.input_transcript.delta' : 'session.output_transcript.delta',
+          event_id: String(index), delta, start_ms, end_ms,
+        }));
+        grouper.close();
+        assert.deepEqual(closed, expected);
+        `,
+        compiledFixture('src/helpers/live.ts'),
+        JSON.stringify({ options, events, expected }),
+      ],
+      { encoding: 'utf-8', timeout: 5000 },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stderr).toBe(0);
+  });
+
+  it.each([
     ['overlapping text', 'x', 200, false],
     ['overlapping punctuation', '.', 200, false],
     ['standalone acknowledgment suffix', '.', 700, false],
