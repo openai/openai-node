@@ -1,7 +1,7 @@
 import { once, getEventListeners } from 'node:events';
 import { execFileSync } from 'node:child_process';
 import { compiledFixture } from '../../utils/compiled-fixtures';
-import { createServer } from 'node:http';
+import { createServer } from 'node:https';
 import type { IncomingHttpHeaders } from 'node:http';
 import { vi } from 'vitest';
 import { WebSocketServer } from 'ws';
@@ -10,16 +10,22 @@ import { BedrockOpenAI } from 'openai/bedrock';
 import { createProvider } from 'openai/internal/provider';
 import { OpenAIRealtimeTranslationWS } from 'openai/realtime/translations/ws';
 import type { RealtimeTranslationClientEvent } from 'openai/resources/realtime/realtime';
+import { createX509TestLab } from '../../utils/x509-test-lab';
+
+const lab = createX509TestLab();
 
 async function withServer(run: (server: WebSocketServer, baseURL: string) => Promise<void>): Promise<void> {
-  const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
-  await once(server, 'listening');
-  const address = server.address();
+  const https = createServer({ cert: lab.server.certificate, key: lab.server.privateKey });
+  const server = new WebSocketServer({ server: https });
+  const listening = once(https, 'listening');
+  https.listen(0, '127.0.0.1');
+  await listening;
+  const address = https.address();
   if (!address || typeof address === 'string') {
     throw new Error('Expected local server');
   }
   try {
-    await run(server, `http://127.0.0.1:${address.port}/v1`);
+    await run(server, `https://127.0.0.1:${address.port}/v1`);
   } finally {
     for (const socket of server.clients) {
       socket.terminate();
@@ -27,11 +33,17 @@ async function withServer(run: (server: WebSocketServer, baseURL: string) => Pro
     const closed = once(server, 'close');
     server.close();
     await closed;
+    const stopped = once(https, 'close');
+    https.close();
+    await stopped;
   }
 }
 
 async function open(client: OpenAI): Promise<OpenAIRealtimeTranslationWS> {
-  const connection = await OpenAIRealtimeTranslationWS.create(client, { model: 'translation-test' });
+  const connection = await OpenAIRealtimeTranslationWS.create(client, {
+    model: 'translation-test',
+    options: { ca: lab.certificateAuthority },
+  });
   await once(connection.socket.platformSocket, 'open');
   return connection;
 }
@@ -39,6 +51,35 @@ async function open(client: OpenAI): Promise<OpenAIRealtimeTranslationWS> {
 const terminal = { type: 'session.closed', event_id: 'terminal' };
 
 describe('realtime translation WebSocket', () => {
+  test('incomplete terminal envelopes remain raw and do not discard subsequent translation output', async () => {
+    await withServer(async (server, baseURL) => {
+      const malformed = [
+        { type: 'session.closed' },
+        { type: 'session.closed', event_id: 42 },
+        { type: 'session.closed', event_id: null },
+      ];
+      const trailing = { type: 'session.output_transcript.delta', event_id: 'output', delta: 'bonjour' };
+      server.on('connection', (peer) => {
+        peer.on('message', () => {
+          for (const frame of [...malformed, trailing, terminal]) {
+            peer.send(JSON.stringify(frame));
+          }
+        });
+      });
+      const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+      const raw: unknown[] = [];
+      const typedTerminal: string[] = [];
+      const transcripts: string[] = [];
+      connection.on('event', (event) => raw.push(event));
+      connection.on('session.closed', (event) => typedTerminal.push(event.event_id));
+      connection.on('session.output_transcript.delta', (event) => transcripts.push(event.delta));
+      await connection.finish({ timeoutMs: 1000 });
+      expect(raw).toEqual([...malformed, trailing, terminal]);
+      expect(typedTerminal).toEqual(['terminal']);
+      expect(transcripts).toEqual(['bonjour']);
+    });
+  });
+
   test('one terminal ends delivery even when the peer buffered duplicate or post-terminal output', async () => {
     await withServer(async (server, baseURL) => {
       server.on('connection', (peer) => {
@@ -311,7 +352,7 @@ async function inspectHandshake(
     });
     const connection = await OpenAIRealtimeTranslationWS.create(makeClient(baseURL), {
       model: 'model with space',
-      options,
+      options: { ca: lab.certificateAuthority, ...options },
     });
     await once(connection.socket.platformSocket, 'open');
     connection.close();
@@ -323,6 +364,29 @@ async function inspectHandshake(
 }
 
 describe('translation connection authentication', () => {
+  test('rejects plaintext translation endpoints before resolving credentials or opening a socket', async () => {
+    await withServer(async (server, baseURL) => {
+      const credential = vi.fn(async () => 'synthetic-key');
+      const connected = vi.fn();
+      server.on('connection', connected);
+      const creating = OpenAIRealtimeTranslationWS.create(
+        new OpenAI({ apiKey: credential, baseURL: baseURL.replace('https:', 'http:') }),
+        { model: 'translation-test' },
+      );
+      try {
+        await expect(creating).rejects.toThrow('HTTPS');
+        expect(credential).not.toHaveBeenCalled();
+        expect(connected).not.toHaveBeenCalled();
+      } finally {
+        // Clean up even when regressing to a version that opens the unwanted socket.
+        await creating.then(
+          (connection) => connection.close(),
+          () => {},
+        );
+      }
+    });
+  });
+
   test.each(['defaultQuery', 'baseURL'] as const)(
     'rejects forbidden translation intent from %s before credentials or a connection',
     async (source) => {
@@ -417,23 +481,26 @@ describe('translation connection authentication', () => {
 
   test('rejects redirects even when the caller requests them', async () => {
     let redirected = false;
-    const server = createServer((request, response) => {
-      if (request.url === '/redirected') {
-        redirected = true;
-      }
-      response.writeHead(302, { Location: '/redirected' });
-      response.end();
-    });
+    const server = createServer(
+      { cert: lab.server.certificate, key: lab.server.privateKey },
+      (request, response) => {
+        if (request.url === '/redirected') {
+          redirected = true;
+        }
+        response.writeHead(302, { Location: '/redirected' });
+        response.end();
+      },
+    );
     await once(server.listen(0, '127.0.0.1'), 'listening');
     try {
       const address = server.address();
       if (!address || typeof address === 'string') {
         throw new Error('Expected local server');
       }
-      const client = new OpenAI({ apiKey: 'synthetic-key', baseURL: `http://127.0.0.1:${address.port}/v1` });
+      const client = new OpenAI({ apiKey: 'synthetic-key', baseURL: `https://127.0.0.1:${address.port}/v1` });
       const connection = await OpenAIRealtimeTranslationWS.create(client, {
         model: 'translation-test',
-        options: { followRedirects: true },
+        options: { ca: lab.certificateAuthority, followRedirects: true },
       });
       await once(connection.socket.platformSocket, 'error');
       expect(redirected).toBe(false);

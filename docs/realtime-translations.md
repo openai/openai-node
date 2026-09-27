@@ -37,7 +37,9 @@ and resolves after listeners receive all events through `session.closed` and the
 transport closes.
 Choose a positive, finite timeout in milliseconds (at most 2,147,483,647).
 Repeated calls share the first call's deadline, signal, and result. API error
-events can be nonterminal and do not stop draining. An abort, timeout, or transport
+events can be nonterminal and do not stop draining. A `session.closed` envelope
+without a string `event_id` is delivered only to `event`; it does not finish
+the session or discard later output. An abort, timeout, or transport
 failure rejects. The same deadline includes transport cleanup. A stalled close
 handshake is forcibly terminated and rejects even if listeners already received
 `session.closed`. Transport listeners are released before `finish()` settles.
@@ -46,8 +48,8 @@ handshake is forcibly terminated and rejects even if listeners already received
 call `finish()` to await the terminal event. `connection.close()` closes the
 transport without waiting for remaining output; use it in cleanup paths.
 
-The connection uses the client's base URL, default query, organization, project,
-and default headers. Per-connection `options.headers` overrides headers without
+The connection requires an HTTPS base URL and uses the client's default query,
+organization, project, and default headers. Per-connection `options.headers` overrides headers without
 regard to case; `undefined` preserves a default and `null` removes it. Other
 `options` are Node `ws` options, such as `agent` and `handshakeTimeout`. Redirects
 are always disabled. HTTP `fetch` and `fetchOptions` do not apply.

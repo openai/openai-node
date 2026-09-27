@@ -70,13 +70,13 @@ function buildTranslationURL(client: OpenAI, model: string): URL {
   const endpoint = new URL(client.baseURL);
   endpoint.pathname = `${endpoint.pathname.replace(/\/$/u, '')}/realtime/translations`;
   const url = new URL(client.buildURL(endpoint.toString(), { model }));
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new Error('The translation endpoint must use HTTP or HTTPS.');
+  if (url.protocol !== 'https:') {
+    throw new Error('The translation endpoint must use HTTPS.');
   }
   if (url.searchParams.has('intent')) {
     throw new Error('Realtime translation does not accept an intent query parameter.');
   }
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.protocol = 'wss:';
   return url;
 }
 
@@ -249,7 +249,7 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
       return;
     }
     const { type } = event;
-    const terminal = type === 'session.closed';
+    const terminal = type === 'session.closed' && typeof event['event_id'] === 'string';
     if (terminal) {
       this._inputClosed = true;
       this._terminalReceived = true;
@@ -263,7 +263,7 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
           // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Forward server error fields unchanged through the existing Realtime error wrapper.
           const apiErrorEvent = event as unknown as RealtimeErrorEvent;
           this._emit('error', new OpenAIRealtimeError('Translation API error.', apiErrorEvent));
-        } else if (type !== 'event') {
+        } else if (type !== 'event' && (type !== 'session.closed' || terminal)) {
           // SAFETY: The wire discriminator selects its listener; future event names remain visible on `event`.
           this._emit(type as Exclude<keyof TranslationEvents, 'event' | 'error'>, event as never);
         }
