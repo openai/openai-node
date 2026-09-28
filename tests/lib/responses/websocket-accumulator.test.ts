@@ -28,7 +28,11 @@ test('raw WebSocket lifecycle and unscaffolded deltas are not SSE input', () => 
 
 test('unvalidated provisional metadata remains raw until the terminal response arrives', () => {
   const accumulator = new ResponsesWebSocketAccumulator();
-  accumulator.add({ type: 'response.created', response: { id: 'r' } });
+  const created = {
+    type: 'response.created',
+    response: { id: 'r', metadata: { label: '', count: 0, include: false }, future_optional: null },
+  };
+  accumulator.add(created);
   accumulator.add({
     type: 'response.output_item.added',
     output_index: 0,
@@ -38,6 +42,20 @@ test('unvalidated provisional metadata remains raw until the terminal response a
   if (state?.phase !== 'provisional') {
     throw new Error('Expected provisional output');
   }
+  expectTypeOf(state.snapshot.metadata).toEqualTypeOf<unknown>();
+  expect(state.snapshot).toMatchObject({
+    id: 'r',
+    metadata: { label: '', count: 0, include: false },
+    future_optional: null,
+  });
+  created.response.metadata.label = 'changed input';
+  const returned = state.snapshot.metadata;
+  if (returned && typeof returned === 'object' && 'label' in returned) {
+    returned.label = 'changed snapshot';
+  }
+  expect(accumulator.current).toMatchObject({
+    snapshot: { metadata: { label: '', count: 0, include: false } },
+  });
   const [message] = state.snapshot.output;
   if (message?.type !== 'message') {
     throw new Error('Expected message');
@@ -51,6 +69,15 @@ test('unvalidated provisional metadata remains raw until the terminal response a
   }
   expectTypeOf(selected.role).toEqualTypeOf<unknown>();
   expect(selected).toEqual(message);
+  accumulator.reset();
+  accumulator.add({ type: 'response.created', response: { id: 'without_metadata' } });
+  const absent = accumulator.current;
+  if (absent?.phase !== 'provisional') {
+    throw new Error('Expected provisional output');
+  }
+  expect(absent.snapshot).not.toHaveProperty('metadata');
+  accumulator.add({ type: 'response.created', response: { id: 'null_metadata', metadata: null } });
+  expect(accumulator.current).toMatchObject({ snapshot: { id: 'null_metadata', metadata: null } });
 });
 
 test('reconstructs text and tool arguments as provisional data while leaving raw input detached', () => {
@@ -278,7 +305,10 @@ test('one accumulator per lane isolates state, permits unknown events, and accep
   });
   first.add({ type: 'response.future_event', payload: { untouched: true } });
   expect(first.current).toMatchObject({ phase: 'provisional', snapshot: { output: [{ id: 'first_tool' }] } });
-  expect(second.current).toEqual({ phase: 'provisional', snapshot: { output: [], output_text: '' } });
+  expect(second.current).toEqual({
+    phase: 'provisional',
+    snapshot: { id: 'second', output: [], output_text: '' },
+  });
   const terminal = { type: 'response.completed', response: { id: 'first', output: [], output_text: '' } };
   first.add(terminal);
   expect(first.current).toEqual({ phase: 'terminal', event: terminal });
@@ -411,12 +441,20 @@ test('preserves explicit output_text across non-message completion as SSE does',
     socket.add(event);
     expect(socket.current).toEqual({
       phase: 'provisional',
-      snapshot: { output: sse.output, output_text: sse.output_text },
+      snapshot: sse,
     });
   }
 });
 
 test('shared scaffolded events produce identical provisional output over SSE and WebSocket', () => {
+  const firstLogprob = {
+    token: 'こんにちは',
+    bytes: [227, 129, 147],
+    logprob: -0.1,
+    top_logprobs: [{ token: 'はい', bytes: [227, 129, 175], logprob: -2 }],
+    future_optional: null,
+  };
+  const lastLogprob = { token: '!', bytes: [33], logprob: -0.2, top_logprobs: [] };
   const initial: Response = {
     id: 'resp_scaffold',
     object: 'response',
@@ -425,7 +463,7 @@ test('shared scaffolded events produce identical provisional output over SSE and
     error: null,
     incomplete_details: null,
     instructions: null,
-    metadata: null,
+    metadata: { test_id: 'current_model_logprobs', optional: '' },
     model: 'gpt-5',
     output: [],
     output_text: '',
@@ -459,11 +497,30 @@ test('shared scaffolded events produce identical provisional output over SSE and
       output_index: 0,
       content_index: 0,
       delta: 'こんにちは',
-      logprobs: [],
+      logprobs: [firstLogprob],
+    },
+    {
+      type: 'response.output_text.delta',
+      sequence_number: 4,
+      item_id: 'msg_match',
+      output_index: 0,
+      content_index: 0,
+      delta: '!',
+      logprobs: [lastLogprob],
+    },
+    {
+      type: 'response.output_text.done',
+      sequence_number: 5,
+      item_id: 'msg_match',
+      output_index: 0,
+      content_index: 0,
+      text: 'Final',
+      // The final set is deliberately different: done is authoritative, not another delta.
+      logprobs: [lastLogprob],
     },
     {
       type: 'response.output_item.added',
-      sequence_number: 4,
+      sequence_number: 6,
       output_index: 1,
       item: {
         type: 'function_call',
@@ -475,7 +532,7 @@ test('shared scaffolded events produce identical provisional output over SSE and
     },
     {
       type: 'response.function_call_arguments.delta',
-      sequence_number: 5,
+      sequence_number: 7,
       item_id: 'fc_match',
       output_index: 1,
       delta: '{"q":"hello"}',
@@ -483,15 +540,21 @@ test('shared scaffolded events produce identical provisional output over SSE and
   ];
   const socket = new ResponsesWebSocketAccumulator();
   let sse: Response | undefined;
+  const expectedLogprobs = [[firstLogprob], [firstLogprob, lastLogprob], [lastLogprob]];
   for (const event of events) {
     sse = accumulateResponse(event, sse);
     socket.add(event);
     if ('output_index' in event) {
       expect(socket.outputAt(event.output_index)).toEqual(sse.output[event.output_index]);
     }
+    if (event.type === 'response.output_text.delta' || event.type === 'response.output_text.done') {
+      const expected = expectedLogprobs[event.sequence_number - 3];
+      expect(socket.outputAt(0, { content_index: 0 })).toMatchObject({ logprobs: expected });
+      expect(sse.output[0]).toMatchObject({ content: [{ logprobs: expected }] });
+    }
   }
   expect(socket.current).toEqual({
     phase: 'provisional',
-    snapshot: { output: sse?.output, output_text: sse?.output_text },
+    snapshot: sse,
   });
 });

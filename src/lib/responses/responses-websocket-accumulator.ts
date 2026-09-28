@@ -9,7 +9,7 @@ import {
 } from '../../internal/responses/response-accumulator';
 import { hasOwn } from '../../internal/utils';
 import { isObj } from '../../internal/utils/values';
-import type { ResponseOutputItem } from '../../resources/responses/responses';
+import type { Response, ResponseOutputItem } from '../../resources/responses/responses';
 import type { ResponsesWebSocketEvent } from './responses-websocket-lane';
 
 /** The discriminator is checked; other wire fields can be absent or not schema-valid yet. */
@@ -56,7 +56,13 @@ const outputItemTypes = {
 
 /** Provisional output is never substituted for a completed, failed, or incomplete response. */
 export type ResponsesWebSocketAccumulatorState =
-  | { phase: 'provisional'; snapshot: { output: ProvisionalOutputItem[]; output_text: string } }
+  | {
+      phase: 'provisional';
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- As with output items, only generated field names are typed: provisional wire metadata is not yet validated and must be narrowed by callers.
+      snapshot: { output: ProvisionalOutputItem[]; output_text: string } & {
+        [Field in Exclude<keyof Response, 'output' | 'output_text'>]?: unknown;
+      };
+    }
   | { phase: 'unavailable'; error: Error }
   | { phase: 'terminal'; event: ResponsesWebSocketEvent };
 
@@ -66,6 +72,8 @@ export type ResponsesWebSocketAccumulatorState =
  * Feed the raw events returned by lane.receive(). Use a separate instance per
  * lane. This helper never reads, sends, closes, or registers a listener on a
  * socket; raw events remain in the caller's hands. Tools remain output data.
+ * Provisional response metadata is preserved as received and is not yet schema
+ * validated. Narrow its unknown fields before use. Omitted fields remain absent.
  * Raw deltas give per-event progress. Use outputAt(event.output_index) when an
  * item finishes, or pass its content_index/summary_index to read only a changed
  * part. For citations use content_index and annotation_index together. A full
@@ -315,6 +323,7 @@ export class ResponsesWebSocketAccumulator {
       }
     }
     const snapshot = cloneValidatedResponse(this.#context, {
+      ...event.response,
       output: output ?? [],
       output_text: outputText ?? '',
     });
