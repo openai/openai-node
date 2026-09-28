@@ -667,7 +667,7 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
     }
 
     try {
-      this._sendQueue.flush((data) => this.socket.send(flattenRawData(data)));
+      this._sendQueue.flush((data) => this.socket.send(flattenRawData(data)), { requeueFailed: false });
     } catch (err) {
       this._onError(null, 'could not send queued data', err);
     }

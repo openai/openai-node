@@ -671,7 +671,7 @@ export abstract class ForksWSBase<TSocket extends WebSocketLike> extends ForksEm
     }
 
     try {
-      this._sendQueue.flush((data) => this.socket.send(flattenRawData(data)));
+      this._sendQueue.flush((data) => this.socket.send(flattenRawData(data)), { requeueFailed: false });
     } catch (err) {
       this._onError(null, 'could not send queued data', err);
     }
