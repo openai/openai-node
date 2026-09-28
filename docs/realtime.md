@@ -156,6 +156,34 @@ rt.on('error', (err) => {
 });
 ```
 
+### Disconnection and restoring a session
+
+Realtime does not automatically retry or reconnect. That retry bound is zero:
+an SDK `error` from a protocol rejection can leave the same socket usable,
+while a raw socket `close` (including a transport failure) ends that connection.
+Do not keep retrying permission or authentication failures. Check
+`response.done` to learn the response's outcome; a close alone cannot tell
+you whether a request completed.
+
+Only your application can decide whether to create a new session. Construct a
+new client socket, or use `OpenAIRealtimeWS.create(client, options)` (and
+`OpenAIRealtimeWebSocket.create` for native WebSockets) for a function-based
+credential. Each factory call resolves the current credential anew. For Azure,
+call the appropriate `.azure(client, options)` factory again. Register new
+listeners and wait for the new socket's `open` before sending new session
+configuration. Neither session settings nor conversation context are restored
+automatically. Remove unwanted listeners with `rt.off(event, originalListener)`;
+it detaches that listener only.
+
+`send()` returns `void` and writes to the current raw socket: it is not a
+durable pre-open queue. Wait for `open`; report send/serialization errors via
+an `error` listener. If your application queues commands, it owns that queue.
+It may choose what to do with commands it never attempted. A command already
+passed to `send()` is delivery-uncertain after a disconnect and must not be
+replayed automatically. The SDK does not retry or transfer it to the new
+socket. These rules apply to stable and beta Realtime; other WebSocket
+endpoints can have different contracts.
+
 ## Realtime translation
 
 For Node.js translation sessions and draining final audio and transcripts, see
