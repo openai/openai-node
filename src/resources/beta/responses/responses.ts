@@ -9470,7 +9470,7 @@ export namespace BetaResponseOutputText {
     filename: string;
 
     /**
-     * The index of the file in the list of files.
+     * The index in the output text at which to insert the file citation.
      */
     index: number;
 
@@ -9658,7 +9658,7 @@ export namespace BetaResponseOutputTextAnnotationAddedEvent {
     filename: string;
 
     /**
-     * The index of the file in the list of files.
+     * The index in the output text at which to insert the file citation.
      */
     index: number;
 

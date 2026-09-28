@@ -6850,7 +6850,7 @@ export namespace ResponseOutputText {
     filename: string;
 
     /**
-     * The index of the file in the list of files.
+     * The index in the output text at which to insert the file citation.
      */
     index: number;
 
@@ -7033,7 +7033,7 @@ export namespace ResponseOutputTextAnnotationAddedEvent {
     filename: string;
 
     /**
-     * The index of the file in the list of files.
+     * The index in the output text at which to insert the file citation.
      */
     index: number;
 
