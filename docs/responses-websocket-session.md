@@ -57,6 +57,89 @@ events, cancellation fails and detaches the lane so a later call cannot return a
 response as a complete result. Already-consumed events are not put back.
 Raw events remain observable on the original connection throughout.
 
+## Optional provisional output
+
+Import `ResponsesWebSocketAccumulator` from
+`openai/lib/responses/responses-websocket-accumulator` to observe selected output
+while consuming a lane yourself. Use one accumulator for each lane. It doesn't
+read, send, close the socket, execute tools, or change `lane.finalResponse()`.
+Raw lane events, including future event types, remain available to your code.
+
+```ts
+import { ResponsesWebSocketAccumulator } from 'openai/lib/responses/responses-websocket-accumulator';
+
+// After opening a ResponsesWebSocketSession and registering a lane:
+const accumulator = new ResponsesWebSocketAccumulator();
+lane.create({ model, input: 'Hello' });
+for (;;) {
+  const event = await lane.receive({ signal });
+  accumulator.add(event);
+  // Deltas are already available on event for frequent progress updates.
+  if (
+    event.type === 'response.reasoning_summary_part.done' &&
+    typeof event.output_index === 'number' &&
+    typeof event.summary_index === 'number'
+  ) {
+    const part = accumulator.outputAt(event.output_index, { summary_index: event.summary_index });
+    const summaryText =
+      part && typeof part === 'object' && 'text' in part && typeof part.text === 'string'
+        ? part.text
+        : undefined;
+    // Use summaryText in your application.
+  } else if (
+    event.type === 'response.output_text.annotation.added' &&
+    typeof event.output_index === 'number' &&
+    typeof event.content_index === 'number' &&
+    typeof event.annotation_index === 'number'
+  ) {
+    const annotation = accumulator.outputAt(event.output_index, {
+      content_index: event.content_index,
+      annotation_index: event.annotation_index,
+    });
+    // Inspect this raw citation without copying the part's other citations.
+  } else if (
+    event.type === 'response.content_part.done' &&
+    typeof event.output_index === 'number' &&
+    typeof event.content_index === 'number'
+  ) {
+    const part = accumulator.outputAt(event.output_index, { content_index: event.content_index });
+    // Inspect this content part without copying earlier parts.
+  } else if (event.type === 'response.output_item.done' && typeof event.output_index === 'number') {
+    const item = accumulator.outputAt(event.output_index);
+    // Inspect this finished provisional item.
+  }
+  if (
+    event.type === 'response.completed' ||
+    event.type === 'response.failed' ||
+    event.type === 'response.incomplete' ||
+    event.type === 'error'
+  ) {
+    const terminal = accumulator.current;
+    // terminal.phase is 'terminal'; terminal.event is the original raw payload,
+    // including omitted/null/empty output. Check its type before treating it as success.
+    break;
+  }
+}
+```
+
+`current` returns a detached full snapshot in phase `provisional`; if required
+scaffolding is missing, malformed or unrecognized, its phase is `unavailable`
+with an error. `outputAt()` returns `undefined` when no provisional item/part
+can be reconstructed. The output-item `type` is checked, but other provisional
+fields, parts and citations are raw values: check them before using them as
+typed data. For example, a message's `role` or `status` can be missing or
+different from a completed response. You can continue consuming raw events. A terminal event
+always changes the phase to `terminal` and preserves that event exactly: the
+helper never fills missing terminal output from partial results.
+
+Reading `current` copies the entire accumulated response. Reading `outputAt(index)`
+copies the whole item, including all its parts. For frequent updates consume the
+raw deltas or select just the affected part. If a part has growing annotations,
+add `annotation_index` to its `content_index` selector to read just one entry;
+reading the whole part copies all its annotations. Request full snapshots only at
+meaningful boundaries. Call `reset()` for an explicit new turn; a new
+`response.created` also resets provisional state without affecting the lane.
+
 Closing a lane detaches that consumer, without canceling server work or closing
 the socket. Its ID remains reserved until reconnect, even after a terminal event,
 because steering can create an automatic successor. Continue using the same open
