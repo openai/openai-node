@@ -756,6 +756,68 @@ describe('realtime translation WebSocket', () => {
     });
   });
 
+  test('streams Translation output before input ends and finishes immediately after the last admitted chunk', async () => {
+    await withServer(async (server, baseURL) => {
+      const chunks = [
+        { type: 'session.input_audio_buffer.append', audio: Buffer.alloc(16 * 1024, 0).toString('base64') },
+        { type: 'session.input_audio_buffer.append', audio: Buffer.alloc(16 * 1024, 1).toString('base64') },
+        { type: 'session.input_audio_buffer.append', audio: Buffer.from([2, 0]).toString('base64') },
+      ] as const satisfies readonly RealtimeTranslationClientEvent[];
+      const first = { type: 'session.input_transcript.delta', event_id: 'input-1', delta: 'hello' };
+      const trailing = [
+        { type: 'session.output_transcript.delta', event_id: 'text-1', delta: 'bon' },
+        { type: 'future.translation.event', items: [null, { language: 'future-locale' }] },
+        { type: 'session.output_audio.delta', event_id: 'audio-1', delta: 'AQI=', sample_rate: 24_000 },
+        { type: 'session.output_transcript.delta', event_id: 'text-2', delta: 'jour' },
+        terminal,
+      ];
+      const requests: unknown[] = [];
+      let connections = 0;
+      server.on('connection', (peer) => {
+        connections += 1;
+        peer.on('message', (data) => {
+          const frame: unknown = JSON.parse(data.toString());
+          requests.push(frame);
+          if (requests.length === 1) {
+            peer.send(JSON.stringify(first));
+          }
+          if (requests.length === chunks.length + 1) {
+            for (const event of trailing) {
+              peer.send(JSON.stringify(event));
+            }
+          }
+        });
+      });
+      const connection = await open(new OpenAI({ apiKey: 'synthetic-key', baseURL }));
+      const raw: unknown[] = [];
+      const typed: string[] = [];
+      connection.on('event', (event) => raw.push(event));
+      connection.on('session.input_transcript.delta', (event) => typed.push(event.delta));
+      connection.on('session.output_transcript.delta', (event) => typed.push(event.delta));
+      connection.on('session.output_audio.delta', (event) => typed.push(event.delta));
+      connection.on('session.closed', () => typed.push('closed'));
+
+      expect(connection.send(chunks[0])).toBeUndefined();
+      await vi.waitFor(() => expect(typed).toEqual(['hello']));
+      // Observe output while the remaining input has not even been sent.
+      expect(requests).toEqual([chunks[0]]);
+      expect(raw).toEqual([first]);
+      connection.send(chunks[1]);
+      expect(connection.send(chunks[2])).toBeUndefined();
+      // No direct session.close, awaiting send, or event-loop turn before finish.
+      const finished = connection.finish({ timeoutMs: 2000 });
+      expect(connection.finish({ timeoutMs: 2000 })).toBe(finished);
+      await expect(finished).resolves.toBeUndefined();
+      typed.push('finished');
+
+      expect(requests).toEqual([...chunks, { type: 'session.close' }]);
+      expect(raw).toEqual([first, ...trailing]);
+      expect(typed).toEqual(['hello', 'bon', 'AQI=', 'jour', 'closed', 'finished']);
+      expect(connections).toBe(1);
+      expect(connection.socket.platformSocket.listenerCount('message')).toBe(0);
+    });
+  });
+
   test('a terminal event before finish prevents later protocol close, including reentrant and throwing listeners', async () => {
     await withServer(async (server, baseURL) => {
       const requests: unknown[] = [];
