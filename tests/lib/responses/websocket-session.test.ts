@@ -151,6 +151,89 @@ test('caller-fed provisional output borrows no reader and leaves other lanes and
   });
 });
 
+test('preview preserves supported logprobs while incomplete raw logprobs and another lane remain readable', async () => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane('preview');
+    const neighbor = session.lane('neighbor');
+    const preview = new ResponsesWebSocketAccumulator();
+    const signal = AbortSignal.timeout(3000);
+    try {
+      const created = {
+        type: 'response.created',
+        stream_id: 'preview',
+        response: {
+          id: 'p',
+          metadata: { present: '', count: 0 },
+          future_optional: null,
+          output: [
+            {
+              type: 'message',
+              id: 'm',
+              content: [{ type: 'output_text', text: '', annotations: [], logprobs: [] }],
+            },
+          ],
+        },
+      };
+      peer.send(JSON.stringify(created));
+      const received = await lane.receive({ signal });
+      expect(received).toEqual(created);
+      preview.add(received);
+      expect(preview.current).toMatchObject({
+        snapshot: { id: 'p', metadata: created.response.metadata, future_optional: null },
+      });
+      const complete = {
+        type: 'response.output_text.delta',
+        item_id: 'm',
+        output_index: 0,
+        content_index: 0,
+        delta: 'Hi',
+        stream_id: 'preview',
+        logprobs: [{ token: 'Hi', logprob: -0.5, bytes: [72, 105], top_logprobs: [], extra: null }],
+      };
+      peer.send(JSON.stringify(complete));
+      peer.send(
+        JSON.stringify({ type: 'response.completed', stream_id: 'neighbor', response: response('other') }),
+      );
+      const rawComplete = await lane.receive({ signal });
+      expect(rawComplete).toEqual(complete);
+      preview.add(rawComplete);
+      const earlier = preview.outputAt(0, { content_index: 0 });
+      expect(earlier).toEqual({
+        type: 'output_text',
+        text: 'Hi',
+        annotations: [],
+        logprobs: complete.logprobs,
+      });
+
+      // Valid in the streamed model, but missing bytes required by the final model.
+      const partial = { ...complete, delta: '!', logprobs: [{ token: '!', logprob: -1, top_logprobs: [] }] };
+      peer.send(JSON.stringify(partial));
+      const rawPartial = await lane.receive({ signal });
+      preview.add(rawPartial);
+      expect(rawPartial).toEqual(partial);
+      expect(preview.outputAt(0, { content_index: 0 })).toMatchObject({
+        text: 'Hi!',
+        logprobs: complete.logprobs,
+      });
+      expect(earlier).toMatchObject({ text: 'Hi', logprobs: complete.logprobs });
+      expect(await neighbor.finalResponse({ signal })).toMatchObject({ id: 'other', output: [] });
+
+      const terminal = {
+        type: 'response.completed',
+        stream_id: 'preview',
+        response: { id: 'p', output: [] },
+      };
+      peer.send(JSON.stringify(terminal));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toEqual({ phase: 'terminal', event: terminal });
+      expect(preview.outputAt(0, { content_index: 0 })).toBeUndefined();
+    } finally {
+      session.close();
+    }
+  });
+});
+
 test('idle and reset previews ignore non-output wire events but still reject unscaffolded output', async () => {
   await withSocket(async (connection, peer) => {
     const session = new ResponsesWebSocketSession(connection, limits);
@@ -172,7 +255,10 @@ test('idle and reset previews ignore non-output wire events but still reject uns
       }
       peer.send(JSON.stringify({ type: 'response.created', response: { id: 'r' }, stream_id: 'preview' }));
       preview.add(await lane.receive({ signal }));
-      expect(preview.current).toEqual({ phase: 'provisional', snapshot: { output: [], output_text: '' } });
+      expect(preview.current).toEqual({
+        phase: 'provisional',
+        snapshot: { id: 'r', output: [], output_text: '' },
+      });
       preview.reset();
       peer.send(JSON.stringify({ type: 'keepalive', sequence_number: 3, stream_id: 'preview' }));
       preview.add(await lane.receive({ signal }));

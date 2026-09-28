@@ -2,6 +2,7 @@ import type { Response, ResponseOutputText, ResponseStreamEvent } from '../../re
 import type { ResponseAccumulatorContext, ResponseOutputSnapshot } from './canonical-output-text';
 import { OpenAIError } from '../../error';
 import { hasOwn } from '../utils';
+import { isObj } from '../utils/values';
 import {
   cloneResponse,
   createCanonicalResponseContext,
@@ -742,6 +743,54 @@ function accumulateContentPartDoneEvent(
   }
 }
 
+// Streamed logprobs have a looser type than final output: bytes and even the
+// top token fields may be missing. Do not fabricate them in typed SSE snapshots.
+function isLogprobWithBytes(value: unknown): value is ResponseOutputText.Logprob.TopLogprob {
+  return (
+    isObj(value) &&
+    typeof value['token'] === 'string' &&
+    typeof value['logprob'] === 'number' &&
+    Array.isArray(value['bytes']) &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- This boundary checks each byte against the generated final-output contract before exposing a typed SSE snapshot.
+    value['bytes'].every((byte) => typeof byte === 'number')
+  );
+}
+
+function isOutputLogprobs(value: unknown): value is ResponseOutputText.Logprob[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry) =>
+        isLogprobWithBytes(entry) &&
+        'top_logprobs' in entry &&
+        Array.isArray(entry.top_logprobs) &&
+        entry.top_logprobs.every(isLogprobWithBytes),
+    )
+  );
+}
+
+function accumulateOutputLogprobs(
+  content: ResponseOutputText,
+  event: Extract<ResponseOutputTextEvent, { logprobs: unknown }>,
+): void {
+  const logprobs = structuredClone(event.logprobs);
+  if (!isOutputLogprobs(logprobs)) {
+    return;
+  }
+  if (event.type === 'response.output_text.done') {
+    if (logprobs.length > 0 || (Array.isArray(content.logprobs) && content.logprobs.length > 0)) {
+      content.logprobs = logprobs;
+    }
+  } else if (logprobs.length > 0) {
+    if (!Array.isArray(content.logprobs)) {
+      content.logprobs = [];
+    }
+    for (const logprob of logprobs) {
+      content.logprobs.push(logprob);
+    }
+  }
+}
+
 function accumulateOutputTextEvent(
   event: ResponseAccumulatorEvent,
   snapshot: ResponseOutputSnapshot,
@@ -755,6 +804,7 @@ function accumulateOutputTextEvent(
         if (content.type !== 'output_text') {
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
+        accumulateOutputLogprobs(content, event);
         const previousText = content.text;
         ensureCanonicalOutputText(context, snapshot);
         content.text = previousText + event.delta;
@@ -790,6 +840,7 @@ function accumulateOutputTextEvent(
         if (content.type !== 'output_text') {
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
+        accumulateOutputLogprobs(content, event);
         const previousText = content.text;
         ensureCanonicalOutputText(context, snapshot);
         content.text = event.text;
