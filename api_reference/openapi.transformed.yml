@@ -1236,24 +1236,18 @@ paths:
             {
               "task": "transcribe",
               "language": "english",
-              "duration": 8.470000267028809,
-              "text": "The beach was a popular spot on a hot summer day. People were swimming in the ocean, building sandcastles, and playing beach volleyball.",
+              "duration": 0.5,
+              "text": "Hello.",
               "words": [
                 {
-                  "word": "The",
+                  "word": "Hello",
                   "start": 0.0,
-                  "end": 0.23999999463558197
-                },
-                ...
-                {
-                  "word": "volleyball",
-                  "start": 7.400000095367432,
-                  "end": 7.900000095367432
+                  "end": 0.5
                 }
               ],
               "usage": {
                 "type": "duration",
-                "seconds": 9
+                "seconds": 1
               }
             }
         - title: Segment timestamps
@@ -1321,8 +1315,8 @@ paths:
             {
               "task": "transcribe",
               "language": "english",
-              "duration": 8.470000267028809,
-              "text": "The beach was a popular spot on a hot summer day. People were swimming in the ocean, building sandcastles, and playing beach volleyball.",
+              "duration": 3.32,
+              "text": "The beach was a popular spot on a hot summer day.",
               "segments": [
                 {
                   "id": 0,
@@ -1337,12 +1331,11 @@ paths:
                   "avg_logprob": -0.2860786020755768,
                   "compression_ratio": 1.2363636493682861,
                   "no_speech_prob": 0.00985979475080967
-                },
-                ...
+                }
               ],
               "usage": {
                 "type": "duration",
-                "seconds": 9
+                "seconds": 4
               }
             }
   /audio/translations:
@@ -1956,14 +1949,13 @@ paths:
                   },
                   "metadata": {
                     "customer_id": "user_123456789",
-                    "batch_description": "Nightly job",
+                    "batch_description": "Nightly job"
                   }
-                },
-                { ... },
+                }
               ],
               "first_id": "batch_abc123",
-              "last_id": "batch_abc456",
-              "has_more": true
+              "last_id": "batch_abc123",
+              "has_more": false
             }
   /batches/{batch_id}:
     get:
@@ -2322,7 +2314,27 @@ paths:
               $ref: '#/components/schemas/CreateChatCompletionRequest'
       responses:
         '200':
-          description: OK
+          description: |
+            Returns a Chat Completion object for a non-streaming request.
+
+            If `stream` is `true`, returns server-sent events (`text/event-stream`).
+            Successful chunk frames contain a JSON Chat Completion chunk matching
+            `CreateChatCompletionStreamResponse`. On normal completion, the final
+            frame is:
+
+            ```text
+            data: [DONE]
+
+            ```
+
+            The final frame ends with a blank line. `[DONE]` is literal text, not a
+            JSON chunk, and this frame has no `event: done` field.
+
+            If a failure occurs after streaming has started, a data frame may
+            contain a JSON object with an `error` field instead of a completion
+            chunk. The streaming schema describes successful JSON chunks, not
+            error frames or the completion marker. An interrupted stream may end
+            without the marker.
           content:
             application/json:
               schema:
@@ -2698,14 +2710,17 @@ paths:
                       Console.Write(completionUpdate.ContentUpdate[0].Text);
                   }
               }
-          response: |
-            {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"gpt-6-astra", "system_fingerprint": "fp_44709d6fcb", "choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}]}
+          response: |+
+            data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"gpt-6-astra", "system_fingerprint": "fp_44709d6fcb", "choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}]}
 
-            {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"gpt-6-astra", "system_fingerprint": "fp_44709d6fcb", "choices":[{"index":0,"delta":{"content":"Hello"},"logprobs":null,"finish_reason":null}]}
+            data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"gpt-6-astra", "system_fingerprint": "fp_44709d6fcb", "choices":[{"index":0,"delta":{"content":"Hello"},"logprobs":null,"finish_reason":null}]}
 
-            ....
+            : Intermediate chat completion chunks omitted.
 
-            {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"gpt-6-astra", "system_fingerprint": "fp_44709d6fcb", "choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"stop"}]}
+            data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"gpt-6-astra", "system_fingerprint": "fp_44709d6fcb", "choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"stop"}]}
+
+            data: [DONE]
+
         - title: Functions
           request:
             curl: |
@@ -4785,18 +4800,20 @@ paths:
                 -H "Authorization: Bearer $OPENAI_API_KEY" \
                 -H "Content-Type: application/json" \
                 -d '{
-                  "input": "The food was delicious and the waiter...",
-                  "model": "text-embedding-ada-002",
-                  "encoding_format": "float"
+                  "input": "Hello world",
+                  "model": "text-embedding-3-small",
+                  "encoding_format": "float",
+                  "dimensions": 3
                 }'
             python: |
               from openai import OpenAI
               client = OpenAI()
 
               client.embeddings.create(
-                model="text-embedding-ada-002",
-                input="The food was delicious and the waiter...",
-                encoding_format="float"
+                model="text-embedding-3-small",
+                input="Hello world",
+                encoding_format="float",
+                dimensions=3
               )
             javascript: |
               import OpenAI from "openai";
@@ -4805,9 +4822,10 @@ paths:
 
               async function main() {
                 const embedding = await openai.embeddings.create({
-                  model: "text-embedding-ada-002",
-                  input: "The quick brown fox jumped over the lazy dog",
+                  model: "text-embedding-3-small",
+                  input: "Hello world",
                   encoding_format: "float",
+                  dimensions: 3,
                 });
 
                 console.log(embedding);
@@ -4824,7 +4842,8 @@ paths:
                   apiKey: Environment.GetEnvironmentVariable("OPENAI_API_KEY")
               );
 
-              OpenAIEmbedding embedding = client.GenerateEmbedding(input: "The quick brown fox jumped over the lazy dog");
+              EmbeddingGenerationOptions options = new() { Dimensions = 3 };
+              OpenAIEmbedding embedding = client.GenerateEmbedding(input: "Hello world", options: options);
               ReadOnlyMemory<float> vector = embedding.ToFloats();
 
               for (int i = 0; i < vector.Length; i++)
@@ -4838,18 +4857,17 @@ paths:
                 {
                   "object": "embedding",
                   "embedding": [
-                    0.0023064255,
-                    -0.009327292,
-                    .... (1536 floats total for ada-002)
-                    -0.0028842222,
+                    0.26726124,
+                    0.53452248,
+                    0.80178373
                   ],
                   "index": 0
                 }
               ],
-              "model": "text-embedding-ada-002",
+              "model": "text-embedding-3-small",
               "usage": {
-                "prompt_tokens": 8,
-                "total_tokens": 8
+                "prompt_tokens": 2,
+                "total_tokens": 2
               }
             }
   /evals:
@@ -8117,7 +8135,7 @@ paths:
         examples:
           request:
             curl: |
-              curl https://api.openai.com/v1/fine_tuning/jobs?limit=2&metadata[key]=value \
+              curl "https://api.openai.com/v1/fine_tuning/jobs?limit=2&metadata[key]=value" \
                 -H "Authorization: Bearer $OPENAI_API_KEY"
             python: |
               from openai import OpenAI
@@ -8153,13 +8171,31 @@ paths:
                   "status": "queued",
                   "validation_file": null,
                   "training_file": "file-abc123",
+                  "error": null,
+                  "finished_at": null,
+                  "trained_tokens": null,
+                  "seed": 42,
+                  "hyperparameters": {
+                    "batch_size": "auto",
+                    "learning_rate_multiplier": "auto",
+                    "n_epochs": "auto"
+                  },
+                  "method": {
+                    "type": "supervised",
+                    "supervised": {
+                      "hyperparameters": {
+                        "batch_size": "auto",
+                        "learning_rate_multiplier": "auto",
+                        "n_epochs": "auto"
+                      }
+                    }
+                  },
                   "metadata": {
                     "key": "value"
                   }
-                },
-                { ... },
-                { ... }
-              ], "has_more": true
+                }
+              ],
+              "has_more": false
             }
   /fine_tuning/jobs/{fine_tuning_job_id}:
     get:
@@ -9796,13 +9832,17 @@ paths:
                 -H "Content-Type: application/json" \
                 -H "Authorization: Bearer $OPENAI_API_KEY" \
                 -d '{
+                  "model": "omni-moderation-latest",
                   "input": "I want to kill them."
                 }'
             python: |
               from openai import OpenAI
               client = OpenAI()
 
-              moderation = client.moderations.create(input="I want to kill them.")
+              moderation = client.moderations.create(
+                  model="omni-moderation-latest",
+                  input="I want to kill them.",
+              )
               print(moderation)
             javascript: |
               import OpenAI from "openai";
@@ -9810,7 +9850,10 @@ paths:
               const openai = new OpenAI();
 
               async function main() {
-                const moderation = await openai.moderations.create({ input: "I want to kill them." });
+                const moderation = await openai.moderations.create({
+                  model: "omni-moderation-latest",
+                  input: "I want to kill them.",
+                });
 
                 console.log(moderation);
               }
@@ -9830,7 +9873,7 @@ paths:
           response: |
             {
               "id": "modr-AB8CjOTu2jiq12hp1AQPfeqFWaORR",
-              "model": "text-moderation-007",
+              "model": "omni-moderation-latest",
               "results": [
                 {
                   "flagged": true,
@@ -9845,20 +9888,65 @@ paths:
                     "self-harm/intent": false,
                     "self-harm/instructions": false,
                     "harassment/threatening": true,
-                    "violence": true
+                    "violence": true,
+                    "illicit": false,
+                    "illicit/violent": false
                   },
                   "category_scores": {
-                    "sexual": 0.000011726012417057063,
+                    "sexual": 1.1726012417057063e-05,
                     "hate": 0.22706663608551025,
                     "harassment": 0.5215635299682617,
-                    "self-harm": 2.227119921371923e-6,
-                    "sexual/minors": 7.107352217872176e-8,
+                    "self-harm": 2.227119921371923e-06,
+                    "sexual/minors": 7.107352217872176e-08,
                     "hate/threatening": 0.023547329008579254,
-                    "violence/graphic": 0.00003391829886822961,
-                    "self-harm/intent": 1.646940972932498e-6,
-                    "self-harm/instructions": 1.1198755256458526e-9,
+                    "violence/graphic": 3.391829886822961e-05,
+                    "self-harm/intent": 1.646940972932498e-06,
+                    "self-harm/instructions": 1.1198755256458526e-09,
                     "harassment/threatening": 0.5694745779037476,
-                    "violence": 0.9971134662628174
+                    "violence": 0.9971134662628174,
+                    "illicit": 0.001,
+                    "illicit/violent": 0.001
+                  },
+                  "category_applied_input_types": {
+                    "sexual": [
+                      "text"
+                    ],
+                    "hate": [
+                      "text"
+                    ],
+                    "harassment": [
+                      "text"
+                    ],
+                    "self-harm": [
+                      "text"
+                    ],
+                    "sexual/minors": [
+                      "text"
+                    ],
+                    "hate/threatening": [
+                      "text"
+                    ],
+                    "violence/graphic": [
+                      "text"
+                    ],
+                    "self-harm/intent": [
+                      "text"
+                    ],
+                    "self-harm/instructions": [
+                      "text"
+                    ],
+                    "harassment/threatening": [
+                      "text"
+                    ],
+                    "violence": [
+                      "text"
+                    ],
+                    "illicit": [
+                      "text"
+                    ],
+                    "illicit/violent": [
+                      "text"
+                    ]
                   }
                 }
               ]
@@ -10222,6 +10310,7 @@ paths:
               "name": "Main Admin Key",
               "redacted_value": "sk-admin...xyz",
               "created_at": 1711471533,
+              "expires_at": null,
               "last_used_at": 1711471534,
               "owner": {
                 "type": "user",
@@ -11331,6 +11420,7 @@ paths:
                         "id": "group_01J1F8ABCDXYZ",
                         "name": "Support Team",
                         "created_at": 1711471533,
+                        "group_type": "group",
                         "is_scim_managed": false
                     }
                 ],
@@ -11408,6 +11498,7 @@ paths:
                 "id": "group_01J1F8ABCDXYZ",
                 "name": "Support Team",
                 "created_at": 1711471533,
+                "group_type": "group",
                 "is_scim_managed": false
             }
   /organization/groups/{group_id}:
@@ -11700,7 +11791,13 @@ paths:
                             "name": "Ada Lovelace",
                             "email": "ada@example.com"
                         },
-                        "metadata": {}
+                        "metadata": {},
+                        "assignment_sources": [
+                            {
+                                "principal_id": "group_01J1F8ABCDXYZ",
+                                "principal_type": "group"
+                            }
+                        ]
                     }
                 ],
                 "has_more": false,
@@ -12305,7 +12402,8 @@ paths:
                   "status": "accepted",
                   "created_at": 1711471533,
                   "expires_at": 1711471533,
-                  "accepted_at": 1711471533
+                  "accepted_at": 1711471533,
+                  "projects": []
                 }
               ],
               "first_id": "invite-abc",
@@ -12465,7 +12563,8 @@ paths:
                 "status": "accepted",
                 "created_at": 1711471533,
                 "expires_at": 1711471533,
-                "accepted_at": 1711471533
+                "accepted_at": 1711471533,
+                "projects": []
             }
     delete:
       security:
@@ -13608,6 +13707,7 @@ paths:
                         "project_id": "proj_abc123",
                         "group_id": "group_01J1F8ABCDXYZ",
                         "group_name": "Support Team",
+                        "group_type": "group",
                         "created_at": 1711471533
                     }
                 ],
@@ -13687,6 +13787,7 @@ paths:
                 "project_id": "proj_abc123",
                 "group_id": "group_01J1F8ABCDXYZ",
                 "group_name": "Support Team",
+                "group_type": "group",
                 "created_at": 1711471533
             }
   /organization/projects/{project_id}/groups/{group_id}:
@@ -14253,6 +14354,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: project_not_found
+                  message: The project proj_abc was not found
+                  type: invalid_request_error
+                  param: null
       x-oaiMeta:
         group: administration
         examples:
@@ -14277,11 +14384,6 @@ paths:
                 "first_id": "rl-ada",
                 "last_id": "rl-ada",
                 "has_more": false
-            }
-          error_response: |
-            {
-                "code": 404,
-                "message": "The project {project_id} was not found"
             }
   /organization/projects/{project_id}/rate_limits/{rate_limit_id}:
     post:
@@ -14337,6 +14439,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: project_not_found
+                  message: The project proj_abc was not found
+                  type: invalid_request_error
+                  param: null
       x-oaiMeta:
         group: administration
         examples:
@@ -14357,11 +14465,6 @@ paths:
                 "max_tokens_per_1_minute": 150000,
                 "max_images_per_1_minute": 10
               }
-          error_response: |
-            {
-                "code": 404,
-                "message": "The project {project_id} was not found"
-            }
   /organization/projects/{project_id}/service_accounts:
     get:
       security:
@@ -18060,7 +18163,13 @@ paths:
                             "name": "Ada Lovelace",
                             "email": "ada@example.com"
                         },
-                        "metadata": {}
+                        "metadata": {},
+                        "assignment_sources": [
+                            {
+                                "principal_id": "user_abc123",
+                                "principal_type": "user"
+                            }
+                        ]
                     }
                 ],
                 "has_more": false,
@@ -18388,7 +18497,13 @@ paths:
                             "name": "Ada Lovelace",
                             "email": "ada@example.com"
                         },
-                        "metadata": {}
+                        "metadata": {},
+                        "assignment_sources": [
+                            {
+                                "principal_id": "group_01J1F8ABCDXYZ",
+                                "principal_type": "group"
+                            }
+                        ]
                     }
                 ],
                 "has_more": false,
@@ -19117,7 +19232,13 @@ paths:
                             "name": "Ada Lovelace",
                             "email": "ada@example.com"
                         },
-                        "metadata": {}
+                        "metadata": {},
+                        "assignment_sources": [
+                            {
+                                "principal_id": "user_abc123",
+                                "principal_type": "user"
+                            }
+                        ]
                     }
                 ],
                 "has_more": false,
@@ -20816,35 +20937,36 @@ paths:
                       Console.Write(outputTextDeltaUpdate.Delta);
                   }
               }
-          response: |
+          response: |+
             event: response.created
-            data: {"type":"response.created","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","access_programs":null,"created_at":1741290958,"status":"in_progress","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-6-astra","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+            data: {"type":"response.created","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","access_programs":null,"created_at":1741290958,"status":"in_progress","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-6-astra","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}},"sequence_number":0}
 
             event: response.in_progress
-            data: {"type":"response.in_progress","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","access_programs":null,"created_at":1741290958,"status":"in_progress","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-6-astra","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+            data: {"type":"response.in_progress","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","access_programs":null,"created_at":1741290958,"status":"in_progress","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-6-astra","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}},"sequence_number":1}
 
             event: response.output_item.added
-            data: {"type":"response.output_item.added","output_index":0,"item":{"id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","type":"message","status":"in_progress","role":"assistant","content":[]}}
+            data: {"type":"response.output_item.added","output_index":0,"item":{"id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","type":"message","status":"in_progress","role":"assistant","content":[]},"sequence_number":2}
 
             event: response.content_part.added
-            data: {"type":"response.content_part.added","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}
+            data: {"type":"response.content_part.added","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"part":{"type":"output_text","text":"","annotations":[],"logprobs":[]},"sequence_number":3}
 
             event: response.output_text.delta
-            data: {"type":"response.output_text.delta","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"delta":"Hi"}
+            data: {"type":"response.output_text.delta","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"delta":"Hi","sequence_number":4,"logprobs":[]}
 
-            ...
+            : Intermediate response events omitted.
 
             event: response.output_text.done
-            data: {"type":"response.output_text.done","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"text":"Hi there! How can I assist you today?"}
+            data: {"type":"response.output_text.done","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"text":"Hi there! How can I assist you today?","sequence_number":10,"logprobs":[]}
 
             event: response.content_part.done
-            data: {"type":"response.content_part.done","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"part":{"type":"output_text","text":"Hi there! How can I assist you today?","annotations":[]}}
+            data: {"type":"response.content_part.done","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"part":{"type":"output_text","text":"Hi there! How can I assist you today?","annotations":[],"logprobs":[]},"sequence_number":11}
 
             event: response.output_item.done
-            data: {"type":"response.output_item.done","output_index":0,"item":{"id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Hi there! How can I assist you today?","annotations":[]}]}}
+            data: {"type":"response.output_item.done","output_index":0,"item":{"id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Hi there! How can I assist you today?","annotations":[],"logprobs":[]}]},"sequence_number":12}
 
             event: response.completed
-            data: {"type":"response.completed","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","access_programs":null,"created_at":1741290958,"status":"completed","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-6-astra","output":[{"id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Hi there! How can I assist you today?","annotations":[]}]}],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":{"input_tokens":37,"output_tokens":11,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":48},"user":null,"metadata":{}}}
+            data: {"type":"response.completed","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","access_programs":null,"created_at":1741290958,"status":"completed","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-6-astra","output":[{"id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Hi there! How can I assist you today?","annotations":[],"logprobs":[]}]}],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":{"input_tokens":37,"output_tokens":11,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":48,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0}},"user":null,"metadata":{}},"sequence_number":13}
+
         - title: Functions
           request:
             curl: |
@@ -21375,8 +21497,8 @@ paths:
               print(response)
           response: |
             {
-              "id": "resp_6786a1bec27481909a17d673315b29f6",
-              "object": "response",
+              "id": "resp_123",
+              "object": "response.deleted",
               "deleted": true
             }
   /responses/{response_id}/cancel:
@@ -21872,35 +21994,35 @@ paths:
               }
 
               main();
-          response: |
+          response: |+
             event: thread.created
-            data: {"id":"thread_123","object":"thread","created_at":1710348075,"metadata":{}}
+            data: {"id":"thread_123","object":"thread","created_at":1710348075,"metadata":{},"tool_resources":{}}
 
             event: thread.run.created
-            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710348675,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[],"tool_resources":{},"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
+            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710348675,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[],"tool_resources":{},"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.queued
-            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710348675,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[],"tool_resources":{},"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
+            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710348675,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[],"tool_resources":{},"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.in_progress
-            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"in_progress","started_at":null,"expires_at":1710348675,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[],"tool_resources":{},"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
+            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"in_progress","started_at":null,"expires_at":1710348675,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[],"tool_resources":{},"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.step.created
-            data: {"id":"step_001","object":"thread.run.step","created_at":1710348076,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710348675,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":null}
+            data: {"id":"step_001","object":"thread.run.step","created_at":1710348076,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710348675,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":null,"expired_at":null,"metadata":{}}
 
             event: thread.run.step.in_progress
-            data: {"id":"step_001","object":"thread.run.step","created_at":1710348076,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710348675,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":null}
+            data: {"id":"step_001","object":"thread.run.step","created_at":1710348076,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710348675,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":null,"expired_at":null,"metadata":{}}
 
             event: thread.message.created
-            data: {"id":"msg_001","object":"thread.message","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[], "metadata":{}}
+            data: {"id":"msg_001","object":"thread.message","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[], "metadata":{},"attachments":[]}
 
             event: thread.message.in_progress
-            data: {"id":"msg_001","object":"thread.message","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[], "metadata":{}}
+            data: {"id":"msg_001","object":"thread.message","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[], "metadata":{},"attachments":[]}
 
             event: thread.message.delta
             data: {"id":"msg_001","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":"Hello","annotations":[]}}]}}
 
-            ...
+            : Intermediate Assistant events omitted.
 
             event: thread.message.delta
             data: {"id":"msg_001","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":" today"}}]}}
@@ -21909,16 +22031,17 @@ paths:
             data: {"id":"msg_001","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":"?"}}]}}
 
             event: thread.message.completed
-            data: {"id":"msg_001","object":"thread.message","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"completed","incomplete_details":null,"incomplete_at":null,"completed_at":1710348077,"role":"assistant","content":[{"type":"text","text":{"value":"Hello! How can I assist you today?","annotations":[]}}], "metadata":{}}
+            data: {"id":"msg_001","object":"thread.message","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"completed","incomplete_details":null,"incomplete_at":null,"completed_at":1710348077,"role":"assistant","content":[{"type":"text","text":{"value":"Hello! How can I assist you today?","annotations":[]}}], "metadata":{},"attachments":[]}
 
             event: thread.run.step.completed
-            data: {"id":"step_001","object":"thread.run.step","created_at":1710348076,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"completed","cancelled_at":null,"completed_at":1710348077,"expires_at":1710348675,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":{"prompt_tokens":20,"completion_tokens":11,"total_tokens":31}}
+            data: {"id":"step_001","object":"thread.run.step","created_at":1710348076,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"completed","cancelled_at":null,"completed_at":1710348077,"expires_at":1710348675,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":{"prompt_tokens":20,"completion_tokens":11,"total_tokens":31},"expired_at":null,"metadata":{}}
 
             event: thread.run.completed
-            {"id":"run_123","object":"thread.run","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","status":"completed","started_at":1713226836,"expires_at":null,"cancelled_at":null,"failed_at":null,"completed_at":1713226837,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":{"prompt_tokens":345,"completion_tokens":11,"total_tokens":356},"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
+            data: {"id":"run_123","object":"thread.run","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","status":"completed","started_at":1713226836,"expires_at":null,"cancelled_at":null,"failed_at":null,"completed_at":1713226837,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":{"prompt_tokens":345,"completion_tokens":11,"total_tokens":356},"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: done
             data: [DONE]
+
         - title: Streaming with Functions
           request:
             curl: |
@@ -22040,24 +22163,24 @@ paths:
               }
 
               main();
-          response: |
+          response: |+
             event: thread.created
-            data: {"id":"thread_123","object":"thread","created_at":1710351818,"metadata":{}}
+            data: {"id":"thread_123","object":"thread","created_at":1710351818,"metadata":{},"tool_resources":{}}
 
             event: thread.run.created
-            data: {"id":"run_123","object":"thread.run","created_at":1710351818,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710352418,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710351818,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710352418,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.queued
-            data: {"id":"run_123","object":"thread.run","created_at":1710351818,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710352418,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710351818,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710352418,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.in_progress
-            data: {"id":"run_123","object":"thread.run","created_at":1710351818,"assistant_id":"asst_123","thread_id":"thread_123","status":"in_progress","started_at":1710351818,"expires_at":1710352418,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710351818,"assistant_id":"asst_123","thread_id":"thread_123","status":"in_progress","started_at":1710351818,"expires_at":1710352418,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.step.created
-            data: {"id":"step_001","object":"thread.run.step","created_at":1710351819,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"tool_calls","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710352418,"failed_at":null,"last_error":null,"step_details":{"type":"tool_calls","tool_calls":[]},"usage":null}
+            data: {"id":"step_001","object":"thread.run.step","created_at":1710351819,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"tool_calls","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710352418,"failed_at":null,"last_error":null,"step_details":{"type":"tool_calls","tool_calls":[]},"usage":null,"expired_at":null,"metadata":{}}
 
             event: thread.run.step.in_progress
-            data: {"id":"step_001","object":"thread.run.step","created_at":1710351819,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"tool_calls","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710352418,"failed_at":null,"last_error":null,"step_details":{"type":"tool_calls","tool_calls":[]},"usage":null}
+            data: {"id":"step_001","object":"thread.run.step","created_at":1710351819,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"tool_calls","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710352418,"failed_at":null,"last_error":null,"step_details":{"type":"tool_calls","tool_calls":[]},"usage":null,"expired_at":null,"metadata":{}}
 
             event: thread.run.step.delta
             data: {"id":"step_001","object":"thread.run.step.delta","delta":{"step_details":{"type":"tool_calls","tool_calls":[{"index":0,"id":"call_XXNp8YGaFrjrSjgqxtC8JJ1B","type":"function","function":{"name":"get_current_weather","arguments":"","output":null}}]}}}
@@ -22068,7 +22191,7 @@ paths:
             event: thread.run.step.delta
             data: {"id":"step_001","object":"thread.run.step.delta","delta":{"step_details":{"type":"tool_calls","tool_calls":[{"index":0,"type":"function","function":{"arguments":"location"}}]}}}
 
-            ...
+            : Intermediate Assistant events omitted.
 
             event: thread.run.step.delta
             data: {"id":"step_001","object":"thread.run.step.delta","delta":{"step_details":{"type":"tool_calls","tool_calls":[{"index":0,"type":"function","function":{"arguments":"ahrenheit"}}]}}}
@@ -22077,10 +22200,11 @@ paths:
             data: {"id":"step_001","object":"thread.run.step.delta","delta":{"step_details":{"type":"tool_calls","tool_calls":[{"index":0,"type":"function","function":{"arguments":"\"}"}}]}}}
 
             event: thread.run.requires_action
-            data: {"id":"run_123","object":"thread.run","created_at":1710351818,"assistant_id":"asst_123","thread_id":"thread_123","status":"requires_action","started_at":1710351818,"expires_at":1710352418,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":{"type":"submit_tool_outputs","submit_tool_outputs":{"tool_calls":[{"id":"call_XXNp8YGaFrjrSjgqxtC8JJ1B","type":"function","function":{"name":"get_current_weather","arguments":"{\"location\":\"San Francisco, CA\",\"unit\":\"fahrenheit\"}"}}]}},"last_error":null,"model":"gpt-5","instructions":null,"tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":{"prompt_tokens":345,"completion_tokens":11,"total_tokens":356},"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710351818,"assistant_id":"asst_123","thread_id":"thread_123","status":"requires_action","started_at":1710351818,"expires_at":1710352418,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":{"type":"submit_tool_outputs","submit_tool_outputs":{"tool_calls":[{"id":"call_XXNp8YGaFrjrSjgqxtC8JJ1B","type":"function","function":{"name":"get_current_weather","arguments":"{\"location\":\"San Francisco, CA\",\"unit\":\"fahrenheit\"}"}}]}},"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":{"prompt_tokens":345,"completion_tokens":11,"total_tokens":356},"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: done
             data: [DONE]
+
   /threads/{thread_id}:
     get:
       operationId: getThread
@@ -22397,7 +22521,11 @@ paths:
                     }
                   ],
                   "attachments": [],
-                  "metadata": {}
+                  "metadata": {},
+                  "status": "completed",
+                  "completed_at": 1699016383,
+                  "incomplete_at": null,
+                  "incomplete_details": null
                 },
                 {
                   "id": "msg_abc456",
@@ -22417,7 +22545,11 @@ paths:
                     }
                   ],
                   "attachments": [],
-                  "metadata": {}
+                  "metadata": {},
+                  "status": "completed",
+                  "completed_at": 1699016383,
+                  "incomplete_at": null,
+                  "incomplete_details": null
                 }
               ],
               "first_id": "msg_abc123",
@@ -22510,7 +22642,11 @@ paths:
                 }
               ],
               "attachments": [],
-              "metadata": {}
+              "metadata": {},
+              "status": "completed",
+              "completed_at": 1713226573,
+              "incomplete_at": null,
+              "incomplete_details": null
             }
   /threads/{thread_id}/messages/{message_id}:
     get:
@@ -22594,7 +22730,11 @@ paths:
                 }
               ],
               "attachments": [],
-              "metadata": {}
+              "metadata": {},
+              "status": "completed",
+              "completed_at": 1699017614,
+              "incomplete_at": null,
+              "incomplete_details": null
             }
     post:
       operationId: modifyMessage
@@ -22693,11 +22833,15 @@ paths:
                   }
                 }
               ],
-              "file_ids": [],
               "metadata": {
                 "modified": "true",
                 "user": "abc123"
-              }
+              },
+              "status": "completed",
+              "completed_at": 1699017614,
+              "incomplete_at": null,
+              "incomplete_details": null,
+              "attachments": []
             }
     delete:
       operationId: deleteMessage
@@ -22869,7 +23013,7 @@ paths:
                   "completed_at": 1699075073,
                   "last_error": null,
                   "model": "gpt-5",
-                  "instructions": null,
+                  "instructions": "You are a helpful assistant.",
                   "incomplete_details": null,
                   "tools": [
                     {
@@ -22895,12 +23039,12 @@ paths:
                   "max_prompt_tokens": 1000,
                   "max_completion_tokens": 1000,
                   "truncation_strategy": {
-                    "type": "auto",
-                    "last_messages": null
+                    "type": "auto"
                   },
                   "response_format": "auto",
                   "tool_choice": "auto",
-                  "parallel_tool_calls": true
+                  "parallel_tool_calls": true,
+                  "required_action": null
                 },
                 {
                   "id": "run_abc456",
@@ -22916,7 +23060,7 @@ paths:
                   "completed_at": 1699063291,
                   "last_error": null,
                   "model": "gpt-5",
-                  "instructions": null,
+                  "instructions": "You are a helpful assistant.",
                   "incomplete_details": null,
                   "tools": [
                     {
@@ -22942,12 +23086,12 @@ paths:
                   "max_prompt_tokens": 1000,
                   "max_completion_tokens": 1000,
                   "truncation_strategy": {
-                    "type": "auto",
-                    "last_messages": null
+                    "type": "auto"
                   },
                   "response_format": "auto",
                   "tool_choice": "auto",
-                  "parallel_tool_calls": true
+                  "parallel_tool_calls": true,
+                  "required_action": null
                 }
               ],
               "first_id": "run_abc123",
@@ -23006,7 +23150,8 @@ paths:
                 -H "Content-Type: application/json" \
                 -H "OpenAI-Beta: assistants=v2" \
                 -d '{
-                  "assistant_id": "asst_abc123"
+                  "assistant_id": "asst_abc123",
+                  "instructions": "You are a helpful assistant."
                 }'
             python: |
               from openai import OpenAI
@@ -23014,7 +23159,8 @@ paths:
 
               run = client.beta.threads.runs.create(
                 thread_id="thread_abc123",
-                assistant_id="asst_abc123"
+                assistant_id="asst_abc123",
+                instructions="You are a helpful assistant."
               )
 
               print(run)
@@ -23026,7 +23172,7 @@ paths:
               async function main() {
                 const run = await openai.beta.threads.runs.create(
                   "thread_abc123",
-                  { assistant_id: "asst_abc123" }
+                  { assistant_id: "asst_abc123", instructions: "You are a helpful assistant." }
                 );
 
                 console.log(run);
@@ -23041,14 +23187,14 @@ paths:
               "assistant_id": "asst_abc123",
               "thread_id": "thread_abc123",
               "status": "queued",
-              "started_at": 1699063290,
+              "started_at": null,
               "expires_at": null,
               "cancelled_at": null,
               "failed_at": null,
-              "completed_at": 1699063291,
+              "completed_at": null,
               "last_error": null,
               "model": "gpt-5",
-              "instructions": null,
+              "instructions": "You are a helpful assistant.",
               "incomplete_details": null,
               "tools": [
                 {
@@ -23062,12 +23208,12 @@ paths:
               "max_prompt_tokens": 1000,
               "max_completion_tokens": 1000,
               "truncation_strategy": {
-                "type": "auto",
-                "last_messages": null
+                "type": "auto"
               },
               "response_format": "auto",
               "tool_choice": "auto",
-              "parallel_tool_calls": true
+              "parallel_tool_calls": true,
+              "required_action": null
             }
         - title: Streaming
           request:
@@ -23109,32 +23255,32 @@ paths:
               }
 
               main();
-          response: |
+          response: |+
             event: thread.run.created
-            data: {"id":"run_123","object":"thread.run","created_at":1710330640,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710331240,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710330640,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710331240,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.queued
-            data: {"id":"run_123","object":"thread.run","created_at":1710330640,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710331240,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710330640,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710331240,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.in_progress
-            data: {"id":"run_123","object":"thread.run","created_at":1710330640,"assistant_id":"asst_123","thread_id":"thread_123","status":"in_progress","started_at":1710330641,"expires_at":1710331240,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710330640,"assistant_id":"asst_123","thread_id":"thread_123","status":"in_progress","started_at":1710330641,"expires_at":1710331240,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.step.created
-            data: {"id":"step_001","object":"thread.run.step","created_at":1710330641,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710331240,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":null}
+            data: {"id":"step_001","object":"thread.run.step","created_at":1710330641,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710331240,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":null,"expired_at":null,"metadata":{}}
 
             event: thread.run.step.in_progress
-            data: {"id":"step_001","object":"thread.run.step","created_at":1710330641,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710331240,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":null}
+            data: {"id":"step_001","object":"thread.run.step","created_at":1710330641,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710331240,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":null,"expired_at":null,"metadata":{}}
 
             event: thread.message.created
-            data: {"id":"msg_001","object":"thread.message","created_at":1710330641,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[],"metadata":{}}
+            data: {"id":"msg_001","object":"thread.message","created_at":1710330641,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[],"metadata":{},"attachments":[]}
 
             event: thread.message.in_progress
-            data: {"id":"msg_001","object":"thread.message","created_at":1710330641,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[],"metadata":{}}
+            data: {"id":"msg_001","object":"thread.message","created_at":1710330641,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[],"metadata":{},"attachments":[]}
 
             event: thread.message.delta
             data: {"id":"msg_001","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":"Hello","annotations":[]}}]}}
 
-            ...
+            : Intermediate Assistant events omitted.
 
             event: thread.message.delta
             data: {"id":"msg_001","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":" today"}}]}}
@@ -23143,16 +23289,17 @@ paths:
             data: {"id":"msg_001","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":"?"}}]}}
 
             event: thread.message.completed
-            data: {"id":"msg_001","object":"thread.message","created_at":1710330641,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"completed","incomplete_details":null,"incomplete_at":null,"completed_at":1710330642,"role":"assistant","content":[{"type":"text","text":{"value":"Hello! How can I assist you today?","annotations":[]}}],"metadata":{}}
+            data: {"id":"msg_001","object":"thread.message","created_at":1710330641,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"completed","incomplete_details":null,"incomplete_at":null,"completed_at":1710330642,"role":"assistant","content":[{"type":"text","text":{"value":"Hello! How can I assist you today?","annotations":[]}}],"metadata":{},"attachments":[]}
 
             event: thread.run.step.completed
-            data: {"id":"step_001","object":"thread.run.step","created_at":1710330641,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"completed","cancelled_at":null,"completed_at":1710330642,"expires_at":1710331240,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":{"prompt_tokens":20,"completion_tokens":11,"total_tokens":31}}
+            data: {"id":"step_001","object":"thread.run.step","created_at":1710330641,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"completed","cancelled_at":null,"completed_at":1710330642,"expires_at":1710331240,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":{"prompt_tokens":20,"completion_tokens":11,"total_tokens":31},"expired_at":null,"metadata":{}}
 
             event: thread.run.completed
-            data: {"id":"run_123","object":"thread.run","created_at":1710330640,"assistant_id":"asst_123","thread_id":"thread_123","status":"completed","started_at":1710330641,"expires_at":null,"cancelled_at":null,"failed_at":null,"completed_at":1710330642,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":{"prompt_tokens":20,"completion_tokens":11,"total_tokens":31},"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710330640,"assistant_id":"asst_123","thread_id":"thread_123","status":"completed","started_at":1710330641,"expires_at":null,"cancelled_at":null,"failed_at":null,"completed_at":1710330642,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":{"prompt_tokens":20,"completion_tokens":11,"total_tokens":31},"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: done
             data: [DONE]
+
         - title: Streaming with Functions
           request:
             curl: |
@@ -23263,32 +23410,32 @@ paths:
               }
 
               main();
-          response: |
+          response: |+
             event: thread.run.created
-            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710348675,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710348675,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.queued
-            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710348675,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":null,"expires_at":1710348675,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.in_progress
-            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"in_progress","started_at":1710348075,"expires_at":1710348675,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"in_progress","started_at":1710348075,"expires_at":1710348675,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.step.created
-            data: {"id":"step_001","object":"thread.run.step","created_at":1710348076,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710348675,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":null}
+            data: {"id":"step_001","object":"thread.run.step","created_at":1710348076,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710348675,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":null,"expired_at":null,"metadata":{}}
 
             event: thread.run.step.in_progress
-            data: {"id":"step_001","object":"thread.run.step","created_at":1710348076,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710348675,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":null}
+            data: {"id":"step_001","object":"thread.run.step","created_at":1710348076,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710348675,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":null,"expired_at":null,"metadata":{}}
 
             event: thread.message.created
-            data: {"id":"msg_001","object":"thread.message","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[],"metadata":{}}
+            data: {"id":"msg_001","object":"thread.message","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[],"metadata":{},"attachments":[]}
 
             event: thread.message.in_progress
-            data: {"id":"msg_001","object":"thread.message","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[],"metadata":{}}
+            data: {"id":"msg_001","object":"thread.message","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[],"metadata":{},"attachments":[]}
 
             event: thread.message.delta
             data: {"id":"msg_001","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":"Hello","annotations":[]}}]}}
 
-            ...
+            : Intermediate Assistant events omitted.
 
             event: thread.message.delta
             data: {"id":"msg_001","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":" today"}}]}}
@@ -23297,16 +23444,17 @@ paths:
             data: {"id":"msg_001","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":"?"}}]}}
 
             event: thread.message.completed
-            data: {"id":"msg_001","object":"thread.message","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"completed","incomplete_details":null,"incomplete_at":null,"completed_at":1710348077,"role":"assistant","content":[{"type":"text","text":{"value":"Hello! How can I assist you today?","annotations":[]}}],"metadata":{}}
+            data: {"id":"msg_001","object":"thread.message","created_at":1710348076,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"completed","incomplete_details":null,"incomplete_at":null,"completed_at":1710348077,"role":"assistant","content":[{"type":"text","text":{"value":"Hello! How can I assist you today?","annotations":[]}}],"metadata":{},"attachments":[]}
 
             event: thread.run.step.completed
-            data: {"id":"step_001","object":"thread.run.step","created_at":1710348076,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"completed","cancelled_at":null,"completed_at":1710348077,"expires_at":1710348675,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":{"prompt_tokens":20,"completion_tokens":11,"total_tokens":31}}
+            data: {"id":"step_001","object":"thread.run.step","created_at":1710348076,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"completed","cancelled_at":null,"completed_at":1710348077,"expires_at":1710348675,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_001"}},"usage":{"prompt_tokens":20,"completion_tokens":11,"total_tokens":31},"expired_at":null,"metadata":{}}
 
             event: thread.run.completed
-            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"completed","started_at":1710348075,"expires_at":null,"cancelled_at":null,"failed_at":null,"completed_at":1710348077,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":{"prompt_tokens":20,"completion_tokens":11,"total_tokens":31},"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710348075,"assistant_id":"asst_123","thread_id":"thread_123","status":"completed","started_at":1710348075,"expires_at":null,"cancelled_at":null,"failed_at":null,"completed_at":1710348077,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":{"prompt_tokens":20,"completion_tokens":11,"total_tokens":31},"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: done
             data: [DONE]
+
   /threads/{thread_id}/runs/{run_id}:
     get:
       operationId: getRun
@@ -23385,7 +23533,7 @@ paths:
               "completed_at": 1699075073,
               "last_error": null,
               "model": "gpt-5",
-              "instructions": null,
+              "instructions": "You are a helpful assistant.",
               "incomplete_details": null,
               "tools": [
                 {
@@ -23403,12 +23551,12 @@ paths:
               "max_prompt_tokens": 1000,
               "max_completion_tokens": 1000,
               "truncation_strategy": {
-                "type": "auto",
-                "last_messages": null
+                "type": "auto"
               },
               "response_format": "auto",
               "tool_choice": "auto",
-              "parallel_tool_calls": true
+              "parallel_tool_calls": true,
+              "required_action": null
             }
     post:
       operationId: modifyRun
@@ -23505,7 +23653,7 @@ paths:
               "completed_at": 1699075073,
               "last_error": null,
               "model": "gpt-5",
-              "instructions": null,
+              "instructions": "You are a helpful assistant.",
               "incomplete_details": null,
               "tools": [
                 {
@@ -23533,12 +23681,12 @@ paths:
               "max_prompt_tokens": 1000,
               "max_completion_tokens": 1000,
               "truncation_strategy": {
-                "type": "auto",
-                "last_messages": null
+                "type": "auto"
               },
               "response_format": "auto",
               "tool_choice": "auto",
-              "parallel_tool_calls": true
+              "parallel_tool_calls": true,
+              "required_action": null
             }
   /threads/{thread_id}/runs/{run_id}/cancel:
     post:
@@ -23636,7 +23784,14 @@ paths:
               "top_p": 1.0,
               "response_format": "auto",
               "tool_choice": "auto",
-              "parallel_tool_calls": true
+              "parallel_tool_calls": true,
+              "required_action": null,
+              "incomplete_details": null,
+              "max_prompt_tokens": null,
+              "max_completion_tokens": null,
+              "truncation_strategy": {
+                "type": "auto"
+              }
             }
   /threads/{thread_id}/runs/{run_id}/steps:
     get:
@@ -23770,11 +23925,12 @@ paths:
                     "prompt_tokens": 123,
                     "completion_tokens": 456,
                     "total_tokens": 579
-                  }
+                  },
+                  "metadata": {}
                 }
               ],
               "first_id": "step_abc123",
-              "last_id": "step_abc456",
+              "last_id": "step_abc123",
               "has_more": false
             }
   /threads/{thread_id}/runs/{run_id}/steps/{step_id}:
@@ -23883,7 +24039,8 @@ paths:
                 "prompt_tokens": 123,
                 "completion_tokens": 456,
                 "total_tokens": 579
-              }
+              },
+              "metadata": {}
             }
   /threads/{thread_id}/runs/{run_id}/submit_tool_outputs:
     post:
@@ -23994,7 +24151,7 @@ paths:
               "completed_at": null,
               "last_error": null,
               "model": "gpt-5",
-              "instructions": null,
+              "instructions": "You are a helpful assistant.",
               "tools": [
                 {
                   "type": "function",
@@ -24025,12 +24182,13 @@ paths:
               "max_prompt_tokens": 1000,
               "max_completion_tokens": 1000,
               "truncation_strategy": {
-                "type": "auto",
-                "last_messages": null
+                "type": "auto"
               },
               "response_format": "auto",
               "tool_choice": "auto",
-              "parallel_tool_calls": true
+              "parallel_tool_calls": true,
+              "required_action": null,
+              "incomplete_details": null
             }
         - title: Streaming
           request:
@@ -24091,27 +24249,27 @@ paths:
               }
 
               main();
-          response: |
+          response: |+
             event: thread.run.step.completed
-            data: {"id":"step_001","object":"thread.run.step","created_at":1710352449,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"tool_calls","status":"completed","cancelled_at":null,"completed_at":1710352475,"expires_at":1710353047,"failed_at":null,"last_error":null,"step_details":{"type":"tool_calls","tool_calls":[{"id":"call_iWr0kQ2EaYMaxNdl0v3KYkx7","type":"function","function":{"name":"get_current_weather","arguments":"{\"location\":\"San Francisco, CA\",\"unit\":\"fahrenheit\"}","output":"70 degrees and sunny."}}]},"usage":{"prompt_tokens":291,"completion_tokens":24,"total_tokens":315}}
+            data: {"id":"step_001","object":"thread.run.step","created_at":1710352449,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"tool_calls","status":"completed","cancelled_at":null,"completed_at":1710352475,"expires_at":1710353047,"failed_at":null,"last_error":null,"step_details":{"type":"tool_calls","tool_calls":[{"id":"call_iWr0kQ2EaYMaxNdl0v3KYkx7","type":"function","function":{"name":"get_current_weather","arguments":"{\"location\":\"San Francisco, CA\",\"unit\":\"fahrenheit\"}","output":"70 degrees and sunny."}}]},"usage":{"prompt_tokens":291,"completion_tokens":24,"total_tokens":315},"expired_at":null,"metadata":{}}
 
             event: thread.run.queued
-            data: {"id":"run_123","object":"thread.run","created_at":1710352447,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":1710352448,"expires_at":1710353047,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710352447,"assistant_id":"asst_123","thread_id":"thread_123","status":"queued","started_at":1710352448,"expires_at":1710353047,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.in_progress
-            data: {"id":"run_123","object":"thread.run","created_at":1710352447,"assistant_id":"asst_123","thread_id":"thread_123","status":"in_progress","started_at":1710352475,"expires_at":1710353047,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710352447,"assistant_id":"asst_123","thread_id":"thread_123","status":"in_progress","started_at":1710352475,"expires_at":1710353047,"cancelled_at":null,"failed_at":null,"completed_at":null,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":null,"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: thread.run.step.created
-            data: {"id":"step_002","object":"thread.run.step","created_at":1710352476,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710353047,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_002"}},"usage":null}
+            data: {"id":"step_002","object":"thread.run.step","created_at":1710352476,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710353047,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_002"}},"usage":null,"expired_at":null,"metadata":{}}
 
             event: thread.run.step.in_progress
-            data: {"id":"step_002","object":"thread.run.step","created_at":1710352476,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710353047,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_002"}},"usage":null}
+            data: {"id":"step_002","object":"thread.run.step","created_at":1710352476,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"in_progress","cancelled_at":null,"completed_at":null,"expires_at":1710353047,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_002"}},"usage":null,"expired_at":null,"metadata":{}}
 
             event: thread.message.created
-            data: {"id":"msg_002","object":"thread.message","created_at":1710352476,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[],"metadata":{}}
+            data: {"id":"msg_002","object":"thread.message","created_at":1710352476,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[],"metadata":{},"attachments":[]}
 
             event: thread.message.in_progress
-            data: {"id":"msg_002","object":"thread.message","created_at":1710352476,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[],"metadata":{}}
+            data: {"id":"msg_002","object":"thread.message","created_at":1710352476,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"in_progress","incomplete_details":null,"incomplete_at":null,"completed_at":null,"role":"assistant","content":[],"metadata":{},"attachments":[]}
 
             event: thread.message.delta
             data: {"id":"msg_002","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":"The","annotations":[]}}]}}
@@ -24122,7 +24280,7 @@ paths:
             event: thread.message.delta
             data: {"id":"msg_002","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":" weather"}}]}}
 
-            ...
+            : Intermediate Assistant events omitted.
 
             event: thread.message.delta
             data: {"id":"msg_002","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":" sunny"}}]}}
@@ -24131,16 +24289,17 @@ paths:
             data: {"id":"msg_002","object":"thread.message.delta","delta":{"content":[{"index":0,"type":"text","text":{"value":"."}}]}}
 
             event: thread.message.completed
-            data: {"id":"msg_002","object":"thread.message","created_at":1710352476,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"completed","incomplete_details":null,"incomplete_at":null,"completed_at":1710352477,"role":"assistant","content":[{"type":"text","text":{"value":"The current weather in San Francisco, CA is 70 degrees Fahrenheit and sunny.","annotations":[]}}],"metadata":{}}
+            data: {"id":"msg_002","object":"thread.message","created_at":1710352476,"assistant_id":"asst_123","thread_id":"thread_123","run_id":"run_123","status":"completed","incomplete_details":null,"incomplete_at":null,"completed_at":1710352477,"role":"assistant","content":[{"type":"text","text":{"value":"The current weather in San Francisco, CA is 70 degrees Fahrenheit and sunny.","annotations":[]}}],"metadata":{},"attachments":[]}
 
             event: thread.run.step.completed
-            data: {"id":"step_002","object":"thread.run.step","created_at":1710352476,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"completed","cancelled_at":null,"completed_at":1710352477,"expires_at":1710353047,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_002"}},"usage":{"prompt_tokens":329,"completion_tokens":18,"total_tokens":347}}
+            data: {"id":"step_002","object":"thread.run.step","created_at":1710352476,"run_id":"run_123","assistant_id":"asst_123","thread_id":"thread_123","type":"message_creation","status":"completed","cancelled_at":null,"completed_at":1710352477,"expires_at":1710353047,"failed_at":null,"last_error":null,"step_details":{"type":"message_creation","message_creation":{"message_id":"msg_002"}},"usage":{"prompt_tokens":329,"completion_tokens":18,"total_tokens":347},"expired_at":null,"metadata":{}}
 
             event: thread.run.completed
-            data: {"id":"run_123","object":"thread.run","created_at":1710352447,"assistant_id":"asst_123","thread_id":"thread_123","status":"completed","started_at":1710352475,"expires_at":null,"cancelled_at":null,"failed_at":null,"completed_at":1710352477,"required_action":null,"last_error":null,"model":"gpt-5","instructions":null,"tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto","last_messages":null},"incomplete_details":null,"usage":{"prompt_tokens":20,"completion_tokens":11,"total_tokens":31},"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}}
+            data: {"id":"run_123","object":"thread.run","created_at":1710352447,"assistant_id":"asst_123","thread_id":"thread_123","status":"completed","started_at":1710352475,"expires_at":null,"cancelled_at":null,"failed_at":null,"completed_at":1710352477,"required_action":null,"last_error":null,"model":"gpt-5","instructions":"You are a helpful assistant.","tools":[{"type":"function","function":{"name":"get_current_weather","description":"Get the current weather in a given location","parameters":{"type":"object","properties":{"location":{"type":"string","description":"The city and state, e.g. San Francisco, CA"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["location"]}}}],"metadata":{},"temperature":1.0,"top_p":1.0,"max_completion_tokens":null,"max_prompt_tokens":null,"truncation_strategy":{"type":"auto"},"incomplete_details":null,"usage":{"prompt_tokens":20,"completion_tokens":11,"total_tokens":31},"response_format":"auto","tool_choice":"auto","parallel_tool_calls":true}
 
             event: done
             data: [DONE]
+
   /uploads:
     post:
       operationId: createUpload
@@ -24378,9 +24537,9 @@ paths:
                 "object": "file",
                 "bytes": 2147483648,
                 "created_at": 1719186911,
-                "expires_at": 1719127296,
                 "filename": "training_examples.jsonl",
-                "purpose": "fine-tune"
+                "purpose": "fine-tune",
+                "status": "processed"
               }
             }
   /uploads/{upload_id}/parts:
@@ -25851,7 +26010,7 @@ paths:
         examples:
           request:
             curl: |
-              curl https://api.openai.com/v1/vector_stores/{vector_store_id}/files/{file_id} \
+              curl https://api.openai.com/v1/vector_stores/vs_abc123/files/file-abc123 \
                 -H "Authorization: Bearer $OPENAI_API_KEY" \
                 -H "Content-Type: application/json" \
                 -d '{"attributes": {"key1": "value1", "key2": 2}}'
@@ -25861,10 +26020,16 @@ paths:
               "object": "vector_store.file",
               "usage_bytes": 1234,
               "created_at": 1699061776,
-              "vector_store_id": "vs_abcd",
+              "vector_store_id": "vs_abc123",
               "status": "completed",
               "last_error": null,
-              "chunking_strategy": {...},
+              "chunking_strategy": {
+                "type": "static",
+                "static": {
+                  "max_chunk_size_tokens": 800,
+                  "chunk_overlap_tokens": 400
+                }
+              },
               "attributes": {"key1": "value1", "key2": 2}
             }
   /vector_stores/{vector_store_id}/files/{file_id}/content:
@@ -25926,13 +26091,12 @@ paths:
               -H "Authorization: Bearer $OPENAI_API_KEY"
           response: |
             {
-              "file_id": "file-abc123",
-              "filename": "example.txt",
-              "attributes": {"key": "value"},
-              "content": [
-                {"type": "text", "text": "..."},
-                ...
-              ]
+              "object": "vector_store.file_content.page",
+              "data": [
+                {"type": "text", "text": "file content"}
+              ],
+              "has_more": false,
+              "next_page": null
             }
   /vector_stores/{vector_store_id}/search:
     post:
@@ -27934,7 +28098,22 @@ paths:
         group: videos
         path: retrieve matching the provided identifier.
         examples:
-          response: ''
+          response: |
+            {
+              "id": "video_123",
+              "object": "video",
+              "model": "sora-2",
+              "status": "queued",
+              "progress": 0,
+              "created_at": 1712697600,
+              "completed_at": null,
+              "error": null,
+              "expires_at": null,
+              "prompt": "A calico cat playing a piano on stage",
+              "remixed_from_video_id": null,
+              "size": "720x1280",
+              "seconds": "4"
+            }
           request:
             javascript: |
               import OpenAI from 'openai';
@@ -34356,35 +34535,36 @@ paths:
                       Console.Write(outputTextDeltaUpdate.Delta);
                   }
               }
-          response: |
+          response: |+
             event: response.created
-            data: {"type":"response.created","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","access_programs":null,"created_at":1741290958,"status":"in_progress","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-6-astra","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+            data: {"type":"response.created","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","access_programs":null,"created_at":1741290958,"status":"in_progress","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-6-astra","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}},"sequence_number":0}
 
             event: response.in_progress
-            data: {"type":"response.in_progress","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","access_programs":null,"created_at":1741290958,"status":"in_progress","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-6-astra","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+            data: {"type":"response.in_progress","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","access_programs":null,"created_at":1741290958,"status":"in_progress","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-6-astra","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}},"sequence_number":1}
 
             event: response.output_item.added
-            data: {"type":"response.output_item.added","output_index":0,"item":{"id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","type":"message","status":"in_progress","role":"assistant","content":[]}}
+            data: {"type":"response.output_item.added","output_index":0,"item":{"id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","type":"message","status":"in_progress","role":"assistant","content":[]},"sequence_number":2}
 
             event: response.content_part.added
-            data: {"type":"response.content_part.added","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}
+            data: {"type":"response.content_part.added","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"part":{"type":"output_text","text":"","annotations":[],"logprobs":[]},"sequence_number":3}
 
             event: response.output_text.delta
-            data: {"type":"response.output_text.delta","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"delta":"Hi"}
+            data: {"type":"response.output_text.delta","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"delta":"Hi","sequence_number":4,"logprobs":[]}
 
-            ...
+            : Intermediate response events omitted.
 
             event: response.output_text.done
-            data: {"type":"response.output_text.done","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"text":"Hi there! How can I assist you today?"}
+            data: {"type":"response.output_text.done","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"text":"Hi there! How can I assist you today?","sequence_number":10,"logprobs":[]}
 
             event: response.content_part.done
-            data: {"type":"response.content_part.done","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"part":{"type":"output_text","text":"Hi there! How can I assist you today?","annotations":[]}}
+            data: {"type":"response.content_part.done","item_id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","output_index":0,"content_index":0,"part":{"type":"output_text","text":"Hi there! How can I assist you today?","annotations":[],"logprobs":[]},"sequence_number":11}
 
             event: response.output_item.done
-            data: {"type":"response.output_item.done","output_index":0,"item":{"id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Hi there! How can I assist you today?","annotations":[]}]}}
+            data: {"type":"response.output_item.done","output_index":0,"item":{"id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Hi there! How can I assist you today?","annotations":[],"logprobs":[]}]},"sequence_number":12}
 
             event: response.completed
-            data: {"type":"response.completed","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","access_programs":null,"created_at":1741290958,"status":"completed","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-6-astra","output":[{"id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Hi there! How can I assist you today?","annotations":[]}]}],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":{"input_tokens":37,"output_tokens":11,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":48},"user":null,"metadata":{}}}
+            data: {"type":"response.completed","response":{"id":"resp_67c9fdcecf488190bdd9a0409de3a1ec07b8b0ad4e5eb654","object":"response","access_programs":null,"created_at":1741290958,"status":"completed","error":null,"incomplete_details":null,"instructions":"You are a helpful assistant.","max_output_tokens":null,"model":"gpt-6-astra","output":[{"id":"msg_67c9fdcf37fc8190ba82116e33fb28c507b8b0ad4e5eb654","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Hi there! How can I assist you today?","annotations":[],"logprobs":[]}]}],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":{"input_tokens":37,"output_tokens":11,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":48,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0}},"user":null,"metadata":{}},"sequence_number":13}
+
         - title: Functions
           request:
             curl: |
@@ -34955,8 +35135,8 @@ paths:
               print(response)
           response: |
             {
-              "id": "resp_6786a1bec27481909a17d673315b29f6",
-              "object": "response",
+              "id": "resp_123",
+              "object": "response.deleted",
               "deleted": true
             }
   /responses/{response_id}/cancel?beta=true:
@@ -35892,6 +36072,7 @@ components:
             "name": "Main Admin Key",
             "redacted_value": "sk-admin...xyz",
             "created_at": 1711471533,
+            "expires_at": null,
             "last_used_at": 1711471534,
             "owner": {
               "type": "user",
@@ -39310,7 +39491,6 @@ components:
       - completion_tokens
       - total_tokens
     CompoundFilter:
-      $recursiveAnchor: true
       type: object
       additionalProperties: false
       title: Compound Filter
@@ -39336,6 +39516,7 @@ components:
       - filters
       x-oaiMeta:
         name: CompoundFilter
+      $recursiveAnchor: true
     ComputerAction:
       discriminator:
         propertyName: type
@@ -40503,7 +40684,6 @@ components:
               logprobs:
                 description: Log probability information for the choice.
                 type: object
-                nullable: true
                 properties:
                   content:
                     description: A list of message content tokens with log probability information.
@@ -40520,6 +40700,7 @@ components:
                 required:
                 - content
                 - refusal
+                nullable: true
               finish_reason:
                 type: string
                 description: |
@@ -40565,8 +40746,6 @@ components:
           - chat.completion.chunk
           x-stainless-const: true
         usage:
-          $ref: '#/components/schemas/CompletionUsage'
-          nullable: true
           description: |
             An optional field that will only be present when you set
             `stream_options: {"include_usage": true}` in your request. When present, it
@@ -40576,6 +40755,8 @@ components:
             **NOTE:** If the stream is interrupted or cancelled, you may not
             receive the final usage chunk which contains the total token usage for
             the request.
+          $ref: '#/components/schemas/CompletionUsage'
+          nullable: true
         moderation:
           anyOf:
           - $ref: '#/components/schemas/ChatCompletionModeration'
@@ -40589,17 +40770,23 @@ components:
       - id
       - model
       - object
+      examples:
+      - id: chatcmpl-123
+        object: chat.completion.chunk
+        created: 1694268190
+        model: gpt-6-astra
+        system_fingerprint: fp_44709d6fcb
+        choices:
+        - index: 0
+          delta: {}
+          logprobs: null
+          finish_reason: stop
+        obfuscation: ''
       x-oaiMeta:
         name: The chat completion chunk object
         group: chat
         example: |
           {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"gpt-6-astra", "system_fingerprint": "fp_44709d6fcb", "choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}],"obfuscation":"r4N7vQ2m"}
-
-          {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"gpt-6-astra", "system_fingerprint": "fp_44709d6fcb", "choices":[{"index":0,"delta":{"content":"Hello"},"logprobs":null,"finish_reason":null}],"obfuscation":"p9K3xT6w"}
-
-          ....
-
-          {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1694268190,"model":"gpt-6-astra", "system_fingerprint": "fp_44709d6fcb", "choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"stop"}],"obfuscation":""}
     CreateCompletionRequest:
       type: object
       properties:
@@ -43544,8 +43731,8 @@ components:
           {
             "task": "transcribe",
             "language": "english",
-            "duration": 8.470000267028809,
-            "text": "The beach was a popular spot on a hot summer day. People were swimming in the ocean, building sandcastles, and playing beach volleyball.",
+            "duration": 3.32,
+            "text": "The beach was a popular spot on a hot summer day.",
             "segments": [
               {
                 "id": 0,
@@ -43560,12 +43747,11 @@ components:
                 "avg_logprob": -0.2860786020755768,
                 "compression_ratio": 1.2363636493682861,
                 "no_speech_prob": 0.00985979475080967
-              },
-              ...
+              }
             ],
             "usage": {
               "type": "duration",
-              "seconds": 9
+              "seconds": 4
             }
           }
     CreateTranslationRequest:
@@ -44413,10 +44599,9 @@ components:
           {
             "object": "embedding",
             "embedding": [
-              0.0023064255,
-              -0.009327292,
-              .... (1536 floats total for ada-002)
-              -0.0028842222,
+              0.26726124,
+              0.53452248,
+              0.80178373
             ],
             "index": 0
           }
@@ -47342,12 +47527,14 @@ components:
                       "id": "group_01J1F8ABCDXYZ",
                       "name": "Support Team",
                       "created_at": 1711471533,
+                      "group_type": "group",
                       "is_scim_managed": false
                   },
                   {
                       "id": "group_01J1F8PQRMNO",
                       "name": "Sales",
                       "created_at": 1711472599,
+                      "group_type": "group",
                       "is_scim_managed": true
                   }
               ],
@@ -50389,7 +50576,11 @@ components:
             "assistant_id": "asst_abc123",
             "run_id": "run_abc123",
             "attachments": [],
-            "metadata": {}
+            "metadata": {},
+            "status": "completed",
+            "completed_at": 1698983503,
+            "incomplete_at": null,
+            "incomplete_details": null
           }
     MessagePhase:
       type: string
@@ -50913,7 +51104,8 @@ components:
             "created_at": 1677610602,
             "expires_at": 1680202602,
             "filename": "salesOverview.pdf",
-            "purpose": "assistants"
+            "purpose": "assistants",
+            "status": "processed"
           }
     OrganizationCertificate:
       type: object
@@ -51794,6 +51986,7 @@ components:
                       "project_id": "proj_abc123",
                       "group_id": "group_01J1F8ABCDXYZ",
                       "group_name": "Support Team",
+                      "group_type": "group",
                       "created_at": 1711471533
                   }
               ],
@@ -66058,7 +66251,6 @@ components:
         required_action:
           type: object
           description: Details on the action required to continue the run. Will be `null` if no action is required.
-          nullable: true
           properties:
             type:
               description: For now, this is always `submit_tool_outputs`.
@@ -66080,10 +66272,10 @@ components:
           required:
           - type
           - submit_tool_outputs
+          nullable: true
         last_error:
           type: object
           description: The last error associated with this run. Will be `null` if there are no errors.
-          nullable: true
           properties:
             code:
               type: string
@@ -66098,6 +66290,7 @@ components:
           required:
           - code
           - message
+          nullable: true
         expires_at:
           description: The Unix timestamp (in seconds) for when the run will expire.
           type: integer
@@ -66126,7 +66319,6 @@ components:
         incomplete_details:
           description: Details on why the run is incomplete. Will be `null` if the run is not incomplete.
           type: object
-          nullable: true
           properties:
             reason:
               description: The reason why the run is incomplete. This will point to which specific token limit was reached over the course of the run.
@@ -66134,6 +66326,7 @@ components:
               enum:
               - max_completion_tokens
               - max_prompt_tokens
+          nullable: true
         model:
           description: The model that the [assistant](https://developers.openai.com/api/docs/assistants/migration) used for this run.
           type: string
@@ -66161,16 +66354,16 @@ components:
           nullable: true
         max_prompt_tokens:
           type: integer
-          nullable: true
           description: |
             The maximum number of prompt tokens specified to have been used over the course of the run.
           minimum: 256
+          nullable: true
         max_completion_tokens:
           type: integer
-          nullable: true
           description: |
             The maximum number of completion tokens specified to have been used over the course of the run.
           minimum: 256
+          nullable: true
         truncation_strategy:
           allOf:
           - $ref: '#/components/schemas/TruncationObject'
@@ -66228,7 +66421,7 @@ components:
             "completed_at": 1699073498,
             "last_error": null,
             "model": "gpt-5",
-            "instructions": null,
+            "instructions": "You are a helpful assistant.",
             "tools": [{"type": "file_search"}, {"type": "code_interpreter"}],
             "metadata": {},
             "incomplete_details": null,
@@ -66242,12 +66435,12 @@ components:
             "max_prompt_tokens": 1000,
             "max_completion_tokens": 1000,
             "truncation_strategy": {
-              "type": "auto",
-              "last_messages": null
+              "type": "auto"
             },
             "response_format": "auto",
             "tool_choice": "auto",
-            "parallel_tool_calls": true
+            "parallel_tool_calls": true,
+            "required_action": null
           }
     RunStepCompletionUsage:
       anyOf:
@@ -66871,7 +67064,8 @@ components:
               "prompt_tokens": 123,
               "completion_tokens": 456,
               "total_tokens": 579
-            }
+            },
+            "metadata": {}
           }
     RunStepStreamEvent:
       anyOf:
@@ -67520,7 +67714,8 @@ components:
             "id": "thread_abc123",
             "object": "thread",
             "created_at": 1698107661,
-            "metadata": {}
+            "metadata": {},
+            "tool_resources": {}
           }
     ThreadStreamEvent:
       anyOf:
@@ -68304,7 +68499,8 @@ components:
               "bytes": 2147483648,
               "created_at": 1719186911,
               "filename": "training_examples.jsonl",
-              "purpose": "fine-tune"
+              "purpose": "fine-tune",
+              "status": "processed"
             }
           }
     UploadCertificateRequest:
@@ -71874,7 +72070,7 @@ components:
           description: The ID of the file.
         index:
           type: integer
-          description: The index of the file in the list of files.
+          description: The index in the output text at which to insert the file citation.
         filename:
           type: string
           description: The filename of the file cited.
@@ -80403,6 +80599,7 @@ components:
       - usage_limit_exceeded
       - credit_balance_exhausted
       - rate_limit_exceeded
+      - flex_unavailable
       - server_overloaded
       - cyber_policy
       - misalignment_policy_violation
@@ -80422,6 +80619,7 @@ components:
       - The organization has reached a usage, plan, or billing limit.
       - The organization has no API credits remaining.
       - The request exceeds the available rate limit.
+      - Flex processing is temporarily unavailable.
       - The model service is temporarily overloaded.
       - The request was rejected by a safety policy.
       - The request was blocked by the safety systems.
@@ -86093,6 +86291,7 @@ components:
             minLength: 0
           minProperties: 0
           description: Application-defined key-value pairs associated with this credential.
+          x-openai-response-map-default: true
         created_at:
           type: integer
           format: int64
@@ -90437,7 +90636,6 @@ components:
       - $ref: '#/components/schemas/BetaComparisonFilter'
       - $ref: '#/components/schemas/BetaCompoundFilter'
     BetaCompoundFilter:
-      $recursiveAnchor: true
       type: object
       additionalProperties: false
       title: Compound Filter
@@ -90463,6 +90661,7 @@ components:
       - filters
       x-oaiMeta:
         name: CompoundFilter
+      $recursiveAnchor: true
     BetaComparisonFilter:
       type: object
       additionalProperties: false
@@ -93817,7 +94016,7 @@ components:
           description: The ID of the file.
         index:
           type: integer
-          description: The index of the file in the list of files.
+          description: The index in the output text at which to insert the file citation.
         filename:
           type: string
           description: The filename of the file cited.
