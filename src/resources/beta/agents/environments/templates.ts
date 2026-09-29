@@ -414,6 +414,11 @@ export interface EnvironmentTemplate {
    * The Unix timestamp, in seconds, when the template was last updated.
    */
   updated_at: number;
+
+  /**
+   * Desktop configuration for each OpenAI-hosted environment.
+   */
+  desktop?: EnvironmentTemplate.Desktop;
 }
 
 export namespace EnvironmentTemplate {
@@ -466,7 +471,7 @@ export namespace EnvironmentTemplate {
      *
      * - `enabled` - Allows unrestricted network access.
      * - `disabled` - Disables network access.
-     * - `restricted` - Allows access only to configured domains.
+     * - `restricted` - Applies the configured domain restrictions.
      */
     access: 'enabled' | 'disabled' | 'restricted';
 
@@ -535,6 +540,16 @@ export namespace EnvironmentTemplate {
      */
     type: 'inline';
   }
+
+  /**
+   * Desktop configuration for each OpenAI-hosted environment.
+   */
+  export interface Desktop {
+    /**
+     * Whether the environment provisions a desktop and browser proxy.
+     */
+    enabled: boolean;
+  }
 }
 
 /**
@@ -563,6 +578,12 @@ export interface TemplateCreateParams {
    * list.
    */
   capability_directories?: Array<string> | null;
+
+  /**
+   * Desktop provisioning. Omission or null inherits the template setting, or
+   * defaults to disabled.
+   */
+  desktop?: TemplateCreateParams.Desktop | null;
 
   /**
    * Environment variables made available to the agent.
@@ -609,6 +630,17 @@ export interface TemplateCreateParams {
 
 export namespace TemplateCreateParams {
   /**
+   * Desktop provisioning. Omission or null inherits the template setting, or
+   * defaults to disabled.
+   */
+  export interface Desktop {
+    /**
+     * Whether to provision the desktop and its browser proxy.
+     */
+    enabled: boolean;
+  }
+
+  /**
    * Network access policy for the environment. Defaults to disabled for GA requests
    * and enabled for beta requests.
    */
@@ -618,7 +650,7 @@ export namespace TemplateCreateParams {
      *
      * - `enabled` - Allows unrestricted network access.
      * - `disabled` - Disables network access.
-     * - `restricted` - Allows access only to configured domains.
+     * - `restricted` - Applies the configured domain restrictions.
      */
     access: 'enabled' | 'disabled' | 'restricted';
 
@@ -626,6 +658,13 @@ export namespace TemplateCreateParams {
      * Domains the environment may access when network access is restricted.
      */
     allowed_domains?: Array<string> | null;
+
+    /**
+     * Domains blocked for both executor and browser when access is restricted. A
+     * nonempty list requires `access: restricted` and cannot be combined with nonempty
+     * `allowed_domains`. Wildcard domains are not supported.
+     */
+    blocked_domains?: Array<string> | null;
   }
 
   /**
@@ -654,6 +693,11 @@ export interface TemplateUpdateParams {
    * Directories that expose capabilities to the agent.
    */
   capability_directories?: Array<string> | null;
+
+  /**
+   * Replacement desktop configuration, or null to disable the desktop.
+   */
+  desktop?: TemplateUpdateParams.Desktop | null;
 
   /**
    * Replacement confidential environment values.
@@ -700,6 +744,16 @@ export interface TemplateUpdateParams {
 
 export namespace TemplateUpdateParams {
   /**
+   * Replacement desktop configuration, or null to disable the desktop.
+   */
+  export interface Desktop {
+    /**
+     * Whether to provision the desktop and its browser proxy.
+     */
+    enabled: boolean;
+  }
+
+  /**
    * Network access available after setup completes. Omit to preserve the current
    * policy, or pass `null` to reset to disabled for GA requests or enabled for beta
    * requests.
@@ -710,7 +764,7 @@ export namespace TemplateUpdateParams {
      *
      * - `enabled` - Allows unrestricted network access.
      * - `disabled` - Disables network access.
-     * - `restricted` - Allows access only to configured domains.
+     * - `restricted` - Applies the configured domain restrictions.
      */
     access: 'enabled' | 'disabled' | 'restricted';
 
@@ -718,6 +772,13 @@ export namespace TemplateUpdateParams {
      * Domains the environment may access when network access is restricted.
      */
     allowed_domains?: Array<string> | null;
+
+    /**
+     * Domains blocked for both executor and browser when access is restricted. A
+     * nonempty list requires `access: restricted` and cannot be combined with nonempty
+     * `allowed_domains`. Wildcard domains are not supported.
+     */
+    blocked_domains?: Array<string> | null;
   }
 
   /**

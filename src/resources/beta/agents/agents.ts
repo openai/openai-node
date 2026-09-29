@@ -440,6 +440,59 @@ export interface Agent {
   updated_at: number;
 }
 
+export interface AgentBrowserAuthenticationCancelParam {
+  action: 'cancel';
+
+  type: 'browser_authentication';
+}
+
+export interface AgentBrowserAuthenticationSubmitParam {
+  action: 'submit';
+
+  /**
+   * Values for up to six active fields in the required action. The submitted
+   * field-value mapping and selected option must fit within 120 KiB of JSON.
+   */
+  fields: Array<AgentBrowserAuthenticationSubmitParam.Field>;
+
+  type: 'browser_authentication';
+
+  /**
+   * The chosen method. Required when the required action contains options.
+   */
+  selected_option?: string | null;
+}
+
+export namespace AgentBrowserAuthenticationSubmitParam {
+  /**
+   * One user-entered value, including non-password fields such as an email address.
+   */
+  export interface Field {
+    /**
+     * The field ID from the required action.
+     */
+    field_id: string;
+
+    /**
+     * The value to enter into the registered control.
+     */
+    value: string;
+  }
+}
+
+export interface AgentBrowserOriginAccessParam {
+  /**
+   * Whether to allow, deny, or cancel the requested origin access.
+   *
+   * - `approve` - Allow the browser to access this origin.
+   * - `deny` - Deny access to this origin.
+   * - `cancel` - Dismiss this request without approving access.
+   */
+  decision: 'approve' | 'deny' | 'cancel';
+
+  type: 'browser_origin_access';
+}
+
 /**
  * A request to close a subagent.
  */
@@ -806,6 +859,8 @@ export type AgentOutputItem =
   | AgentReasoningItem
   | AgentFunctionCallItem
   | AgentMcpCallItem
+  | AgentOutputItem.ComputerUseCallItemResource
+  | AgentOutputItem.BrowserAuthenticationRequestItemResource
   | AgentWebSearchCallItem
   | AgentCommandExecutionItem
   | AgentCreateSubagentCallItem
@@ -814,6 +869,165 @@ export type AgentOutputItem =
   | AgentWaitForSubagentsCallItem
   | AgentInterruptSubagentCallItem
   | AgentCloseSubagentCallItem;
+
+export namespace AgentOutputItem {
+  /**
+   * One execution of the platform-provided computer-use capability.
+   */
+  export interface ComputerUseCallItemResource {
+    /**
+     * The ID of the activity item.
+     */
+    id: string;
+
+    /**
+     * The last screenshot emitted by the model. Null when screenshot inclusion is
+     * disabled or the call emitted no screenshot.
+     */
+    output: ComputerUseCallItemResource.Output | null;
+
+    /**
+     * The execution status of the activity.
+     */
+    status: AgentsAPI.AgentFunctionCallStatus;
+
+    /**
+     * A model-generated description of the activity, when available.
+     */
+    title: string | null;
+
+    /**
+     * The ID of the turn that contains this item.
+     */
+    turn_id: string;
+
+    /**
+     * The item type. Always `computer_use_call`.
+     */
+    type: 'computer_use_call';
+  }
+
+  export namespace ComputerUseCallItemResource {
+    /**
+     * The last screenshot emitted by the model. Null when screenshot inclusion is
+     * disabled or the call emitted no screenshot.
+     */
+    export interface Output {
+      /**
+       * The complete JPEG image as a base64 data URL.
+       */
+      image_url: string;
+
+      /**
+       * The content type. Always `computer_screenshot`.
+       */
+      type: 'computer_screenshot';
+    }
+  }
+
+  /**
+   * A credential-free history record of the emitted login request.
+   */
+  export interface BrowserAuthenticationRequestItemResource {
+    /**
+     * The stable history item ID.
+     */
+    id: string;
+
+    /**
+     * A registered form awaiting the application's response.
+     */
+    request: BrowserAuthenticationRequestItemResource.Request;
+
+    request_id: string;
+
+    turn_id: string;
+
+    /**
+     * The item type. Always computer_use_approval_request.
+     */
+    type: 'computer_use_approval_request';
+  }
+
+  export namespace BrowserAuthenticationRequestItemResource {
+    /**
+     * A registered form awaiting the application's response.
+     */
+    export interface Request {
+      /**
+       * The registered form or frame origin where values will be entered.
+       */
+      credential_origin: string | null;
+
+      /**
+       * Controls to render. All submitted values are sensitive.
+       */
+      fields: Array<Request.Field>;
+
+      /**
+       * Sign-in methods. Empty for a plain form.
+       */
+      options: Array<Request.Option>;
+
+      /**
+       * Why the agent needs the user to sign in.
+       */
+      reason: string | null;
+
+      /**
+       * The type of the object. Always `browser_authentication`.
+       */
+      type: 'browser_authentication';
+    }
+
+    export namespace Request {
+      /**
+       * A control in a registered browser-login form.
+       */
+      export interface Field {
+        /**
+         * The field ID to submit as field_id in a fields entry.
+         */
+        id: string;
+
+        /**
+         * The label to display beside the control.
+         */
+        label: string;
+
+        /**
+         * Whether this control requires a nonempty value.
+         */
+        required: boolean;
+
+        /**
+         * The rendering type, such as email, password, or text.
+         */
+        type: string;
+      }
+
+      /**
+       * A sign-in method and the fields that belong to it.
+       */
+      export interface Option {
+        /**
+         * The option ID to submit as selected_option.
+         */
+        id: string;
+
+        /**
+         * IDs from the registered fields that this method accepts.
+         */
+        field_ids: Array<string>;
+
+        /**
+         * The method label to display.
+         */
+        label: string;
+      }
+    }
+  }
+}
 
 /**
  * The status of an agent output item.
@@ -1019,6 +1233,7 @@ export interface AgentSession {
    * Actions that must be completed before the session can continue.
    */
   required_actions: Array<
+    | AgentSession.SessionRequiredActionResourceComputerUseApprovalRequest
     | AgentSession.SessionRequiredActionResourceFunctionCall
     | AgentSession.SessionRequiredActionResourceEnvironmentConnection
   >;
@@ -1096,6 +1311,132 @@ export namespace AgentSession {
      * Tools available to the agent.
      */
     tools: Array<AgentsAPI.AgentTool>;
+  }
+
+  /**
+   * Respond to a computer-use request.
+   */
+  export interface SessionRequiredActionResourceComputerUseApprovalRequest {
+    /**
+     * The information needed to render the request.
+     */
+    request:
+      | SessionRequiredActionResourceComputerUseApprovalRequest.ComputerUseApprovalRequestKindResourceBrowserAuthentication
+      | SessionRequiredActionResourceComputerUseApprovalRequest.ComputerUseApprovalRequestKindResourceBrowserOriginAccess;
+
+    /**
+     * The registered request ID to echo when responding.
+     */
+    request_id: string;
+
+    /**
+     * The turn that requested approval.
+     */
+    turn_id: string;
+
+    /**
+     * The type of the object. Always `computer_use_approval_request`.
+     */
+    type: 'computer_use_approval_request';
+  }
+
+  export namespace SessionRequiredActionResourceComputerUseApprovalRequest {
+    /**
+     * A registered form awaiting the application's response.
+     */
+    export interface ComputerUseApprovalRequestKindResourceBrowserAuthentication {
+      /**
+       * The registered form or frame origin where values will be entered.
+       */
+      credential_origin: string | null;
+
+      /**
+       * Controls to render. All submitted values are sensitive.
+       */
+      fields: Array<ComputerUseApprovalRequestKindResourceBrowserAuthentication.Field>;
+
+      /**
+       * Sign-in methods. Empty for a plain form.
+       */
+      options: Array<ComputerUseApprovalRequestKindResourceBrowserAuthentication.Option>;
+
+      /**
+       * Why the agent needs the user to sign in.
+       */
+      reason: string | null;
+
+      /**
+       * The type of the object. Always `browser_authentication`.
+       */
+      type: 'browser_authentication';
+    }
+
+    export namespace ComputerUseApprovalRequestKindResourceBrowserAuthentication {
+      /**
+       * A control in a registered browser-login form.
+       */
+      export interface Field {
+        /**
+         * The field ID to submit as field_id in a fields entry.
+         */
+        id: string;
+
+        /**
+         * The label to display beside the control.
+         */
+        label: string;
+
+        /**
+         * Whether this control requires a nonempty value.
+         */
+        required: boolean;
+
+        /**
+         * The rendering type, such as email, password, or text.
+         */
+        type: string;
+      }
+
+      /**
+       * A sign-in method and the fields that belong to it.
+       */
+      export interface Option {
+        /**
+         * The option ID to submit as selected_option.
+         */
+        id: string;
+
+        /**
+         * IDs from the registered fields that this method accepts.
+         */
+        field_ids: Array<string>;
+
+        /**
+         * The method label to display.
+         */
+        label: string;
+      }
+    }
+
+    /**
+     * A browser origin awaiting the application's approval decision.
+     */
+    export interface ComputerUseApprovalRequestKindResourceBrowserOriginAccess {
+      /**
+       * The origin the browser needs permission to access.
+       */
+      origin: string;
+
+      /**
+       * The browser's explanation for this request, or null when unavailable.
+       */
+      reason: string | null;
+
+      /**
+       * The type of the object. Always `browser_origin_access`.
+       */
+      type: 'browser_origin_access';
+    }
   }
 
   /**
@@ -1613,11 +1954,36 @@ export interface AgentSessionInputMessageParam {
  * Input submitted to an existing session.
  */
 export type AgentSessionInputParam =
+  | AgentSessionInputParam.SessionInputParamAgentSessionInputComputerUseApprovalRequestResult
   | AgentSessionInputParam.SessionInputParamAgentSessionInputMessage
   | AgentSessionInputParam.SessionInputParamAgentSessionInputCancel
   | AgentSessionInputParam.SessionInputParamAgentSessionInputToolResult;
 
 export namespace AgentSessionInputParam {
+  /**
+   * Responds to a pending Computer Use approval request.
+   */
+  export interface SessionInputParamAgentSessionInputComputerUseApprovalRequestResult {
+    /**
+     * The registered request ID from the required action.
+     */
+    request_id: string;
+
+    /**
+     * The response for this request type.
+     */
+    response:
+      | AgentsAPI.AgentBrowserAuthenticationSubmitParam
+      | AgentsAPI.AgentBrowserAuthenticationCancelParam
+      | AgentsAPI.AgentBrowserOriginAccessParam;
+
+    /**
+     * The type of the object. Always
+     * `agent.session.input.computer_use_approval_request_result`.
+     */
+    type: 'agent.session.input.computer_use_approval_request_result';
+  }
+
   /**
    * Adds one or more user messages and starts a turn.
    */
@@ -1689,6 +2055,9 @@ export type AgentSessionItem =
   | AgentSessionItem.FunctionCallOutputItemResource
   | AgentSessionItem.AgentMessageItemResource
   | AgentMcpCallItem
+  | AgentSessionItem.ComputerUseCallItemResource
+  | AgentSessionItem.BrowserAuthenticationRequestItemResource
+  | AgentSessionItem.ComputerUseApprovalRequestResultItemResource
   | AgentWebSearchCallItem
   | AgentCommandExecutionItem
   | AgentCreateSubagentCallItem
@@ -1772,6 +2141,211 @@ export namespace AgentSessionItem {
      * The item type. Always `agent_message`.
      */
     type: 'agent_message';
+  }
+
+  /**
+   * One execution of the platform-provided computer-use capability.
+   */
+  export interface ComputerUseCallItemResource {
+    /**
+     * The ID of the activity item.
+     */
+    id: string;
+
+    /**
+     * The last screenshot emitted by the model. Null when screenshot inclusion is
+     * disabled or the call emitted no screenshot.
+     */
+    output: ComputerUseCallItemResource.Output | null;
+
+    /**
+     * The execution status of the activity.
+     */
+    status: AgentsAPI.AgentFunctionCallStatus;
+
+    /**
+     * A model-generated description of the activity, when available.
+     */
+    title: string | null;
+
+    /**
+     * The ID of the turn that contains this item.
+     */
+    turn_id: string;
+
+    /**
+     * The item type. Always `computer_use_call`.
+     */
+    type: 'computer_use_call';
+  }
+
+  export namespace ComputerUseCallItemResource {
+    /**
+     * The last screenshot emitted by the model. Null when screenshot inclusion is
+     * disabled or the call emitted no screenshot.
+     */
+    export interface Output {
+      /**
+       * The complete JPEG image as a base64 data URL.
+       */
+      image_url: string;
+
+      /**
+       * The content type. Always `computer_screenshot`.
+       */
+      type: 'computer_screenshot';
+    }
+  }
+
+  /**
+   * A credential-free history record of the emitted login request.
+   */
+  export interface BrowserAuthenticationRequestItemResource {
+    /**
+     * The stable history item ID.
+     */
+    id: string;
+
+    /**
+     * A registered form awaiting the application's response.
+     */
+    request: BrowserAuthenticationRequestItemResource.Request;
+
+    request_id: string;
+
+    turn_id: string;
+
+    /**
+     * The item type. Always computer_use_approval_request.
+     */
+    type: 'computer_use_approval_request';
+  }
+
+  export namespace BrowserAuthenticationRequestItemResource {
+    /**
+     * A registered form awaiting the application's response.
+     */
+    export interface Request {
+      /**
+       * The registered form or frame origin where values will be entered.
+       */
+      credential_origin: string | null;
+
+      /**
+       * Controls to render. All submitted values are sensitive.
+       */
+      fields: Array<Request.Field>;
+
+      /**
+       * Sign-in methods. Empty for a plain form.
+       */
+      options: Array<Request.Option>;
+
+      /**
+       * Why the agent needs the user to sign in.
+       */
+      reason: string | null;
+
+      /**
+       * The type of the object. Always `browser_authentication`.
+       */
+      type: 'browser_authentication';
+    }
+
+    export namespace Request {
+      /**
+       * A control in a registered browser-login form.
+       */
+      export interface Field {
+        /**
+         * The field ID to submit as field_id in a fields entry.
+         */
+        id: string;
+
+        /**
+         * The label to display beside the control.
+         */
+        label: string;
+
+        /**
+         * Whether this control requires a nonempty value.
+         */
+        required: boolean;
+
+        /**
+         * The rendering type, such as email, password, or text.
+         */
+        type: string;
+      }
+
+      /**
+       * A sign-in method and the fields that belong to it.
+       */
+      export interface Option {
+        /**
+         * The option ID to submit as selected_option.
+         */
+        id: string;
+
+        /**
+         * IDs from the registered fields that this method accepts.
+         */
+        field_ids: Array<string>;
+
+        /**
+         * The method label to display.
+         */
+        label: string;
+      }
+    }
+  }
+
+  /**
+   * A credential-free record of an admitted response, not proof of completion.
+   */
+  export interface ComputerUseApprovalRequestResultItemResource {
+    /**
+     * The stable history item ID.
+     */
+    id: string;
+
+    /**
+     * The registered request answered by this item.
+     */
+    request_id: string;
+
+    /**
+     * The admitted response, without submitted credential values.
+     */
+    response:
+      | ComputerUseApprovalRequestResultItemResource.ComputerUseApprovalResponseKindResourceBrowserAuthenticationSubmitResource
+      | ComputerUseApprovalRequestResultItemResource.ComputerUseApprovalResponseKindResourceBrowserAuthenticationCancelResource;
+
+    /**
+     * The ID of the turn that contains this item.
+     */
+    turn_id: string;
+
+    type: 'computer_use_approval_request_result';
+  }
+
+  export namespace ComputerUseApprovalRequestResultItemResource {
+    export interface ComputerUseApprovalResponseKindResourceBrowserAuthenticationSubmitResource {
+      action: 'submit';
+
+      /**
+       * The chosen sign-in method, or null when no options were offered.
+       */
+      selected_option: string | null;
+
+      type: 'browser_authentication';
+    }
+
+    export interface ComputerUseApprovalResponseKindResourceBrowserAuthenticationCancelResource {
+      action: 'cancel';
+
+      type: 'browser_authentication';
+    }
   }
 }
 
@@ -2599,7 +3173,8 @@ export type AgentTool =
   | AgentTool.AgentToolResourceFunction
   | AgentTool.AgentToolResourceProgrammaticToolCalling
   | AgentTool.AgentToolResourceMcp
-  | AgentTool.AgentToolResourceWebSearch;
+  | AgentTool.AgentToolResourceWebSearch
+  | AgentTool.AgentToolResourceComputerUse;
 
 export namespace AgentTool {
   /**
@@ -2749,6 +3324,21 @@ export namespace AgentTool {
       timezone: string | null;
     }
   }
+
+  /**
+   * Browser use in an OpenAI-hosted session.
+   */
+  export interface AgentToolResourceComputerUse {
+    /**
+     * Whether computer tool outputs include screenshots.
+     */
+    include_screenshots: boolean;
+
+    /**
+     * The type of the object. Always `computer_use`.
+     */
+    type: 'computer_use';
+  }
 }
 
 /**
@@ -2759,7 +3349,8 @@ export type AgentToolParam =
   | AgentToolParam.AgentToolConfigParamToolSearch
   | AgentToolParam.AgentToolConfigParamProgrammaticToolCalling
   | AgentToolParam.AgentToolConfigParamMcp
-  | AgentToolParam.AgentToolConfigParamWebSearch;
+  | AgentToolParam.AgentToolConfigParamWebSearch
+  | AgentToolParam.AgentToolConfigParamComputerUse;
 
 export namespace AgentToolParam {
   /**
@@ -2930,6 +3521,21 @@ export namespace AgentToolParam {
       timezone?: string | null;
     }
   }
+
+  /**
+   * Browser use in an OpenAI-hosted session.
+   */
+  export interface AgentToolConfigParamComputerUse {
+    /**
+     * The type of the object. Always `computer_use`.
+     */
+    type: 'computer_use';
+
+    /**
+     * Whether computer tool outputs include screenshots. Defaults to `false`.
+     */
+    include_screenshots?: boolean;
+  }
 }
 
 /**
@@ -3060,6 +3666,11 @@ export namespace Environment {
      * The type of the object. Always `openai_hosted`.
      */
     type: 'openai_hosted';
+
+    /**
+     * The effective desktop configuration.
+     */
+    desktop?: EnvironmentResourceOpenAIHosted.Desktop;
   }
 
   export namespace EnvironmentResourceOpenAIHosted {
@@ -3072,7 +3683,7 @@ export namespace Environment {
        *
        * - `enabled` - Allows unrestricted network access.
        * - `disabled` - Disables network access.
-       * - `restricted` - Allows access only to configured domains.
+       * - `restricted` - Applies the configured domain restrictions.
        */
       access: 'enabled' | 'disabled' | 'restricted';
 
@@ -3100,6 +3711,16 @@ export namespace Environment {
        * System packages installed in the environment.
        */
       system: Array<string>;
+    }
+
+    /**
+     * The effective desktop configuration.
+     */
+    export interface Desktop {
+      /**
+       * Whether the environment provisions a desktop and browser proxy.
+       */
+      enabled: boolean;
     }
   }
 
@@ -3171,6 +3792,12 @@ export namespace EnvironmentParam {
     capability_directories?: Array<string> | null;
 
     /**
+     * Desktop provisioning. Omission or null inherits the template setting, or
+     * defaults to disabled.
+     */
+    desktop?: EnvironmentParamOpenAIHosted.Desktop | null;
+
+    /**
      * Environment variables made available to the agent.
      */
     env?: { [key: string]: string } | null;
@@ -3216,6 +3843,17 @@ export namespace EnvironmentParam {
 
   export namespace EnvironmentParamOpenAIHosted {
     /**
+     * Desktop provisioning. Omission or null inherits the template setting, or
+     * defaults to disabled.
+     */
+    export interface Desktop {
+      /**
+       * Whether to provision the desktop and its browser proxy.
+       */
+      enabled: boolean;
+    }
+
+    /**
      * Network access policy for the environment. Defaults to disabled for GA requests
      * and enabled for beta requests.
      */
@@ -3225,7 +3863,7 @@ export namespace EnvironmentParam {
        *
        * - `enabled` - Allows unrestricted network access.
        * - `disabled` - Disables network access.
-       * - `restricted` - Allows access only to configured domains.
+       * - `restricted` - Applies the configured domain restrictions.
        */
       access: 'enabled' | 'disabled' | 'restricted';
 
@@ -3233,6 +3871,13 @@ export namespace EnvironmentParam {
        * Domains the environment may access when network access is restricted.
        */
       allowed_domains?: Array<string> | null;
+
+      /**
+       * Domains blocked for both executor and browser when access is restricted. A
+       * nonempty list requires `access: restricted` and cannot be combined with nonempty
+       * `allowed_domains`. Wildcard domains are not supported.
+       */
+      blocked_domains?: Array<string> | null;
     }
 
     /**
@@ -3821,7 +4466,8 @@ export type PersistedAgentTool =
   | PersistedAgentTool.PersistedAgentToolResourceToolSearch
   | PersistedAgentTool.PersistedAgentToolResourceProgrammaticToolCalling
   | PersistedAgentTool.PersistedAgentToolResourceMcp
-  | PersistedAgentTool.PersistedAgentToolResourceWebSearch;
+  | PersistedAgentTool.PersistedAgentToolResourceWebSearch
+  | PersistedAgentTool.PersistedAgentToolResourceComputerUse;
 
 export namespace PersistedAgentTool {
   /**
@@ -3980,6 +4626,21 @@ export namespace PersistedAgentTool {
       timezone: string | null;
     }
   }
+
+  /**
+   * Browser use in an OpenAI-hosted session.
+   */
+  export interface PersistedAgentToolResourceComputerUse {
+    /**
+     * Whether computer tool outputs include screenshots.
+     */
+    include_screenshots: boolean;
+
+    /**
+     * The type of the object. Always `computer_use`.
+     */
+    type: 'computer_use';
+  }
 }
 
 /**
@@ -3990,7 +4651,8 @@ export type PersistedAgentToolParam =
   | PersistedAgentToolParam.PersistedAgentToolConfigParamToolSearch
   | PersistedAgentToolParam.PersistedAgentToolConfigParamProgrammaticToolCalling
   | PersistedAgentToolParam.PersistedAgentToolConfigParamMcp
-  | PersistedAgentToolParam.PersistedAgentToolConfigParamWebSearch;
+  | PersistedAgentToolParam.PersistedAgentToolConfigParamWebSearch
+  | PersistedAgentToolParam.PersistedAgentToolConfigParamComputerUse;
 
 export namespace PersistedAgentToolParam {
   /**
@@ -4158,6 +4820,21 @@ export namespace PersistedAgentToolParam {
        */
       timezone?: string | null;
     }
+  }
+
+  /**
+   * Browser use in an OpenAI-hosted session.
+   */
+  export interface PersistedAgentToolConfigParamComputerUse {
+    /**
+     * The type of the object. Always `computer_use`.
+     */
+    type: 'computer_use';
+
+    /**
+     * Whether computer tool outputs include screenshots. Defaults to `false`.
+     */
+    include_screenshots?: boolean;
   }
 }
 
@@ -4780,6 +5457,9 @@ Agents.Sessions = Sessions;
 export declare namespace Agents {
   export {
     type Agent as Agent,
+    type AgentBrowserAuthenticationCancelParam as AgentBrowserAuthenticationCancelParam,
+    type AgentBrowserAuthenticationSubmitParam as AgentBrowserAuthenticationSubmitParam,
+    type AgentBrowserOriginAccessParam as AgentBrowserOriginAccessParam,
     type AgentCloseSubagentCallItem as AgentCloseSubagentCallItem,
     type AgentCommandExecutionItem as AgentCommandExecutionItem,
     type AgentContent as AgentContent,
