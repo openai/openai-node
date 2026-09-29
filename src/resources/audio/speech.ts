@@ -26,7 +26,7 @@ export class Speech extends APIResource {
    * const speech = await client.audio.speech.create({
    *   input: 'input',
    *   model: 'tts-1',
-   *   voice: 'alloy',
+   *   voice: 'ash',
    * });
    *
    * const content = await speech.blob();
