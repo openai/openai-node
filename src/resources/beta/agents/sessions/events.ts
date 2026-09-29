@@ -31,13 +31,16 @@ export class Events extends APIResource {
    *   {
    *     events: [
    *       {
-   *         input: [
-   *           {
-   *             content: [{ text: 'text', type: 'input_text' }],
-   *             role: 'user',
-   *           },
-   *         ],
-   *         type: 'agent.session.input.message',
+   *         request_id: 'request_id',
+   *         response: {
+   *           action: 'submit',
+   *           fields: [
+   *             { field_id: 'field_id', value: 'value' },
+   *           ],
+   *           type: 'browser_authentication',
+   *         },
+   *         type:
+   *           'agent.session.input.computer_use_approval_request_result',
    *       },
    *     ],
    *   },

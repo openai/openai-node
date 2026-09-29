@@ -407,6 +407,9 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/beta/agents/agents.ts">Agent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentBrowserAuthenticationCancelParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentBrowserAuthenticationSubmitParam</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentBrowserOriginAccessParam</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentCloseSubagentCallItem</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentCommandExecutionItem</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentContent</a></code>
