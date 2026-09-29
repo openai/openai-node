@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.25.0](https://github.com/openai/openai-node/compare/v7.24.0...v7.25.0) (2026-09-29)
+
+
+### Features
+
+* **api:** add computer use to beta agents ([#2837](https://github.com/openai/openai-node/issues/2837)) ([f982249](https://github.com/openai/openai-node/commit/f98224927efcc518461846372cedaec2636fd9d4))
+
 ## [7.24.0](https://github.com/openai/openai-node/compare/v7.23.0...v7.24.0) (2026-09-29)
 
 
