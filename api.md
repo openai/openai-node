@@ -1596,7 +1596,7 @@ Methods:
 - <code title="get /evals/{eval_id}/runs/{run_id}">client.evals.runs.<a href="./src/resources/evals/runs/runs.ts">retrieve</a>(runID, { ...params }) -> RunRetrieveResponse</code>
 - <code title="get /evals/{eval_id}/runs">client.evals.runs.<a href="./src/resources/evals/runs/runs.ts">list</a>(evalID, { ...params }) -> RunListResponsesPage</code>
 - <code title="delete /evals/{eval_id}/runs/{run_id}">client.evals.runs.<a href="./src/resources/evals/runs/runs.ts">delete</a>(runID, { ...params }) -> RunDeleteResponse</code>
-- <code title="post /evals/{eval_id}/runs/{run_id}">client.evals.runs.<a href="./src/resources/evals/runs/runs.ts">cancel</a>(runID, { ...params }) -> RunCancelResponse</code>
+- <code title="post /evals/{eval_id}/runs/{run_id}/cancel">client.evals.runs.<a href="./src/resources/evals/runs/runs.ts">cancel</a>(runID, { ...params }) -> RunCancelResponse</code>
 
 ### OutputItems
 
