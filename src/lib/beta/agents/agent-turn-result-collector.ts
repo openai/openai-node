@@ -151,13 +151,20 @@ export class AgentTurnResultCollector {
     return this.#terminal && this.#idle;
   }
 
+  release(): void {
+    this.#items.clear();
+    this.#unresolved.clear();
+    this.#pendingCalls.clear();
+    this.#requiredActions = [];
+  }
+
   finish(): AgentTurnResult {
     this.checkAction(() => this.ready);
     if (!this.#terminal || this.#turn?.status !== 'completed' || !this.#idle) {
       throw this.error('observation');
     }
     if (
-      this.#unresolved.size ||
+      [...this.#unresolved].some((id) => this.#items.get(id)?.message.phase !== 'commentary') ||
       [...this.#items.values()].some(
         ({ message, done }) => message.phase !== 'commentary' && (!done || message.phase === null),
       )

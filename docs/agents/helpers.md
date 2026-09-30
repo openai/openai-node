@@ -23,7 +23,7 @@ for await (const event of stream) {
 
 ## Collect a final answer (beta)
 
-Streamed creation and the follow-up helper both expose `finalResult()`. It consumes the existing stream through the selected root turn's completion and subsequent idle event, then returns that turn and its completed final assistant messages:
+Call `finalResult()` on streamed creation or a follow-up to collect the completed turn's final answer.
 
 ```ts
 const stream = await client.beta.agents.sessions.create({
@@ -42,13 +42,7 @@ const followup = client.beta.agents.sessions.stream(result.session_id, {
 console.log((await followup.finalResult()).output_text);
 ```
 
-To display progress, iterate the follow-up stream before calling the getter. Events already consumed contribute to the same result. Repeated calls return the cached result and do not submit input or run handlers again. Do not consume the stream concurrently from multiple readers.
-
-`result.messages` preserves message boundaries and annotations. `output_text` joins their text without extra separators and may be empty for a successful text-free turn. Commentary and subagent answers are excluded. The result uses the generated turn and message types; it is not a full session transcript.
-
-A creation stream retains its normal raw iteration behavior, which may continue beyond one turn. Calling `finalResult()` stops local observation at the selected turn's idle boundary; it does not cancel hosted execution. Existing response/header access, `controller`, `tee()` and `toReadableStream()` remain available.
-
-`AgentTurnResultError`, imported from `openai/lib/beta/agents/agent-turn-result-error`, exposes `reason`, the known `session_id`/`turn_id` and `turn`, completed partial `messages`, `required_actions`, and the original transport `cause` when available. Failed or cancelled turns, unhandled required actions, interrupted observation, incomplete output, and ambiguous legacy message phases do not return a successful result. Raw event iteration continues to support manual tool handling; `finalResult()` instead reports actions that its helper cannot handle. Reconnection and structured parsing are not provided by this getter.
+You can consume progress events before calling the getter; repeated calls reuse the result. `result.messages` preserves the final messages and annotations, and `result.turn` includes the turn's status and usage.
 
 Optional `toolHandlers` map configured function names to callbacks. Each callback receives a detached argument object and may return text, a JSON object, an array of supported input content, `null`, or a promise for one of those values. Callbacks run sequentially during iteration, after their original call event is yielded. Unregistered functions are left for manual handling through the raw events API. Invalid arguments and callback failures submit a generic failure result without exception text.
 

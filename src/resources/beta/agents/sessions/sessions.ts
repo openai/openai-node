@@ -4,7 +4,10 @@ import {
   AgentSessionStream,
   type AgentSessionStreamParams,
 } from '../../../../lib/agents/agent-session-stream';
-import { AgentSessionCreateStream } from '../../../../lib/beta/agents/agent-session-create-stream';
+import {
+  type AgentSessionCreateStream,
+  withAgentTurnResult,
+} from '../../../../lib/beta/agents/agent-session-create-stream';
 import { APIResource } from '../../../../core/resource';
 import * as SessionsAPI from './sessions';
 import * as AgentsAPI from '../agents';
@@ -198,7 +201,7 @@ export class Sessions extends APIResource {
           __security: { bearerAuth: true },
         })),
       )
-      ._thenUnwrap((data) => (data instanceof Stream ? new AgentSessionCreateStream(data) : data)) as
+      ._thenUnwrap((data) => (data instanceof Stream ? withAgentTurnResult(data) : data)) as
       | APIPromise<AgentsAPI.AgentSession>
       | APIPromise<AgentSessionCreateStream>;
   }

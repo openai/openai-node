@@ -92,6 +92,25 @@ async function collect(branch: Stream<AgentSessionEvent>) {
   return items;
 }
 
+class CustomStream<Item> extends Stream<Item> {
+  static last: unknown;
+  customState = { retained: true };
+  customMethod(): string {
+    return this.customState.retained ? 'custom' : 'missing';
+  }
+  static override fromSSEResponse<Item>(
+    response: Response,
+    controller: AbortController,
+    client?: OpenAI,
+    synthesizeEventData?: boolean,
+  ): CustomStream<Item> {
+    const source = Stream.fromSSEResponse<Item>(response, controller, client, synthesizeEventData);
+    const custom = new CustomStream(() => source[Symbol.asyncIterator](), controller, client);
+    CustomStream.last = custom;
+    return custom;
+  }
+}
+
 describe('beta Agents finalResult', () => {
   test('creation collects its answer without waiting for the still-live stream to close', async () => {
     const { client, cancel, requests } = setup([created(), message(), completed(), idle()]);
@@ -312,5 +331,78 @@ describe('beta Agents finalResult', () => {
     await expect(collect(stream)).rejects.toThrow('later failure');
     const result = await stream.finalResult();
     expect(result.output_text).toBe('Final answer');
+  });
+  test.each(['iterate', 'tee', 'readable'])(
+    'preserves custom stream identity and methods through %s consumption',
+    async (mode) => {
+      const { client } = setup([created(), message(), completed(), idle()], { eof: true });
+      const { data: stream, request_id } = await client.beta.agents.sessions
+        .create({ environment: { type: 'none' }, stream: true }, { __streamClass: CustomStream })
+        .withResponse();
+      expect(stream).toBe(CustomStream.last);
+      expect(stream).toBeInstanceOf(CustomStream);
+      expect(request_id).toBe('request_test');
+      if (!(stream instanceof CustomStream)) {
+        throw new Error('Expected configured stream class');
+      }
+      expect(stream.customState).toEqual({ retained: true });
+      expect(stream.customMethod()).toBe('custom');
+      if (mode === 'tee') {
+        const [left, right] = stream.tee();
+        await Promise.all([collect(left), collect(right)]);
+      } else if (mode === 'readable') {
+        await collect(
+          Stream.fromReadableStream<AgentSessionEvent>(stream.toReadableStream(), stream.controller),
+        );
+      } else {
+        await collect(stream);
+      }
+      const result = await stream.finalResult();
+      expect(result.output_text).toBe('Final answer');
+    },
+  );
+
+  test('excludes known unfinished commentary while preserving completed final output', async () => {
+    const commentary = message('Thinking', 'commentary', 'commentary', 0, false);
+    const delta = event('agent.session.turn.output_text.delta', {
+      item_id: 'commentary',
+      delta: '...',
+      content_index: 0,
+      output_index: 0,
+    });
+    const { client } = setup([
+      created(),
+      commentary,
+      delta,
+      message('Answer', 'final_answer', 'final', 1),
+      completed(),
+      idle(),
+    ]);
+    const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    const result = await stream.finalResult();
+    expect(result.output_text).toBe('Answer');
+  });
+
+  test('a done commentary snapshot resolves an initially unclassified message', async () => {
+    const { client } = setup([
+      created(),
+      message('', null, 'commentary', 0, false),
+      message('Thinking', 'commentary', 'commentary'),
+      message('Answer', 'final_answer', 'final', 1),
+      completed(),
+      idle(),
+    ]);
+    const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    const result = await stream.finalResult();
+    expect(result.output_text).toBe('Answer');
+  });
+
+  test('preserves explicit creation abort reason in the observation error', async () => {
+    const { client } = setup([created(), message()]);
+    const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    await stream[Symbol.asyncIterator]().next();
+    const cause = new Error('Stopped by caller');
+    stream.controller.abort(cause);
+    await expect(stream.finalResult()).rejects.toMatchObject({ reason: 'observation', cause });
   });
 });

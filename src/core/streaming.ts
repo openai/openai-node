@@ -301,6 +301,13 @@ export class Stream<Item> implements AsyncIterable<Item> {
     return this.iterator();
   }
 
+  /** Decorates consumption without replacing a configured stream instance.
+   * @internal
+   */
+  __transformIterator(transform: (iterator: () => AsyncIterator<Item>) => () => AsyncIterator<Item>): void {
+    this.iterator = transform(this.iterator.bind(this));
+  }
+
   /**
    * Splits the stream into two streams which can be
    * independently read from at different speeds.

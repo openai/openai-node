@@ -16,14 +16,17 @@ export class ResultCollection {
   readonly collector: AgentTurnResultCollector;
 
   readonly #source: () => AsyncIterator<AgentSessionEvent>;
+  readonly #signal: AbortSignal | undefined;
   readonly #canHandle: (name: string) => boolean;
 
   constructor(
     source: () => AsyncIterator<AgentSessionEvent>,
     canHandle: (name: string) => boolean = () => false,
     sessionID?: string,
+    signal?: AbortSignal,
   ) {
     this.#source = source;
+    this.#signal = signal;
     this.#canHandle = canHandle;
     this.collector = new AgentTurnResultCollector(sessionID);
   }
@@ -79,11 +82,18 @@ export class ResultCollection {
       if (this.#error !== undefined && !this.collector.ready) {
         throw this.#error;
       }
+      if (!this.collector.ready && this.#signal?.aborted) {
+        throw this.collector.error('observation', this.#signal.reason);
+      }
       return this.collector.finish();
     } catch (error) {
       throw error instanceof AgentTurnResultError ? error : this.collector.error('observation', error);
     } finally {
-      await this.#iterator?.return();
+      try {
+        await this.#iterator?.return();
+      } finally {
+        this.collector.release();
+      }
     }
   }
 }
