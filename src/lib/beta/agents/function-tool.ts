@@ -44,7 +44,7 @@ export function functionTool<Arguments>(
     handler: async (arguments_) => {
       const result: unknown = await execute(parse(JSON.stringify(arguments_)));
       if (Array.isArray(result)) {
-        return result.every(isInputContent) ? result : JSON.stringify(result);
+        return result.length > 0 && result.every(isInputContent) ? result : JSON.stringify(result);
       }
       // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Existing schema-tool callbacks return arbitrary application values; adapt them to the Agents dispatcher's output contract.
       if (typeof result === 'object' || typeof result === 'string') {
