@@ -30,7 +30,7 @@
     "start-server-and-test": "^3.0.11",
     "ts-jest": "^29.4.11",
     "typescript": "^5.9.3",
-    "vercel": "^55.0.0"
+    "vercel": "^56.2.1"
   },
   "overrides": {
     "@mapbox/node-pre-gyp": {
