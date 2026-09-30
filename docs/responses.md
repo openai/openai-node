@@ -154,14 +154,43 @@ socket.send({
 });
 ```
 
-The connection inherits endpoint configuration from the `OpenAI` client and automatically adds authentication only
-when the client has a static `apiKey` string. It does not resolve async `apiKey` functions or workload identity; for
-those clients, pass a resolved `Authorization` header in the WebSocket options. A function-backed client can also
-reuse a key already resolved by a previous request. For function-backed clients without a resolved key or
-caller-supplied credential, the Node constructor throws before opening a socket. Compatible endpoints can use
-custom credential headers or the Node `ws` transport's `auth` option. Custom `ResponsesWSBase` transports are
+The connection inherits endpoint configuration from the `OpenAI` client. The synchronous Node constructor uses a
+static `apiKey`, a function-backed key already resolved by a previous request, or a caller-supplied credential.
+It never invokes an async key function for the initial handshake. Without an already resolved key or caller credential
+it throws before opening a socket. Workload identity is not resolved here; pass a resolved `Authorization` header.
+Compatible endpoints can use custom credential headers or the Node `ws` transport's `auth` option.
+
+For opt-in reconnects, both stable and beta Node Responses sockets invoke a callable `apiKey` again on every
+attempt that needs it, so rotated keys reach the new handshake. Provider failures consume reconnect attempts;
+closing during refresh still completes the connection lifecycle. Caller-supplied credentials take precedence and
+do not invoke the key provider. A create already sent on the previous socket is never replayed.
+Custom `ResponsesWSBase` transports are
 responsible for supplying or validating their final authentication in `_createSocket`; the base cannot inspect
 transport-managed credentials.
+
+If a Node `ws` `finishRequest` callback supplies its own credentials for a compatible endpoint, use the
+socket's existing empty `Authorization` override to mark that authentication as caller-managed. This suppresses
+callable key refresh for that socket without changing headers used by HTTP requests on the same client:
+
+```ts
+// client has a function-backed key resolved by a previous request, as required for initial construction.
+const socket = new ResponsesWS(client, {
+  headers: { Authorization: '' },
+  finishRequest(request) {
+    request.removeHeader('Authorization');
+    request.setHeader('X-Custom', getEndpointCredential());
+    request.end();
+  },
+  reconnect: {
+    maxRetries: 3,
+    onReconnecting() {},
+  },
+});
+```
+
+The callback may finish asynchronously, but it is responsible for calling `request.end()`. Omit the empty
+override when the callback uses the SDK key, including when it copies that key into another header:
+the SDK then refreshes the key before each reconnect.
 
 Attach an `error` listener; unhandled WebSocket errors otherwise become unhandled promise rejections. You can also
 iterate over `socket` or `socket.stream()` to receive connection lifecycle events and server messages.

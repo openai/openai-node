@@ -1,6 +1,7 @@
 import { concatBytes, encodeUTF8 } from './utils/bytes';
 import { OpenAIError } from '../core/error';
 import type { WebSocketLike } from './ws-adapter';
+import type { OpenAI } from '../client';
 
 const webSocketErrors = new WeakMap<WebSocketLike, Error>();
 
@@ -99,19 +100,40 @@ const REDIRECT_SAFE_WEBSOCKET_HEADERS = new Set([
   'x-trace-id',
 ]);
 
+const WEBSOCKET_METADATA_HEADER_NAMES = new Set([
+  'accept-language',
+  'x-request-id',
+  'x-client-request-id',
+  'x-correlation-id',
+  'traceparent',
+  'tracestate',
+  'sentry-trace',
+  'x-amzn-trace-id',
+  'baggage',
+  'b3',
+]);
+
+// Request and tracing metadata do not authenticate a Responses socket, but remain protected on redirects.
+export const WEBSOCKET_METADATA_HEADERS = {
+  has: (name: string): boolean => WEBSOCKET_METADATA_HEADER_NAMES.has(name) || name.startsWith('x-b3-'),
+};
+
 function isWebSocketCredentialHeader(name: string): boolean {
   return !REDIRECT_SAFE_WEBSOCKET_HEADERS.has(name.toLowerCase().split('_').join('-'));
 }
 
 /**
  * Snapshots credential values in final socket options before validation and dispatch.
- * Reports potential caller authentication, including custom headers; the server
- * remains responsible for validating credentials. Noncredential headers are left intact.
+ * Reports potential caller authentication, excluding additional metadata when requested.
+ * The server remains responsible for validating credentials. Noncredential headers are left intact.
  */
-export function snapshotWebSocketCredentials(options: {
-  auth?: unknown;
-  headers?: Record<string, unknown> | undefined;
-}): boolean {
+export function snapshotWebSocketCredentials(
+  options: {
+    auth?: unknown;
+    headers?: Record<string, unknown> | undefined;
+  },
+  metadataHeaders?: Pick<ReadonlySet<string>, 'has'>,
+): boolean {
   if (options.auth !== null && options.auth !== undefined) {
     options.auth = String(options.auth);
   }
@@ -135,16 +157,58 @@ export function snapshotWebSocketCredentials(options: {
     }
     headers[name] = snapshot;
     const values = Array.isArray(snapshot) ? snapshot : [snapshot];
-    credentials.set(
-      name.toLowerCase(),
-      values.some((item) => typeof item === 'string' && item.trim().length > 0),
-    );
+    if (!metadataHeaders?.has(normalizedName)) {
+      credentials.set(
+        name.toLowerCase(),
+        values.some((item) => typeof item === 'string' && item.trim().length > 0),
+      );
+    }
   }
   // Node applies header names case-insensitively, and Authorization overrides Basic auth.
   return (
     [...credentials.values()].some(Boolean) ||
     (!credentials.has('authorization') && typeof options.auth === 'string' && options.auth.trim().length > 0)
   );
+}
+
+/** Merge transport authentication before explicit caller overrides and header removals. */
+export function mergeWebSocketAuthHeaders<Options extends CredentialedWebSocketOptions>(
+  options: Options,
+  authHeaders: Record<string, string>,
+  removedHeaders: ReadonlySet<string>,
+): Options {
+  const headers = new Map(Object.entries(authHeaders).map(([name, value]) => [name.toLowerCase(), value]));
+  for (const name of removedHeaders) {
+    headers.delete(name);
+  }
+  for (const [name, value] of Object.entries(options.headers ?? {})) {
+    headers.set(name, value);
+  }
+  return { ...options, headers: Object.fromEntries(headers) };
+}
+
+/** Build a WebSocket handshake with explicit caller headers applied after the client defaults. */
+export function buildWebSocketOptions<Options extends Pick<CredentialedWebSocketOptions, 'headers'>>(
+  client: OpenAI,
+  authHeaders: Record<string, string>,
+  options: Options | null | undefined,
+  removedHeaders?: Set<string>,
+) {
+  const headers = new Map(Object.entries(client._buildWebSocketHeaders(authHeaders, removedHeaders)));
+  for (const [name, value] of Object.entries(options?.headers ?? {})) {
+    if (value === null) {
+      headers.delete(name.toLowerCase());
+      removedHeaders?.add(name.toLowerCase());
+    } else if (value !== undefined) {
+      headers.set(name.toLowerCase(), value);
+      removedHeaders?.delete(name.toLowerCase());
+    }
+  }
+  return {
+    ...options,
+    headers: Object.fromEntries(headers),
+    followRedirects: false,
+  };
 }
 
 /** Prevents WebSocket redirects from forwarding caller or SDK credentials to another origin. */

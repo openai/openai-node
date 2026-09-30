@@ -48,7 +48,11 @@ import {
 import * as Uploads from './core/uploads';
 import * as API from './resources/index';
 import { APIPromise } from './core/api-promise';
-import { resolveRealtimeAPIKey } from './internal/realtime-credentials';
+import {
+  deferRealtimeAPIKeyCache,
+  resolveRealtimeAPIKey,
+  validateCapturedAPIKey,
+} from './internal/realtime-credentials';
 import {
   Batch,
   BatchCreateParams,
@@ -490,6 +494,8 @@ export class OpenAI {
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
+  private _apiKeyInvocation = 0;
+  private _lastCachedAPIKeyInvocation = 0;
   private _workloadIdentityAuth?: WorkloadIdentityAuth | X509WorkloadIdentityAuth;
 
   /**
@@ -741,18 +747,23 @@ export class OpenAI {
   }
 
   /** @internal Client request headers for each new WebSocket handshake. */
-  _buildWebSocketHeaders(authHeaders: Record<string, string>): Record<string, string> {
-    return Object.fromEntries(
-      buildHeaders([
-        {
-          'User-Agent': this.getUserAgent(),
-          'OpenAI-Organization': this.organization,
-          'OpenAI-Project': this.project,
-        },
-        authHeaders,
-        this._options.defaultHeaders,
-      ]).values,
-    );
+  _buildWebSocketHeaders(
+    authHeaders: Record<string, string>,
+    removedHeaders?: Set<string>,
+  ): Record<string, string> {
+    const headers = buildHeaders([
+      {
+        'User-Agent': this.getUserAgent(),
+        'OpenAI-Organization': this.organization,
+        'OpenAI-Project': this.project,
+      },
+      authHeaders,
+      this._options.defaultHeaders,
+    ]);
+    for (const name of headers.nulls) {
+      removedHeaders?.add(name);
+    }
+    return Object.fromEntries(headers.values);
   }
 
   protected validateHeaders(
@@ -880,7 +891,7 @@ export class OpenAI {
    * Resolves a function-based API key and retains the resolved value on this client.
    * Returns whether a provider was invoked. Internal callers can capture this
    * invocation's key before another request updates the shared `apiKey` property.
-   * Overrides should forward `capture` or invoke it with their own resolved key
+   * Overrides should forward `capture`, or invoke `capture` with their own resolved key
    * to preserve invocation-local credentials in concurrent requests and Realtime factories.
    * @internal
    */
@@ -896,6 +907,7 @@ export class OpenAI {
       return false;
     }
 
+    const invocation = ++this._apiKeyInvocation;
     let token: unknown;
     try {
       token = await apiKey();
@@ -913,8 +925,23 @@ export class OpenAI {
         `Expected 'apiKey' function argument to return a string but it returned ${token}`,
       );
     }
-    this.apiKey = token;
-    capture?.(this.apiKey);
+    const resolvedToken = token;
+    const commit = () => {
+      if (capture) validateCapturedAPIKey(this, resolvedToken);
+      if (invocation < this._lastCachedAPIKeyInvocation) {
+        return resolvedToken;
+      }
+      this.apiKey = resolvedToken;
+      const cached = capture ? this.apiKey : resolvedToken;
+      this._lastCachedAPIKeyInvocation = invocation;
+      return cached;
+    };
+    if (capture && deferRealtimeAPIKeyCache(capture, commit)) {
+      capture(resolvedToken);
+    } else {
+      const cached = commit();
+      capture?.(cached);
+    }
     return true;
   }
 
