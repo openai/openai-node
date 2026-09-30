@@ -3638,6 +3638,11 @@ export namespace Environment {
     capability_directories: Array<string>;
 
     /**
+     * The effective desktop configuration.
+     */
+    desktop: EnvironmentResourceOpenAIHosted.Desktop;
+
+    /**
      * Files available in the environment, excluding their contents.
      */
     files: Array<AgentsAPI.HostedEnvironmentFile>;
@@ -3668,12 +3673,23 @@ export namespace Environment {
     type: 'openai_hosted';
 
     /**
-     * The effective desktop configuration.
+     * The effective CPU and memory tier, or null when unknown or outside the public
+     * tiers.
      */
-    desktop?: EnvironmentResourceOpenAIHosted.Desktop;
+    container_size?: 'small' | 'medium' | 'large' | null;
   }
 
   export namespace EnvironmentResourceOpenAIHosted {
+    /**
+     * The effective desktop configuration.
+     */
+    export interface Desktop {
+      /**
+       * Whether the environment provisions a desktop and browser proxy.
+       */
+      enabled: boolean;
+    }
+
     /**
      * The effective network access policy for the environment.
      */
@@ -3711,16 +3727,6 @@ export namespace Environment {
        * System packages installed in the environment.
        */
       system: Array<string>;
-    }
-
-    /**
-     * The effective desktop configuration.
-     */
-    export interface Desktop {
-      /**
-       * Whether the environment provisions a desktop and browser proxy.
-       */
-      enabled: boolean;
     }
   }
 
@@ -3790,6 +3796,11 @@ export namespace EnvironmentParam {
      * list.
      */
     capability_directories?: Array<string> | null;
+
+    /**
+     * The hosted container size. Omission selects the medium tier.
+     */
+    container_size?: 'small' | 'medium' | 'large';
 
     /**
      * Desktop provisioning. Omission or null inherits the template setting, or
