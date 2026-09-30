@@ -504,4 +504,22 @@ describe('beta Agents finalResult', () => {
       }
     },
   );
+  test.each([false, true])('collects from a separate SDK module stream (progress: %s)', async (progress) => {
+    vi.resetModules();
+    const { Stream: ForeignStream } = await import('openai/core/streaming');
+    expect(ForeignStream).not.toBe(Stream);
+    const { client } = setup([created(), message(), completed(), idle()], { eof: true });
+    const { data: stream, request_id } = await client.beta.agents.sessions
+      .create({ environment: { type: 'none' }, stream: true }, { __streamClass: ForeignStream })
+      .withResponse();
+    expect(stream).toBeInstanceOf(ForeignStream);
+    expect(stream).not.toBeInstanceOf(Stream);
+    expect(request_id).toBe('request_test');
+    if (progress) {
+      expect(stream.withResultCollection()).toBe(stream);
+      await collect(stream);
+    }
+    const result = await stream.finalResult();
+    expect(result.output_text).toBe('Final answer');
+  });
 });

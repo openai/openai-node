@@ -35,7 +35,7 @@ import * as SubagentsAPI from './subagents/subagents';
 import { SubagentListParams, SubagentRetrieveParams, Subagents } from './subagents/subagents';
 import { APIPromise } from '../../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
-import { Stream } from '../../../../core/streaming';
+import type { Stream } from '../../../../core/streaming';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
@@ -201,9 +201,10 @@ export class Sessions extends APIResource {
           __security: { bearerAuth: true },
         })),
       )
-      ._thenUnwrap((data) => (data instanceof Stream ? withAgentTurnResult(data) : data)) as
-      | APIPromise<AgentsAPI.AgentSession>
-      | APIPromise<AgentSessionCreateStream>;
+      ._thenUnwrap((data, { options }) =>
+        // SAFETY: defaultParseResponse uses this same resolved flag to return the configured stream instance.
+        options.stream ? withAgentTurnResult(data as Stream<AgentsAPI.AgentSessionEvent>) : data,
+      ) as APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream>;
   }
 
   /**
