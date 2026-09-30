@@ -3668,6 +3668,12 @@ export namespace Environment {
     type: 'openai_hosted';
 
     /**
+     * The effective CPU and memory tier, or null when unknown or outside the public
+     * tiers.
+     */
+    container_size?: 'small' | 'medium' | 'large' | null;
+
+    /**
      * The effective desktop configuration.
      */
     desktop?: EnvironmentResourceOpenAIHosted.Desktop;
@@ -3790,6 +3796,11 @@ export namespace EnvironmentParam {
      * list.
      */
     capability_directories?: Array<string> | null;
+
+    /**
+     * The hosted container size. Omission selects the medium tier.
+     */
+    container_size?: 'small' | 'medium' | 'large';
 
     /**
      * Desktop provisioning. Omission or null inherits the template setting, or
