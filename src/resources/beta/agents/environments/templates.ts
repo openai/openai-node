@@ -370,6 +370,11 @@ export interface EnvironmentTemplate {
   created_at: number;
 
   /**
+   * Desktop configuration for each OpenAI-hosted environment.
+   */
+  desktop: EnvironmentTemplate.Desktop;
+
+  /**
    * Safe file metadata, excluding contents and session-scoped file IDs.
    */
   files: Array<
@@ -414,14 +419,19 @@ export interface EnvironmentTemplate {
    * The Unix timestamp, in seconds, when the template was last updated.
    */
   updated_at: number;
-
-  /**
-   * Desktop configuration for each OpenAI-hosted environment.
-   */
-  desktop?: EnvironmentTemplate.Desktop;
 }
 
 export namespace EnvironmentTemplate {
+  /**
+   * Desktop configuration for each OpenAI-hosted environment.
+   */
+  export interface Desktop {
+    /**
+     * Whether the environment provisions a desktop and browser proxy.
+     */
+    enabled: boolean;
+  }
+
   /**
    * A project-scoped Files API reference resolved separately for each session.
    */
@@ -539,16 +549,6 @@ export namespace EnvironmentTemplate {
      * The type of the object. Always `inline`.
      */
     type: 'inline';
-  }
-
-  /**
-   * Desktop configuration for each OpenAI-hosted environment.
-   */
-  export interface Desktop {
-    /**
-     * Whether the environment provisions a desktop and browser proxy.
-     */
-    enabled: boolean;
   }
 }
 
