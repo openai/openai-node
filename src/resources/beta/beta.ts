@@ -76,6 +76,9 @@ import {
 import * as AgentsAPI from './agents/agents';
 import {
   Agent,
+  AgentBrowserAuthenticationCancelParam,
+  AgentBrowserAuthenticationSubmitParam,
+  AgentBrowserOriginAccessParam,
   AgentCloseSubagentCallItem,
   AgentCommandExecutionItem,
   AgentContent,
@@ -451,6 +454,9 @@ export declare namespace Beta {
     type TranscriptionSessionUpdatedEvent as TranscriptionSessionUpdatedEvent,
     Agents as Agents,
     type Agent as Agent,
+    type AgentBrowserAuthenticationCancelParam as AgentBrowserAuthenticationCancelParam,
+    type AgentBrowserAuthenticationSubmitParam as AgentBrowserAuthenticationSubmitParam,
+    type AgentBrowserOriginAccessParam as AgentBrowserOriginAccessParam,
     type AgentCloseSubagentCallItem as AgentCloseSubagentCallItem,
     type AgentCommandExecutionItem as AgentCommandExecutionItem,
     type AgentContent as AgentContent,

@@ -3,6 +3,9 @@
 export {
   Agents,
   type Agent,
+  type AgentBrowserAuthenticationCancelParam,
+  type AgentBrowserAuthenticationSubmitParam,
+  type AgentBrowserOriginAccessParam,
   type AgentCloseSubagentCallItem,
   type AgentCommandExecutionItem,
   type AgentContent,

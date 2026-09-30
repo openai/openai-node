@@ -299,16 +299,18 @@ export class SendQueue<T = unknown> {
   /**
    * Send every queued message via `send`. If `send` throws, the failing
    * message and all subsequent messages are re-queued and the error is
-   * re-thrown so the caller can report it.
+   * re-thrown so the caller can report it. Endpoints that cannot safely replay
+   * an attempted write use `requeueFailed: false`. Never-attempted messages
+   * remain queued, including messages enqueued during the failed send.
    */
-  flush(send: (data: RawWebSocketData) => void): void {
+  flush(send: (data: RawWebSocketData) => void, options?: { requeueFailed?: boolean }): void {
     const pending = this._queue.splice(0);
     this._bytes = 0;
     for (let i = 0; i < pending.length; i++) {
       try {
         send(pending[i]!.data);
       } catch (err) {
-        const remaining = pending.slice(i);
+        const remaining = pending.slice(options?.requeueFailed === false ? i + 1 : i);
         this._queue = [...remaining, ...this._queue];
         this._bytes = this._queue.reduce((sum, item) => sum + item.byteLength, 0);
         throw err;

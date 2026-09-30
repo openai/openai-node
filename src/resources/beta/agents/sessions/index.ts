@@ -21,4 +21,5 @@ export {
   type SessionListParams,
 } from './sessions';
 export { Subagents, type SubagentRetrieveParams, type SubagentListParams } from './subagents/index';
+export { Traces, type SessionTrace, type TraceListParams, type SessionTracesPage } from './traces';
 export { Turns, type Turn, type TurnRetrieveParams, type TurnListParams, type TurnsPage } from './turns';

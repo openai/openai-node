@@ -26,6 +26,7 @@ describe('resource templates', () => {
       client.beta.agents.environments.templates.create(
         {
           capability_directories: ['string'],
+          desktop: { enabled: true },
           env: { foo: 'string' },
           files: [
             {
@@ -35,7 +36,11 @@ describe('resource templates', () => {
             },
           ],
           name: 'x',
-          network: { access: 'enabled', allowed_domains: ['string'] },
+          network: {
+            access: 'enabled',
+            allowed_domains: ['string'],
+            blocked_domains: ['string'],
+          },
           packages: {
             npm: ['string'],
             python: ['string'],
@@ -96,6 +101,7 @@ describe('resource templates', () => {
         'environment_template_id',
         {
           capability_directories: ['string'],
+          desktop: { enabled: true },
           env: { foo: 'string' },
           files: [
             {
@@ -105,7 +111,11 @@ describe('resource templates', () => {
             },
           ],
           name: 'x',
-          network: { access: 'enabled', allowed_domains: ['string'] },
+          network: {
+            access: 'enabled',
+            allowed_domains: ['string'],
+            blocked_domains: ['string'],
+          },
           packages: {
             npm: ['string'],
             python: ['string'],
