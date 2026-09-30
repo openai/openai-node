@@ -7,6 +7,8 @@ import { ResultCollection } from './result-collection';
 export type AgentSessionCreateStream = Stream<AgentSessionEvent> & {
   /** Drain through the selected turn's completion and idle event, then return its final messages. */
   finalResult: () => Promise<AgentTurnResult>;
+  /** Opt into retaining completed final messages before iterating progress events. */
+  withResultCollection: () => AgentSessionCreateStream;
 };
 
 /** Add beta result collection without replacing custom stream instances.
@@ -18,5 +20,12 @@ export function withAgentTurnResult(stream: Stream<AgentSessionEvent>): AgentSes
     collection = new ResultCollection(source, undefined, undefined, stream.controller.signal);
     return () => collection.iterate();
   });
-  return Object.assign(stream, { finalResult: () => collection.finalResult() });
+  const result: AgentSessionCreateStream = Object.assign(stream, {
+    finalResult: () => collection.finalResult(),
+    withResultCollection: (): AgentSessionCreateStream => {
+      collection.enable();
+      return result;
+    },
+  });
+  return result;
 }

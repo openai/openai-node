@@ -1,7 +1,7 @@
 import type {
   AgentSession,
   AgentSessionEvent,
-  AgentSessionMessage,
+  AgentSessionAssistantMessage,
 } from '../../../resources/beta/agents/agents';
 import type { Turn } from '../../../resources/beta/agents/sessions/turns';
 import { AgentTurnResult } from './agent-turn-result';
@@ -13,7 +13,7 @@ import { AgentTurnResultError } from './agent-turn-result-error';
 export class AgentTurnResultCollector {
   #sessionID: string | undefined;
   #turn: Turn | undefined;
-  #messages = new Map<string, { index: number; message: AgentSessionMessage }>();
+  #messages = new Map<string, { index: number; message: AgentSessionAssistantMessage }>();
   #requiredActions: AgentSession['required_actions'] = [];
   #sessionFailed = false;
   #terminal = false;
@@ -71,7 +71,7 @@ export class AgentTurnResultCollector {
     this.#messages.set(event.item.id, { index: event.output_index, message: structuredClone(event.item) });
   }
 
-  #finalMessages(): AgentSessionMessage[] {
+  #finalMessages(): AgentSessionAssistantMessage[] {
     return (
       [...this.#messages.values()]
         // oxlint-disable-next-line unicorn/no-array-sort -- Sort a fresh array; ES2020 declarations do not include toSorted.

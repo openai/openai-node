@@ -169,6 +169,12 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
     return this.#collection.iterate();
   }
 
+  /** Beta: opt into retaining completed final messages before iterating progress events. */
+  withResultCollection(): this {
+    this.#collection.enable();
+    return this;
+  }
+
   /** Beta: drain this turn, dispatch registered tools, and collect its final assistant messages. */
   finalResult(): Promise<AgentTurnResult> {
     return this.#collection.finalResult();

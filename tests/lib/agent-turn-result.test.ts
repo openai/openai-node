@@ -138,6 +138,7 @@ describe('beta Agents finalResult', () => {
     const { client, requests } = setup([created(), message(), completed(), idle()], { followup: true });
     const stream = client.beta.agents.sessions.stream(turn.session_id, { input: 'Follow up' });
     expect(requests).toHaveLength(0);
+    stream.withResultCollection();
     for await (const item of stream) {
       if (item.type === 'agent.session.turn.item.done' && item.item.type === 'message') {
         const [content] = item.item.content;
@@ -161,6 +162,7 @@ describe('beta Agents finalResult', () => {
       idle(),
     ]);
     const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    stream.withResultCollection();
     await stream[Symbol.asyncIterator]().next();
     const result = await stream.finalResult();
     expect(result.output_text).toBe('firstlater');
@@ -222,6 +224,7 @@ describe('beta Agents finalResult', () => {
   test('explicit abort cannot turn partial output into a final answer', async () => {
     const { client } = setup([created(), message()]);
     const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    stream.withResultCollection();
     const iterator = stream[Symbol.asyncIterator]();
     await iterator.next();
     await iterator.next();
@@ -271,6 +274,7 @@ describe('beta Agents finalResult', () => {
       { eof: true },
     );
     const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    stream.withResultCollection();
     for await (const item of stream) {
       expect(item.type).toBeTruthy();
     }
@@ -296,6 +300,7 @@ describe('beta Agents finalResult', () => {
   test('preserves tee consumption and collection after both branches reach EOF', async () => {
     const { client } = setup([created(), message(), completed(), idle()], { eof: true });
     const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    stream.withResultCollection();
     const [left, right] = stream.tee();
     const [a, b] = await Promise.all([collect(left), collect(right)]);
     expect(a).toEqual(b);
@@ -318,6 +323,7 @@ describe('beta Agents finalResult', () => {
       event('error', { error: { message: 'later failure' } }),
     ]);
     const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    stream.withResultCollection();
     await expect(collect(stream)).rejects.toThrow('later failure');
     const result = await stream.finalResult();
     expect(result.output_text).toBe('Final answer');
@@ -337,7 +343,9 @@ describe('beta Agents finalResult', () => {
       }
       expect(stream.customState).toEqual({ retained: true });
       expect(stream.customMethod()).toBe('custom');
+      expect(stream.withResultCollection()).toBe(stream);
       if (mode === 'tee') {
+        stream.withResultCollection();
         const [left, right] = stream.tee();
         await Promise.all([collect(left), collect(right)]);
       } else if (mode === 'readable') {
@@ -390,6 +398,7 @@ describe('beta Agents finalResult', () => {
   test('preserves explicit creation abort reason in the observation error', async () => {
     const { client } = setup([created(), message()]);
     const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    stream.withResultCollection();
     await stream[Symbol.asyncIterator]().next();
     const cause = new Error('Stopped by caller');
     stream.controller.abort(cause);
@@ -398,6 +407,7 @@ describe('beta Agents finalResult', () => {
   test('breaking progress iteration preserves normal stream cancellation', async () => {
     const { client, cancel } = setup([created(), message(), completed(), idle()]);
     const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    stream.withResultCollection();
     for await (const item of stream) {
       if (item.type === 'agent.session.turn.created') {
         break;
@@ -418,4 +428,80 @@ describe('beta Agents finalResult', () => {
     const result = await stream.finalResult();
     expect(result.output_text).toBe('Answer');
   });
+  test.each([false, true])('raw iteration retains no result copies (follow-up: %s)', async (followup) => {
+    const events = [
+      created(),
+      ...Array.from({ length: 128 }, (_, index) =>
+        message('x'.repeat(16_384), 'final_answer', `message_${index}`, index),
+      ),
+      completed(),
+      idle(),
+    ];
+    const { client } = setup(events, { followup, eof: true });
+    const stream = followup
+      ? client.beta.agents.sessions.stream(turn.session_id, { input: 'Question' })
+      : await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    const clone = vi.spyOn(globalThis, 'structuredClone');
+    try {
+      let count = 0;
+      for await (const item of stream) {
+        expect(item.type).toBeTruthy();
+        count += 1;
+      }
+      expect(count).toBe(events.length);
+      expect(clone).not.toHaveBeenCalled();
+      expect(() => stream.withResultCollection()).toThrow('before consuming events');
+      await expect(stream.finalResult()).rejects.toThrow('before consuming events');
+    } finally {
+      clone.mockRestore();
+    }
+  });
+
+  test.each(['tee', 'readable'])('raw %s consumption does not implicitly collect output', async (mode) => {
+    const { client } = setup([created(), message('x'.repeat(1024 * 1024)), completed(), idle()], {
+      eof: true,
+    });
+    const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    const clone = vi.spyOn(globalThis, 'structuredClone');
+    try {
+      if (mode === 'tee') {
+        const [left, right] = stream.tee();
+        await Promise.all([collect(left), collect(right)]);
+      } else {
+        await collect(
+          Stream.fromReadableStream<AgentSessionEvent>(stream.toReadableStream(), stream.controller),
+        );
+      }
+      expect(clone).not.toHaveBeenCalled();
+      await expect(stream.finalResult()).rejects.toThrow('before consuming events');
+    } finally {
+      clone.mockRestore();
+    }
+  });
+
+  test.each([false, true])(
+    'enabled collection retains large completed output (progress: %s)',
+    async (progress) => {
+      const text = 'x'.repeat(1024 * 1024);
+      const { client } = setup([created(), message(text), completed(), idle()], { eof: true });
+      const stream = await client.beta.agents.sessions.create({
+        environment: { type: 'none' },
+        stream: true,
+      });
+      if (progress) {
+        expect(stream.withResultCollection()).toBe(stream);
+        await collect(stream);
+      }
+      const result = await stream.finalResult();
+      expect(result.output_text).toBe(text);
+      expect(await stream.finalResult()).toBe(result);
+      const [assistant] = result.messages;
+      if (assistant) {
+        const id: string = assistant.id;
+        const role: 'assistant' = assistant.role;
+        expect(id).toBe('message_test');
+        expect(role).toBe('assistant');
+      }
+    },
+  );
 });

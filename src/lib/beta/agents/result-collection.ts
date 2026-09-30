@@ -10,6 +10,8 @@ import { AgentTurnResultError } from './agent-turn-result-error';
 export class ResultCollection {
   #iterator: AsyncGenerator<AgentSessionEvent, void> | undefined;
   #ended = false;
+  #enabled = false;
+  #uncollectedEvents = false;
   #error: unknown;
   #result: Promise<AgentTurnResult> | undefined;
   readonly collector: AgentTurnResultCollector;
@@ -30,6 +32,15 @@ export class ResultCollection {
     this.collector = new AgentTurnResultCollector(sessionID);
   }
 
+  enable(): void {
+    if (!this.#enabled && this.#uncollectedEvents) {
+      throw new OpenAIError(
+        'Call withResultCollection() before consuming events, or call finalResult() on a fresh stream.',
+      );
+    }
+    this.#enabled = true;
+  }
+
   iterate(): AsyncIterator<AgentSessionEvent> {
     if (this.#iterator) {
       throw new OpenAIError('An agent result stream can only be consumed once');
@@ -48,11 +59,17 @@ export class ResultCollection {
           done = true;
           return;
         }
-        this.collector.accept(next.value);
+        if (this.#enabled) {
+          this.collector.accept(next.value);
+        } else {
+          this.#uncollectedEvents = true;
+        }
         yield next.value;
       }
     } catch (error) {
-      this.#error = error;
+      if (this.#enabled) {
+        this.#error = error;
+      }
       throw error;
     } finally {
       this.#ended = true;
@@ -67,6 +84,7 @@ export class ResultCollection {
   }
 
   async #collect(): Promise<AgentTurnResult> {
+    this.enable();
     try {
       const iterator = this.#iterator ?? this.iterate();
       while (!this.#ended && !this.collector.ready) {
