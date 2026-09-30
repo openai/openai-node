@@ -19,6 +19,8 @@ import * as EventsAPI from './events';
 import { EventCreateParams, Events } from './events';
 import * as ItemsAPI from './items';
 import { ItemListParams, Items } from './items';
+import * as TracesAPI from './traces';
+import { SessionTrace, SessionTracesPage, TraceListParams, Traces } from './traces';
 import * as TurnsAPI from './turns';
 import { Turn, TurnListParams, TurnRetrieveParams, Turns, TurnsPage } from './turns';
 import * as SubagentsAPI from './subagents/subagents';
@@ -149,6 +151,7 @@ export class Sessions extends APIResource {
   artifacts: ArtifactsAPI.Artifacts = new ArtifactsAPI.Artifacts(this._client);
   items: ItemsAPI.Items = new ItemsAPI.Items(this._client);
   events: EventsAPI.Events = new EventsAPI.Events(this._client);
+  traces: TracesAPI.Traces = new TracesAPI.Traces(this._client);
   turns: TurnsAPI.Turns = new TurnsAPI.Turns(this._client);
 
   /**
@@ -578,6 +581,7 @@ Sessions.Subagents = Subagents;
 Sessions.Artifacts = Artifacts;
 Sessions.Items = Items;
 Sessions.Events = Events;
+Sessions.Traces = Traces;
 Sessions.Turns = Turns;
 
 export declare namespace Sessions {
@@ -609,6 +613,13 @@ export declare namespace Sessions {
   export { Items as Items, type ItemListParams as ItemListParams };
 
   export { Events as Events, type EventCreateParams as EventCreateParams };
+
+  export {
+    Traces as Traces,
+    type SessionTrace as SessionTrace,
+    type SessionTracesPage as SessionTracesPage,
+    type TraceListParams as TraceListParams,
+  };
 
   export {
     Turns as Turns,
