@@ -4,6 +4,7 @@ import {
   AgentSessionStream,
   type AgentSessionStreamParams,
 } from '../../../../lib/agents/agent-session-stream';
+import { AgentSessionCreateStream } from '../../../../lib/beta/agents/agent-session-create-stream';
 import { APIResource } from '../../../../core/resource';
 import * as SessionsAPI from './sessions';
 import * as AgentsAPI from '../agents';
@@ -177,28 +178,29 @@ export class Sessions extends APIResource {
    * ```
    */
   create(body: SessionCreateParamsNonStreaming, options?: RequestOptions): APIPromise<AgentsAPI.AgentSession>;
-  create(
-    body: SessionCreateParamsStreaming,
-    options?: RequestOptions,
-  ): APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
+  create(body: SessionCreateParamsStreaming, options?: RequestOptions): APIPromise<AgentSessionCreateStream>;
   create(
     body: SessionCreateParamsBase,
     options?: RequestOptions,
-  ): APIPromise<Stream<AgentsAPI.AgentSessionEvent> | AgentsAPI.AgentSession>;
+  ): APIPromise<AgentSessionCreateStream | AgentsAPI.AgentSession>;
   create(
     body: SessionCreateParams,
     options?: RequestOptions,
-  ): APIPromise<AgentsAPI.AgentSession> | APIPromise<Stream<AgentsAPI.AgentSessionEvent>> {
-    return this._client.post(
-      '/agents/sessions',
-      resolveResourceRequestOptions(options, (options) => ({
-        body,
-        ...options,
-        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-        stream: body.stream ?? false,
-        __security: { bearerAuth: true },
-      })),
-    ) as APIPromise<AgentsAPI.AgentSession> | APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
+  ): APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream> {
+    return this._client
+      .post<AgentsAPI.AgentSession | Stream<AgentsAPI.AgentSessionEvent>>(
+        '/agents/sessions',
+        resolveResourceRequestOptions(options, (options) => ({
+          body,
+          ...options,
+          headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+          stream: body.stream ?? false,
+          __security: { bearerAuth: true },
+        })),
+      )
+      ._thenUnwrap((data) => (data instanceof Stream ? new AgentSessionCreateStream(data) : data)) as
+      | APIPromise<AgentsAPI.AgentSession>
+      | APIPromise<AgentSessionCreateStream>;
   }
 
   /**

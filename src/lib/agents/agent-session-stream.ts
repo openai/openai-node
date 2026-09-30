@@ -1,4 +1,6 @@
 import { TurnState } from './turn-state';
+import type { AgentTurnResult } from '../beta/agents/agent-turn-result';
+import { ResultCollection } from '../beta/agents/result-collection';
 import { APIUserAbortError, BadRequestError, OpenAIError } from '../../core/error';
 import type { Stream } from '../../core/streaming';
 import { buildHeaders } from '../../internal/headers';
@@ -102,6 +104,7 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
   /** Aborts local requests and iteration without cancelling the backend turn. */
   readonly controller = new AbortController();
   #consumed = false;
+  #collection: ResultCollection;
   #stream: Stream<AgentSessionEvent> | undefined;
   #response: Response | undefined;
   #reading = false;
@@ -141,6 +144,11 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
     headers.nulls.delete('idempotency-key');
     const { idempotencyKey: _key, ...rest } = options ?? {};
     this.#options = { ...rest, headers };
+    this.#collection = new ResultCollection(
+      () => this.#iterate(),
+      (name) => this.#handlers.has(name),
+      sessionID,
+    );
   }
 
   /** Closes local requests without cancelling the turn; an optional reason becomes the abort error's cause. */
@@ -158,7 +166,12 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
       throw new OpenAIError('An AgentSessionStream can only be consumed once');
     }
     this.#consumed = true;
-    return this.#iterate();
+    return this.#collection.iterate();
+  }
+
+  /** Beta: drain this turn, dispatch registered tools, and collect its final assistant messages. */
+  finalResult(): Promise<AgentTurnResult> {
+    return this.#collection.finalResult();
   }
 
   async *#iterate(): AsyncGenerator<AgentSessionEvent> {
