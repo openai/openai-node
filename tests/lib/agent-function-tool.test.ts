@@ -23,17 +23,19 @@ describe('beta Agents functionTool', () => {
       apiKey: 'sk-synthetic-agents-test',
       fetch: async (url, init) => {
         bodies.push(await new Request(url, init).json());
-        return Response.json({ id: 'session_test', status: 'idle' });
+        return Response.json({ id: 'session_test', status: 'in_progress' });
       },
     });
     await client.beta.agents.sessions.create({
       agent: { model: 'model_test', tools: [tool.definition] },
       environment: { type: 'none' },
+      input: 'Reply READY without calling tools.',
     });
     expect(bodies).toEqual([
       {
         agent: { model: 'model_test', tools: [tool.definition] },
         environment: { type: 'none' },
+        input: 'Reply READY without calling tools.',
       },
     ]);
     expect(action).not.toHaveBeenCalled();
@@ -65,7 +67,7 @@ describe('beta Agents functionTool', () => {
     });
     expect(tool.name).toBe('wallet_balance');
     expect(await tool.handler({ asset: 'USDC' })).toEqual({ asset: 'USDC', balance: '12.50' });
-    expect(() => tool.handler({ asset: 123 })).toThrow();
+    await expect(tool.handler({ asset: 123 })).rejects.toThrow();
     expect(execute).toHaveBeenCalledExactlyOnceWith({ asset: 'USDC' });
   });
 
@@ -86,7 +88,7 @@ describe('beta Agents functionTool', () => {
     );
     expect(tool.definition.description).toBe('');
     expect(await tool.handler({ asset: 'usdc' })).toEqual({ asset: 'USDC', balance: '12.50' });
-    expect(() => tool.handler({ asset: false })).toThrow();
+    await expect(tool.handler({ asset: false })).rejects.toThrow();
     expect(execute).toHaveBeenCalledExactlyOnceWith('USDC');
   });
 
@@ -94,6 +96,31 @@ describe('beta Agents functionTool', () => {
     expect(() => functionTool(zodResponsesFunction({ name: 'balance', parameters: z4.object({}) }))).toThrow(
       'require a callback',
     );
+  });
+
+  test.each([
+    [42, '42'],
+    [false, 'false'],
+    [undefined, 'undefined'],
+    [null, null],
+    ['text', 'text'],
+    [{ receipt: 'synthetic' }, { receipt: 'synthetic' }],
+    [
+      [{ type: 'input_image', image_url: 'https://example.com/image.png' }],
+      [{ type: 'input_image', image_url: 'https://example.com/image.png' }],
+    ],
+  ])('normalizes callback result %j for the existing dispatcher', async (value, expected) => {
+    const tool = functionTool(
+      zodResponsesFunction({ name: 'result', parameters: z4.object({}), function: async () => value }),
+    );
+    expect(await tool.handler({})).toEqual(expected);
+  });
+
+  test('rejects non-JSON callback results', async () => {
+    const tool = functionTool(
+      zodResponsesFunction({ name: 'result', parameters: z4.object({}), function: () => Symbol('not JSON') }),
+    );
+    await expect(tool.handler({})).rejects.toThrow('JSON serializable');
   });
 
   test('preserves deferred discovery without forwarding Responses-only fields', () => {

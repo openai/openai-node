@@ -18,6 +18,7 @@ export interface AgentFunctionTool {
  * Pass `definition` to `agent.tools` and register `handler` under `name` in
  * `sessions.stream()`'s `toolHandlers`. Creating a definition does not execute it.
  * The existing dispatcher handles callback results, failures, and submission retries.
+ * Scalar results become JSON text; `undefined` becomes the text `undefined`.
  *
  * @throws {OpenAIError} If the tool has no callback or argument schema.
  */
@@ -38,6 +39,17 @@ export function functionTool<Arguments>(
       parameters: tool.parameters,
       ...(tool.defer_loading === undefined ? {} : { defer_loading: tool.defer_loading }),
     },
-    handler: (arguments_) => execute(parse(JSON.stringify(arguments_))),
+    handler: async (arguments_) => {
+      const result: unknown = await execute(parse(JSON.stringify(arguments_)));
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Existing schema-tool callbacks return arbitrary application values; adapt them to the Agents dispatcher's output contract.
+      if (typeof result === 'object' || typeof result === 'string') {
+        return result;
+      }
+      const text = result === undefined ? 'undefined' : JSON.stringify(result);
+      if (text === undefined) {
+        throw new OpenAIError('Tool output must be JSON serializable');
+      }
+      return text;
+    },
   };
 }

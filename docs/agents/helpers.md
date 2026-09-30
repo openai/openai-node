@@ -58,11 +58,11 @@ const lookup = functionTool(
     function: ({ order_id }) => orderService.lookup(order_id),
   }),
 );
-const session = await client.beta.agents.sessions.create({
-  agent: { model: MODEL, tools: [lookup.definition] },
-  environment: { type: 'none' },
-});
-const stream = client.beta.agents.sessions.stream(session.id, {
+// Use this agent configuration when creating your session.
+const agent = { model: MODEL, tools: [lookup.definition] };
+
+// Attach the local handler once the configured session is idle.
+const stream = client.beta.agents.sessions.stream(SESSION_ID, {
   input: 'Where is order A123?',
   toolHandlers: { [lookup.name]: lookup.handler },
 });
