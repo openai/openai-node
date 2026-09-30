@@ -5,14 +5,14 @@ import type { Turn } from '../../../resources/beta/agents/sessions/turns';
 /** Beta: final collection failed; partial state is evidence, not a successful result. */
 export class AgentTurnResultError extends OpenAIError {
   override name = 'AgentTurnResultError';
-  readonly reason: 'failed' | 'cancelled' | 'requires_action' | 'observation' | 'output_selection';
+  readonly reason: 'failed' | 'cancelled' | 'requires_action' | 'observation';
   readonly session_id: string | undefined;
   readonly turn: Turn | undefined;
   readonly messages: AgentSessionMessage[];
   readonly required_actions: AgentSession['required_actions'];
   readonly cause: unknown;
   constructor(
-    reason: 'failed' | 'cancelled' | 'requires_action' | 'observation' | 'output_selection',
+    reason: 'failed' | 'cancelled' | 'requires_action' | 'observation',
     session_id: string | undefined,
     turn: Turn | undefined,
     messages: AgentSessionMessage[],

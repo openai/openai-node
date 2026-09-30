@@ -301,10 +301,12 @@ export class Stream<Item> implements AsyncIterable<Item> {
     return this.iterator();
   }
 
-  /** Decorates consumption without replacing a configured stream instance.
+  /** Beta-only iterator decoration for Agents helpers, preserving custom stream identity.
    * @internal
    */
-  __transformIterator(transform: (iterator: () => AsyncIterator<Item>) => () => AsyncIterator<Item>): void {
+  __betaTransformIterator(
+    transform: (iterator: () => AsyncIterator<Item>) => () => AsyncIterator<Item>,
+  ): void {
     this.iterator = transform(this.iterator.bind(this));
   }
 

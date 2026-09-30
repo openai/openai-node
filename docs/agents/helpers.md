@@ -23,7 +23,7 @@ for await (const event of stream) {
 
 ## Collect a final answer (beta)
 
-Call `finalResult()` on streamed creation or a follow-up to collect the completed turn's final answer.
+Call `finalResult()` on streamed creation with initial input or a follow-up to collect the completed turn's final answer.
 
 ```ts
 const stream = await client.beta.agents.sessions.create({
@@ -42,7 +42,7 @@ const followup = client.beta.agents.sessions.stream(result.session_id, {
 console.log((await followup.finalResult()).output_text);
 ```
 
-You can consume progress events before calling the getter; repeated calls reuse the result. `result.messages` preserves the final messages and annotations, and `result.turn` includes the turn's status and usage.
+You can finish iterating progress events before calling the getter; repeated calls reuse the result. As with other streams, breaking out of iteration closes observation. `result.messages` preserves the final messages and annotations, and `result.turn` includes the turn's status and usage.
 
 Optional `toolHandlers` map configured function names to callbacks. Each callback receives a detached argument object and may return text, a JSON object, an array of supported input content, `null`, or a promise for one of those values. Callbacks run sequentially during iteration, after their original call event is yielded. Unregistered functions are left for manual handling through the raw events API. Invalid arguments and callback failures submit a generic failure result without exception text.
 

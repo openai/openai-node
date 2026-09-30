@@ -9,7 +9,6 @@ import { AgentTurnResultError } from './agent-turn-result-error';
  */
 export class ResultCollection {
   #iterator: AsyncGenerator<AgentSessionEvent, void> | undefined;
-  #consumed = false;
   #ended = false;
   #error: unknown;
   #result: Promise<AgentTurnResult> | undefined;
@@ -32,10 +31,9 @@ export class ResultCollection {
   }
 
   iterate(): AsyncIterator<AgentSessionEvent> {
-    if (this.#consumed) {
+    if (this.#iterator) {
       throw new OpenAIError('An agent result stream can only be consumed once');
     }
-    this.#consumed = true;
     return (this.#iterator = this.#observe());
   }
 

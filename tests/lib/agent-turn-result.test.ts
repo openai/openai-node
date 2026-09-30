@@ -185,16 +185,6 @@ describe('beta Agents finalResult', () => {
   );
 
   test.each([
-    {
-      name: 'null phase',
-      events: [created(), message('ambiguous', null), completed(), idle()],
-      reason: 'output_selection',
-    },
-    {
-      name: 'unfinished message',
-      events: [created(), message('partial', 'final_answer', 'a', 0, false), completed(), idle()],
-      reason: 'output_selection',
-    },
     { name: 'truncated turn', events: [created(), message()], reason: 'observation' },
     { name: 'missing idle', events: [created(), message(), completed()], reason: 'observation' },
   ])('rejects $name', async ({ events, reason }) => {
@@ -404,5 +394,28 @@ describe('beta Agents finalResult', () => {
     const cause = new Error('Stopped by caller');
     stream.controller.abort(cause);
     await expect(stream.finalResult()).rejects.toMatchObject({ reason: 'observation', cause });
+  });
+  test('breaking progress iteration preserves normal stream cancellation', async () => {
+    const { client, cancel } = setup([created(), message(), completed(), idle()]);
+    const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    for await (const item of stream) {
+      if (item.type === 'agent.session.turn.created') {
+        break;
+      }
+    }
+    expect(cancel).toHaveBeenCalledOnce();
+    await expect(stream.finalResult()).rejects.toMatchObject({ reason: 'observation' });
+  });
+  test('collects completed legacy null-phase messages and ignores partial snapshots', async () => {
+    const { client } = setup([
+      created(),
+      message('partial', 'final_answer', 'partial', 0, false),
+      message('Answer', null, 'answer', 1),
+      completed(),
+      idle(),
+    ]);
+    const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    const result = await stream.finalResult();
+    expect(result.output_text).toBe('Answer');
   });
 });

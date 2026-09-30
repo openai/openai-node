@@ -14,7 +14,7 @@ export type AgentSessionCreateStream = Stream<AgentSessionEvent> & {
  */
 export function withAgentTurnResult(stream: Stream<AgentSessionEvent>): AgentSessionCreateStream {
   let collection: ResultCollection;
-  stream.__transformIterator((source) => {
+  stream.__betaTransformIterator((source) => {
     collection = new ResultCollection(source, undefined, undefined, stream.controller.signal);
     return () => collection.iterate();
   });
