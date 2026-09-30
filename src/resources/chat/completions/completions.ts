@@ -1340,7 +1340,7 @@ export namespace ChatCompletionContentPartImage {
      * Specifies the detail level of the image. Learn more in the
      * [Vision guide](https://developers.openai.com/api/docs/guides/images-vision#choose-an-image-detail-level).
      */
-    detail?: 'auto' | 'low' | 'high';
+    detail?: 'auto' | 'low' | 'high' | 'original';
   }
 
   /**
