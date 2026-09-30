@@ -2,6 +2,7 @@ import { OpenAIError } from '../../../core/error';
 import type { AgentToolHandler } from '../../agents/agent-session-stream';
 import type { AutoParseableResponseTool } from '../../ResponsesParser';
 import type { AgentToolParam } from '../../../resources/beta/agents/agents';
+import { isInputContent } from './tool-output';
 
 /** A beta Agents function definition paired with its local, validating handler. */
 export interface AgentFunctionTool {
@@ -18,7 +19,8 @@ export interface AgentFunctionTool {
  * Pass `definition` to `agent.tools` and register `handler` under `name` in
  * `sessions.stream()`'s `toolHandlers`. Creating a definition does not execute it.
  * The existing dispatcher handles callback results, failures, and submission retries.
- * Scalar results become JSON text; `undefined` becomes the text `undefined`.
+ * Scalar results and business-data arrays become JSON text; `undefined` becomes
+ * the text `undefined`. Supported text/image content arrays retain their format.
  *
  * @throws {OpenAIError} If the tool has no callback or argument schema.
  */
@@ -41,6 +43,9 @@ export function functionTool<Arguments>(
     },
     handler: async (arguments_) => {
       const result: unknown = await execute(parse(JSON.stringify(arguments_)));
+      if (Array.isArray(result)) {
+        return result.every(isInputContent) ? result : JSON.stringify(result);
+      }
       // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Existing schema-tool callbacks return arbitrary application values; adapt them to the Agents dispatcher's output contract.
       if (typeof result === 'object' || typeof result === 'string') {
         return result;

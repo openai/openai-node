@@ -4,14 +4,14 @@ import type { Stream } from '../../core/streaming';
 import { buildHeaders } from '../../internal/headers';
 import type { RequestOptions } from '../../internal/request-options';
 import { uuid4 } from '../../internal/utils/uuid';
-import { hasOwn, isObj } from '../../internal/utils/values';
+import { isObj } from '../../internal/utils/values';
+import { isInputContent } from '../beta/agents/tool-output';
 import type {
   AgentFunctionCallItem,
   AgentFunctionCallOutputParam,
   AgentSessionEvent,
   AgentSessionInputMessageParam,
   AgentSessionInputParam,
-  InputContentParam,
 } from '../../resources/beta/agents/agents';
 import type { Sessions } from '../../resources/beta/agents/sessions/sessions';
 
@@ -33,22 +33,6 @@ export interface AgentSessionStreamParams {
 }
 
 type ToolResult = AgentSessionInputParam.SessionInputParamAgentSessionInputToolResult;
-
-function isInputContent(value: unknown): value is InputContentParam {
-  if (!isObj(value)) {
-    return false;
-  }
-  const content = value;
-  let field: string;
-  if (content['type'] === 'input_text') {
-    field = 'text';
-  } else if (content['type'] === 'input_image') {
-    field = 'image_url';
-  } else {
-    return false;
-  }
-  return hasOwn(content, 'type') && hasOwn(content, field) && typeof content[field] === 'string';
-}
 
 function normalizedOutput(value: unknown): AgentFunctionCallOutputParam | null {
   if (value === null) {

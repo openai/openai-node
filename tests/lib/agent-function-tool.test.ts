@@ -105,6 +105,12 @@ describe('beta Agents functionTool', () => {
     [null, null],
     ['text', 'text'],
     [{ receipt: 'synthetic' }, { receipt: 'synthetic' }],
+    [[1, 2], '[1,2]'],
+    [[{ type: 'input_text', status: 'pending' }], '[{"type":"input_text","status":"pending"}]'],
+    [
+      { type: 'input_text', text: 'business record' },
+      { type: 'input_text', text: 'business record' },
+    ],
     [
       [{ type: 'input_image', image_url: 'https://example.com/image.png' }],
       [{ type: 'input_image', image_url: 'https://example.com/image.png' }],
