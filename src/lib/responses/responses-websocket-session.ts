@@ -22,9 +22,13 @@ interface LaneState {
   bytes: number;
 }
 
+// A disposed helper cannot distinguish a delayed terminal from a later request
+// on the same socket. Retain only IDs (never lane buffers) until that socket is gone.
+const reservedLanes = new WeakMap<WebSocketLike, Set<string | undefined>>();
+
 /** Limits for this optional helper. They do not change the underlying socket's limits. */
 export interface ResponsesWebSocketSessionOptions {
-  /** Maximum lane IDs registered until the next reconnect, including detached lanes. */
+  /** Maximum lane IDs registered on the socket until the next reconnect, including detached lanes. */
   maxLanes: number;
   /** Maximum queued events across all lanes. */
   maxBufferedEvents: number;
@@ -129,10 +133,16 @@ export class ResponsesWebSocketSession {
     ) {
       throw new OpenAIError('Invalid Responses WebSocket stream ID');
     }
-    if (this.#lanes.has(streamID)) {
+    const { socket: physicalSocket } = this.#connection;
+    let reservations = reservedLanes.get(physicalSocket);
+    if (!reservations) {
+      reservations = new Set();
+      reservedLanes.set(physicalSocket, reservations);
+    }
+    if (reservations.has(streamID)) {
       throw new OpenAIError('Responses WebSocket lane is already registered');
     }
-    if (this.#lanes.size >= this.#maxLanes) {
+    if (reservations.size >= this.#maxLanes) {
       throw new OpenAIError('Responses WebSocket lane limit exceeded');
     }
     const entry: LaneState = {
@@ -160,6 +170,7 @@ export class ResponsesWebSocketSession {
         positiveInteger(limits.maxBufferedBytes ?? this.#maxBytes),
       ),
     };
+    reservations.add(streamID);
     this.#lanes.set(streamID, entry);
     return entry.lane;
   }
