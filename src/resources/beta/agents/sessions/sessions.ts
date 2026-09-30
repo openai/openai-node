@@ -4,6 +4,10 @@ import {
   AgentSessionStream,
   type AgentSessionStreamParams,
 } from '../../../../lib/agents/agent-session-stream';
+import {
+  type AgentSessionCreateStream,
+  withAgentTurnResult,
+} from '../../../../lib/beta/agents/agent-session-create-stream';
 import { APIResource } from '../../../../core/resource';
 import * as SessionsAPI from './sessions';
 import * as AgentsAPI from '../agents';
@@ -31,7 +35,7 @@ import * as SubagentsAPI from './subagents/subagents';
 import { SubagentListParams, SubagentRetrieveParams, Subagents } from './subagents/subagents';
 import { APIPromise } from '../../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
-import { Stream } from '../../../../core/streaming';
+import type { Stream } from '../../../../core/streaming';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
@@ -177,28 +181,30 @@ export class Sessions extends APIResource {
    * ```
    */
   create(body: SessionCreateParamsNonStreaming, options?: RequestOptions): APIPromise<AgentsAPI.AgentSession>;
-  create(
-    body: SessionCreateParamsStreaming,
-    options?: RequestOptions,
-  ): APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
+  create(body: SessionCreateParamsStreaming, options?: RequestOptions): APIPromise<AgentSessionCreateStream>;
   create(
     body: SessionCreateParamsBase,
     options?: RequestOptions,
-  ): APIPromise<Stream<AgentsAPI.AgentSessionEvent> | AgentsAPI.AgentSession>;
+  ): APIPromise<AgentSessionCreateStream | AgentsAPI.AgentSession>;
   create(
     body: SessionCreateParams,
     options?: RequestOptions,
-  ): APIPromise<AgentsAPI.AgentSession> | APIPromise<Stream<AgentsAPI.AgentSessionEvent>> {
-    return this._client.post(
-      '/agents/sessions',
-      resolveResourceRequestOptions(options, (options) => ({
-        body,
-        ...options,
-        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-        stream: body.stream ?? false,
-        __security: { bearerAuth: true },
-      })),
-    ) as APIPromise<AgentsAPI.AgentSession> | APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
+  ): APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream> {
+    return this._client
+      .post<AgentsAPI.AgentSession | Stream<AgentsAPI.AgentSessionEvent>>(
+        '/agents/sessions',
+        resolveResourceRequestOptions(options, (options) => ({
+          body,
+          ...options,
+          headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+          stream: body.stream ?? false,
+          __security: { bearerAuth: true },
+        })),
+      )
+      ._thenUnwrap((data, { options }) =>
+        // SAFETY: defaultParseResponse uses this same resolved flag to return the configured stream instance.
+        options.stream ? withAgentTurnResult(data as Stream<AgentsAPI.AgentSessionEvent>) : data,
+      ) as APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream>;
   }
 
   /**

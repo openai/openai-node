@@ -21,6 +21,32 @@ for await (const event of stream) {
 
 `outputText(message)` joins that message's `output_text` content blocks in order. It works on messages from streaming events and REST results, preserves both commentary and final-answer phases, and does not modify or fetch anything.
 
+## Collect a final answer (beta)
+
+Call `finalResult()` on streamed creation with initial input or a follow-up to collect the completed turn's final answer.
+
+```ts
+const stream = await client.beta.agents.sessions.create({
+  agent: { model: 'gpt-5', instructions: 'Explain the policy clearly.' },
+  environment: { type: 'none' },
+  input: 'Summarize the policy.',
+  stream: true,
+});
+const result = await stream.finalResult();
+console.log(result.output_text);
+console.log(result.session_id, result.turn_id, result.turn.usage);
+
+const followup = client.beta.agents.sessions
+  .stream(result.session_id, {
+    input: 'Give an example.',
+  })
+  .withResultCollection();
+for await (const event of followup) console.log(event.type);
+console.log((await followup.finalResult()).output_text);
+```
+
+Call `stream.withResultCollection()` before iterating progress if you also want a final result; calling `finalResult()` directly enables collection automatically. Raw iteration retains no result messages. Repeated getters reuse the result. As with other streams, breaking out of iteration closes observation. `result.messages` preserves the final messages and annotations, and `result.turn` includes the turn's status and usage.
+
 Optional `toolHandlers` map configured function names to callbacks. Each callback receives a detached argument object and may return text, a JSON object, an array of supported input content, `null`, or a promise for one of those values. Callbacks run sequentially during iteration, after their original call event is yielded. Unregistered functions are left for manual handling through the raw events API. Invalid arguments and callback failures submit a generic failure result without exception text.
 
 ```ts
