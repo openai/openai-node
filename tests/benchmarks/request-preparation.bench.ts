@@ -1,4 +1,4 @@
-import { bench, beforeAll, describe } from 'vitest';
+import { test, beforeAll, describe } from 'vitest';
 
 import OpenAI from '../../src';
 import { buildHeaders } from '../../src/internal/headers';
@@ -170,84 +170,66 @@ beforeAll(async () => {
 });
 
 describe('request header preparation', () => {
-  bench(
-    'build standard authentication and SDK headers',
-    () => {
+  test('build standard authentication and SDK headers', async ({ bench }) => {
+    await bench('build standard authentication and SDK headers', () => {
       const headers = buildHeaders(BASIC_HEADER_LAYERS);
       benchmarkSink += headers.values.get('authorization')?.length ?? 0;
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'merge layered defaults, overrides, removals, and cookie values',
-    () => {
+  test('merge layered defaults, overrides, removals, and cookie values', async ({ bench }) => {
+    await bench('merge layered defaults, overrides, removals, and cookie values', () => {
       const headers = buildHeaders(LAYERED_REQUEST_HEADERS);
       benchmarkSink += headers.values.get('cookie')?.length ?? 0;
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 });
 
 describe('request query serialization', () => {
-  bench(
-    'serialize flat pagination parameters',
-    () => {
+  test('serialize flat pagination parameters', async ({ bench }) => {
+    await bench('serialize flat pagination parameters', () => {
       benchmarkSink += stringifyQuery(FLAT_QUERY).length;
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'serialize nested filters and bracket-array parameters',
-    () => {
+  test('serialize nested filters and bracket-array parameters', async ({ bench }) => {
+    await bench('serialize nested filters and bracket-array parameters', () => {
       benchmarkSink += stringifyQuery(NESTED_QUERY).length;
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'build a URL with default and flat query parameters',
-    () => {
+  test('build a URL with default and flat query parameters', async ({ bench }) => {
+    await bench('build a URL with default and flat query parameters', () => {
       benchmarkSink += requestClient.buildURL('/files', FLAT_QUERY).length;
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'build a URL with existing, default, and nested query parameters',
-    () => {
+  test('build a URL with existing, default, and nested query parameters', async ({ bench }) => {
+    await bench('build a URL with existing, default, and nested query parameters', () => {
       benchmarkSink += requestClient.buildURL('/files?view=active&locale=path-default', NESTED_QUERY).length;
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 });
 
 describe('complete request preparation', () => {
-  bench(
-    'build an authenticated GET request with nested query parameters',
-    async () => {
+  test('build an authenticated GET request with nested query parameters', async ({ bench }) => {
+    await bench('build an authenticated GET request with nested query parameters', async () => {
       const request = await requestClient.buildRequest(LIST_REQUEST_OPTIONS);
       benchmarkSink += request.url.length;
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'build an authenticated JSON POST request',
-    async () => {
+  test('build an authenticated JSON POST request', async ({ bench }) => {
+    await bench('build an authenticated JSON POST request', async () => {
       const request = await requestClient.buildRequest(CHAT_REQUEST_OPTIONS);
       benchmarkSink += request.req.headers.get('content-length')?.length ?? request.url.length;
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'send a public chat completions request through in-memory fetch',
-    async () => {
+  test('send a public chat completions request through in-memory fetch', async ({ bench }) => {
+    await bench('send a public chat completions request through in-memory fetch', async () => {
       const completion = await requestClient.chat.completions.create(CHAT_REQUEST);
       benchmarkSink += completion.choices[0]?.message.content?.length ?? 0;
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 });

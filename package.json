@@ -26,7 +26,7 @@
     "test:live:bedrock": "jest --config jest.live.config.ts --runInBand tests/live/bedrock.live.test.ts",
     "test:live:x509": "pnpm build && node --input-type=module < examples/mtls/x509-workload-identity.mjs",
     "bench": "vitest bench --run --config vitest.bench.config.mts",
-    "bench:json": "vitest bench --run --config vitest.bench.config.mts --outputJson benchmark-results.json",
+    "bench:json": "vitest bench --run --config vitest.bench.config.mts --reporter=default --reporter=json --outputFile=benchmark-results.json",
     "build": "./scripts/build",
     "prepublishOnly": "echo 'to publish, run pnpm build && (cd dist; npm publish)' && exit 1",
     "format": "./scripts/format",
@@ -65,7 +65,7 @@
     "typescript-4-9": "npm:typescript@4.9.5",
     "ultracite": "7.11.1",
     "undici": "8.10.2",
-    "vitest": "4.1.11",
+    "vitest": "5.0.1",
     "ws": "^8.21.0",
     "yargs": "^18.1.0",
     "zod": "^3.25 || ^4.0"

@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { test, describe } from 'vitest';
 import { z as zodV3 } from 'zod/v3';
 import { z as zodV4 } from 'zod/v4';
 
@@ -97,88 +97,70 @@ const structuredOutputRequest = {
 };
 
 describe('structured output', () => {
-  bench(
-    'generate a strict response schema with reusable definitions (Zod v3)',
-    () => {
+  test('generate a strict response schema with reusable definitions (Zod v3)', async ({ bench }) => {
+    await bench('generate a strict response schema with reusable definitions (Zod v3)', () => {
       zodResponseFormat(structuredOutputSchemaV3, 'benchmark_structured_output', {
         schemaDefinitions: { Step: stepSchemaV3 },
       });
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'generate a strict response schema with reusable definitions (Zod v4)',
-    () => {
+  test('generate a strict response schema with reusable definitions (Zod v4)', async ({ bench }) => {
+    await bench('generate a strict response schema with reusable definitions (Zod v4)', () => {
       zodResponseFormat(structuredOutputSchemaV4, 'benchmark_structured_output', {
         schemaDefinitions: { Step: stepSchemaV4 },
       });
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'parse and validate a structured response format',
-    () => {
+  test('parse and validate a structured response format', async ({ bench }) => {
+    await bench('parse and validate a structured response format', () => {
       assertStepCount(responseFormat.$parseRaw(structuredOutputJSON));
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'parse and validate a structured text format',
-    () => {
+  test('parse and validate a structured text format', async ({ bench }) => {
+    await bench('parse and validate a structured text format', () => {
       assertStepCount(textFormat.$parseRaw(structuredOutputJSON));
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'parse structured output through the public chat completions API',
-    async () => {
+  test('parse structured output through the public chat completions API', async ({ bench }) => {
+    await bench('parse structured output through the public chat completions API', async () => {
       const completion = await structuredOutputClient.chat.completions.parse(structuredOutputRequest);
       assertStepCount(completion.choices[0]?.message.parsed);
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 });
 
 describe('partial JSON parsing', () => {
-  bench(
-    'JSON.parse complete structured output',
-    () => {
+  test('JSON.parse complete structured output', async ({ bench }) => {
+    await bench('JSON.parse complete structured output', () => {
       assertStepCount(JSON.parse(structuredOutputJSON));
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'partialParse complete structured output',
-    () => {
+  test('partialParse complete structured output', async ({ bench }) => {
+    await bench('partialParse complete structured output', () => {
       assertStepCount(partialParse(structuredOutputJSON));
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'partialParse incomplete structured output',
-    () => {
+  test('partialParse incomplete structured output', async ({ bench }) => {
+    await bench('partialParse incomplete structured output', () => {
       assertStepCount(partialParse(partialStructuredOutputJSON));
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'partialParse progressive 128-byte streaming chunks',
-    () => {
+  test('partialParse progressive 128-byte streaming chunks', async ({ bench }) => {
+    await bench('partialParse progressive 128-byte streaming chunks', () => {
       let parsed: unknown;
       for (const chunk of progressiveStructuredOutputJSON) {
         parsed = partialParse(chunk);
       }
       assertStepCount(parsed);
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 });
 
 const base64EmbeddingResponse = JSON.stringify(base64EmbeddingFixture);
@@ -191,54 +173,44 @@ const floatEmbeddingClient = createFixtureClient(floatEmbeddingResponse);
 const embeddingRequest = { model: 'text-embedding-3-large', input: 'deterministic embedding benchmark' };
 
 describe(`embeddings (${embeddingDimensions} dimensions)`, () => {
-  bench(
-    'decode a base64 Float32 embedding',
-    () => {
+  test('decode a base64 Float32 embedding', async ({ bench }) => {
+    await bench('decode a base64 Float32 embedding', () => {
       assertEmbeddingDimensions(toFloat32Array(base64Embedding));
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'parse a float-encoded embedding response',
-    () => {
+  test('parse a float-encoded embedding response', async ({ bench }) => {
+    await bench('parse a float-encoded embedding response', () => {
       // SAFETY: The parsed JSON was serialized from the adjacent typed embedding fixture, and dimension checks validate the benchmark result.
       const response = JSON.parse(floatEmbeddingResponse) as typeof floatEmbeddingFixture;
       assertEmbeddingDimensions(response.data[0]?.embedding);
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'parse and decode a base64-encoded embedding response',
-    () => {
+  test('parse and decode a base64-encoded embedding response', async ({ bench }) => {
+    await bench('parse and decode a base64-encoded embedding response', () => {
       // SAFETY: The parsed JSON was serialized from the adjacent typed embedding fixture, and dimension checks validate the benchmark result.
       const response = JSON.parse(base64EmbeddingResponse) as typeof base64EmbeddingFixture;
       assertEmbeddingDimensions(toFloat32Array(response.data[0]!.embedding));
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'embeddings.create default base64 response and Float32 conversion',
-    async () => {
+  test('embeddings.create default base64 response and Float32 conversion', async ({ bench }) => {
+    await bench('embeddings.create default base64 response and Float32 conversion', async () => {
       const response = await base64EmbeddingClient.embeddings.create(embeddingRequest);
       assertEmbeddingDimensions(response.data[0]?.embedding);
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'embeddings.create explicit float response',
-    async () => {
+  test('embeddings.create explicit float response', async ({ bench }) => {
+    await bench('embeddings.create explicit float response', async () => {
       const response = await floatEmbeddingClient.embeddings.create({
         ...embeddingRequest,
         encoding_format: 'float',
       });
       assertEmbeddingDimensions(response.data[0]?.embedding);
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 });
 
 function createFixtureClient(responseBody: string): OpenAI {
