@@ -1,4 +1,4 @@
-import { bench, beforeAll, describe } from 'vitest';
+import { test, beforeAll, describe } from 'vitest';
 
 import { Stream, _iterSSEMessages } from '../../src/core/streaming';
 import { ReadableStreamFrom } from '../../src/internal/shims';
@@ -110,28 +110,24 @@ describe.each(FIXTURES)('SSE streaming: $label', (fixture) => {
     await verifyFixture(fixture);
   });
 
-  bench(
-    'decode SSE frames',
-    async () => {
+  test('decode SSE frames', async ({ bench }) => {
+    await bench('decode SSE frames', async () => {
       let consumed = 0;
       for await (const event of _iterSSEMessages(createResponse(fixture), new AbortController())) {
         consumed += event.data.length;
       }
       benchmarkSink ^= consumed;
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 
-  bench(
-    'decode and parse SSE JSON',
-    async () => {
+  test('decode and parse SSE JSON', async ({ bench }) => {
+    await bench('decode and parse SSE JSON', async () => {
       let consumed = 0;
       const stream = Stream.fromSSEResponse<BenchmarkPayload>(createResponse(fixture), new AbortController());
       for await (const event of stream) {
         consumed += event.text.length + event.index;
       }
       benchmarkSink ^= consumed;
-    },
-    BENCHMARK_OPTIONS,
-  );
+    }).run(BENCHMARK_OPTIONS);
+  });
 });

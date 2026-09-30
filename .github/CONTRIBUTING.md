@@ -253,8 +253,10 @@ To save the machine-readable Vitest benchmark report:
 $ pnpm bench:json
 ```
 
-This writes `benchmark-results.json` in the repository root. The report is ignored
-by Git and uploaded as an artifact by the performance-benchmark job in normal CI.
+This writes `benchmark-results.json` in the repository root using the Vitest JSON
+reporter. Benchmark measurements are in each test case's `benchmarks` field; reports
+from Vitest 4 use a different schema. The report is ignored by Git and uploaded as
+an artifact by the performance-benchmark job in normal CI.
 The separate, manually triggered or scheduled benchmark workflow also uploads a
 runtime, runner, revision, and fixture-hash metadata file. Pass a benchmark name
 or file filter directly to run only part of the suite, for example:
