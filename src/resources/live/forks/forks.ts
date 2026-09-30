@@ -87,7 +87,7 @@ export namespace ForkServerEvent {
   }
 
   /**
-   * A SIP DTMF keypress successfully sent by the hosted tool. Delivered only to
+   * A SIP DTMF keypress successfully sent to the SIP trunk. Delivered only to
    * sideband observers; this is not a client command.
    */
   export interface TransportDtmfSend {
@@ -96,6 +96,11 @@ export namespace ForkServerEvent {
     event_id: string;
 
     type: 'transport.dtmf.send';
+
+    /**
+     * The event_id of the client command, when supplied.
+     */
+    client_event_id?: string;
   }
 
   /**

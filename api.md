@@ -673,6 +673,16 @@ Methods:
 - <code title="post /agents/sessions/{session_id}/events">client.beta.agents.sessions.events.<a href="./src/resources/beta/agents/sessions/events.ts">create</a>(sessionID, { ...params }) -> void</code>
 - <code title="get /agents/sessions/{session_id}/events">client.beta.agents.sessions.events.<a href="./src/resources/beta/agents/sessions/events.ts">stream</a>(sessionID) -> AgentSessionEvent</code>
 
+#### Traces
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/sessions/traces.ts">SessionTrace</a></code>
+
+Methods:
+
+- <code title="get /agents/sessions/{session_id}/traces">client.beta.agents.sessions.traces.<a href="./src/resources/beta/agents/sessions/traces.ts">list</a>(sessionID, { ...params }) -> SessionTracesPage</code>
+
 #### Turns
 
 Types:
