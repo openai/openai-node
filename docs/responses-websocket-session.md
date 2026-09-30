@@ -17,7 +17,7 @@ the runnable [two-turn example](../examples/responses/websocket-session.ts).
 
 Choose `maxLanes`, `maxBufferedEvents`, and `maxBufferedBytes` for your application
 when creating the session. Individual lanes can use smaller queue budgets.
-`maxLanes` counts all IDs registered with this session until reconnect, including
+`maxLanes` counts all IDs registered on the physical socket until reconnect, including
 the default lane and detached lanes. The buffer budgets limit retained events;
 they do not change the underlying transport's message limits. A lane queue overflow fails that lane.
 If the session budget is exhausted, the helper fails and drains the largest existing
@@ -141,7 +141,8 @@ meaningful boundaries. Call `reset()` for an explicit new turn; a new
 `response.created` also resets provisional state without affecting the lane.
 
 Closing a lane detaches that consumer, without canceling server work or closing
-the socket. Its ID remains reserved until reconnect, even after a terminal event,
+the socket. Its ID remains reserved until reconnect, including after disposing
+the session and attaching a replacement helper, even after a terminal event,
 because steering can create an automatic successor. Continue using the same open
 lane for sequential responses. Closing the session releases its listeners and lanes; the caller
 still owns and must close the connection. Accepted events remain available if
