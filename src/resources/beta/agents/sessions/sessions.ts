@@ -8,7 +8,8 @@ import {
   type AgentSessionCreateStream,
   withAgentTurnResult,
 } from '../../../../lib/beta/agents/agent-session-create-stream';
-import { type AgentOutputFormat, agentFormatParser } from '../../../../lib/beta/agents/output-format';
+import type { AgentOutputFormat } from '../../../../lib/beta/agents/output-format';
+import { captureAgentOutput } from '../../../../lib/beta/agents/parse-result';
 import { APIResource } from '../../../../core/resource';
 import * as SessionsAPI from './sessions';
 import * as AgentsAPI from '../agents';
@@ -199,11 +200,12 @@ export class Sessions extends APIResource {
     body: SessionCreateParams,
     options?: RequestOptions,
   ): APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream> {
+    const output = captureAgentOutput(body);
     return this._client
       .post<AgentsAPI.AgentSession | Stream<AgentsAPI.AgentSessionEvent>>(
         '/agents/sessions',
         resolveResourceRequestOptions(options, (options) => ({
-          body,
+          body: output.body,
           ...options,
           headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
           stream: body.stream ?? false,
@@ -213,10 +215,7 @@ export class Sessions extends APIResource {
       ._thenUnwrap((data, { options }) =>
         // SAFETY: defaultParseResponse uses this same resolved flag to return the configured stream instance.
         options.stream
-          ? withAgentTurnResult(
-              data as Stream<AgentsAPI.AgentSessionEvent>,
-              agentFormatParser(body.agent?.text?.format),
-            )
+          ? withAgentTurnResult(data as Stream<AgentsAPI.AgentSessionEvent>, output.format)
           : data,
       ) as APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream>;
   }

@@ -1,7 +1,7 @@
 import type { AgentOutputFormat, AgentResult } from './output-format';
 import type { Stream } from '../../../core/streaming';
 import type { AgentSessionEvent } from '../../../resources/beta/agents/agents';
-import { parseAgentResultPromise } from './output-format';
+import { parseAgentResultPromise } from './parse-result';
 import { ResultCollection } from './result-collection';
 
 /** Beta: the original creation stream with optional collection of its initial root turn. */

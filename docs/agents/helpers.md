@@ -124,5 +124,7 @@ console.log((await followup.finalResult()).output_parsed.summary);
 ```
 
 Follow-up `outputFormat` only chooses the local parser; the session must already use
-that schema. `agentOutputFormat(schema, parse)` supports other validators.
+that schema. `standardAgentTextFormat` from
+`openai/helpers/beta/agents/standard-schema` supports synchronous Standard Schema
+validators; `agentOutputFormat(schema, parse)` supports other validators.
 `AgentOutputParseError.raw_result` preserves completed raw output if parsing fails.

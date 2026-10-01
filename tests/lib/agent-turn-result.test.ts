@@ -1,3 +1,4 @@
+import { standardAgentTextFormat } from 'openai/helpers/beta/agents/standard-schema';
 import { z as z3 } from 'zod/v3';
 import { z as z4 } from 'zod/v4';
 import { zodAgentTextFormat } from 'openai/helpers/beta/agents/zod';
@@ -627,5 +628,77 @@ describe('beta Agents typed output', () => {
     );
     expect(JSON.stringify(format)).toBe(JSON.stringify({ type: 'json_schema', schema: format.schema }));
     expect(() => agentOutputFormat({ type: 'object', enum: [{}] }, JSON.parse)).toThrow(/enum/u);
+  });
+  test('ignores inherited and accessor parsers on ordinary formats', async () => {
+    const parse = vi.fn(() => ({ summary: 'Injected' }));
+    const getter = vi.fn(() => parse);
+    for (const format of [
+      Object.assign(Object.create({ $parseRaw: parse }), { type: 'json_schema', schema: { type: 'object' } }),
+      Object.defineProperty({ type: 'json_schema' as const, schema: { type: 'object' } }, '$parseRaw', {
+        get: getter,
+      }),
+    ]) {
+      const { client } = setup([created(), message('Raw answer'), completed(), idle()]);
+      // oxlint-disable-next-line no-await-in-loop -- Each case owns an independent stream and parser spy.
+      const stream = await client.beta.agents.sessions.create({
+        agent: { text: { format } },
+        environment: { type: 'none' },
+        input: 'Question',
+        stream: true,
+      });
+      // oxlint-disable-next-line no-await-in-loop -- Each stream must settle before checking its parser spy.
+      const result = await stream.finalResult();
+      expect(result).not.toHaveProperty('output_parsed');
+      expect(result.output_text).toBe('Raw answer');
+    }
+    expect(parse).not.toHaveBeenCalled();
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  test('snapshots the format before dispatch and ignores later replacement', async () => {
+    const original = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+    const replacement = zodAgentTextFormat(z4.object({ different: z4.number() }));
+    const body = {
+      agent: { text: { format: original } },
+      environment: { type: 'none' as const },
+      input: 'Report',
+      stream: true as const,
+    };
+    const client = new OpenAI({
+      apiKey: 'synthetic',
+      maxRetries: 0,
+      fetch: async (url, init) => {
+        const request = await new Request(url, init).json();
+        expect(request).toMatchObject({ agent: { text: { format: { schema: original.schema } } } });
+        Object.assign(body.agent.text, { format: replacement });
+        const events = [created(), message('{"summary":"Report"}'), completed(), idle()];
+        return new Response(events.map((item) => `data: ${JSON.stringify(item)}\n\n`).join(''), {
+          headers: { 'content-type': 'text/event-stream' },
+        });
+      },
+    });
+    const stream = await client.beta.agents.sessions.create(body);
+    const result = await stream.finalResult();
+    expect(result.output_parsed.summary).toBe('Report');
+  });
+  test('Standard Schema shares inferred creation output and validation', async () => {
+    const schema = z4.object({ summary: z4.string() });
+    const format = standardAgentTextFormat(schema, {
+      type: 'object',
+      properties: { summary: { type: 'string' } },
+      required: ['summary'],
+      additionalProperties: false,
+    });
+    const { client } = setup([created(), message('{"summary":"Standard"}'), completed(), idle()]);
+    const stream = await client.beta.agents.sessions.create({
+      agent: { text: { format } },
+      environment: { type: 'none' },
+      input: 'Report',
+      stream: true,
+    });
+    const result = await stream.finalResult();
+    const summary: string = result.output_parsed.summary;
+    expect(summary).toBe('Standard');
+    expect(() => format.$parseRaw('{"summary":1}')).toThrow();
   });
 });

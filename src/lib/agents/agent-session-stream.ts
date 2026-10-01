@@ -1,6 +1,6 @@
 import type { AgentOutputFormat, AgentResult } from '../beta/agents/output-format';
 import { TurnState } from './turn-state';
-import { parseAgentResultPromise } from '../beta/agents/output-format';
+import { parseAgentResultPromise } from '../beta/agents/parse-result';
 import { ResultCollection } from '../beta/agents/result-collection';
 import { APIUserAbortError, BadRequestError, OpenAIError } from '../../core/error';
 import type { Stream } from '../../core/streaming';
