@@ -18,9 +18,9 @@ export function parseAgentResult<T>(result: AgentTurnResult, format?: AgentOutpu
 }
 
 /** @internal */
-export function agentFormatParser(
+export function agentFormatParser<T = unknown>(
   format: TextFormatParam | null | undefined,
-): AgentOutputFormat<unknown> | undefined {
+): AgentOutputFormat<T> | undefined {
   if (format?.type !== 'json_schema') {
     return undefined;
   }
@@ -28,7 +28,7 @@ export function agentFormatParser(
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Only an own data-property function can opt a public API format into local parsing.
   if (descriptor && 'value' in descriptor && typeof descriptor.value === 'function') {
     // SAFETY: The own descriptor was checked for a callable parser; retain its receiver and never reread the property.
-    const parse = descriptor.value as AgentOutputFormat<unknown>['$parseRaw'];
+    const parse = descriptor.value as AgentOutputFormat<T>['$parseRaw'];
     return { type: 'json_schema', schema: format.schema, $parseRaw: (text) => parse.call(format, text) };
   }
   return undefined;

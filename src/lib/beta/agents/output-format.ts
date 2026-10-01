@@ -1,5 +1,6 @@
 import type { AgentOutputFormat } from './output-format-types';
 
+import { hasOwn } from '../../../internal/utils/values';
 import { OpenAIError } from '../../../core/error';
 import type { JSONSchema } from '../../jsonschema';
 import { toStrictJsonSchema } from '../../transform';
@@ -13,7 +14,7 @@ export { AgentOutputParseError } from './output-parse-error';
 export function agentOutputFormat<T>(schema: JSONSchema, parse: (text: string) => T): AgentOutputFormat<T> {
   const normalized = toStrictJsonSchema(schema);
   for (const keyword of ['oneOf', 'anyOf', 'allOf', 'enum', 'not']) {
-    if (keyword in normalized) {
+    if (hasOwn(normalized, keyword)) {
       throw new OpenAIError(`Agents output schemas cannot contain top-level ${keyword}`);
     }
   }

@@ -759,4 +759,45 @@ describe('beta Agents typed output', () => {
     expect(JSON.stringify(await requests[0]?.json())).not.toContain('$parseRaw');
     expect(JSON.stringify(format)).not.toContain('$parseRaw');
   });
+  test('follow-up validates and captures its local parser before any requests', async () => {
+    const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+    const injected = vi.fn(() => ({ summary: 'Injected' }));
+    const getter = vi.fn(() => injected);
+    const { client, requests } = setup([created(), message('{"summary":"Captured"}'), completed(), idle()], {
+      followup: true,
+    });
+    for (const invalid of [
+      Object.assign(Object.create({ $parseRaw: injected }), { type: 'json_schema', schema: format.schema }),
+      Object.defineProperty({ ...format }, '$parseRaw', { get: getter }),
+    ]) {
+      expect(() =>
+        client.beta.agents.sessions.stream(turn.session_id, { input: 'Again', outputFormat: invalid }),
+      ).toThrow('own parser function');
+    }
+    expect(requests).toHaveLength(0);
+    const stream = client.beta.agents.sessions.stream(turn.session_id, {
+      input: 'Again',
+      outputFormat: format,
+    });
+    format.$parseRaw = injected;
+    const result = await stream.finalResult();
+    expect(result.output_parsed.summary).toBe('Captured');
+    expect(injected).not.toHaveBeenCalled();
+    expect(getter).not.toHaveBeenCalled();
+  });
+  test('schema keyword checks ignore ambient prototype properties', () => {
+    const previous = Object.getOwnPropertyDescriptor(Object.prototype, 'enum');
+    try {
+      // oxlint-disable-next-line no-extend-native -- Reproduce ambient prototype pollution and restore it in finally.
+      Object.defineProperty(Object.prototype, 'enum', { value: [], configurable: true });
+      expect(() => agentOutputFormat({ type: 'object', properties: {} }, JSON.parse)).not.toThrow();
+    } finally {
+      if (previous) {
+        // oxlint-disable-next-line no-extend-native -- Restore the exact descriptor after this regression.
+        Object.defineProperty(Object.prototype, 'enum', previous);
+      } else {
+        Reflect.deleteProperty(Object.prototype, 'enum');
+      }
+    }
+  });
 });

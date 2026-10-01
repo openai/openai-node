@@ -1,6 +1,6 @@
 import type { AgentOutputFormat, AgentResult } from '../beta/agents/output-format-types';
 import { TurnState } from './turn-state';
-import { parseAgentResultPromise } from '../beta/agents/parse-result';
+import { agentFormatParser, parseAgentResultPromise } from '../beta/agents/parse-result';
 import { ResultCollection } from '../beta/agents/result-collection';
 import { APIUserAbortError, BadRequestError, OpenAIError } from '../../core/error';
 import type { Stream } from '../../core/streaming';
@@ -118,7 +118,10 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
     if (params.input.length === 0) {
       throw new OpenAIError('input must not be empty');
     }
-    this.#format = params.outputFormat;
+    this.#format = agentFormatParser<T>(params.outputFormat);
+    if (params.outputFormat && !this.#format) {
+      throw new OpenAIError('outputFormat must have its own parser function');
+    }
     this.#sessions = sessions;
     this.#sessionID = sessionID;
     this.#input = { type: 'agent.session.input.message', input };
