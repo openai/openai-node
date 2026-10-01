@@ -19,11 +19,26 @@ export function parseAgentResult<T>(result: AgentTurnResult, format?: AgentOutpu
   }
 }
 
+// Inspect only JSON-visible data fields; leave getters and inherited values to normal serialization.
+function ownJSONValue<T extends object, K extends keyof T>(
+  object: T | null | undefined,
+  key: K,
+): T[K] | undefined {
+  const descriptor = object && Object.getOwnPropertyDescriptor(object, key);
+  // SAFETY: The own data descriptor corresponds to the requested property in T.
+  return descriptor?.enumerable && 'value' in descriptor ? (descriptor.value as T[K]) : undefined;
+}
+
 /** @internal */
 export function agentFormatParser<T = unknown>(
   format: TextFormatParam | null | undefined,
 ): AgentOutputFormat<T> | undefined {
-  if (format?.type !== 'json_schema') {
+  if (!format || ownJSONValue(format, 'type') !== 'json_schema') {
+    return undefined;
+  }
+  // SAFETY: The own JSON discriminator identifies the schema-bearing format variant.
+  const schema = ownJSONValue(format as TextFormatParam.TextFormatParamJSONSchema, 'schema');
+  if (!schema) {
     return undefined;
   }
   const descriptor = Object.getOwnPropertyDescriptor(format, '$parseRaw');
@@ -31,16 +46,16 @@ export function agentFormatParser<T = unknown>(
   if (descriptor && 'value' in descriptor && typeof descriptor.value === 'function') {
     // SAFETY: The own descriptor was checked for a callable parser; retain its receiver and never reread the property.
     const parse = descriptor.value as AgentOutputFormat<T>['$parseRaw'];
-    return { type: 'json_schema', schema: format.schema, $parseRaw: (text) => parse.call(format, text) };
+    return { type: 'json_schema', schema, $parseRaw: (text) => parse.call(format, text) };
   }
   return undefined;
 }
 
 /** @internal */
 export function captureAgentOutput(body: SessionCreateParams, options?: RequestOptions) {
-  const { agent } = body;
-  const text = agent?.text;
-  const format = agentFormatParser(text?.format);
+  const agent = ownJSONValue(body, 'agent');
+  const text = ownJSONValue(agent, 'text');
+  const format = agentFormatParser(ownJSONValue(text, 'format'));
   if (!format) {
     return { body, options };
   }

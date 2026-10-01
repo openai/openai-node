@@ -701,8 +701,82 @@ describe('beta Agents typed output', () => {
       z4.object({ nested: z4.object({ values: z4.array(z4.string().nullable()) }) }),
     );
     expect(JSON.stringify(format)).toBe(JSON.stringify({ type: 'json_schema', schema: format.schema }));
-    expect(() => agentOutputFormat({ type: 'object', enum: [{}] }, JSON.parse)).toThrow(/enum/u);
+    const enumSchema = { type: 'object' as const, enum: [{}] };
+    expect(() =>
+      standardResponsesFunction({ name: 'select', parameters: z4.object({}), schema: enumSchema }),
+    ).not.toThrow();
+    expect(() => agentOutputFormat(enumSchema, JSON.parse)).toThrow(/enum/u);
   });
+  test.each(['agent', 'text', 'format'] as const)(
+    'does not promote an inherited %s into the request',
+    async (key) => {
+      const parse = vi.fn(() => ({ summary: 'Unexpected' }));
+      const format = agentOutputFormat({ type: 'object' }, parse);
+      const agent = { text: { format } };
+      const body = {
+        agent,
+        environment: { type: 'none' as const },
+        input: 'Question',
+        stream: true as const,
+      };
+      const { target, value } = {
+        agent: { target: body, value: agent },
+        text: { target: agent, value: agent.text },
+        format: { target: agent.text, value: format },
+      }[key];
+      Reflect.deleteProperty(target, key);
+      Object.setPrototypeOf(target, { [key]: value });
+      const { client, requests } = setup([created(), message('Raw answer'), completed(), idle()]);
+      const stream = await client.beta.agents.sessions.create(body);
+      const result = await stream.finalResult();
+      expect(result).not.toHaveProperty('output_parsed');
+      expect(parse).not.toHaveBeenCalled();
+      // oxlint-disable-next-line unicorn/prefer-structured-clone -- Compare JSON wire semantics, which omit inherited fields.
+      expect(await requests[0]?.json()).toEqual(JSON.parse(JSON.stringify(body)));
+    },
+  );
+
+  test.each(['agent', 'text', 'format', 'type', 'schema'] as const)(
+    'leaves the %s getter to ordinary request serialization',
+    async (key) => {
+      const parse = vi.fn(() => ({ summary: 'Unexpected' }));
+      const format = agentOutputFormat({ type: 'object' }, parse);
+      const agent = { text: { format } };
+      const body = {
+        agent,
+        environment: { type: 'none' as const },
+        input: 'Question',
+        stream: true as const,
+      };
+      const { target, value } = {
+        agent: { target: body, value: agent },
+        text: { target: agent, value: agent.text },
+        format: { target: agent.text, value: format },
+        type: { target: format, value: format.type },
+        schema: { target: format, value: format.schema },
+      }[key];
+      const getter = vi.fn(() => value);
+      Object.defineProperty(target, key, { get: getter, enumerable: true });
+      const { client } = setup([created(), message('Raw answer'), completed(), idle()]);
+      const stream = await client.beta.agents.sessions.create(body);
+      const result = await stream.finalResult();
+      expect(result).not.toHaveProperty('output_parsed');
+      expect(getter).toHaveBeenCalledOnce();
+      expect(parse).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each([
+    { anyOf: [{ type: 'object' as const }, { type: 'string' as const }] },
+    { oneOf: [{ type: 'object' as const }, { type: 'string' as const }] },
+    { allOf: [{ type: 'string' as const }] },
+    { not: { type: 'object' as const } },
+  ])('uses shared strict conversion for unsupported root keywords: %j', (keyword) => {
+    const schema = { type: 'object' as const, ...keyword };
+    expect(() => standardResponsesFunction({ name: 'lookup', parameters: z4.object({}), schema })).toThrow();
+    expect(() => agentOutputFormat(schema, JSON.parse)).toThrow();
+  });
+
   test('ignores inherited and accessor parsers on ordinary formats', async () => {
     const parse = vi.fn(() => ({ summary: 'Injected' }));
     const getter = vi.fn(() => parse);
@@ -891,6 +965,15 @@ describe('beta Agents typed output', () => {
     },
   );
   test('rejects unsupported URL formats in nested schemas while keeping supported formats', () => {
+    expect(() =>
+      functionTool(
+        zodResponsesFunction({
+          name: 'lookup',
+          parameters: z4.object({ link: z4.url() }),
+          function: ({ link }) => link,
+        }),
+      ),
+    ).not.toThrow();
     expect(() => zodAgentTextFormat(z3.object({ links: z3.array(z3.string().url()) }))).toThrow(
       /format uri/u,
     );

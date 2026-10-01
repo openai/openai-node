@@ -59,10 +59,9 @@ function validateFormats(schema: JSONSchemaDefinition): void {
 export function agentOutputFormat<T>(schema: JSONSchema, parse: (text: string) => T): AgentOutputFormat<T> {
   const normalized = toStrictJsonSchema(schema);
   validateFormats(normalized);
-  for (const keyword of ['oneOf', 'anyOf', 'allOf', 'enum', 'not']) {
-    if (hasOwn(normalized, keyword)) {
-      throw new OpenAIError(`Agents output schemas cannot contain top-level ${keyword}`);
-    }
+  // The shared strict converter owns root and keyword validation; Agents additionally excludes root enums.
+  if (hasOwn(normalized, 'enum')) {
+    throw new OpenAIError('Agents output schemas cannot contain top-level enum');
   }
   // Keep spread-compatible parsing without exposing caller-owned serialization hooks.
   const parser = Object.defineProperty((text: string) => parse(text), 'toJSON', {
