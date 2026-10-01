@@ -1,10 +1,19 @@
 # Changelog
 
+## [7.27.0](https://github.com/openai/openai-node/compare/v7.26.0...v7.27.0) (2026-10-01)
+
+
+### Features
+
+* **agents:** prepare hosted files and download result artifacts ([#2855](https://github.com/openai/openai-node/issues/2855)) ([7b5a9e0](https://github.com/openai/openai-node/commit/7b5a9e0113ead1b35d43cbd86a2869481fce7e22))
+
 ## [7.26.0](https://github.com/openai/openai-node/compare/v7.25.0...v7.26.0) (2026-10-01)
 
 
 ### Features
 
+* collect final output from beta Agents streams ([#2850](https://github.com/openai/openai-node/issues/2850)) ([71d2412](https://github.com/openai/openai-node/commit/71d24120c4cc4e5897a767f16d25f2804fa4ad7c))
+* **agents:** [1/n] parse typed output from agent streams ([#2853](https://github.com/openai/openai-node/issues/2853)) ([95b197b](https://github.com/openai/openai-node/commit/95b197b6b35c84bb7da322c3e5eb9adf1d1f79e7))
 * **api:** Add agent session trace listing ([#2845](https://github.com/openai/openai-node/issues/2845)) ([c6dd4c7](https://github.com/openai/openai-node/commit/c6dd4c75d0c864ad2f7e7c9df9a10310fd34fe44))
 * **beta:** bind typed application functions to Agents tools ([#2852](https://github.com/openai/openai-node/issues/2852)) ([6198ba0](https://github.com/openai/openai-node/commit/6198ba0d659084e34f540e9e8fa6c9ef86306ba1))
 
