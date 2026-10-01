@@ -836,4 +836,31 @@ describe('beta Agents typed output', () => {
       ),
     ).not.toThrow();
   });
+  test('typed creation rejects a request-options body override before dispatch', () => {
+    const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+    const { client, requests } = setup([]);
+    expect(() =>
+      client.beta.agents.sessions.create(
+        { agent: { text: { format } }, environment: { type: 'none' }, input: 'Report', stream: true },
+        { body: { agent: { text: { format: { type: 'text' } } } } },
+      ),
+    ).toThrow('cannot override the body');
+    expect(requests).toHaveLength(0);
+  });
+  test('typed creation rejects inherited envelope serialization hooks without invoking them', () => {
+    const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+    const { client, requests } = setup([]);
+    const hook = vi.fn();
+    const agent = Object.assign(Object.create({ toJSON: hook }), { text: { format } });
+    expect(() =>
+      client.beta.agents.sessions.create({
+        agent,
+        environment: { type: 'none' },
+        input: 'Report',
+        stream: true,
+      }),
+    ).toThrow('cannot customize');
+    expect(hook).not.toHaveBeenCalled();
+    expect(requests).toHaveLength(0);
+  });
 });

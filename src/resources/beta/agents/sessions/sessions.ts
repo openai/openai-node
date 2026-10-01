@@ -200,11 +200,11 @@ export class Sessions extends APIResource {
     body: SessionCreateParams,
     options?: RequestOptions,
   ): APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream> {
-    const output = captureAgentOutput(body);
+    const output = captureAgentOutput(body, options);
     return this._client
       .post<AgentsAPI.AgentSession | Stream<AgentsAPI.AgentSessionEvent>>(
         '/agents/sessions',
-        resolveResourceRequestOptions(options, (options) => ({
+        resolveResourceRequestOptions(output.options, (options) => ({
           body: output.body,
           ...options,
           headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),

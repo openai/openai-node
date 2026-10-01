@@ -1,3 +1,4 @@
+import type { RequestOptions } from '../../../internal/request-options';
 import { OpenAIError } from '../../../core/error';
 import type { SessionCreateParams } from '../../../resources/beta/agents/sessions/sessions';
 import type { AgentTurnResult } from './agent-turn-result';
@@ -36,19 +37,26 @@ export function agentFormatParser<T = unknown>(
 }
 
 /** @internal */
-export function captureAgentOutput(body: SessionCreateParams) {
+export function captureAgentOutput(body: SessionCreateParams, options?: RequestOptions) {
   const { agent } = body;
   const text = agent?.text;
   const format = agentFormatParser(text?.format);
   if (!format) {
-    return { body };
+    return { body, options };
   }
   for (const envelope of [body, agent, text]) {
-    if (envelope && Object.getOwnPropertyDescriptor(envelope, 'toJSON')) {
+    if (envelope && 'toJSON' in envelope) {
       throw new OpenAIError('Typed agent requests cannot customize body, agent, or text serialization');
     }
   }
+  if (options?.body !== undefined) {
+    throw new OpenAIError('Typed agent requests cannot override the body in request options');
+  }
+  // Snapshot options too: an asynchronous request must retain the captured schema contract.
+  const capturedOptions = { ...options };
+  delete capturedOptions.body;
   return {
+    options: capturedOptions,
     body: {
       ...body,
       agent: {
