@@ -14,6 +14,7 @@ export class AttachedTurn {
   turn: Turn | undefined;
   #baselineID: string | undefined;
   #reconciled = false;
+  #idle = false;
   readonly #sessions: Sessions;
   readonly #sessionID: string;
   readonly #options: RequestOptions;
@@ -29,7 +30,7 @@ export class AttachedTurn {
   }
 
   terminal(event: AgentSessionEvent): boolean {
-    return this.settled || (!this.turn && event.type === 'agent.session.idle');
+    return this.settled || (!this.turn && this.#idle && event.type === 'agent.session.idle');
   }
 
   #ordered(order: 'asc' | 'desc'): RequestOptions {
@@ -87,14 +88,16 @@ export class AttachedTurn {
     this.turn = this.turn
       ? await this.#sessions.turns.retrieve(this.turn.id, { session_id: this.#sessionID }, this.#options)
       : await this.#newRoot();
-    return this.#sessions.retrieve(this.#sessionID, this.#options);
+    const session = await this.#sessions.retrieve(this.#sessionID, this.#options);
+    this.#idle = session.status === 'idle';
+    return session;
   }
 
   async observe(event: AgentSessionEvent): Promise<boolean> {
+    if (event.type === 'agent.session.idle' && !this.settled) {
+      await this.refresh();
+    }
     if (this.turn) {
-      if (event.type === 'agent.session.idle' && !this.settled) {
-        await this.refresh();
-      }
       if ('turn' in event && event.turn.id === this.turn.id) {
         this.turn = structuredClone(event.turn);
       } else if (

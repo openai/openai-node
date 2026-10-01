@@ -490,15 +490,18 @@ describe('beta agents stream attachment', () => {
     },
   );
 
-  test('historical authentication replay cannot select the old completed root', async () => {
-    const { client } = attachTransport({ historyReplay: true });
-    const handler = vi.fn(() => 'found');
-    const result = await client.beta.agents.sessions
-      .stream(turn.session_id, { toolHandlers: { lookup: handler } })
-      .finalResult();
-    expect(result.turn_id).toBe(turn.id);
-    expect(handler).toHaveBeenCalledOnce();
-  });
+  test.each([false, true])(
+    'historical authentication replay cannot select the old completed root (early idle %s)',
+    async (earlyIdle) => {
+      const { client } = attachTransport({ historyReplay: true, earlyIdle });
+      const handler = vi.fn(() => 'found');
+      const result = await client.beta.agents.sessions
+        .stream(turn.session_id, { toolHandlers: { lookup: handler } })
+        .finalResult();
+      expect(result.turn_id).toBe(turn.id);
+      expect(handler).toHaveBeenCalledOnce();
+    },
+  );
   test.each(['failed', 'cancelled'] as const)(
     'raw recovery preserves the read error for %s work',
     async (terminalStatus) => {
