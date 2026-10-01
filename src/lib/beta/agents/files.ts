@@ -19,6 +19,7 @@ export interface PreparedAgentFiles {
 /** Beta: uploaded file IDs remain available after partial preparation or staging failure. */
 export class AgentFileUploadError extends OpenAIError {
   override readonly name = 'AgentFileUploadError';
+  declare readonly cause: unknown;
   readonly uploadedFiles: FileObject[];
   constructor(uploadedFiles: FileObject[], cause: unknown) {
     super('Agent file preparation or staging failed; uploaded files remain caller-owned.');

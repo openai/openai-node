@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { appendFile, mkdir, mkdtemp, readFile, rm, symlink, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
-import OpenAI from 'openai';
+import OpenAI, { APIError } from 'openai';
 import { AgentFileUploadError } from 'openai/lib/beta/agents/files';
 import { AgentTurnResult } from 'openai/lib/beta/agents/agent-turn-result';
 import {
@@ -250,6 +250,11 @@ describe('beta agent file preparation', () => {
       throw new Error('Expected partial upload error');
     }
     expect(failure.uploadedFiles.map((file) => file.id)).toEqual(['file_1']);
+    expect(failure.cause).toBeInstanceOf(APIError);
+    if (failure.cause instanceof APIError) {
+      expect(failure.cause.status).toBe(400);
+    }
+    expect(Object.prototype.propertyIsEnumerable.call(failure, 'cause')).toBe(false);
     expect(requests.every((req) => req.method === 'POST')).toBe(true);
   });
   test('uploads then stages on the live environment, preserving options and file ownership', async () => {
