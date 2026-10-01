@@ -145,6 +145,10 @@ console.log((await stream.finalResult()).output_text);
 Reattachment sends no user message. Final-result collection recovers saved output
 for the selected turn, including one recovery read if its event connection fails.
 An already-idle attachment has no selected result. Use
-`withResultCollection()` before progress iteration as above. A call whose result
-was not acknowledged may run again after reconnecting, so application side effects
-still need their own deduplication.
+`withResultCollection()` before progress iteration as above.
+
+Reattachment uses at-least-once tool-call delivery with application-owned recovery:
+an unacknowledged call may be delivered again after reconnecting. After process death,
+the application must restart its worker, recover the saved session ID, and reattach
+handlers; the SDK does not recover the process automatically. Applications are
+responsible for idempotency when handlers perform mutations.
