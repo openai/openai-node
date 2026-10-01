@@ -98,6 +98,7 @@ for await (const event of stream) {
 ```
 
 Reuse the handler with an existing idle session whose agent already has the matching definition. Raw handlers can share the same `toolHandlers` map.
+
 ### Typed final output (beta)
 
 Bind a Zod v3/v4/Mini object schema to creation and its final result:

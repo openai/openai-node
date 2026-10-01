@@ -1,5 +1,8 @@
 import * as mini from 'zod/v4-mini';
 import { inspect } from 'node:util';
+import { zodResponsesFunction } from 'openai/helpers/zod';
+import { standardResponsesFunction } from 'openai/helpers/standard-schema';
+import { functionTool } from 'openai/lib/beta/agents/function-tool';
 import { standardAgentTextFormat } from 'openai/helpers/beta/agents/standard-schema';
 import { z as z3 } from 'zod/v3';
 import { z as z4 } from 'zod/v4';
@@ -540,10 +543,14 @@ describe('beta Agents typed output', () => {
     ['v4-mini', mini.object({ summary: mini.string(), findings: mini.array(mini.string()) })],
   ] as const)('binds %s schema, request, and typed result', async (_version, schema) => {
     const format = zodAgentTextFormat(schema);
+    const callback = vi.fn((args) => args);
+    const tool = functionTool(
+      zodResponsesFunction({ name: 'summarize', parameters: schema, function: callback }),
+    );
     const answer = { summary: 'Report', findings: ['First'] };
     const { client, requests } = setup([created(), message(JSON.stringify(answer)), completed(), idle()]);
     const stream = await client.beta.agents.sessions.create({
-      agent: { model: 'gpt-6-astra', text: { format } },
+      agent: { model: 'gpt-6-astra', tools: [tool.definition], text: { format } },
       environment: { type: 'none' },
       input: 'Research',
       stream: true,
@@ -560,8 +567,70 @@ describe('beta Agents typed output', () => {
         text: { format: { type: 'json_schema', schema: { type: 'object', additionalProperties: false } } },
       },
     });
-    expect(JSON.stringify(request)).not.toMatch(/parseRaw|strict|name/u);
+    expect(request).toMatchObject({ agent: { tools: [tool.definition] } });
+    expect(tool.definition.parameters).toEqual(format.schema);
+    expect(callback).not.toHaveBeenCalled();
+    expect(JSON.stringify(request)).not.toMatch(/parseRaw|strict|callback/u);
   });
+
+  test.each(['zod', 'standard'] as const)(
+    'dispatches a typed tool and parses its final %s output',
+    async (adapter) => {
+      const schema = z4.object({ summary: z4.string() });
+      const jsonSchema = {
+        type: 'object' as const,
+        properties: { summary: { type: 'string' as const } },
+        required: ['summary'],
+      };
+      const callback = vi.fn(({ summary }: { summary: string }) => ({ summary: summary.toUpperCase() }));
+      const options = { name: 'summarize', parameters: schema, function: callback };
+      const tool = functionTool(
+        adapter === 'zod'
+          ? zodResponsesFunction(options)
+          : standardResponsesFunction({ ...options, schema: jsonSchema }),
+      );
+      const format =
+        adapter === 'zod' ? zodAgentTextFormat(schema) : standardAgentTextFormat(schema, jsonSchema);
+      const { client, requests } = setup(
+        [
+          created(),
+          event('agent.session.turn.item.added', {
+            item: {
+              id: 'item_tool',
+              type: 'function_call',
+              call_id: 'call_tool',
+              turn_id: turn.id,
+              name: tool.name,
+              arguments: { summary: 'notes' },
+              status: 'in_progress',
+            },
+          }),
+          message('{"summary":"NOTES"}'),
+          completed(),
+          idle(),
+        ],
+        { followup: true },
+      );
+      const result = await client.beta.agents.sessions
+        .stream(turn.session_id, {
+          input: 'Summarize the notes.',
+          toolHandlers: { [tool.name]: tool.handler },
+          outputFormat: format,
+        })
+        .finalResult();
+      const summary: string = result.output_parsed.summary;
+      expect(summary).toBe('NOTES');
+      expect(callback).toHaveBeenCalledExactlyOnceWith({ summary: 'notes' });
+      const posts = requests.filter((request) => request.method === 'POST');
+      expect(posts).toHaveLength(2);
+      expect(await posts[1]?.json()).toMatchObject({
+        events: [{ call_id: 'call_tool', success: true, output: '{"summary":"NOTES"}' }],
+      });
+      await expect(tool.handler({ summary: 42 })).rejects.toThrow();
+      expect(() => format.$parseRaw('{"summary":42}')).toThrow();
+      expect(callback).toHaveBeenCalledOnce();
+    },
+  );
 
   test('follow-up parses locally without changing the hosted schema', async () => {
     const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
