@@ -12,8 +12,8 @@ export function parseAgentResult<T>(result: AgentTurnResult, format?: AgentOutpu
     return (
       format ? new ParsedAgentTurnResult(result, format.$parseRaw(result.output_text)) : result
     ) as AgentResult<T>;
-  } catch (error) {
-    throw new AgentOutputParseError(result, error);
+  } catch {
+    throw new AgentOutputParseError(result);
   }
 }
 

@@ -1,3 +1,5 @@
+import * as mini from 'zod/v4-mini';
+import { inspect } from 'node:util';
 import { standardAgentTextFormat } from 'openai/helpers/beta/agents/standard-schema';
 import { z as z3 } from 'zod/v3';
 import { z as z4 } from 'zod/v4';
@@ -533,6 +535,7 @@ describe('beta Agents typed output', () => {
   test.each([
     ['v3', z3.object({ summary: z3.string(), findings: z3.array(z3.string()) })],
     ['v4', z4.object({ summary: z4.string(), findings: z4.array(z4.string()) })],
+    ['v4-mini', mini.object({ summary: mini.string(), findings: mini.array(mini.string()) })],
   ] as const)('binds %s schema, request, and typed result', async (_version, schema) => {
     const format = zodAgentTextFormat(schema);
     const answer = { summary: 'Report', findings: ['First'] };
@@ -595,7 +598,7 @@ describe('beta Agents typed output', () => {
       }
       expect(failure.raw_result.turn.status).toBe('completed');
       expect(failure.raw_result.output_text).toBe(text);
-      expect(failure.cause).toBeDefined();
+      expect(failure).not.toHaveProperty('cause');
       expect(failure.message).not.toContain(text);
       expect(await stream.finalResult().catch((error: unknown) => error)).toBe(failure);
     },
@@ -700,5 +703,60 @@ describe('beta Agents typed output', () => {
     const summary: string = result.output_parsed.summary;
     expect(summary).toBe('Standard');
     expect(() => format.$parseRaw('{"summary":1}')).toThrow();
+  });
+  test('ordinary parse-error logging does not expose response or validator diagnostics', async () => {
+    const canary = 'private-output-canary';
+    const format = agentOutputFormat({ type: 'object', properties: {} }, (text) => {
+      throw new Error(`Invalid output: ${text}`);
+    });
+    const { client } = setup([created(), message(canary), completed(), idle()]);
+    const stream = await client.beta.agents.sessions.create({
+      agent: { text: { format } },
+      environment: { type: 'none' },
+      input: 'Report',
+      stream: true,
+    });
+    const failure = await stream.finalResult().catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(AgentOutputParseError);
+    expect(inspect(failure)).not.toContain(canary);
+    expect(String(failure)).not.toContain(canary);
+    expect(JSON.stringify(failure)).not.toContain(canary);
+    if (!(failure instanceof AgentOutputParseError)) {
+      throw new Error('Expected parse error');
+    }
+    expect(failure.stack).not.toContain(canary);
+    expect(failure.raw_result.output_text).toBe(canary);
+  });
+
+  test('snapshots the streaming flag with the submitted typed request', async () => {
+    const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+    const body = {
+      agent: { text: { format } },
+      environment: { type: 'none' as const },
+      input: 'Report',
+      stream: true as const,
+    };
+    const { client, requests } = setup([created(), message('{"summary":"Captured"}'), completed(), idle()]);
+    const pending = client.beta.agents.sessions.create(body);
+    Object.assign(body, { stream: false });
+    const stream = await pending;
+    const result = await stream.finalResult();
+    expect(result.output_parsed.summary).toBe('Captured');
+    expect(await requests[0]?.json()).toMatchObject({ stream: true });
+  });
+  test('shallow-copied formats retain inferred parsing and serialize only API fields', async () => {
+    const format = { ...zodAgentTextFormat(z4.object({ summary: z4.string() })) };
+    const { client, requests } = setup([created(), message('{"summary":"Copied"}'), completed(), idle()]);
+    const stream = await client.beta.agents.sessions.create({
+      agent: { text: { format } },
+      environment: { type: 'none' },
+      input: 'Report',
+      stream: true,
+    });
+    const result = await stream.finalResult();
+    const summary: string = result.output_parsed.summary;
+    expect(summary).toBe('Copied');
+    expect(JSON.stringify(await requests[0]?.json())).not.toContain('$parseRaw');
+    expect(JSON.stringify(format)).not.toContain('$parseRaw');
   });
 });

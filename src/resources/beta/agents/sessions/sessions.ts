@@ -208,7 +208,7 @@ export class Sessions extends APIResource {
           body: output.body,
           ...options,
           headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-          stream: body.stream ?? false,
+          stream: output.body.stream ?? false,
           __security: { bearerAuth: true },
         })),
       )

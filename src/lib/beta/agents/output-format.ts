@@ -17,9 +17,7 @@ export function agentOutputFormat<T>(schema: JSONSchema, parse: (text: string) =
       throw new OpenAIError(`Agents output schemas cannot contain top-level ${keyword}`);
     }
   }
-  // SAFETY: defineProperty installs the non-enumerable parser required by AgentOutputFormat.
-  return Object.defineProperty({ type: 'json_schema' as const, schema: normalized }, '$parseRaw', {
-    value: parse,
-    enumerable: false,
-  }) as AgentOutputFormat<T>;
+  // Functions survive object spread but are omitted by JSON serialization.
+  // SAFETY: Strict normalization returns an object JSON Schema; the API schema type exposes its JSON keywords as a record.
+  return { type: 'json_schema', schema: normalized as AgentOutputFormat<T>['schema'], $parseRaw: parse };
 }
