@@ -171,3 +171,6 @@ remain caller-owned: `prepared.uploadedFiles` and `AgentFileUploadError.uploaded
 expose them for explicit Files API cleanup. Directory preparation stages only the
 selected files once; it does not synchronize a directory.
 
+Local path and directory uploads assume application-owned paths and stable source
+directories. They are convenience helpers, not a filesystem sandbox; file contents
+may be user-provided.

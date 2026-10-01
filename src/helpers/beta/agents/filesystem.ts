@@ -84,12 +84,12 @@ function selectedAgentFile({
   });
 }
 
-/** Beta, Node.js: select a regular local file for a lazy Files API upload. */
+/** Beta, Node.js: select an application-owned file in a stable directory for a lazy upload. */
 export async function agentFile(path: string): Promise<StreamingFile & { size: number }> {
   return selectedAgentFile(await checkedPath(path));
 }
 
-/** Beta, Node.js: prepare explicitly selected relative files from a directory once. */
+/** Beta, Node.js: prepare explicit files from a stable application-owned directory once. */
 export async function prepareAgentDirectory(
   resource: Files,
   directory: string,
