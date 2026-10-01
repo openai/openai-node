@@ -1,4 +1,6 @@
 import { constants } from 'node:fs';
+import type { Stats } from 'node:fs';
+import type { WritableStream as AgentWritableStream } from '../../../internal/shim-types';
 import { lstat, open, realpath } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
 import nodePath from 'node:path';
@@ -9,25 +11,43 @@ import type { RequestOptions } from '../../../internal/request-options';
 import type { Files } from '../../../resources/beta/agents/environments/files';
 import type { PreparedAgentFiles } from '../../../lib/beta/agents/files';
 
-async function checkedPath(path: string, boundary?: string): Promise<string> {
+async function checkedPath(path: string, boundary?: string): Promise<{ path: string; info: Stats }> {
   const absolute = nodePath.resolve(path);
   const root = boundary ?? nodePath.dirname(absolute);
   let current = root;
+  let selected: Stats | undefined;
   for (const component of nodePath.relative(root, absolute).split(nodePath.sep)) {
     current = nodePath.join(current, component);
     // oxlint-disable-next-line no-await-in-loop -- Check each ancestor before following the next path component.
     const info = await lstat(current);
+    selected = info;
     if (info.isSymbolicLink()) {
       throw new OpenAIError('Agent file sources cannot contain symbolic links');
     }
   }
-  return realpath(absolute);
+  const resolved = await realpath(absolute);
+  const info = await lstat(resolved);
+  const relative = boundary ? nodePath.relative(boundary, resolved) : '';
+  if (
+    !selected ||
+    selected.dev !== info.dev ||
+    selected.ino !== info.ino ||
+    selected.size !== info.size ||
+    (boundary &&
+      (relative === '..' || relative.startsWith(`..${nodePath.sep}`) || nodePath.isAbsolute(relative)))
+  ) {
+    throw new OpenAIError('Selected agent file changed while resolving its path');
+  }
+  return { path: resolved, info: selected };
 }
 
-/** Beta, Node.js: select a regular local file for a lazy Files API upload. */
-export async function agentFile(path: string): Promise<StreamingFile & { size: number }> {
-  const absolute = await checkedPath(path);
-  const info = await lstat(absolute);
+function selectedAgentFile({
+  path: absolute,
+  info,
+}: {
+  path: string;
+  info: Stats;
+}): StreamingFile & { size: number } {
   if (!info.isFile()) {
     throw new OpenAIError('Agent file sources must be regular files');
   }
@@ -54,6 +74,11 @@ export async function agentFile(path: string): Promise<StreamingFile & { size: n
   });
 }
 
+/** Beta, Node.js: select a regular local file for a lazy Files API upload. */
+export async function agentFile(path: string): Promise<StreamingFile & { size: number }> {
+  return selectedAgentFile(await checkedPath(path));
+}
+
 /** Beta, Node.js: prepare explicitly selected relative files from a directory once. */
 export async function prepareAgentDirectory(
   resource: Files,
@@ -66,8 +91,7 @@ export async function prepareAgentDirectory(
   if (include.length > 50) {
     throw new OpenAIError('A hosted environment accepts at most 50 initial files');
   }
-  const root = await checkedPath(directory);
-  const rootInfo = await lstat(root);
+  const { path: root, info: rootInfo } = await checkedPath(directory);
   if (!rootInfo.isDirectory()) {
     throw new OpenAIError('Expected a directory');
   }
@@ -85,14 +109,13 @@ export async function prepareAgentDirectory(
     seen.add(relative);
     // oxlint-disable-next-line no-await-in-loop -- Prepare each explicitly selected source before any upload begins.
     const source = await checkedPath(nodePath.join(root, relative), root);
-    // oxlint-disable-next-line no-await-in-loop -- Preserve explicit file selection order before upload.
-    selected[`${destination}/${relative}`] = await agentFile(source);
+    selected[`${destination}/${relative}`] = selectedAgentFile(source);
   }
   return resource.prepare(selected, options);
 }
 
 /** Beta, Node.js: a chosen local destination, opened only when a download writes or completes. */
-export function agentFileDestination(path: string): WritableStream<Uint8Array> {
+export function agentFileDestination(path: string): AgentWritableStream<Uint8Array> {
   const absolute = nodePath.resolve(path);
   let handle: FileHandle | undefined;
   const close = async () => {

@@ -35,6 +35,7 @@ export function validateAgentFilePath(path: string): void {
   const root = parts[2] ?? '';
   if (
     !path.startsWith('/workspace/') ||
+    [...path].length > 4096 ||
     path.includes('\\') ||
     path.includes('\0') ||
     parts.slice(1).some((part) => part === '' || part === '.' || part === '..') ||
@@ -47,17 +48,12 @@ export function validateAgentFilePath(path: string): void {
   }
 }
 
-function preflight(
-  client: OpenAI,
-  files: Record<string, Uploadable>,
-  options?: RequestOptions,
-): [string, Uploadable][] {
+function preflight(files: Record<string, Uploadable>, options: RequestOptions): [string, Uploadable][] {
   const entries = Object.entries(files);
   if (entries.length > 50) {
     throw new OpenAIError('A hosted environment accepts at most 50 initial files');
   }
-  // Internal SDK read: guard the effective wire key, including client defaults and request omissions.
-  const headers = buildHeaders([client['_options'].defaultHeaders, options?.headers]);
+  const headers = buildHeaders([options.headers]);
   if (
     entries.length > 1 &&
     (headers.values.has('idempotency-key') ||
@@ -93,12 +89,20 @@ export async function prepareAgentFiles(
   files: Record<string, Uploadable>,
   options?: RequestOptions,
 ): Promise<PreparedAgentFiles> {
-  const entries = preflight(client, files, options);
+  const requestOptions = { ...options };
+  // Internal SDK read: capture effective headers once, including defaults and explicit omissions.
+  const headers = buildHeaders([client['_options'].defaultHeaders, requestOptions.headers]);
+  requestOptions.headers = headers;
+  const entries = preflight(files, requestOptions);
+  if (entries.length > 1) {
+    // Keep a later mutation of client defaults from adding one key to this entire batch.
+    headers.nulls.add('idempotency-key');
+  }
   const prepared: PreparedAgentFiles = { files: [], uploadedFiles: [] };
   try {
     for (const [path, file] of entries) {
       // oxlint-disable-next-line no-await-in-loop -- Stop on the first failure and expose precisely the uploads already created.
-      const uploaded = await client.files.create({ file, purpose: 'user_data' }, options);
+      const uploaded = await client.files.create({ file, purpose: 'user_data' }, requestOptions);
       prepared.uploadedFiles.push(uploaded);
       prepared.files.push({ type: 'file_id', file_id: uploaded.id, path });
     }

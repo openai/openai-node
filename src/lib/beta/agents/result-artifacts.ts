@@ -1,3 +1,4 @@
+import type { WritableStream } from '../../../internal/shim-types';
 import { agentItems } from './pages';
 import { OpenAIError } from '../../../core/error';
 import type { RequestOptions } from '../../../internal/request-options';

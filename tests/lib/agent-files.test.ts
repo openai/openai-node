@@ -1,3 +1,4 @@
+import * as fsPromises from 'node:fs/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -11,6 +12,12 @@ import {
   prepareAgentDirectory,
 } from 'openai/helpers/beta/agents/filesystem';
 import type { Turn } from 'openai/resources/beta/agents/sessions/turns';
+
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Keep real filesystem I/O while deterministically testing an identity change during path resolution.
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof fsPromises>();
+  return { ...actual, realpath: vi.fn(actual.realpath) };
+});
 
 function fileTransport({
   failUpload = 0,
@@ -168,6 +175,7 @@ describe('beta agent file preparation', () => {
     '/workspace/a//b',
     '/workspace/.codex/config',
     '/workspace/outputs',
+    `/workspace/${'a'.repeat(4096)}`,
   ])('rejects invalid destination before uploading: %s', async (path) => {
     const { client, requests } = fileTransport();
     await expect(
@@ -199,6 +207,37 @@ describe('beta agent file preparation', () => {
     expect(requests).toHaveLength(0);
     await client.beta.agents.environments.files.prepare(files, { headers: { 'Idempotency-Key': null } });
     expect(requests).toHaveLength(2);
+    expect(requests.every((request) => !request.headers.has('idempotency-key'))).toBe(true);
+  });
+  test('uses the validated header snapshot throughout a batch', async () => {
+    const { client, requests } = fileTransport();
+    const headers = new Headers({ 'X-Trace-Test': 'original' });
+    const prepared = client.beta.agents.environments.files.prepare(
+      { '/workspace/a': new File(['a'], 'a'), '/workspace/b': new File(['b'], 'b') },
+      { headers },
+    );
+    headers.set('Idempotency-Key', 'later-key');
+    headers.set('X-Trace-Test', 'changed');
+    await prepared;
+    expect(requests).toHaveLength(2);
+    expect(requests.every((request) => !request.headers.has('idempotency-key'))).toBe(true);
+    expect(requests.every((request) => request.headers.get('x-trace-test') === 'original')).toBe(true);
+  });
+  test('reads accessor-backed batch headers only once', async () => {
+    const { client, requests } = fileTransport();
+    const read = vi
+      .fn()
+      .mockReturnValueOnce({ 'X-Trace-Test': 'original' })
+      .mockReturnValue({ 'Idempotency-Key': 'later' });
+    await client.beta.agents.environments.files.prepare(
+      { '/workspace/a': new File(['a'], 'a'), '/workspace/b': new File(['b'], 'b') },
+      {
+        get headers() {
+          return read();
+        },
+      },
+    );
+    expect(read).toHaveBeenCalledOnce();
     expect(requests.every((request) => !request.headers.has('idempotency-key'))).toBe(true);
   });
   test('exposes partial uploads without deleting them on later failure', async () => {
@@ -274,6 +313,19 @@ describe('beta agent file preparation', () => {
       }),
     ).rejects.toThrow('symbolic');
     expect(bad.requests).toHaveLength(0);
+  });
+  test('rejects a resolved file whose identity differs from the checked selection', async () => {
+    const root = await directory();
+    const selected = nodePath.join(root, 'selected.txt');
+    const other = nodePath.join(root, 'other.txt');
+    await writeFile(selected, 'selected');
+    await writeFile(other, 'other');
+    const resolution = vi.spyOn(fsPromises, 'realpath').mockResolvedValueOnce(other);
+    try {
+      await expect(agentFile(selected)).rejects.toThrow('changed while resolving');
+    } finally {
+      resolution.mockRestore();
+    }
   });
   test('a selected local file that changes identity before upload is not read', async () => {
     const root = await directory();
