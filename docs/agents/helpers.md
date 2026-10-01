@@ -130,3 +130,58 @@ that schema. `standardAgentTextFormat` from
 validators; `agentOutputFormat(schema, parse)` supports other validators.
 `output_parsed` contains the first parsed final text part; every final text part is validated.
 `AgentOutputParseError.raw_result` preserves completed raw output if parsing fails.
+
+### Stage files and download a report (beta)
+
+```ts
+import { agentFileDestination, prepareAgentDirectory } from 'openai/helpers/beta/agents/filesystem';
+
+const files = client.beta.agents.environments.files;
+const prepared = await prepareAgentDirectory(files, './documents', {
+  include: ['source.pdf', 'notes.txt'],
+  to: '/workspace/documents',
+});
+const stream = await client.beta.agents.sessions.create({
+  agent: { model: 'gpt-6-astra' },
+  environment: { type: 'openai_hosted', files: prepared.files },
+  input: 'Read the documents and write /workspace/outputs/report.md.',
+  stream: true,
+});
+const result = await stream.finalResult();
+await client.beta.agents.sessions.artifacts.forResult(result).download({
+  path: '/workspace/outputs/report.md',
+  to: agentFileDestination('./report.md'),
+});
+```
+
+To read the report into memory, use the native response:
+
+```ts
+const report = client.beta.agents.sessions.artifacts.forResult(result);
+const bytes = await (await report.content('/workspace/outputs/report.md')).arrayBuffer();
+```
+
+`agentFileDestination` assumes an application-owned safe path whose parent directory
+stays stable during the download. To control file opening yourself, pass your own
+`WritableStream` to `download` instead.
+
+For a connected environment, stage another file directly:
+
+```ts
+import { agentFile } from 'openai/helpers/beta/agents/filesystem';
+
+await files.upload(environmentId, {
+  file: await agentFile('./extra.txt'),
+  path: '/workspace/extra.txt',
+});
+```
+
+For existing upload inputs, call `files.prepare({ '/workspace/source.pdf': file })`.
+Downloads also accept ordinary web `WritableStream` destinations. Uploaded files
+remain caller-owned: `prepared.uploadedFiles` and `AgentFileUploadError.uploadedFiles`
+expose them for explicit Files API cleanup. Directory preparation stages only the
+selected files once; it does not synchronize a directory.
+
+Local path and directory uploads assume application-owned paths and stable source
+directories. They are convenience helpers, not a filesystem sandbox; file contents
+may be user-provided.
