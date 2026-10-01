@@ -181,7 +181,6 @@ describe('beta agent file preparation', () => {
     '/workspace/a//b',
     '/workspace/.codex/config',
     '/workspace/outputs',
-    `/workspace/${'a'.repeat(4096)}`,
   ])('rejects invalid destination before uploading: %s', async (path) => {
     const { client, requests } = fileTransport();
     await expect(
@@ -189,57 +188,70 @@ describe('beta agent file preparation', () => {
     ).rejects.toThrow('absolute file path');
     expect(requests).toHaveLength(0);
   });
-  test('preflights path conflicts, file count, individual and aggregate sizes, and shared retry keys', async () => {
+  test('preflights conflicting destinations and shared retry keys', async () => {
     const { client, requests } = fileTransport();
     const file = new File(['a'], 'a');
-    const large = Object.defineProperty(new File(['x'], 'large'), 'size', { value: 51 * 1024 * 1024 });
-    const medium = Object.defineProperty(new File(['x'], 'medium'), 'size', { value: 30 * 1024 * 1024 });
     const prepare = client.beta.agents.environments.files.prepare.bind(client.beta.agents.environments.files);
     await expect(prepare({ '/workspace/a': file, '/workspace/a/b': file })).rejects.toThrow('conflict');
-    await expect(
-      prepare(Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`/workspace/${i}`, file]))),
-    ).rejects.toThrow('50 initial');
-    await expect(prepare({ '/workspace/large': large })).rejects.toThrow('50 MiB');
-    await expect(prepare({ '/workspace/a': medium, '/workspace/b': medium })).rejects.toThrow('aggregate');
     await expect(
       prepare({ '/workspace/a': file, '/workspace/b': file }, { headers: { 'IDEMPOTENCY-KEY': 'same' } }),
     ).rejects.toThrow('Idempotency-Key');
     expect(requests).toHaveLength(0);
   });
-  test('retains an oversized streamed upload without staging it', async () => {
-    const { client, requests, staged } = fileTransport({ uploadedSizes: [50 * 1024 * 1024 + 1] });
-    const failure = await client.beta.agents.environments.files
-      .upload('env_test', { file: new Response('streamed contents'), path: '/workspace/a' })
-      .catch((error: unknown) => error);
-    expect(failure).toBeInstanceOf(AgentFileUploadError);
-    if (!(failure instanceof AgentFileUploadError)) {
-      throw new Error('Expected upload error');
-    }
-    expect(failure.cause).toEqual(
-      expect.objectContaining({ message: 'Agent file exceeds the 50 MiB limit' }),
+  test.each([() => 1, 51 * 1024 * 1024])(
+    'accepts upload streams with unrelated size members: %s',
+    async (size) => {
+      const { client, uploaded } = fileTransport();
+      const stream = {
+        size,
+        async *[Symbol.asyncIterator]() {
+          yield new TextEncoder().encode('streamed contents');
+        },
+      };
+      const prepared = await client.beta.agents.environments.files.prepare({ '/workspace/a': stream });
+      expect(prepared.files).toEqual([{ type: 'file_id', file_id: 'file_1', path: '/workspace/a' }]);
+      expect(uploaded).toEqual(['streamed contents']);
+    },
+  );
+  test('leaves file-count and aggregate-size policy to the API', async () => {
+    const { client, requests } = fileTransport({
+      uploadedSizes: Array.from({ length: 51 }, () => 30 * 1024 * 1024),
+    });
+    const files = Object.fromEntries(
+      Array.from({ length: 51 }, (_, i) => [`/workspace/${i}`, new File(['a'], 'a')]),
     );
-    expect(failure.uploadedFiles.map((file) => file.id)).toEqual(['file_1']);
-    expect(requests).toHaveLength(1);
-    expect(staged).toHaveLength(0);
+    const prepared = await client.beta.agents.environments.files.prepare(files);
+    expect(prepared.files).toHaveLength(51);
+    expect(prepared.uploadedFiles).toHaveLength(51);
+    expect(requests).toHaveLength(51);
   });
-  test('checks the returned aggregate size and retains every created upload', async () => {
-    const { client, requests } = fileTransport({ uploadedSizes: [30 * 1024 * 1024, 30 * 1024 * 1024] });
+  test('submits long destinations and retains the API rejection with uploaded file ownership', async () => {
+    const { client, requests, staged } = fileTransport({
+      uploadedSizes: [51 * 1024 * 1024],
+      failStage: true,
+    });
+    const path = `/workspace/${'a'.repeat(4096)}`;
     const failure = await client.beta.agents.environments.files
-      .prepare({
-        '/workspace/a': new Response('a'),
-        '/workspace/b': new Response('b'),
-        '/workspace/c': new Response('c'),
-      })
+      .upload('env_test', { file: new Response('streamed contents'), path })
       .catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(AgentFileUploadError);
     if (!(failure instanceof AgentFileUploadError)) {
       throw new Error('Expected upload error');
     }
-    expect(failure.cause).toEqual(
-      expect.objectContaining({ message: 'Initial agent files exceed the 50 MiB aggregate limit' }),
-    );
-    expect(failure.uploadedFiles.map((file) => file.id)).toEqual(['file_1', 'file_2']);
+    expect(failure.cause).toBeInstanceOf(APIError);
+    expect(failure.cause).toEqual(expect.objectContaining({ status: 400 }));
+    expect(failure.uploadedFiles.map((file) => file.id)).toEqual(['file_1']);
     expect(requests).toHaveLength(2);
+    expect(staged).toEqual([{ type: 'file_id', file_id: 'file_1', path }]);
+  });
+  test('prepares directory selections without a local file-count limit', async () => {
+    const root = await directory();
+    const include = Array.from({ length: 51 }, (_, i) => `${i}.txt`);
+    await Promise.all(include.map((name) => writeFile(nodePath.join(root, name), 'a')));
+    const { client, uploaded } = fileTransport();
+    const prepared = await prepareAgentDirectory(client.beta.agents.environments.files, root, { include });
+    expect(prepared.files).toHaveLength(51);
+    expect(uploaded).toHaveLength(51);
   });
   test('rejects inherited batch keys but honors an explicit request omission', async () => {
     const { client, requests } = fileTransport({ defaultKey: 'default-key' });

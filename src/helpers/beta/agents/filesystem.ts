@@ -98,9 +98,6 @@ export async function prepareAgentDirectory(
 ): Promise<PreparedAgentFiles> {
   const include = [...params.include];
   const destination = params.to ?? '/workspace';
-  if (include.length > 50) {
-    throw new OpenAIError('A hosted environment accepts at most 50 initial files');
-  }
   const { path: root, info: rootInfo } = await checkedPath(directory);
   if (!rootInfo.isDirectory()) {
     throw new OpenAIError('Expected a directory');
