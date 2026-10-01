@@ -1,0 +1,400 @@
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import nodePath from 'node:path';
+import OpenAI from 'openai';
+import { AgentFileUploadError } from 'openai/lib/beta/agents/files';
+import { AgentTurnResult } from 'openai/lib/beta/agents/agent-turn-result';
+import {
+  agentFile,
+  agentFileDestination,
+  prepareAgentDirectory,
+} from 'openai/helpers/beta/agents/filesystem';
+import type { Turn } from 'openai/resources/beta/agents/sessions/turns';
+
+function fileTransport({
+  failUpload = 0,
+  failStage = false,
+  defaultKey,
+}: { failUpload?: number; failStage?: boolean; defaultKey?: string } = {}) {
+  const requests: Request[] = [];
+  const uploaded: string[] = [];
+  const staged: unknown[] = [];
+  const client = new OpenAI({
+    apiKey: 'synthetic',
+    maxRetries: 0,
+    defaultHeaders: defaultKey ? { 'Idempotency-Key': defaultKey } : undefined,
+    fetch: async (url, init) => {
+      if (String(url) === 'data:,') {
+        return new Response('');
+      }
+      const request = new Request(url, init);
+      requests.push(request);
+      if (new URL(request.url).pathname === '/v1/files') {
+        const data = await request.formData();
+        const value = data.get('file');
+        if (!value || typeof value === 'string') {
+          throw new Error('Missing upload');
+        }
+        uploaded.push(await value.text());
+        expect(data.get('purpose')).toBe('user_data');
+        if (uploaded.length === failUpload) {
+          return Response.json({ error: { message: 'Synthetic upload failure' } }, { status: 400 });
+        }
+        return Response.json({
+          id: `file_${uploaded.length}`,
+          object: 'file',
+          filename: value.name,
+          bytes: value.size,
+          purpose: 'user_data',
+        });
+      }
+      const body = await request.json();
+      if (!body || typeof body !== 'object' || !('path' in body)) {
+        throw new Error('Missing stage path');
+      }
+      staged.push(body);
+      if (failStage) {
+        return Response.json({ error: { message: 'Synthetic stage failure' } }, { status: 400 });
+      }
+      return Response.json({
+        object: 'agent.environment.file',
+        environment_id: 'env_test',
+        path: body.path,
+        size_bytes: 1,
+      });
+    },
+  });
+  return { client, requests, uploaded, staged };
+}
+
+const turn: Turn = {
+  id: 'turn_test',
+  session_id: 'session_test',
+  agent_id: 'agent_test',
+  object: 'agent.session.turn',
+  status: 'completed',
+  subagent_id: null,
+  created_at: 1,
+  started_at: 1,
+  completed_at: 2,
+  error: null,
+  usage: null,
+};
+const artifact = {
+  id: 'artifact_exact',
+  object: 'agent.session.artifact',
+  session_id: turn.session_id,
+  turn_id: turn.id,
+  path: '/workspace/outputs/report.md',
+  size_bytes: 6,
+  created_at: 2,
+  environment_id: 'env_test',
+};
+function artifactTransport(mode: 'found' | 'missing' | 'ambiguous' = 'found') {
+  const requests: Request[] = [];
+  const client = new OpenAI({
+    apiKey: 'synthetic',
+    maxRetries: 0,
+    fetch: async (url, init) => {
+      const req = new Request(url, init);
+      requests.push(req);
+      const parsed = new URL(req.url);
+      if (parsed.pathname.endsWith('/content')) {
+        expect(parsed.pathname).toContain('/artifact_exact/content');
+        let index = 0;
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              if (index < 2) {
+                controller.enqueue(new TextEncoder().encode(index === 0 ? 'one' : 'two'));
+                index += 1;
+              } else {
+                controller.close();
+              }
+            },
+          }),
+        );
+      }
+      if (!parsed.searchParams.has('after')) {
+        return Response.json({
+          object: 'list',
+          data: [{ ...artifact, id: 'artifact_old', turn_id: 'turn_old' }],
+          has_more: true,
+          last_id: 'artifact_old',
+        });
+      }
+      let data = [artifact];
+      if (mode === 'missing') {
+        data = [];
+      }
+      if (mode === 'ambiguous') {
+        data.push({ ...artifact, id: 'artifact_duplicate' });
+      }
+      return Response.json({ object: 'list', data, has_more: false });
+    },
+  });
+  return { client, requests };
+}
+
+const directories: string[] = [];
+async function directory() {
+  const path = await mkdtemp(nodePath.join(tmpdir(), 'agent-files-'));
+  directories.push(path);
+  return path;
+}
+afterEach(async () => {
+  await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+});
+
+describe('beta agent file preparation', () => {
+  test('prepares ordinary Files inputs and exposes owned uploads', async () => {
+    const { client, requests, uploaded } = fileTransport();
+    const prepared = await client.beta.agents.environments.files.prepare(
+      { '/workspace/a.txt': new File(['a'], 'a.txt'), '/workspace/b.txt': new File(['b'], 'b.txt') },
+      { headers: { 'X-Trace-Test': 'kept' } },
+    );
+    expect(prepared.files).toEqual([
+      { type: 'file_id', file_id: 'file_1', path: '/workspace/a.txt' },
+      { type: 'file_id', file_id: 'file_2', path: '/workspace/b.txt' },
+    ]);
+    expect(prepared.uploadedFiles.map((file) => file.id)).toEqual(['file_1', 'file_2']);
+    expect(uploaded).toEqual(['a', 'b']);
+    expect(requests.every((req) => req.headers.get('x-trace-test') === 'kept')).toBe(true);
+  });
+  test.each([
+    '/etc/secret',
+    '/workspace/../secret',
+    '/workspace/a//b',
+    '/workspace/.codex/config',
+    '/workspace/outputs',
+  ])('rejects invalid destination before uploading: %s', async (path) => {
+    const { client, requests } = fileTransport();
+    await expect(
+      client.beta.agents.environments.files.prepare({ [path]: new File(['a'], 'a') }),
+    ).rejects.toThrow('absolute file path');
+    expect(requests).toHaveLength(0);
+  });
+  test('preflights path conflicts, file count, individual and aggregate sizes, and shared retry keys', async () => {
+    const { client, requests } = fileTransport();
+    const file = new File(['a'], 'a');
+    const large = Object.defineProperty(new File(['x'], 'large'), 'size', { value: 51 * 1024 * 1024 });
+    const medium = Object.defineProperty(new File(['x'], 'medium'), 'size', { value: 30 * 1024 * 1024 });
+    const prepare = client.beta.agents.environments.files.prepare.bind(client.beta.agents.environments.files);
+    await expect(prepare({ '/workspace/a': file, '/workspace/a/b': file })).rejects.toThrow('conflict');
+    await expect(
+      prepare(Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`/workspace/${i}`, file]))),
+    ).rejects.toThrow('50 initial');
+    await expect(prepare({ '/workspace/large': large })).rejects.toThrow('50 MiB');
+    await expect(prepare({ '/workspace/a': medium, '/workspace/b': medium })).rejects.toThrow('aggregate');
+    await expect(
+      prepare({ '/workspace/a': file, '/workspace/b': file }, { headers: { 'IDEMPOTENCY-KEY': 'same' } }),
+    ).rejects.toThrow('Idempotency-Key');
+    expect(requests).toHaveLength(0);
+  });
+  test('rejects inherited batch keys but honors an explicit request omission', async () => {
+    const { client, requests } = fileTransport({ defaultKey: 'default-key' });
+    const files = { '/workspace/a': new File(['a'], 'a'), '/workspace/b': new File(['b'], 'b') };
+    await expect(client.beta.agents.environments.files.prepare(files)).rejects.toThrow('Idempotency-Key');
+    expect(requests).toHaveLength(0);
+    await client.beta.agents.environments.files.prepare(files, { headers: { 'Idempotency-Key': null } });
+    expect(requests).toHaveLength(2);
+    expect(requests.every((request) => !request.headers.has('idempotency-key'))).toBe(true);
+  });
+  test('exposes partial uploads without deleting them on later failure', async () => {
+    const { client, requests } = fileTransport({ failUpload: 2 });
+    const failure = await client.beta.agents.environments.files
+      .prepare({ '/workspace/a': new File(['a'], 'a'), '/workspace/b': new File(['b'], 'b') })
+      .catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(AgentFileUploadError);
+    if (!(failure instanceof AgentFileUploadError)) {
+      throw new Error('Expected partial upload error');
+    }
+    expect(failure.uploadedFiles.map((file) => file.id)).toEqual(['file_1']);
+    expect(requests.every((req) => req.method === 'POST')).toBe(true);
+  });
+  test('uploads then stages on the live environment, preserving options and file ownership', async () => {
+    const { client, requests, staged } = fileTransport();
+    const result = await client.beta.agents.environments.files.upload(
+      'env_test',
+      { file: new File(['a'], 'a'), path: '/workspace/a' },
+      { headers: { 'X-Trace-Test': 'kept', 'Idempotency-Key': 'single' } },
+    );
+    expect(result.uploadedFile.id).toBe('file_1');
+    expect(staged).toEqual([{ type: 'file_id', file_id: 'file_1', path: '/workspace/a' }]);
+    expect(requests.every((req) => req.headers.get('x-trace-test') === 'kept')).toBe(true);
+    const failed = fileTransport({ failStage: true });
+    await expect(
+      failed.client.beta.agents.environments.files.upload('env_test', {
+        file: new File(['a'], 'a'),
+        path: '/workspace/a',
+      }),
+    ).rejects.toMatchObject({ uploadedFiles: [{ id: 'file_1' }] });
+  });
+  test('directory selection uploads only explicit files and rejects links before any upload', async () => {
+    const root = await directory();
+    await writeFile(nodePath.join(root, 'selected.txt'), 'selected');
+    await writeFile(nodePath.join(root, 'private.txt'), 'unselected');
+    const good = fileTransport();
+    await prepareAgentDirectory(good.client.beta.agents.environments.files, root, {
+      include: ['selected.txt'],
+      to: '/workspace/docs',
+    });
+    expect(good.uploaded).toEqual(['selected']);
+    await symlink(nodePath.join(root, 'private.txt'), nodePath.join(root, 'linked.txt'));
+    const bad = fileTransport();
+    await expect(
+      prepareAgentDirectory(bad.client.beta.agents.environments.files, root, {
+        include: ['selected.txt', 'linked.txt'],
+      }),
+    ).rejects.toThrow('symbolic');
+    expect(bad.requests).toHaveLength(0);
+  });
+  test('allows normal ancestor aliases but rejects a selected root or nested entry symlink', async () => {
+    const root = await directory();
+    await mkdir(nodePath.join(root, 'physical', 'documents'), { recursive: true });
+    await writeFile(nodePath.join(root, 'physical', 'documents', 'source.txt'), 'source');
+    await symlink(nodePath.join(root, 'physical'), nodePath.join(root, 'alias'), 'dir');
+    const good = fileTransport();
+    await prepareAgentDirectory(
+      good.client.beta.agents.environments.files,
+      nodePath.join(root, 'alias', 'documents'),
+      { include: ['source.txt'] },
+    );
+    expect(good.uploaded).toEqual(['source']);
+    const bad = fileTransport();
+    await expect(
+      prepareAgentDirectory(bad.client.beta.agents.environments.files, nodePath.join(root, 'alias'), {
+        include: ['documents/source.txt'],
+      }),
+    ).rejects.toThrow('symbolic');
+    await expect(
+      prepareAgentDirectory(bad.client.beta.agents.environments.files, root, {
+        include: ['alias/documents/source.txt'],
+      }),
+    ).rejects.toThrow('symbolic');
+    expect(bad.requests).toHaveLength(0);
+  });
+  test('a selected local file that changes identity before upload is not read', async () => {
+    const root = await directory();
+    const path = nodePath.join(root, 'source.txt');
+    await writeFile(path, 'original');
+    const source = await agentFile(path);
+    await writeFile(path, 'changed-size');
+    const { client } = fileTransport();
+    await expect(
+      client.beta.agents.environments.files.prepare({ '/workspace/source.txt': source }),
+    ).rejects.toBeInstanceOf(AgentFileUploadError);
+  });
+});
+
+describe('beta result artifacts', () => {
+  test('binds identity once, paginates, and streams the exact artifact to the chosen destination', async () => {
+    const { client, requests } = artifactTransport();
+    const result = new AgentTurnResult({ ...turn }, []);
+    const scoped = client.beta.agents.sessions.artifacts.forResult(result);
+    expect(requests).toHaveLength(0);
+    result.turn.id = 'mutated';
+    const chunks: string[] = [];
+    const downloaded = await scoped.download(
+      {
+        path: artifact.path,
+        to: new WritableStream({
+          write(chunk) {
+            chunks.push(new TextDecoder().decode(chunk));
+          },
+        }),
+      },
+      { headers: { 'X-Trace-Test': 'kept' } },
+    );
+    expect(downloaded.id).toBe(artifact.id);
+    expect(chunks).toEqual(['one', 'two']);
+    expect(requests).toHaveLength(3);
+    expect(requests.every((req) => req.headers.get('x-trace-test') === 'kept')).toBe(true);
+  });
+  test.each(['missing', 'ambiguous'] as const)(
+    'fails %s selection before downloading or opening a local destination',
+    async (mode) => {
+      const { client, requests } = artifactTransport(mode);
+      const root = await directory();
+      const destination = nodePath.join(root, 'report.md');
+      await writeFile(destination, 'keep');
+      await expect(
+        client.beta.agents.sessions.artifacts
+          .forResult(new AgentTurnResult(turn, []))
+          .download({ path: artifact.path, to: agentFileDestination(destination) }),
+      ).rejects.toThrow(/artifact/u);
+      expect(await readFile(destination, 'utf-8')).toBe('keep');
+      expect(requests.some((req) => req.url.endsWith('/content'))).toBe(false);
+    },
+  );
+  test('writes to the caller local path without deriving any destination from hosted paths', async () => {
+    const { client } = artifactTransport();
+    const root = await directory();
+    const destination = nodePath.join(root, 'chosen.md');
+    await client.beta.agents.sessions.artifacts
+      .forResult(new AgentTurnResult(turn, []))
+      .download({ path: artifact.path, to: agentFileDestination(destination) });
+    expect(await readFile(destination, 'utf-8')).toBe('onetwo');
+  });
+  test('closes a content response when a locked destination cannot accept it', async () => {
+    const cancel = vi.fn();
+    const client = new OpenAI({
+      apiKey: 'synthetic',
+      maxRetries: 0,
+      fetch: async (url) => {
+        if (String(url).endsWith('/content')) {
+          return new Response(new ReadableStream({ cancel }));
+        }
+        return Response.json({ data: [artifact], has_more: false });
+      },
+    });
+    const destination = new WritableStream<Uint8Array>();
+    const writer = destination.getWriter();
+    try {
+      await expect(
+        client.beta.agents.sessions.artifacts
+          .forResult(new AgentTurnResult(turn, []))
+          .download({ path: artifact.path, to: destination }),
+      ).rejects.toThrow();
+      expect(cancel).toHaveBeenCalledOnce();
+    } finally {
+      writer.releaseLock();
+    }
+  });
+  test('a cancelled download aborts its sink and cancels the content stream', async () => {
+    const abort = new AbortController();
+    const cancel = vi.fn();
+    const sinkAbort = vi.fn();
+    const client = new OpenAI({
+      apiKey: 'synthetic',
+      maxRetries: 0,
+      fetch: async (url) => {
+        if (String(url).endsWith('/content')) {
+          return new Response(
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.enqueue(new Uint8Array([1]));
+              },
+              cancel,
+            }),
+          );
+        }
+        return Response.json({ data: [artifact], has_more: false });
+      },
+    });
+    const destination = new WritableStream<Uint8Array>({
+      write() {
+        abort.abort();
+      },
+      abort: sinkAbort,
+    });
+    await expect(
+      client.beta.agents.sessions.artifacts
+        .forResult(new AgentTurnResult(turn, []))
+        .download({ path: artifact.path, to: destination }, { signal: abort.signal }),
+    ).rejects.toThrow();
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(sinkAbort).toHaveBeenCalledOnce();
+  });
+});

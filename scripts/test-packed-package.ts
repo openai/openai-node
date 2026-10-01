@@ -100,6 +100,7 @@ const packedPackagePath = require('node:path');
     (source.startsWith('_vendor/zod-to-json-schema/') && !standaloneZodParsers.has(source)) ||
     source === 'helpers/zod.ts' ||
     source === 'helpers/beta/agents/zod.ts' ||
+    source === 'helpers/beta/agents/filesystem.ts' ||
     source === 'helpers/audio.ts' ||
     source === 'providers/bedrock/aws.ts' ||
     source === 'auth/x509-transport.ts' ||
