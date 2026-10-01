@@ -1,3 +1,4 @@
+import { OpenAIError } from '../../../core/error';
 import type { SessionCreateParams } from '../../../resources/beta/agents/sessions/sessions';
 import type { AgentTurnResult } from './agent-turn-result';
 import type { TextFormatParam } from '../../../resources/beta/agents/agents';
@@ -41,6 +42,11 @@ export function captureAgentOutput(body: SessionCreateParams) {
   const format = agentFormatParser(text?.format);
   if (!format) {
     return { body };
+  }
+  for (const envelope of [body, agent, text]) {
+    if (envelope && Object.getOwnPropertyDescriptor(envelope, 'toJSON')) {
+      throw new OpenAIError('Typed agent requests cannot customize body, agent, or text serialization');
+    }
   }
   return {
     body: {

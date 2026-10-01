@@ -800,4 +800,23 @@ describe('beta Agents typed output', () => {
       }
     }
   });
+  test.each(['body', 'agent', 'text'] as const)(
+    'rejects a custom %s serialization hook before typed dispatch',
+    (level) => {
+      const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+      const { client, requests } = setup([created(), message('{"summary":"unused"}'), completed(), idle()]);
+      const body = {
+        agent: { text: { format } },
+        environment: { type: 'none' as const },
+        input: 'Report',
+        stream: true as const,
+      };
+      const envelope = { body, agent: body.agent, text: body.agent.text }[level];
+      const hook = vi.fn(() => ({ agent: { text: { format: { type: 'text' } } } }));
+      Object.defineProperty(envelope, 'toJSON', { value: hook, enumerable: true });
+      expect(() => client.beta.agents.sessions.create(body)).toThrow('cannot customize');
+      expect(hook).not.toHaveBeenCalled();
+      expect(requests).toHaveLength(0);
+    },
+  );
 });
