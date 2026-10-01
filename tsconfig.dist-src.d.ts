@@ -21,7 +21,8 @@ declare global {
 
   interface BufferConstructor {
     from(input: string, encoding: 'base64' | 'utf-8'): Buffer<ArrayBuffer> & Uint8Array;
-    from(input: ArrayBuffer): Buffer<ArrayBuffer> & Uint8Array;
+    from(input: ArrayBuffer | ArrayLike<number>): Buffer<ArrayBuffer> & Uint8Array;
+    isBuffer(value: unknown): value is Buffer;
     concat(list: readonly Buffer[]): Buffer<ArrayBuffer> & Uint8Array;
   }
 
