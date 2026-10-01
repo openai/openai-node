@@ -34,6 +34,7 @@ function attachTransport(
     nullID?: boolean;
     paginated?: boolean;
     observed?: boolean;
+    reconciliation?: 'disjoint' | 'anchors' | 'observed-only';
     postFailure?: boolean;
     successor?: boolean;
     manualEnvironment?: boolean;
@@ -118,6 +119,22 @@ function attachTransport(
       }
       return;
     }
+    if (config.reconciliation) {
+      const indexes = config.reconciliation === 'anchors' ? [0, 2] : [1];
+      for (const index of indexes) {
+        send({
+          type: 'agent.session.turn.item.done',
+          event_id: `observed_${index}`,
+          turn_id: turn.id,
+          output_index: index,
+          item: {
+            ...history,
+            id: `message_${index}`,
+            content: [{ type: 'output_text', text: ['First', 'Second', 'Third'][index], annotations: [] }],
+          },
+        });
+      }
+    }
     if (config.observed) {
       send({
         type: 'agent.session.turn.item.done',
@@ -184,6 +201,28 @@ function attachTransport(
       if (path.endsWith('/items')) {
         if (config.historyFailure) {
           return Response.json({ error: { message: 'History read failed' } }, { status: 500 });
+        }
+        if (config.reconciliation) {
+          const indexes = config.reconciliation === 'anchors' ? [0, 1, 2] : [];
+          if (config.reconciliation === 'disjoint') {
+            indexes.push(0);
+          }
+          return Response.json({
+            object: 'list',
+            has_more: false,
+            data: [
+              ...Array.from({ length: 5 }, (_, index) => ({
+                ...history,
+                id: `old_${index}`,
+                turn_id: 'turn_old',
+              })),
+              ...indexes.map((index) => ({
+                ...history,
+                id: `message_${index}`,
+                content: [{ type: 'output_text', text: ['First', 'Second', 'Third'][index] }],
+              })),
+            ],
+          });
         }
         if (config.multipleMessages) {
           const messages = ['First', 'Second'].map((text, index) => ({
@@ -351,6 +390,21 @@ describe('beta agents stream attachment', () => {
     });
     expect(await stream.finalResult()).toBe(result);
   });
+  test.each([
+    ['disjoint', 'FirstSecond'],
+    ['anchors', 'FirstSecondThird'],
+    ['observed-only', 'Second'],
+  ] as const)(
+    'merges %s history and live output without mixing index domains',
+    async (reconciliation, expected) => {
+      const { client } = attachTransport({ reconciliation });
+      const result = await client.beta.agents.sessions
+        .stream(turn.session_id, { toolHandlers: { lookup: () => 'found' } })
+        .finalResult();
+      expect(result.output_text).toBe(expected);
+      expect(new Set(result.messages.map((message) => message.id)).size).toBe(result.messages.length);
+    },
+  );
   test('does not silently discard a historical final message with a missing identity', async () => {
     const { client } = attachTransport({ race: true, nullID: true });
     await expect(client.beta.agents.sessions.stream(turn.session_id).finalResult()).rejects.toBeInstanceOf(

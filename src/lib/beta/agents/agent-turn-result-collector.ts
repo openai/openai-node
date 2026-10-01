@@ -15,7 +15,10 @@ import { AgentTurnResultError } from './agent-turn-result-error';
 export class AgentTurnResultCollector {
   #sessionID: string | undefined;
   #turn: Turn | undefined;
-  #messages = new Map<string, { index: number; message: AgentSessionAssistantMessage }>();
+  #messages = new Map<
+    string,
+    { index: number | undefined; historyIndex?: number; message: AgentSessionAssistantMessage }
+  >();
   #requiredActions: AgentSession['required_actions'] = [];
   #sessionFailed = false;
   #terminal = false;
@@ -62,14 +65,14 @@ export class AgentTurnResultCollector {
     if (item.id === null || item.content.some((part) => part.type !== 'output_text')) {
       throw this.error('observation');
     }
-    const observed = this.#messages.get(item.id)?.message;
-    const message: AgentSessionAssistantMessage = observed ?? {
+    const observed = this.#messages.get(item.id);
+    const message: AgentSessionAssistantMessage = observed?.message ?? {
       ...item,
       id: item.id,
       role: 'assistant',
       content: item.content.flatMap((part) => (part.type === 'output_text' ? [{ ...part }] : [])),
     };
-    this.#messages.set(item.id, { index, message });
+    this.#messages.set(item.id, { index: observed?.index, historyIndex: index, message });
   }
 
   accept(event: AgentSessionEvent): void {
@@ -121,12 +124,35 @@ export class AgentTurnResultCollector {
   }
 
   #finalMessages(): AgentSessionAssistantMessage[] {
-    return (
-      [...this.#messages.values()]
-        // oxlint-disable-next-line unicorn/no-array-sort -- Sort a fresh array; ES2020 declarations do not include toSorted.
-        .sort((a, b) => a.index - b.index)
-        .map(({ message }) => message)
-    );
+    const entries = [...this.#messages.values()];
+    // History positions span the session; SSE output indexes belong to one turn.
+    // Merge their relative orders at shared message IDs instead of comparing indexes.
+    /* oxlint-disable unicorn/no-array-sort -- Sort fresh arrays; ES2020 has no toSorted. */
+    const observed = entries
+      .filter((entry): entry is typeof entry & { index: number } => entry.index !== undefined)
+      .sort((a, b) => a.index - b.index);
+    const history = entries
+      .filter((entry): entry is typeof entry & { historyIndex: number } => entry.historyIndex !== undefined)
+      .sort((a, b) => a.historyIndex - b.historyIndex);
+    /* oxlint-enable unicorn/no-array-sort */
+    const merged = new Map<string, AgentSessionAssistantMessage>();
+    let cursor = 0;
+    for (const entry of history) {
+      // Unanchored history precedes newly observed output; shared IDs preserve both orders.
+      while (entry.index !== undefined) {
+        const next = observed[cursor];
+        if (!next || next.index > entry.index) {
+          break;
+        }
+        merged.set(next.message.id, next.message);
+        cursor += 1;
+      }
+      merged.set(entry.message.id, entry.message);
+    }
+    for (const { message } of observed.slice(cursor)) {
+      merged.set(message.id, message);
+    }
+    return [...merged.values()];
   }
 
   error(reason: AgentTurnResultError['reason'], cause?: unknown): AgentTurnResultError {
