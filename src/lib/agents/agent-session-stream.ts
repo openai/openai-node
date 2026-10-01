@@ -1,5 +1,6 @@
+import type { AgentOutputFormat, AgentResult } from '../beta/agents/output-format-types';
 import { TurnState } from './turn-state';
-import type { AgentTurnResult } from '../beta/agents/agent-turn-result';
+import { agentFormatParser, parseAgentResultPromise } from '../beta/agents/parse-result';
 import { ResultCollection } from '../beta/agents/result-collection';
 import { APIUserAbortError, BadRequestError, OpenAIError } from '../../core/error';
 import type { Stream } from '../../core/streaming';
@@ -25,14 +26,16 @@ export type AgentToolHandler = (
 ) => AgentToolOutput | PromiseLike<AgentToolOutput>;
 
 /** Input and optional sequential tool handlers for one turn on an idle session. */
-export interface AgentSessionStreamParams {
+export type AgentSessionStreamParams<T = never> = {
+  /** Beta: parse this turn locally; does not change the existing session schema. */
+  outputFormat?: AgentOutputFormat<T>;
   /** User messages, or text normalized to a single user message. Must not be empty. */
   input: string | AgentSessionInputMessageParam[];
   /** Registered functions run after their call event is yielded; unknown functions remain manual. */
   toolHandlers?: Record<string, AgentToolHandler>;
   /** Key for the input submission only; request headers take precedence, case-insensitively. */
   idempotencyKey?: string;
-}
+} & ([T] extends [never] ? unknown : { outputFormat: AgentOutputFormat<T> });
 
 type ToolResult = AgentSessionInputParam.SessionInputParamAgentSessionInputToolResult;
 
@@ -84,10 +87,12 @@ async function cancelBody(response: Response | undefined): Promise<void> {
  * idempotency key. Breaking iteration or calling abort closes local requests;
  * neither cancels the backend turn. No work starts until iteration begins.
  */
-export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
+export class AgentSessionStream<T = never> implements AsyncIterable<AgentSessionEvent> {
   /** Aborts local requests and iteration without cancelling the backend turn. */
   readonly controller = new AbortController();
   #consumed = false;
+  #format: AgentOutputFormat<T> | undefined;
+  #parsedResult: Promise<AgentResult<T>> | undefined;
   #collection: ResultCollection;
   #stream: Stream<AgentSessionEvent> | undefined;
   #response: Response | undefined;
@@ -103,7 +108,7 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
   constructor(
     sessions: Sessions,
     sessionID: string,
-    params: AgentSessionStreamParams,
+    params: AgentSessionStreamParams<T>,
     options?: RequestOptions,
   ) {
     const input: AgentSessionInputMessageParam[] =
@@ -112,6 +117,10 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
         : params.input;
     if (params.input.length === 0) {
       throw new OpenAIError('input must not be empty');
+    }
+    this.#format = agentFormatParser<T>(params.outputFormat);
+    if (params.outputFormat && !this.#format) {
+      throw new OpenAIError('outputFormat must have its own parser function');
     }
     this.#sessions = sessions;
     this.#sessionID = sessionID;
@@ -160,8 +169,8 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
   }
 
   /** Beta: drain this turn, dispatch registered tools, and collect its final assistant messages. */
-  finalResult(): Promise<AgentTurnResult> {
-    return this.#collection.finalResult();
+  finalResult(): Promise<AgentResult<T>> {
+    return (this.#parsedResult ??= parseAgentResultPromise(this.#collection.finalResult(), this.#format));
   }
 
   async *#iterate(): AsyncGenerator<AgentSessionEvent> {
@@ -271,7 +280,7 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
     return error;
   }
 
-  async #wait<T>(action: () => T | PromiseLike<T>): Promise<T> {
+  async #wait<Value>(action: () => Value | PromiseLike<Value>): Promise<Value> {
     let onAbort: (() => void) | undefined;
     // oxlint-disable-next-line promise/avoid-new -- Bridge the caller's AbortSignal while a handler or registration delay is pending.
     const aborted = new Promise<never>((_resolve, reject) => {

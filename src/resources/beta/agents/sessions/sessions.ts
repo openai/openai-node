@@ -8,6 +8,8 @@ import {
   type AgentSessionCreateStream,
   withAgentTurnResult,
 } from '../../../../lib/beta/agents/agent-session-create-stream';
+import type { AgentOutputFormat } from '../../../../lib/beta/agents/output-format-types';
+import { captureAgentOutput } from '../../../../lib/beta/agents/parse-result';
 import { APIResource } from '../../../../core/resource';
 import * as SessionsAPI from './sessions';
 import * as AgentsAPI from '../agents';
@@ -156,7 +158,11 @@ function normalizeRequestOptionsForQuery(
 
 export class Sessions extends APIResource {
   /** Stream one turn on an idle session with a single input writer. See AgentSessionStream for lifecycle and tool handling. */
-  stream(sessionID: string, params: AgentSessionStreamParams, options?: RequestOptions): AgentSessionStream {
+  stream<T = never>(
+    sessionID: string,
+    params: AgentSessionStreamParams<T>,
+    options?: RequestOptions,
+  ): AgentSessionStream<T> {
     return new AgentSessionStream(this, sessionID, params, options);
   }
 
@@ -180,6 +186,10 @@ export class Sessions extends APIResource {
    *   });
    * ```
    */
+  create<T>(
+    body: SessionCreateParamsStreaming & { agent: { text: { format: AgentOutputFormat<T> } } },
+    options?: RequestOptions,
+  ): APIPromise<AgentSessionCreateStream<T>>;
   create(body: SessionCreateParamsNonStreaming, options?: RequestOptions): APIPromise<AgentsAPI.AgentSession>;
   create(body: SessionCreateParamsStreaming, options?: RequestOptions): APIPromise<AgentSessionCreateStream>;
   create(
@@ -190,20 +200,23 @@ export class Sessions extends APIResource {
     body: SessionCreateParams,
     options?: RequestOptions,
   ): APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream> {
+    const output = captureAgentOutput(body, options);
     return this._client
       .post<AgentsAPI.AgentSession | Stream<AgentsAPI.AgentSessionEvent>>(
         '/agents/sessions',
-        resolveResourceRequestOptions(options, (options) => ({
-          body,
+        resolveResourceRequestOptions(output.options, (options) => ({
+          body: output.body,
           ...options,
           headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-          stream: body.stream ?? false,
+          stream: output.body.stream ?? false,
           __security: { bearerAuth: true },
         })),
       )
       ._thenUnwrap((data, { options }) =>
         // SAFETY: defaultParseResponse uses this same resolved flag to return the configured stream instance.
-        options.stream ? withAgentTurnResult(data as Stream<AgentsAPI.AgentSessionEvent>) : data,
+        options.stream
+          ? withAgentTurnResult(data as Stream<AgentsAPI.AgentSessionEvent>, output.format)
+          : data,
       ) as APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream>;
   }
 
