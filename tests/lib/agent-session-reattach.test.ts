@@ -35,7 +35,11 @@ function attachTransport(
     paginated?: boolean;
     observed?: boolean;
     postFailure?: boolean;
-    missingHandler?: boolean;
+    successor?: boolean;
+    manualEnvironment?: boolean;
+    staleFunction?: boolean;
+    terminalStatus?: 'completed' | 'failed' | 'cancelled';
+    multipleMessages?: boolean;
   } = {},
 ) {
   const requests: Request[] = [];
@@ -54,24 +58,27 @@ function attachTransport(
     controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`));
   const currentTurn = () => ({
     ...turn,
-    status: finished ? 'completed' : 'waiting',
+    status: finished ? (config.terminalStatus ?? 'completed') : 'waiting',
     completed_at: finished ? 2 : null,
   });
-  const session = () => ({
-    id: turn.session_id,
-    status: finished ? 'idle' : 'requires_action',
-    required_actions: finished
-      ? []
+  const session = () => {
+    const required_actions = config.manualEnvironment
+      ? [{ type: 'environment_connection', environment_id: 'env_test' }]
       : [
           {
             type: 'function_call',
-            turn_id: turn.id,
+            turn_id: config.successor && finished ? 'turn_successor' : turn.id,
             call_id: 'call_lookup',
-            name: 'lookup',
+            name: config.staleFunction ? 'stale_unknown' : 'lookup',
             arguments: '{}',
           },
-        ],
-  });
+        ];
+    return {
+      id: turn.session_id,
+      status: finished && !config.successor ? 'idle' : 'requires_action',
+      required_actions: finished && !config.successor ? [] : required_actions,
+    };
+  };
   const complete = () => {
     finished = true;
     if (config.observed) {
@@ -124,6 +131,17 @@ function attachTransport(
         return Response.json(currentTurn());
       }
       if (path.endsWith('/items')) {
+        if (config.multipleMessages) {
+          const messages = ['First', 'Second'].map((text, index) => ({
+            ...history,
+            id: `message_${index}`,
+            content: [{ type: 'output_text', text }],
+          }));
+          if (new URL(req.url).searchParams.get('order') !== 'asc') {
+            messages.reverse();
+          }
+          return Response.json({ object: 'list', data: messages, has_more: false });
+        }
         const after = new URL(req.url).searchParams.get('after');
         if (config.paginated && !after) {
           return Response.json({
@@ -151,7 +169,7 @@ function attachTransport(
         if (config.race) {
           finished = true;
         }
-        if (!finished) {
+        if (!finished && !config.manualEnvironment) {
           const call = {
             type: 'agent.session.turn.item.added',
             event_id: 'call',
@@ -299,5 +317,55 @@ describe('beta agents stream attachment', () => {
     );
     expect(handler).toHaveBeenCalledOnce();
     expect(third.requests.some((req) => req.method === 'POST')).toBe(false);
+  });
+  test('settles the selected completed root without servicing a successor session action', async () => {
+    const { client, requests } = attachTransport({ race: true, successor: true });
+    const lookup = vi.fn(() => 'must not execute');
+    const result = await client.beta.agents.sessions
+      .stream(turn.session_id, { toolHandlers: { lookup } })
+      .finalResult();
+    expect(result.turn_id).toBe(turn.id);
+    expect(result.output_text).toBe('Recovered answer');
+    expect(lookup).not.toHaveBeenCalled();
+    expect(requests.some((request) => request.method === 'POST')).toBe(false);
+  });
+  test.each(['failed', 'cancelled'] as const)(
+    'recovers durable partial messages before reporting %s',
+    async (terminalStatus) => {
+      const { client } = attachTransport({ race: true, terminalStatus });
+      await expect(client.beta.agents.sessions.stream(turn.session_id).finalResult()).rejects.toMatchObject({
+        reason: terminalStatus,
+        messages: [expect.objectContaining({ id: history.id })],
+      });
+    },
+  );
+  test('reports a blocking environment connection without waiting for a nonexistent replay frame', async () => {
+    const { client } = attachTransport({ manualEnvironment: true });
+    await expect(client.beta.agents.sessions.stream(turn.session_id).finalResult()).rejects.toMatchObject({
+      reason: 'requires_action',
+      required_actions: [{ type: 'environment_connection', environment_id: 'env_test' }],
+    });
+  });
+  test('ignores stale function snapshots and dispatches only the replayed function', async () => {
+    const { client } = attachTransport({ staleFunction: true });
+    const lookup = vi.fn(() => 'found');
+    const result = await client.beta.agents.sessions
+      .stream(turn.session_id, { toolHandlers: { lookup } })
+      .finalResult();
+    expect(result.output_text).toBe('Recovered answer');
+    expect(lookup).toHaveBeenCalledOnce();
+  });
+  test('keeps helper ordering while preserving caller query options', async () => {
+    const { client, requests } = attachTransport({ race: true, multipleMessages: true });
+    const result = await client.beta.agents.sessions
+      .stream(turn.session_id, {}, { query: { trace: 'yes' } })
+      .finalResult();
+    expect(result.output_text).toBe('FirstSecond');
+    const listRequests = requests.filter((request) =>
+      /\/(?:items|turns)$/u.test(new URL(request.url).pathname),
+    );
+    expect(listRequests.every((request) => new URL(request.url).searchParams.get('trace') === 'yes')).toBe(
+      true,
+    );
   });
 });

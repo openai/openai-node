@@ -68,6 +68,13 @@ export class ResultCollection {
         }
         if (this.#enabled) {
           this.collector.accept(next.value);
+          if (
+            next.value.type === 'agent.session.turn.item.added' &&
+            next.value.item.type === 'function_call' &&
+            !this.#canHandle(next.value.item.name)
+          ) {
+            this.collector.pendingFunction(next.value.item);
+          }
         } else {
           this.#uncollectedEvents = true;
         }

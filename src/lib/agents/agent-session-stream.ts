@@ -197,18 +197,17 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
       this.#reading = true;
       for await (const event of stream) {
         this.#checkAbort();
-        if (this.#attachment) {
-          await this.#attachment.observe(event);
-          state.select(this.#attachment.turn);
-          if (this.#collection.enabled) {
-            this.#collection.collector.snapshot(this.#attachment.turn);
-          }
+        if (!(await this.#observeAttachment(event, state))) {
+          this.#settled = true;
+          return;
         }
         if (!state.accept(event)) {
           continue;
         }
         const terminal =
-          state.terminal(event) || (this.#attachment !== undefined && event.type === 'agent.session.idle');
+          state.terminal(event) ||
+          this.#attachment?.settled ||
+          (this.#attachment !== undefined && event.type === 'agent.session.idle');
         const pendingCall = state.call(event);
         const handler = pendingCall && this.#handlers.get(pendingCall.name);
         // Freeze dispatch identity and arguments before exposing the original event.
@@ -236,6 +235,20 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
       this.controller.signal.removeEventListener('abort', abort);
       await this.#closeObservation();
     }
+  }
+
+  async #observeAttachment(event: AgentSessionEvent, state: TurnState): Promise<boolean> {
+    if (!this.#attachment) {
+      return true;
+    }
+    if (!(await this.#attachment.observe(event))) {
+      return false;
+    }
+    state.select(this.#attachment.turn);
+    if (this.#collection.enabled) {
+      this.#attachment.snapshot(this.#collection.collector);
+    }
+    return true;
   }
 
   async #closeObservation(): Promise<void> {
@@ -280,9 +293,12 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
       const session = await this.#attachment.refresh();
       state.select(this.#attachment.turn);
       if (this.#collection.enabled) {
-        this.#collection.collector.snapshot(this.#attachment.turn, session);
+        this.#attachment.snapshot(this.#collection.collector, session);
+        if (await this.#attachment.blockedEnvironment(session)) {
+          this.#collection.collector.checkAction(() => false);
+        }
       }
-      if (session.status === 'idle' || session.status === 'failed') {
+      if (this.#attachment.settled || session.status === 'idle' || session.status === 'failed') {
         this.#settled = true;
         return undefined;
       }

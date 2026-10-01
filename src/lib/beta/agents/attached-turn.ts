@@ -1,3 +1,4 @@
+import { OpenAIError } from '../../../core/error';
 import type { AgentSession, AgentSessionEvent } from '../../../resources/beta/agents/agents';
 import type { Sessions } from '../../../resources/beta/agents/sessions/sessions';
 import type { Turn } from '../../../resources/beta/agents/sessions/turns';
@@ -21,8 +22,41 @@ export class AttachedTurn {
     this.#options = options;
   }
 
+  get settled(): boolean {
+    return this.turn !== undefined && !active(this.turn);
+  }
+
+  #ordered(order: 'asc' | 'desc'): RequestOptions {
+    return { ...this.#options, query: { ...this.#options.query, order } };
+  }
+
+  snapshot(collector: AgentTurnResultCollector, session?: AgentSession): void {
+    // Function delivery is authoritative in SSE, including its stale-call exclusion.
+    const selected = session && {
+      ...session,
+      required_actions: session.required_actions.filter(
+        (action) =>
+          action.type === 'environment_connection' ||
+          (action.type !== 'function_call' && action.turn_id === this.turn?.id),
+      ),
+    };
+    collector.snapshot(this.turn, selected, this.settled);
+  }
+
+  async blockedEnvironment(session: AgentSession): Promise<boolean> {
+    if (
+      this.turn?.status !== 'waiting' ||
+      session.status !== 'requires_action' ||
+      !session.required_actions.some((action) => action.type === 'environment_connection')
+    ) {
+      return false;
+    }
+    const root = await this.#activeRoot();
+    return root?.id === this.turn.id;
+  }
+
   async #activeRoot(): Promise<Turn | undefined> {
-    for await (const turn of this.#sessions.turns.list(this.#sessionID, { order: 'desc' }, this.#options)) {
+    for await (const turn of this.#sessions.turns.list(this.#sessionID, {}, this.#ordered('desc'))) {
       if (turn.subagent_id === null) {
         // Once the newest root has settled, an older completed answer is not this attachment's result.
         return active(turn) ? turn : undefined;
@@ -42,12 +76,26 @@ export class AttachedTurn {
     return this.#sessions.retrieve(this.#sessionID, this.#options);
   }
 
-  async observe(event: AgentSessionEvent): Promise<void> {
+  async observe(event: AgentSessionEvent): Promise<boolean> {
     if (this.turn) {
       if ('turn' in event && event.turn.id === this.turn.id) {
         this.turn = structuredClone(event.turn);
+      } else if (
+        (event.type === 'agent.session.turn.created' &&
+          event.turn.subagent_id === null &&
+          event.turn_id !== this.turn.id) ||
+        (event.type === 'agent.session.turn.item.added' &&
+          event.item.type === 'function_call' &&
+          event.item.turn_id !== this.turn.id)
+      ) {
+        // Hosted local function deliveries belong to the active root; never dispatch a successor through this attachment.
+        await this.refresh();
+        if (!this.settled) {
+          throw new OpenAIError('Another root turn became active before selected work settled');
+        }
+        return false;
       }
-      return;
+      return true;
     }
     // A replayed pending function can be the first frame, without turn.created.
     let id = 'turn_id' in event ? event.turn_id : undefined;
@@ -55,13 +103,14 @@ export class AttachedTurn {
       id = event.item.turn_id;
     }
     if (!id) {
-      return;
+      return true;
     }
     const turn =
       'turn' in event
         ? event.turn
         : await this.#sessions.turns.retrieve(id, { session_id: this.#sessionID }, this.#options);
     this.turn = turn.subagent_id === null ? structuredClone(turn) : await this.#activeRoot();
+    return true;
   }
 
   async reconcile(collector: AgentTurnResultCollector): Promise<void> {
@@ -69,13 +118,12 @@ export class AttachedTurn {
       return;
     }
     const session = await this.refresh();
-    collector.snapshot(this.turn, session);
-    collector.checkAction(() => false);
-    if (!collector.ready || this.turn.status !== 'completed') {
+    this.snapshot(collector, session);
+    if (!this.settled) {
       return;
     }
     let index = 0;
-    for await (const item of this.#sessions.items.list(this.#sessionID, { order: 'asc' }, this.#options)) {
+    for await (const item of this.#sessions.items.list(this.#sessionID, {}, this.#ordered('asc'))) {
       if (
         item.type === 'message' &&
         item.turn_id === this.turn.id &&

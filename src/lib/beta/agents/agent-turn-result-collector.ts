@@ -3,6 +3,7 @@ import type {
   AgentSessionEvent,
   AgentSessionAssistantMessage,
   AgentSessionMessage,
+  AgentFunctionCallItem,
 } from '../../../resources/beta/agents/agents';
 import type { Turn } from '../../../resources/beta/agents/sessions/turns';
 import { AgentTurnResult } from './agent-turn-result';
@@ -25,17 +26,35 @@ export class AgentTurnResultCollector {
   }
 
   /** Seed a selected root without synthesizing public SSE events. */
-  snapshot(turn: Turn | undefined, session?: AgentSession): void {
+  snapshot(turn: Turn | undefined, session?: AgentSession, settled = false): void {
     if (turn && turn.subagent_id === null && (!this.#turn || this.#turn.id === turn.id)) {
       this.#turn = structuredClone(turn);
       this.#sessionID = turn.session_id;
       this.#terminal = turn.status === 'completed' || turn.status === 'failed' || turn.status === 'cancelled';
+    }
+    if (settled && this.#terminal) {
+      this.#idle = true;
+      this.#requiredActions = [];
+      return;
     }
     if (session) {
       this.#requiredActions = structuredClone(session.required_actions ?? []);
       this.#sessionFailed ||= session.status === 'failed';
       this.#idle ||= session.status === 'idle' && this.#terminal;
     }
+  }
+
+  /** A replayed unhandled function is a diagnostic, never a snapshot execution queue. */
+  pendingFunction(call: AgentFunctionCallItem): void {
+    this.#requiredActions = [
+      {
+        type: 'function_call',
+        turn_id: call.turn_id,
+        call_id: call.call_id,
+        name: call.name,
+        arguments: structuredClone(call.arguments),
+      },
+    ];
   }
 
   /** Preserve an observed SSE snapshot, including extra fields omitted from history. */
