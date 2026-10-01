@@ -839,6 +839,59 @@ describe('beta Agents typed output', () => {
     },
   );
 
+  test.each(['agent', 'text', 'format'] as const)(
+    'captures a typed %s getter once for both request and result',
+    async (key) => {
+      const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+      const alternate = zodAgentTextFormat(z4.object({ different: z4.number() }));
+      const agent = { text: { format } };
+      const body = {
+        agent,
+        environment: { type: 'none' as const },
+        input: 'Question',
+        stream: true as const,
+      };
+      const { target, first, second } = {
+        agent: { target: body, first: agent, second: { text: { format: alternate } } },
+        text: { target: agent, first: agent.text, second: { format: alternate } },
+        format: { target: agent.text, first: format, second: alternate },
+      }[key];
+      const getter = vi.fn().mockReturnValueOnce(first).mockReturnValue(second);
+      Object.defineProperty(target, key, { get: getter, enumerable: true });
+      const { client, requests } = setup([created(), message('{"summary":"Captured"}'), completed(), idle()]);
+      const stream = await client.beta.agents.sessions.create(body);
+      const result = await stream.finalResult();
+      const summary: string = result.output_parsed.summary;
+      expect(summary).toBe('Captured');
+      expect(getter).toHaveBeenCalledOnce();
+      expect(await requests[0]?.json()).toEqual({
+        agent: { text: { format: { type: 'json_schema', schema: format.schema } } },
+        environment: { type: 'none' },
+        input: 'Question',
+        stream: true,
+      });
+    },
+  );
+
+  test.each(['agent', 'text', 'format'] as const)('does not read a non-enumerable %s getter', async (key) => {
+    const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+    const agent = { text: { format } };
+    const body = { agent, environment: { type: 'none' as const }, stream: true as const };
+    const { target, value } = {
+      agent: { target: body, value: agent },
+      text: { target: agent, value: agent.text },
+      format: { target: agent.text, value: format },
+    }[key];
+    const getter = vi.fn(() => value);
+    Object.defineProperty(target, key, { get: getter, enumerable: false });
+    const { client, requests } = setup([created(), message('Raw answer'), completed(), idle()]);
+    const stream = await client.beta.agents.sessions.create(body);
+    expect(await stream.finalResult()).not.toHaveProperty('output_parsed');
+    expect(getter).not.toHaveBeenCalled();
+    // oxlint-disable-next-line unicorn/prefer-structured-clone -- Assert JSON omission of non-enumerable fields.
+    expect(await requests[0]?.json()).toEqual(JSON.parse(JSON.stringify(body)));
+  });
+
   test.each(['agent', 'text', 'format', 'type', 'schema'] as const)(
     'leaves the %s getter to ordinary request serialization',
     async (key) => {

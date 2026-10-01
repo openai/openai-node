@@ -65,8 +65,34 @@ export function agentFormatParser<T = unknown>(
   return { type: 'json_schema', schema, $parseRaw: (text) => parse.call(format, text) };
 }
 
+// Materialize JSON-visible envelope getters once without evaluating unrelated properties.
+function snapshotJSONProperty<T extends object, K extends keyof T>(
+  object: T,
+  key: K,
+  capture: (value: T[K]) => T[K] = (value) => value,
+): T {
+  const descriptor = Object.getOwnPropertyDescriptor(object, key);
+  if (!descriptor?.enumerable) {
+    return object;
+  }
+  const value = capture(object[key]);
+  if ('value' in descriptor && value === descriptor.value) {
+    return object;
+  }
+  // SAFETY: Preserve the original properties/prototype, replacing only this captured property's value.
+  return Object.create(Object.getPrototypeOf(object), {
+    ...Object.getOwnPropertyDescriptors(object),
+    [key]: { value, enumerable: true, configurable: descriptor.configurable, writable: true },
+  }) as T;
+}
+
 /** @internal */
-export function captureAgentOutput(body: SessionCreateParams, options?: RequestOptions) {
+export function captureAgentOutput(input: SessionCreateParams, options?: RequestOptions) {
+  const body = snapshotJSONProperty(input, 'agent', (agent) =>
+    agent
+      ? snapshotJSONProperty(agent, 'text', (text) => (text ? snapshotJSONProperty(text, 'format') : text))
+      : agent,
+  );
   const agent = ownJSONValue(body, 'agent');
   const text = ownJSONValue(agent, 'text');
   const format = agentFormatParser(ownJSONValue(text, 'format'));
