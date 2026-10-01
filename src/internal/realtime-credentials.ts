@@ -2,25 +2,28 @@ import type { OpenAI } from '../client';
 import { assertValidBedrockBearerCredential, brand_privateBedrockClient } from './bedrock';
 
 type CaptureAPIKey = (apiKey: string | null) => void;
-interface DeferredAPIKeyCache {
+export interface DeferredAPIKeyCache {
   client: Pick<OpenAI, 'apiKey'>;
   providerKey?: string;
   commit: () => string | null;
 }
-const deferredCaches = new WeakMap<CaptureAPIKey, DeferredAPIKeyCache>();
-// This exists only during synchronous _callApiKey entry, never across a provider or hook await.
-let activeCache: DeferredAPIKeyCache | undefined;
+interface RealtimeAPIKeyCacheContext {
+  run: <T>(cache: DeferredAPIKeyCache | undefined, operation: () => T) => T;
+  getStore: () => DeferredAPIKeyCache | undefined;
+}
+let cacheContext: RealtimeAPIKeyCacheContext | undefined;
+
+/** Installs the Node transport's invocation context without loading Node in the base client. @internal */
+export function setRealtimeAPIKeyCacheContext(context: RealtimeAPIKeyCacheContext): void {
+  cacheContext = context;
+}
 
 /** Reserves a deferred commit when the base hook is entered for this invocation. @internal */
 export function getDeferredRealtimeAPIKeyCache(
   client: Pick<OpenAI, 'apiKey'>,
-  capture?: CaptureAPIKey,
 ): DeferredAPIKeyCache | undefined {
-  const deferred = capture ? deferredCaches.get(capture) : undefined;
-  if (deferred?.client === client) {
-    return deferred;
-  }
-  return activeCache?.client === client ? activeCache : undefined;
+  const deferred = cacheContext?.getStore();
+  return deferred?.client === client ? deferred : undefined;
 }
 
 /** Applies the Bedrock getter's validation when a captured credential does not enter the cache. @internal */
@@ -65,32 +68,21 @@ export async function resolveRealtimeAPIKey(
   const capture: CaptureAPIKey = (resolved) => {
     apiKey = resolved;
   };
-  if (deferCache) {
-    deferredCaches.set(capture, current);
-  }
-  try {
-    const previous = activeCache;
-    let pending: Promise<boolean>;
-    activeCache = deferCache ? current : undefined;
-    try {
-      pending = client._callApiKey(capture);
-    } finally {
-      activeCache = previous;
-    }
-    const isProvider = await pending;
-    return {
-      apiKey: apiKey === undefined ? client.apiKey : apiKey,
-      isProvider,
-      commit: () => {
-        const hookKey =
-          current.providerKey !== undefined && apiKey !== undefined && apiKey !== current.providerKey
-            ? validateCapturedAPIKey(client, apiKey)
-            : undefined;
-        const cached = current.commit();
-        return hookKey === undefined ? validateCapturedAPIKey(client, cached) : hookKey;
-      },
-    };
-  } finally {
-    deferredCaches.delete(capture);
-  }
+  const invoke = () => client._callApiKey(capture);
+  // An HTTP or ordinary Realtime request nested inside a WebSocket hook owns its own cache writes.
+  const isProvider = await (cacheContext
+    ? cacheContext.run(deferCache ? current : undefined, invoke)
+    : invoke());
+  return {
+    apiKey: apiKey === undefined ? client.apiKey : apiKey,
+    isProvider,
+    commit: () => {
+      const hookKey =
+        current.providerKey !== undefined && apiKey !== undefined && apiKey !== current.providerKey
+          ? validateCapturedAPIKey(client, apiKey)
+          : undefined;
+      const cached = current.commit();
+      return hookKey === undefined ? validateCapturedAPIKey(client, cached) : hookKey;
+    },
+  };
 }

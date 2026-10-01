@@ -111,6 +111,12 @@ describe.each([
         ['X-B3-Flags', '1'],
         ['sentry-trace', '0123456789abcdef0123456789abcdef-0123456789abcdef-1'],
         ['X-Amzn-Trace-Id', 'Root=1-01234567-0123456789abcdef01234567'],
+        ['X-Datadog-Trace-Id', '123456789'],
+        ['X-Datadog-Parent-Id', '987654321'],
+        ['X-Datadog-Sampling-Priority', '1'],
+        ['X-Datadog-Origin', 'synthetics'],
+        ['X-Datadog-Tags', '_dd.p.dm=-0'],
+        ['Sec-WebSocket-Protocol', 'responses'],
       ] as const
     ).flatMap(([header, value]) => [
       {

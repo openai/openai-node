@@ -13,7 +13,10 @@ describe.each([
 ])('$name reconnect through a credential capture wrapper', ({ Responses }) => {
   test.each(
     ['none', 'successful', 'failed'].flatMap((laterRequest) =>
-      ['synchronous', 'after await', 'before delegation'].map((wrapper) => ({ laterRequest, wrapper })),
+      ['synchronous', 'after await', 'before delegation', 'after await with wrapper'].map((wrapper) => ({
+        laterRequest,
+        wrapper,
+      })),
     ),
   )(
     'canceled refresh cannot cache its key with a $laterRequest concurrent HTTP request and $wrapper capture',
@@ -48,6 +51,10 @@ describe.each([
           if (wrapper === 'before delegation') {
             await Promise.resolve();
             return super._callApiKey(capture);
+          }
+          if (wrapper === 'after await with wrapper') {
+            await Promise.resolve();
+            return super._callApiKey((key) => capture?.(key));
           }
           if (wrapper === 'synchronous') {
             return super._callApiKey((key) => {
@@ -116,9 +123,84 @@ describe.each([
     },
   );
 
-  test.each(['passthrough', 'derived'])(
-    'uses the %s hook credential on reconnect while committing the provider cache independently',
-    async (mode) => {
+  test('an HTTP request inside a delayed credential hook commits independently of canceled refresh', async () => {
+    const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+    await once(server, 'listening');
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Missing local server address');
+    }
+    let release!: (key: string) => void;
+    // oxlint-disable-next-line promise/avoid-new -- Pause only the actual WebSocket refresh provider.
+    const pending = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    const apiKey = vi
+      .fn()
+      .mockResolvedValueOnce('synthetic-A')
+      .mockResolvedValueOnce('synthetic-HTTP')
+      .mockReturnValueOnce(pending);
+    const upgrades: (string | undefined)[] = [];
+    server.on('connection', (_peer, request) => upgrades.push(request.headers.authorization));
+    let issueHTTPRequest = false;
+    let httpResult: { authorization: string | null } | undefined;
+    class NestedRequestOpenAI extends OpenAI {
+      override async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
+        await Promise.resolve();
+        if (issueHTTPRequest) {
+          issueHTTPRequest = false;
+          httpResult = await this.get('/nested-request');
+        }
+        return super._callApiKey((key) => capture?.(key));
+      }
+    }
+    const client = new NestedRequestOpenAI({
+      apiKey,
+      baseURL: `http://127.0.0.1:${address.port}/v1`,
+      fetch: async (_url, init) =>
+        Response.json({ authorization: new Headers(init?.headers).get('authorization') }),
+    });
+    await client._callApiKey();
+    const initial = once(server, 'connection');
+    // SAFETY: Stable and beta expose identical reconnect and close event contracts.
+    const connection = new Responses(client, {
+      reconnect: { maxRetries: 1, initialDelay: 0, maxDelay: 0, onReconnecting() {} },
+    }) as StableResponsesWS;
+    connection.on('error', () => {});
+    try {
+      const [peer] = await initial;
+      await once(connection.socket.platformSocket, 'open');
+      issueHTTPRequest = true;
+      peer.close(1012);
+      await vi.waitFor(() => expect(apiKey).toHaveBeenCalledTimes(3));
+      expect(httpResult).toEqual({ authorization: 'Bearer synthetic-HTTP' });
+      expect(client.apiKey).toBe('synthetic-HTTP');
+      const closed = connection.emitted('close');
+      connection.close();
+      await closed;
+      release('synthetic-canceled');
+      await setImmediate();
+      expect(client.apiKey).toBe('synthetic-HTTP');
+      expect(upgrades).toEqual(['Bearer synthetic-A']);
+    } finally {
+      release('synthetic-canceled');
+      connection.close();
+      for (const peer of server.clients) {
+        peer.terminate();
+      }
+      const closed = once(server, 'close');
+      server.close();
+      await closed;
+    }
+  });
+
+  test.each(
+    ['passthrough', 'derived'].flatMap((mode) =>
+      [false, true].map((awaitBeforeSuper) => ({ mode, awaitBeforeSuper })),
+    ),
+  )(
+    'uses the $mode hook credential on reconnect while committing the provider cache independently (await before super: $awaitBeforeSuper)',
+    async ({ mode, awaitBeforeSuper }) => {
       const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
       await once(server, 'listening');
       const address = server.address();
@@ -131,6 +213,9 @@ describe.each([
       class SigningOpenAI extends OpenAI {
         override async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
           let resolved: string | null = null;
+          if (awaitBeforeSuper) {
+            await Promise.resolve();
+          }
           const invoked = await super._callApiKey((key) => {
             resolved = key;
           });

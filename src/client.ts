@@ -901,7 +901,6 @@ export class OpenAI {
   /**
    * Resolves and retains a provider key, returning whether a provider was invoked.
    * Overrides should forward `capture` (or call it with their resolved key) for local credentials.
-   * Forward `capture` unchanged across awaits, or enter `super` before awaiting, for deferred caching.
    * @internal
    */
   async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
@@ -916,7 +915,7 @@ export class OpenAI {
       return false;
     }
 
-    const deferredCache = getDeferredRealtimeAPIKeyCache(this, capture);
+    const deferredCache = getDeferredRealtimeAPIKeyCache(this);
     const invocation = ++this._apiKeyInvocation;
     let token: unknown;
     try {

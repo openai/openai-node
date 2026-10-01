@@ -1,6 +1,11 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type * as WS from 'ws';
 import type { WebSocketLike } from './ws-adapter';
 import { protectWebSocketOptionsFromCredentialRedirects } from './ws';
+import { setRealtimeAPIKeyCacheContext } from './realtime-credentials';
+import type { DeferredAPIKeyCache } from './realtime-credentials';
+
+setRealtimeAPIKeyCacheContext(new AsyncLocalStorage<DeferredAPIKeyCache | undefined>());
 
 /** A generic event listener callback. */
 type Listener = (...args: any[]) => void;
@@ -54,6 +59,14 @@ export function snapshotNodeWebSocketOptions(
   }
   if ('session' in captured && Buffer.isBuffer(captured.session)) {
     captured.session = Buffer.from(captured.session);
+  }
+  if ('ALPNProtocols' in captured) {
+    if (Array.isArray(captured.ALPNProtocols)) {
+      captured.ALPNProtocols = [...captured.ALPNProtocols];
+    } else if (ArrayBuffer.isView(captured.ALPNProtocols)) {
+      const { buffer, byteOffset, byteLength } = captured.ALPNProtocols;
+      captured.ALPNProtocols = Buffer.from(new Uint8Array(buffer, byteOffset, byteLength));
+    }
   }
   return captured;
 }

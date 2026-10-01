@@ -112,14 +112,26 @@ const WEBSOCKET_METADATA_HEADER_NAMES = new Set([
   'tracestate',
   'sentry-trace',
   'x-amzn-trace-id',
+  'x-datadog-trace-id',
+  'x-datadog-parent-id',
+  'x-datadog-sampling-priority',
+  'x-datadog-origin',
+  'x-datadog-tags',
   'baggage',
   'b3',
-  'sec-websocket-protocol',
 ]);
 
 // Request and tracing metadata do not authenticate a Responses socket, but remain protected on redirects.
 export const WEBSOCKET_METADATA_HEADERS = {
-  has: (name: string): boolean => WEBSOCKET_METADATA_HEADER_NAMES.has(name) || name.startsWith('x-b3-'),
+  has: (name: string, values: readonly unknown[]): boolean =>
+    WEBSOCKET_METADATA_HEADER_NAMES.has(name) ||
+    name.startsWith('x-b3-') ||
+    (name === 'sec-websocket-protocol' &&
+      !values.some(
+        (value) =>
+          typeof value === 'string' &&
+          value.split(',').some((protocol) => protocol.trim().startsWith('openai-insecure-api-key.')),
+      )),
 };
 
 function isWebSocketCredentialHeader(name: string): boolean {
@@ -136,7 +148,7 @@ export function snapshotWebSocketCredentials(
     auth?: unknown;
     headers?: Record<string, unknown> | undefined;
   },
-  metadataHeaders?: Pick<ReadonlySet<string>, 'has'>,
+  metadataHeaders?: { has: (name: string, values: readonly unknown[]) => boolean },
 ): boolean {
   if (options.auth !== null && options.auth !== undefined) {
     options.auth = String(options.auth);
@@ -161,7 +173,7 @@ export function snapshotWebSocketCredentials(
     }
     headers[name] = snapshot;
     const values = Array.isArray(snapshot) ? snapshot : [snapshot];
-    if (!metadataHeaders?.has(normalizedName)) {
+    if (!metadataHeaders?.has(normalizedName, values)) {
       credentials.set(
         name.toLowerCase(),
         values.some((item) => typeof item === 'string' && item.trim().length > 0),
