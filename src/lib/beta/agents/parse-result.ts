@@ -33,22 +33,22 @@ function ownJSONValue<T extends object, K extends keyof T>(
 export function agentFormatParser<T = unknown>(
   format: TextFormatParam | null | undefined,
 ): AgentOutputFormat<T> | undefined {
-  if (!format || ownJSONValue(format, 'type') !== 'json_schema') {
-    return undefined;
-  }
-  // SAFETY: The own JSON discriminator identifies the schema-bearing format variant.
-  const schema = ownJSONValue(format as TextFormatParam.TextFormatParamJSONSchema, 'schema');
-  if (!schema) {
+  if (!format) {
     return undefined;
   }
   const descriptor = Object.getOwnPropertyDescriptor(format, '$parseRaw');
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Only an own data-property function can opt a public API format into local parsing.
-  if (descriptor && 'value' in descriptor && typeof descriptor.value === 'function') {
-    // SAFETY: The own descriptor was checked for a callable parser; retain its receiver and never reread the property.
-    const parse = descriptor.value as AgentOutputFormat<T>['$parseRaw'];
-    return { type: 'json_schema', schema, $parseRaw: (text) => parse.call(format, text) };
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- An own parser data property is the explicit opt-in marker.
+  if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') {
+    return undefined;
   }
-  return undefined;
+  // SAFETY: Inspect the schema data descriptor without evaluating a caller getter; validate its discriminator below.
+  const schema = ownJSONValue(format as TextFormatParam.TextFormatParamJSONSchema, 'schema');
+  if (ownJSONValue(format, 'type') !== 'json_schema' || !schema) {
+    throw new OpenAIError('Typed agent formats require own enumerable type and schema data properties');
+  }
+  // SAFETY: The own descriptor was checked for a callable parser; retain its receiver and never reread the property.
+  const parse = descriptor.value as AgentOutputFormat<T>['$parseRaw'];
+  return { type: 'json_schema', schema, $parseRaw: (text) => parse.call(format, text) };
 }
 
 /** @internal */
@@ -59,6 +59,7 @@ export function captureAgentOutput(body: SessionCreateParams, options?: RequestO
   if (!format) {
     return { body, options };
   }
+  const schema = structuredClone(format.schema);
   for (const envelope of [body, agent, text]) {
     if (envelope && 'toJSON' in envelope) {
       throw new OpenAIError('Typed agent requests cannot customize body, agent, or text serialization');
@@ -76,7 +77,7 @@ export function captureAgentOutput(body: SessionCreateParams, options?: RequestO
       ...body,
       agent: {
         ...agent,
-        text: { ...text, format: { type: 'json_schema', schema: structuredClone(format.schema) } },
+        text: { ...text, format: { type: 'json_schema', schema } },
       },
     },
     format,

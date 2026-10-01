@@ -739,8 +739,7 @@ describe('beta Agents typed output', () => {
   test.each(['agent', 'text', 'format', 'type', 'schema'] as const)(
     'leaves the %s getter to ordinary request serialization',
     async (key) => {
-      const parse = vi.fn(() => ({ summary: 'Unexpected' }));
-      const format = agentOutputFormat({ type: 'object' }, parse);
+      const format = { type: 'json_schema' as const, schema: { type: 'object' } };
       const agent = { text: { format } };
       const body = {
         agent,
@@ -762,7 +761,6 @@ describe('beta Agents typed output', () => {
       const result = await stream.finalResult();
       expect(result).not.toHaveProperty('output_parsed');
       expect(getter).toHaveBeenCalledOnce();
-      expect(parse).not.toHaveBeenCalled();
     },
   );
 
@@ -1011,6 +1009,44 @@ describe('beta Agents typed output', () => {
       expect(getter).toHaveBeenCalledTimes(kind === 'own' ? 1 : 0);
     },
   );
+
+  test('captures the schema before request-option getters run', async () => {
+    const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+    const schema = structuredClone(format.schema);
+    const { client, requests } = setup([created(), message('{"summary":"Expected"}'), completed(), idle()]);
+    const stream = await client.beta.agents.sessions.create(
+      { agent: { text: { format } }, environment: { type: 'none' }, input: 'Question', stream: true },
+      {
+        get headers() {
+          Object.assign(format.schema, {
+            properties: { changed: { type: 'number' } },
+            required: ['changed'],
+          });
+          return {};
+        },
+      },
+    );
+    const result = await stream.finalResult();
+    expect(result.output_parsed.summary).toBe('Expected');
+    expect(await requests[0]?.json()).toMatchObject({ agent: { text: { format: { schema } } } });
+  });
+
+  test.each(['type', 'schema'] as const)('rejects an explicit parser with an accessor-backed %s', (key) => {
+    const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+    const getter = vi.fn(() => (key === 'type' ? 'json_schema' : { type: 'object' }));
+    Object.defineProperty(format, key, { get: getter, enumerable: true });
+    const { client, requests } = setup([]);
+    expect(() =>
+      client.beta.agents.sessions.create({
+        agent: { text: { format } },
+        environment: { type: 'none' },
+        input: 'Question',
+        stream: true,
+      }),
+    ).toThrow(/data properties/u);
+    expect(getter).not.toHaveBeenCalled();
+    expect(requests).toHaveLength(0);
+  });
 
   test('typed creation rejects a request-options body override before dispatch', () => {
     const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
