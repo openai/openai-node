@@ -9,12 +9,12 @@ import { functionTool } from 'openai/lib/beta/agents/function-tool';
 import { expectType } from '../utils/typing';
 
 describe('beta Agents functionTool', () => {
-  test('sends the hosted definition at creation without invoking the local wallet action', async () => {
-    const action = vi.fn(() => ({ balance: '12.50' }));
+  test('sends the hosted definition at creation without invoking the local catalog lookup', async () => {
+    const action = vi.fn(() => ({ price: '12.50' }));
     const tool = functionTool(
       zodResponsesFunction({
-        name: 'wallet_balance',
-        parameters: z4.object({ asset: z4.string() }),
+        name: 'lookup_item',
+        parameters: z4.object({ item_id: z4.string() }),
         function: action,
       }),
     );
@@ -42,17 +42,17 @@ describe('beta Agents functionTool', () => {
   });
 
   test.each([
-    z3.object({ asset: z3.string() }),
-    z4.object({ asset: z4.string() }),
-    mini.object({ asset: mini.string() }),
+    z3.object({ item_id: z3.string() }),
+    z4.object({ item_id: z4.string() }),
+    mini.object({ item_id: mini.string() }),
   ])('reuses Zod validation and exposes only the flat Agents definition', async (parameters) => {
-    const execute = vi.fn(({ asset }: { asset: string }) => ({ asset, balance: '12.50' }));
+    const execute = vi.fn(({ item_id }: { item_id: string }) => ({ item_id, price: '12.50' }));
     const parsed = zodResponsesFunction({
-      name: 'wallet_balance',
-      description: 'Read a wallet balance.',
+      name: 'lookup_item',
+      description: 'Look up a catalog item.',
       parameters,
       function: (args) => {
-        expectType<{ asset: string }>(args);
+        expectType<{ item_id: string }>(args);
         return execute(args);
       },
     });
@@ -61,39 +61,39 @@ describe('beta Agents functionTool', () => {
     // oxlint-disable-next-line unicorn/prefer-structured-clone -- Verify the actual JSON wire representation, including omitted metadata.
     expect(JSON.parse(JSON.stringify(tool.definition))).toEqual({
       type: 'function',
-      name: 'wallet_balance',
-      description: 'Read a wallet balance.',
+      name: 'lookup_item',
+      description: 'Look up a catalog item.',
       parameters: parsed.parameters,
     });
-    expect(tool.name).toBe('wallet_balance');
-    expect(await tool.handler({ asset: 'USDC' })).toEqual({ asset: 'USDC', balance: '12.50' });
-    await expect(tool.handler({ asset: 123 })).rejects.toThrow();
-    expect(execute).toHaveBeenCalledExactlyOnceWith({ asset: 'USDC' });
+    expect(tool.name).toBe('lookup_item');
+    expect(await tool.handler({ item_id: 'ITEM_A' })).toEqual({ item_id: 'ITEM_A', price: '12.50' });
+    await expect(tool.handler({ item_id: 123 })).rejects.toThrow();
+    expect(execute).toHaveBeenCalledExactlyOnceWith({ item_id: 'ITEM_A' });
   });
 
   test('reuses Standard Schema output inference, validation, and asynchronous callbacks', async () => {
-    const execute = vi.fn(async (asset: string) => ({ balance: '12.50', asset }));
+    const execute = vi.fn(async (item_id: string) => ({ price: '12.50', item_id }));
     const tool = functionTool(
       standardResponsesFunction({
-        name: 'wallet_balance',
+        name: 'lookup_item',
         parameters: z4
-          .object({ asset: z4.string() })
-          .transform(({ asset }) => ({ asset: asset.toUpperCase() })),
-        schema: { type: 'object', properties: { asset: { type: 'string' } }, required: ['asset'] },
+          .object({ item_id: z4.string() })
+          .transform(({ item_id }) => ({ item_id: item_id.toUpperCase() })),
+        schema: { type: 'object', properties: { item_id: { type: 'string' } }, required: ['item_id'] },
         function: (args) => {
-          expectType<{ asset: string }>(args);
-          return execute(args.asset);
+          expectType<{ item_id: string }>(args);
+          return execute(args.item_id);
         },
       }),
     );
     expect(tool.definition.description).toBe('');
-    expect(await tool.handler({ asset: 'usdc' })).toEqual({ asset: 'USDC', balance: '12.50' });
-    await expect(tool.handler({ asset: false })).rejects.toThrow();
-    expect(execute).toHaveBeenCalledExactlyOnceWith('USDC');
+    expect(await tool.handler({ item_id: 'item_a' })).toEqual({ item_id: 'ITEM_A', price: '12.50' });
+    await expect(tool.handler({ item_id: false })).rejects.toThrow();
+    expect(execute).toHaveBeenCalledExactlyOnceWith('ITEM_A');
   });
 
   test('requires an executable callback before a session can start', () => {
-    expect(() => functionTool(zodResponsesFunction({ name: 'balance', parameters: z4.object({}) }))).toThrow(
+    expect(() => functionTool(zodResponsesFunction({ name: 'price', parameters: z4.object({}) }))).toThrow(
       'require a callback',
     );
   });
@@ -131,7 +131,7 @@ describe('beta Agents functionTool', () => {
   });
 
   test('preserves deferred discovery without forwarding Responses-only fields', () => {
-    const parsed = zodResponsesFunction({ name: 'balance', parameters: z4.object({}), function: () => null });
+    const parsed = zodResponsesFunction({ name: 'price', parameters: z4.object({}), function: () => null });
     parsed.defer_loading = false;
     const tool = functionTool(parsed);
     expect(tool.definition.defer_loading).toBe(false);

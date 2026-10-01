@@ -52,10 +52,10 @@ import { functionTool } from 'openai/lib/beta/agents/function-tool';
 
 const lookup = functionTool(
   zodResponsesFunction({
-    name: 'lookup_order',
-    description: 'Look up an order.',
-    parameters: z.object({ order_id: z.string() }),
-    function: ({ order_id }) => orderService.lookup(order_id),
+    name: 'lookup_item',
+    description: 'Look up a catalog item.',
+    parameters: z.object({ item_id: z.string() }),
+    function: ({ item_id }) => catalog.lookup(item_id),
   }),
 );
 // Use this agent configuration when creating your session.
@@ -63,7 +63,7 @@ const agent = { model: MODEL, tools: [lookup.definition] };
 
 // Attach the local handler once the configured session is idle.
 const stream = client.beta.agents.sessions.stream(SESSION_ID, {
-  input: 'Where is order A123?',
+  input: 'Look up catalog item ITEM_A.',
   toolHandlers: { [lookup.name]: lookup.handler },
 });
 for await (const event of stream) {

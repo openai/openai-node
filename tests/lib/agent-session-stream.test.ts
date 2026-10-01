@@ -116,37 +116,40 @@ function badRequest(message: string, code = 'invalid_request_error') {
 }
 
 describe('agents sessions.stream public transport', () => {
-  test('binds a Coinbase-style wallet action without exposing local dependencies', async () => {
-    const wallet = {
-      walletID: 'wallet_local',
-      balance: vi.fn(async (asset: string) => ({ asset, balance: '12.50' })),
+  test('binds a catalog lookup without exposing local dependencies', async () => {
+    const catalog = {
+      catalogID: 'catalog_local',
+      lookup: vi.fn(async (item_id: string) => ({ item_id, price: '12.50' })),
     };
     const tool = functionTool(
       zodResponsesFunction({
-        name: 'wallet_balance',
-        description: 'Read the balance of an asset in the connected wallet.',
-        parameters: z.object({ asset: z.string() }),
-        function: ({ asset }) => wallet.balance(asset),
+        name: 'lookup_item',
+        description: 'Look up an item in the connected catalog.',
+        parameters: z.object({ item_id: z.string() }),
+        function: ({ item_id }) => catalog.lookup(item_id),
       }),
     );
-    const valid = call('valid', { asset: 'USDC' }, 'turn_main', tool.name);
+    const valid = call('valid', { item_id: 'ITEM_A' }, 'turn_main', tool.name);
     const { client, requests } = transport([
       turn(),
       valid,
       valid,
-      call('invalid', { asset: 12 }, 'turn_main', tool.name),
-      call('legacy', '{"asset":"ETH"}', 'turn_main', tool.name),
+      call('invalid', { item_id: 12 }, 'turn_main', tool.name),
+      call('legacy', '{"item_id":"ITEM_B"}', 'turn_main', tool.name),
       call('raw', {}, 'turn_main', 'raw'),
       ...ending(),
     ]);
     await collect(
       client.beta.agents.sessions.stream(
         'session_test',
-        { input: 'Read my wallet balance.', toolHandlers: { [tool.name]: tool.handler, raw: () => 'raw' } },
-        { headers: { 'x-application': 'wallet' } },
+        {
+          input: 'Look up catalog item ITEM_A.',
+          toolHandlers: { [tool.name]: tool.handler, raw: () => 'raw' },
+        },
+        { headers: { 'x-application': 'catalog' } },
       ),
     );
-    expect(wallet.balance.mock.calls).toEqual([['USDC'], ['ETH']]);
+    expect(catalog.lookup.mock.calls).toEqual([['ITEM_A'], ['ITEM_B']]);
     expect(
       posts(requests)
         .slice(1)
@@ -155,18 +158,18 @@ describe('agents sessions.stream public transport', () => {
       expect.objectContaining({
         call_id: 'valid',
         success: true,
-        output: '{"asset":"USDC","balance":"12.50"}',
+        output: '{"item_id":"ITEM_A","price":"12.50"}',
       }),
       expect.objectContaining({ call_id: 'invalid', success: false, error: 'Tool handler failed.' }),
       expect.objectContaining({
         call_id: 'legacy',
         success: true,
-        output: '{"asset":"ETH","balance":"12.50"}',
+        output: '{"item_id":"ITEM_B","price":"12.50"}',
       }),
       expect.objectContaining({ call_id: 'raw', success: true, output: 'raw' }),
     ]);
-    expect(requests.every(({ request }) => request.headers.get('x-application') === 'wallet')).toBe(true);
-    expect(JSON.stringify(tool.definition)).not.toContain('wallet_local');
+    expect(requests.every(({ request }) => request.headers.get('x-application') === 'catalog')).toBe(true);
+    expect(JSON.stringify(tool.definition)).not.toContain('catalog_local');
   });
 
   test('subscribes before normalized input and waits for selected coordinator terminal then idle', async () => {
