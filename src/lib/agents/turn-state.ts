@@ -1,3 +1,4 @@
+import type { Turn } from '../../resources/beta/agents/sessions/turns';
 import type { AgentSessionEvent, AgentFunctionCallItem } from '../../resources/beta/agents/agents';
 
 /** Tracks one helper invocation's coordinator turn and duplicate deliveries.
@@ -8,6 +9,15 @@ export class TurnState {
   #turnEnded = false;
   #eventIDs = new Set<string>();
   #calls = new Set<string>();
+
+  /** Seed reattached work without requiring a replayed turn.created event. */
+  select(turn: Turn | undefined): void {
+    if (!turn || turn.subagent_id !== null || (this.#turnID && this.#turnID !== turn.id)) {
+      return;
+    }
+    this.#turnID = turn.id;
+    this.#turnEnded = turn.status === 'completed' || turn.status === 'failed' || turn.status === 'cancelled';
+  }
 
   /** Records a delivery unless its event ID is in the bounded recent window. */
   accept(event: AgentSessionEvent): boolean {

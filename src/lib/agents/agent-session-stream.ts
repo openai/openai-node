@@ -1,4 +1,5 @@
 import type { AgentOutputFormat, AgentResult } from '../beta/agents/output-format-types';
+import { AttachedTurn } from '../beta/agents/attached-turn';
 import { TurnState } from './turn-state';
 import { agentFormatParser, parseAgentResultPromise } from '../beta/agents/parse-result';
 import { ResultCollection } from '../beta/agents/result-collection';
@@ -25,12 +26,12 @@ export type AgentToolHandler = (
   arguments_: Record<string, unknown>,
 ) => AgentToolOutput | PromiseLike<AgentToolOutput>;
 
-/** Input and optional sequential tool handlers for one turn on an idle session. */
+/** Input or attachment with optional sequential tool handlers. */
 export type AgentSessionStreamParams<T = never> = {
   /** Beta: parse this turn locally; does not change the existing session schema. */
   outputFormat?: AgentOutputFormat<T>;
-  /** User messages, or text normalized to a single user message. Must not be empty. */
-  input: string | AgentSessionInputMessageParam[];
+  /** User messages, or text normalized to a single user message. Omit to reattach without submitting input. */
+  input?: string | AgentSessionInputMessageParam[];
   /** Registered functions run after their call event is yielded; unknown functions remain manual. */
   toolHandlers?: Record<string, AgentToolHandler>;
   /** Key for the input submission only; request headers take precedence, case-insensitively. */
@@ -76,11 +77,10 @@ async function cancelBody(response: Response | undefined): Promise<void> {
 
 /**
  * A single-use, lazy async iterable of original session events for one turn.
- * Requires an idle session and a single input writer: the input endpoint does not
- * return a turn ID. Subscribe-before-input avoids losing events; the first
- * coordinator turn selects the turn to follow. Initial idle events and subagent
- * completion do not end iteration. A selected turn's terminal event followed by
- * session.idle, or session.failed, ends iteration. Unexpected EOF throws.
+ * With input, requires an idle session and a single input writer. Omitting input
+ * reattaches to hosted work without submitting another message. Pending functions
+ * replayed by the stream use the same handlers; result collection also recovers
+ * saved output for the selected root turn.
  *
  * Tool handlers run sequentially during iteration. Handler failures submit a
  * generic error without exception text. Each submission has a distinct retry-safe
@@ -99,7 +99,9 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
   #reading = false;
   #sessions: Sessions;
   #sessionID: string;
-  #input: AgentSessionInputParam.SessionInputParamAgentSessionInputMessage;
+  #input: AgentSessionInputParam.SessionInputParamAgentSessionInputMessage | undefined;
+  #attachment: AttachedTurn | undefined;
+  #settled = false;
   #handlers: Map<string, AgentToolHandler>;
   #inputKey: string | undefined;
   #options: RequestOptions;
@@ -108,14 +110,14 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
   constructor(
     sessions: Sessions,
     sessionID: string,
-    params: AgentSessionStreamParams<T>,
+    params: AgentSessionStreamParams<T> = {},
     options?: RequestOptions,
   ) {
-    const input: AgentSessionInputMessageParam[] =
+    const input: AgentSessionInputMessageParam[] | undefined =
       typeof params.input === 'string'
         ? [{ role: 'user', content: [{ type: 'input_text', text: params.input }] }]
         : params.input;
-    if (params.input.length === 0) {
+    if (params.input?.length === 0) {
       throw new OpenAIError('input must not be empty');
     }
     this.#format = agentFormatParser<T>(params.outputFormat);
@@ -124,7 +126,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
     }
     this.#sessions = sessions;
     this.#sessionID = sessionID;
-    this.#input = { type: 'agent.session.input.message', input };
+    this.#input = input === undefined ? undefined : { type: 'agent.session.input.message', input };
     this.#handlers = new Map(Object.entries(params.toolHandlers ?? {}));
     const headers = buildHeaders([options?.headers]);
     this.#inputKey = headers.nulls.has('idempotency-key')
@@ -141,6 +143,8 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
       () => this.#iterate(),
       (name) => this.#handlers.has(name),
       sessionID,
+      this.controller.signal,
+      () => this.#reconcile(),
     );
   }
 
@@ -186,42 +190,32 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
         this.abort(externalSignal.reason);
       }
       this.#checkAbort();
-      const session = await this.#sessions.retrieve(this.#sessionID, options);
-      if (session.status !== 'idle') {
-        throw new OpenAIError(
-          'sessions.stream requires an idle session; use sessions.events.stream for active sessions',
-        );
+      const stream = await this.#start(state, options);
+      if (!stream) {
+        return;
       }
-      const subscription = await this.#sessions.events.stream(this.#sessionID, options).withResponse();
-      this.#stream = subscription.data;
-      this.#response = subscription.response;
-      this.#checkAbort();
-      await this.#sessions.events.create(
-        this.#sessionID,
-        {
-          events: [this.#input],
-          // Spread creates an own data property without invoking inherited setters or changing the object prototype.
-          ...(this.#inputKey === undefined ? {} : { 'Idempotency-Key': this.#inputKey }),
-        },
-        {
-          ...options,
-          headers: buildHeaders([options.headers, { 'Idempotency-Key': this.#inputKey ?? null }]),
-        },
-      );
-      this.#checkAbort();
       this.#reading = true;
-      for await (const event of this.#stream) {
+      for await (const event of stream) {
         this.#checkAbort();
+        if (this.#attachment) {
+          await this.#attachment.observe(event);
+          state.select(this.#attachment.turn);
+          if (this.#collection.enabled) {
+            this.#collection.collector.snapshot(this.#attachment.turn);
+          }
+        }
         if (!state.accept(event)) {
           continue;
         }
-        const terminal = state.terminal(event);
+        const terminal =
+          state.terminal(event) || (this.#attachment !== undefined && event.type === 'agent.session.idle');
         const pendingCall = state.call(event);
         const handler = pendingCall && this.#handlers.get(pendingCall.name);
         // Freeze dispatch identity and arguments before exposing the original event.
         const call = pendingCall && handler ? structuredClone(pendingCall) : undefined;
         if (terminal) {
-          this.#stream.controller.abort();
+          this.#settled = true;
+          stream.controller.abort();
         }
         yield event;
         if (terminal) {
@@ -240,7 +234,78 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
     } finally {
       externalSignal?.removeEventListener('abort', abort);
       this.controller.signal.removeEventListener('abort', abort);
+      await this.#closeObservation();
+    }
+  }
+
+  async #closeObservation(): Promise<void> {
+    if (this.#settled && this.#attachment) {
+      this.#stream?.controller.abort();
+      if (!this.#reading) {
+        await cancelBody(this.#response);
+      }
+    } else {
       this.abort();
+    }
+  }
+
+  async #start(state: TurnState, options: RequestOptions): Promise<Stream<AgentSessionEvent> | undefined> {
+    if (this.#input) {
+      const session = await this.#sessions.retrieve(this.#sessionID, options);
+      if (session.status !== 'idle') {
+        throw new OpenAIError('sessions.stream with input requires an idle session; omit input to reattach');
+      }
+    } else {
+      this.#attachment = new AttachedTurn(this.#sessions, this.#sessionID, options);
+      await this.#attachment.prepare();
+      state.select(this.#attachment.turn);
+    }
+    const subscription = await this.#sessions.events.stream(this.#sessionID, options).withResponse();
+    this.#stream = subscription.data;
+    this.#response = subscription.response;
+    this.#checkAbort();
+    if (this.#input) {
+      await this.#sessions.events.create(
+        this.#sessionID,
+        {
+          events: [this.#input],
+          ...(this.#inputKey === undefined ? {} : { 'Idempotency-Key': this.#inputKey }),
+        },
+        {
+          ...options,
+          headers: buildHeaders([options.headers, { 'Idempotency-Key': this.#inputKey ?? null }]),
+        },
+      );
+    } else if (this.#attachment) {
+      const session = await this.#attachment.refresh();
+      state.select(this.#attachment.turn);
+      if (this.#collection.enabled) {
+        this.#collection.collector.snapshot(this.#attachment.turn, session);
+      }
+      if (session.status === 'idle' || session.status === 'failed') {
+        this.#settled = true;
+        return undefined;
+      }
+    }
+    this.#checkAbort();
+    return this.#stream;
+  }
+
+  async #reconcile(): Promise<void> {
+    if (!this.#attachment) {
+      return;
+    }
+    const external = this.#options.signal;
+    const abort = () => this.abort(external?.reason);
+    external?.addEventListener('abort', abort, { once: true });
+    try {
+      if (external?.aborted) {
+        abort();
+      }
+      this.#checkAbort();
+      await this.#attachment.reconcile(this.#collection.collector);
+    } finally {
+      external?.removeEventListener('abort', abort);
     }
   }
 

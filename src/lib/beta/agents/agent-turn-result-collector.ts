@@ -2,6 +2,7 @@ import type {
   AgentSession,
   AgentSessionEvent,
   AgentSessionAssistantMessage,
+  AgentSessionMessage,
 } from '../../../resources/beta/agents/agents';
 import type { Turn } from '../../../resources/beta/agents/sessions/turns';
 import { AgentTurnResult } from './agent-turn-result';
@@ -21,6 +22,35 @@ export class AgentTurnResultCollector {
 
   constructor(sessionID?: string) {
     this.#sessionID = sessionID;
+  }
+
+  /** Seed a selected root without synthesizing public SSE events. */
+  snapshot(turn: Turn | undefined, session?: AgentSession): void {
+    if (turn && turn.subagent_id === null && (!this.#turn || this.#turn.id === turn.id)) {
+      this.#turn = structuredClone(turn);
+      this.#sessionID = turn.session_id;
+      this.#terminal = turn.status === 'completed' || turn.status === 'failed' || turn.status === 'cancelled';
+    }
+    if (session) {
+      this.#requiredActions = structuredClone(session.required_actions ?? []);
+      this.#sessionFailed ||= session.status === 'failed';
+      this.#idle ||= session.status === 'idle' && this.#terminal;
+    }
+  }
+
+  /** Preserve an observed SSE snapshot, including extra fields omitted from history. */
+  history(item: AgentSessionMessage, index: number): void {
+    if (item.id === null || item.content.some((part) => part.type !== 'output_text')) {
+      throw this.error('observation');
+    }
+    const observed = this.#messages.get(item.id)?.message;
+    const message: AgentSessionAssistantMessage = observed ?? {
+      ...item,
+      id: item.id,
+      role: 'assistant',
+      content: item.content.flatMap((part) => (part.type === 'output_text' ? [{ ...part }] : [])),
+    };
+    this.#messages.set(item.id, { index, message });
   }
 
   accept(event: AgentSessionEvent): void {

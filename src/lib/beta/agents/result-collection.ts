@@ -18,6 +18,7 @@ export class ResultCollection {
 
   readonly #source: () => AsyncIterator<AgentSessionEvent>;
   readonly #signal: AbortSignal | undefined;
+  readonly #finalize: (() => Promise<void>) | undefined;
   readonly #canHandle: (name: string) => boolean;
 
   constructor(
@@ -25,11 +26,17 @@ export class ResultCollection {
     canHandle: (name: string) => boolean = () => false,
     sessionID?: string,
     signal?: AbortSignal,
+    finalize?: () => Promise<void>,
   ) {
     this.#source = source;
+    this.#finalize = finalize;
     this.#signal = signal;
     this.#canHandle = canHandle;
     this.collector = new AgentTurnResultCollector(sessionID);
+  }
+
+  get enabled(): boolean {
+    return this.#enabled;
   }
 
   enable(): void {
@@ -101,6 +108,7 @@ export class ResultCollection {
       if (!this.collector.ready && this.#signal?.aborted) {
         throw this.collector.error('observation', this.#signal.reason);
       }
+      await this.#finalize?.();
       return this.collector.finish();
     } catch (error) {
       throw error instanceof AgentTurnResultError ? error : this.collector.error('observation', error);

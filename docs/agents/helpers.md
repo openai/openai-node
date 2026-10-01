@@ -63,9 +63,9 @@ for await (const event of stream) {
 
 Register the corresponding function on the agent before using a handler. Each input and tool-result submission uses a distinct idempotency key preserved across retries. `idempotencyKey` applies to input only; a case-insensitive `Idempotency-Key` request header takes precedence. Request options are passed as the third argument.
 
-The first coordinator `turn.created` event selects the turn. Initial idle events and subagent completions do not terminate iteration. After that turn completes, fails, or is cancelled, the helper waits for `session.idle`; `session.failed` also terminates. These terminal events remain visible, while an unexpected connection end throws.
+For input submissions, the first coordinator `turn.created` event selects the turn. Initial idle events and subagent completions do not terminate iteration. After that turn completes, fails, or is cancelled, the helper waits for `session.idle`; `session.failed` also terminates. These terminal events remain visible, while an unexpected connection end throws.
 
-Break out of `for await`, call `stream.abort()`, or pass a request `signal` to close local requests. This does not cancel the backend turn. Cancellation interrupts waiting for an asynchronous handler but cannot undo work the callback already started. For observing an active session without submitting input, use `client.beta.agents.sessions.events.stream()`.
+Break out of `for await`, call `stream.abort()`, or pass a request `signal` to close local requests. This does not cancel the backend turn. Cancellation interrupts waiting for an asynchronous handler but cannot undo work the callback already started. For the raw event connection alone, use `client.beta.agents.sessions.events.stream()`.
 
 ## Typed application tools (beta)
 
@@ -130,3 +130,20 @@ that schema. `standardAgentTextFormat` from
 validators; `agentOutputFormat(schema, parse)` supports other validators.
 `output_parsed` contains the first parsed final text part; every final text part is validated.
 `AgentOutputParseError.raw_result` preserves completed raw output if parsing fails.
+
+### Reattach to hosted work (beta)
+
+Omit `input` to reconnect using a saved session ID and the same handlers:
+
+```ts
+const stream = client.beta.agents.sessions.stream(sessionId, {
+  toolHandlers: { lookup_order: lookupOrder },
+});
+console.log((await stream.finalResult()).output_text);
+```
+
+Reattachment sends no user message. Final-result collection recovers saved output
+for the selected turn; an already-idle attachment has no selected result. Use
+`withResultCollection()` before progress iteration as above. A call whose result
+was not acknowledged may run again after reconnecting, so application side effects
+still need their own deduplication.

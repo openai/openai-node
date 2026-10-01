@@ -157,10 +157,10 @@ function normalizeRequestOptionsForQuery(
 }
 
 export class Sessions extends APIResource {
-  /** Stream one turn on an idle session with a single input writer. See AgentSessionStream for lifecycle and tool handling. */
+  /** Stream a new turn on an idle session, or omit input to reattach. See AgentSessionStream for lifecycle and tool handling. */
   stream<T = never>(
     sessionID: string,
-    params: AgentSessionStreamParams<T>,
+    params: AgentSessionStreamParams<T> = {},
     options?: RequestOptions,
   ): AgentSessionStream<T> {
     return new AgentSessionStream(this, sessionID, params, options);
