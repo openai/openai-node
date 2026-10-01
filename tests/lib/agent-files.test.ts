@@ -198,6 +198,42 @@ describe('beta agent file preparation', () => {
     ).rejects.toThrow('Idempotency-Key');
     expect(requests).toHaveLength(0);
   });
+  test.each([
+    ['/workspace/a', '/workspace/a-b', '/workspace/a/b'],
+    ['/workspace/a/b', '/workspace/a-b', '/workspace/a'],
+  ])('rejects ancestor collisions before uploading: %j', async (...paths) => {
+    const { client, requests } = fileTransport();
+    const file = new File(['a'], 'a');
+    await expect(
+      client.beta.agents.environments.files.prepare(Object.fromEntries(paths.map((path) => [path, file]))),
+    ).rejects.toThrow('conflict');
+    expect(requests).toHaveLength(0);
+  });
+  test('keeps caller upload order for nonconflicting destinations with shared prefixes', async () => {
+    const { client, uploaded } = fileTransport();
+    const paths = ['/workspace/z', '/workspace/a-b', '/workspace/a/b', '/workspace/a/bc'];
+    const prepared = await client.beta.agents.environments.files.prepare(
+      Object.fromEntries(paths.map((path) => [path, new File([path], 'input.txt')])),
+    );
+    expect(uploaded).toEqual(paths);
+    expect(prepared.files).toEqual(
+      paths.map((path, i) => ({ type: 'file_id', file_id: `file_${i + 1}`, path })),
+    );
+  });
+  test('reaches the API for a large nonconflicting batch and preserves its rejection', async () => {
+    const { client, requests } = fileTransport({ failUpload: 1 });
+    const file = new File(['a'], 'a');
+    const failure = await client.beta.agents.environments.files
+      .prepare(Object.fromEntries(Array.from({ length: 10_000 }, (_, i) => [`/workspace/batch/${i}`, file])))
+      .catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(AgentFileUploadError);
+    if (!(failure instanceof AgentFileUploadError)) {
+      throw new Error('Expected upload error');
+    }
+    expect(failure.cause).toEqual(expect.objectContaining({ status: 400 }));
+    expect(failure.uploadedFiles).toEqual([]);
+    expect(requests).toHaveLength(1);
+  });
   test.each([() => 1, 51 * 1024 * 1024])(
     'accepts upload streams with unrelated size members: %s',
     async (size) => {

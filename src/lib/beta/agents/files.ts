@@ -56,13 +56,14 @@ function preflight(files: Record<string, Uploadable>, options: RequestOptions): 
   ) {
     throw new OpenAIError('Do not reuse an Idempotency-Key across multiple file uploads');
   }
-  const paths: string[] = [];
+  const paths = new Set(entries.map(([path]) => path));
   for (const [path] of entries) {
     validateAgentFilePath(path);
-    if (paths.some((other) => path.startsWith(`${other}/`) || other.startsWith(`${path}/`))) {
-      throw new OpenAIError('Agent file destinations conflict');
+    for (let slash = path.lastIndexOf('/'); slash > 0; slash = path.lastIndexOf('/', slash - 1)) {
+      if (paths.has(path.slice(0, slash))) {
+        throw new OpenAIError('Agent file destinations conflict');
+      }
     }
-    paths.push(path);
   }
   return entries;
 }
