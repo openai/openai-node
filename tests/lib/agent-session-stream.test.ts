@@ -4,6 +4,9 @@ import OpenAI, { APIUserAbortError, BadRequestError } from 'openai';
 import { outputText } from 'openai/lib/agents/output-text';
 import type { AgentSessionEvent, AgentSessionMessage } from 'openai/resources/beta/agents/agents';
 import type { AgentToolHandler } from 'openai/lib/agents/agent-session-stream';
+import { z } from 'zod/v4';
+import { zodResponsesFunction } from 'openai/helpers/zod';
+import { functionTool } from 'openai/lib/beta/agents/function-tool';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -113,6 +116,62 @@ function badRequest(message: string, code = 'invalid_request_error') {
 }
 
 describe('agents sessions.stream public transport', () => {
+  test('binds a catalog lookup without exposing local dependencies', async () => {
+    const catalog = {
+      catalogID: 'catalog_local',
+      lookup: vi.fn(async (item_id: string) => ({ item_id, price: '12.50' })),
+    };
+    const tool = functionTool(
+      zodResponsesFunction({
+        name: 'lookup_item',
+        description: 'Look up an item in the connected catalog.',
+        parameters: z.object({ item_id: z.string() }),
+        function: ({ item_id }) => catalog.lookup(item_id),
+      }),
+    );
+    const valid = call('valid', { item_id: 'ITEM_A' }, 'turn_main', tool.name);
+    const { client, requests } = transport([
+      turn(),
+      valid,
+      valid,
+      call('invalid', { item_id: 12 }, 'turn_main', tool.name),
+      call('legacy', '{"item_id":"ITEM_B"}', 'turn_main', tool.name),
+      call('raw', {}, 'turn_main', 'raw'),
+      ...ending(),
+    ]);
+    await collect(
+      client.beta.agents.sessions.stream(
+        'session_test',
+        {
+          input: 'Look up catalog item ITEM_A.',
+          toolHandlers: { [tool.name]: tool.handler, raw: () => 'raw' },
+        },
+        { headers: { 'x-application': 'catalog' } },
+      ),
+    );
+    expect(catalog.lookup.mock.calls).toEqual([['ITEM_A'], ['ITEM_B']]);
+    expect(
+      posts(requests)
+        .slice(1)
+        .map(({ body }) => body.events?.[0]),
+    ).toEqual([
+      expect.objectContaining({
+        call_id: 'valid',
+        success: true,
+        output: '{"item_id":"ITEM_A","price":"12.50"}',
+      }),
+      expect.objectContaining({ call_id: 'invalid', success: false, error: 'Tool handler failed.' }),
+      expect.objectContaining({
+        call_id: 'legacy',
+        success: true,
+        output: '{"item_id":"ITEM_B","price":"12.50"}',
+      }),
+      expect.objectContaining({ call_id: 'raw', success: true, output: 'raw' }),
+    ]);
+    expect(requests.every(({ request }) => request.headers.get('x-application') === 'catalog')).toBe(true);
+    expect(JSON.stringify(tool.definition)).not.toContain('catalog_local');
+  });
+
   test('subscribes before normalized input and waits for selected coordinator terminal then idle', async () => {
     const events = [
       event('agent.session.idle', 'initial_idle'),
