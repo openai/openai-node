@@ -374,6 +374,28 @@ describe('beta agent file preparation', () => {
 });
 
 describe('beta result artifacts', () => {
+  test('returns an unconsumed native response for an exact result artifact, preserving options', async () => {
+    const { client, requests } = artifactTransport();
+    const response = await client.beta.agents.sessions.artifacts
+      .forResult(new AgentTurnResult(turn, []))
+      .content(artifact.path, { headers: { 'X-Trace-Test': 'memory' } });
+    expect(response).toBeInstanceOf(Response);
+    expect(response.bodyUsed).toBe(false);
+    expect(new TextDecoder().decode(await response.arrayBuffer())).toBe('onetwo');
+    expect(requests).toHaveLength(3);
+    expect(requests.every((request) => request.headers.get('x-trace-test') === 'memory')).toBe(true);
+  });
+  test('preserves cancellation before an in-memory content lookup begins', async () => {
+    const { client, requests } = artifactTransport();
+    const abort = new AbortController();
+    abort.abort();
+    await expect(
+      client.beta.agents.sessions.artifacts
+        .forResult(new AgentTurnResult(turn, []))
+        .content(artifact.path, { signal: abort.signal }),
+    ).rejects.toThrow(/abort/iu);
+    expect(requests).toHaveLength(0);
+  });
   test('binds identity once, paginates, and streams the exact artifact to the chosen destination', async () => {
     const { client, requests } = artifactTransport();
     const result = new AgentTurnResult({ ...turn }, []);

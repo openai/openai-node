@@ -124,7 +124,7 @@ export async function prepareAgentDirectory(
   return resource.prepare(selected, options);
 }
 
-/** Beta, Node.js: a chosen local destination, opened only when a download writes or completes. */
+/** Beta, Node.js: an application-owned safe path in a stable directory, opened lazily for a download. */
 export function agentFileDestination(path: string): AgentWritableStream<Uint8Array> {
   const absolute = nodePath.resolve(path);
   let handle: FileHandle | undefined;

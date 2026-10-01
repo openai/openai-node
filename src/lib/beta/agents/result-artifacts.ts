@@ -43,6 +43,12 @@ export class AgentResultArtifacts {
     return selected;
   }
 
+  /** Return the native binary response for this result's exact artifact path. */
+  async content(path: string, options?: RequestOptions): Promise<Response> {
+    const artifact = await this.retrieve(path, options);
+    return this.#resource.content(artifact.id, { session_id: this.#sessionID }, options);
+  }
+
   /** Stream bytes to a caller-chosen destination; the hosted path never selects a local path. */
   async download(
     params: { path: string; to: WritableStream<Uint8Array> },

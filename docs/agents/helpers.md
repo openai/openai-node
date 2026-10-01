@@ -154,6 +154,17 @@ await client.beta.agents.sessions.artifacts.forResult(result).download({
 });
 ```
 
+To read the report into memory, use the native response:
+
+```ts
+const report = client.beta.agents.sessions.artifacts.forResult(result);
+const bytes = await (await report.content('/workspace/outputs/report.md')).arrayBuffer();
+```
+
+`agentFileDestination` assumes an application-owned safe path whose parent directory
+stays stable during the download. To control file opening yourself, pass your own
+`WritableStream` to `download` instead.
+
 For a connected environment, stage another file directly:
 
 ```ts
