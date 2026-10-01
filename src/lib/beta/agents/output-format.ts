@@ -1,18 +1,13 @@
+import type { AgentOutputFormat } from './output-format-types';
+
 import { OpenAIError } from '../../../core/error';
 import type { JSONSchema } from '../../jsonschema';
 import { toStrictJsonSchema } from '../../transform';
-import type { AgentTurnResult } from './agent-turn-result';
-import type { TextFormatParam } from '../../../resources/beta/agents/agents';
-import type { ParsedAgentTurnResult } from './parsed-agent-turn-result';
+
+export type { AgentOutputFormat, AgentResult } from './output-format-types';
 
 export { ParsedAgentTurnResult } from './parsed-agent-turn-result';
 export { AgentOutputParseError } from './output-parse-error';
-
-/** Beta: an Agents JSON Schema format with a local output validator. */
-export interface AgentOutputFormat<T> extends TextFormatParam.TextFormatParamJSONSchema {
-  /** SDK-only parser; omitted from serialized requests. */
-  $parseRaw: (text: string) => T;
-}
 
 /** Beta: normalize an object-root schema and bind its local output validator. */
 export function agentOutputFormat<T>(schema: JSONSchema, parse: (text: string) => T): AgentOutputFormat<T> {
@@ -28,6 +23,3 @@ export function agentOutputFormat<T>(schema: JSONSchema, parse: (text: string) =
     enumerable: false,
   }) as AgentOutputFormat<T>;
 }
-
-/** Beta: raw results remain unchanged unless a typed format is supplied. */
-export type AgentResult<T> = [T] extends [never] ? AgentTurnResult : ParsedAgentTurnResult<T>;

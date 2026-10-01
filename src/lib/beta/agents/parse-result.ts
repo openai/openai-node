@@ -1,7 +1,7 @@
 import type { SessionCreateParams } from '../../../resources/beta/agents/sessions/sessions';
 import type { AgentTurnResult } from './agent-turn-result';
 import type { TextFormatParam } from '../../../resources/beta/agents/agents';
-import type { AgentOutputFormat, AgentResult } from './output-format';
+import type { AgentOutputFormat, AgentResult } from './output-format-types';
 import { ParsedAgentTurnResult } from './parsed-agent-turn-result';
 import { AgentOutputParseError } from './output-parse-error';
 

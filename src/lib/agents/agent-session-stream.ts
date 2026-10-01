@@ -1,4 +1,4 @@
-import type { AgentOutputFormat, AgentResult } from '../beta/agents/output-format';
+import type { AgentOutputFormat, AgentResult } from '../beta/agents/output-format-types';
 import { TurnState } from './turn-state';
 import { parseAgentResultPromise } from '../beta/agents/parse-result';
 import { ResultCollection } from '../beta/agents/result-collection';

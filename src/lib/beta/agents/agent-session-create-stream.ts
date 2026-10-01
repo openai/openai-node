@@ -1,4 +1,4 @@
-import type { AgentOutputFormat, AgentResult } from './output-format';
+import type { AgentOutputFormat, AgentResult } from './output-format-types';
 import type { Stream } from '../../../core/streaming';
 import type { AgentSessionEvent } from '../../../resources/beta/agents/agents';
 import { parseAgentResultPromise } from './parse-result';

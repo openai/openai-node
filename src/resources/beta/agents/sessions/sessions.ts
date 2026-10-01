@@ -8,7 +8,7 @@ import {
   type AgentSessionCreateStream,
   withAgentTurnResult,
 } from '../../../../lib/beta/agents/agent-session-create-stream';
-import type { AgentOutputFormat } from '../../../../lib/beta/agents/output-format';
+import type { AgentOutputFormat } from '../../../../lib/beta/agents/output-format-types';
 import { captureAgentOutput } from '../../../../lib/beta/agents/parse-result';
 import { APIResource } from '../../../../core/resource';
 import * as SessionsAPI from './sessions';
