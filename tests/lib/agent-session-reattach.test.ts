@@ -39,6 +39,10 @@ function attachTransport(
     manualEnvironment?: boolean;
     manualOrigin?: 'browser_origin_access' | 'browser_authentication';
     staleFunction?: boolean;
+    staleEnvironment?: boolean;
+    staleIdle?: boolean;
+    historyReplay?: boolean;
+    earlyIdle?: boolean;
     terminalStatus?: 'completed' | 'failed' | 'cancelled';
     multipleMessages?: boolean;
     baselineRace?: boolean;
@@ -76,7 +80,7 @@ function attachTransport(
         arguments: '{}',
       },
     ];
-    if (config.manualEnvironment) {
+    if (config.manualEnvironment || config.staleEnvironment) {
       required_actions = [{ type: 'environment_connection', environment_id: 'env_test' }];
     }
     if (config.manualOrigin) {
@@ -89,9 +93,13 @@ function attachTransport(
         },
       ];
     }
+    let status = (finished && !config.successor) || config.staleIdle ? 'idle' : 'requires_action';
+    if (!finished && config.staleEnvironment) {
+      status = 'in_progress';
+    }
     return {
       id: turn.session_id,
-      status: finished && !config.successor ? 'idle' : 'requires_action',
+      status,
       required_actions: finished && !config.successor ? [] : required_actions,
     };
   };
@@ -150,13 +158,17 @@ function attachTransport(
       if (path.endsWith('/turns')) {
         listCalls += 1;
         let data = config.noInitial && listCalls === 1 ? [] : [currentTurn()];
-        if (config.baselineRace && listCalls === 1) {
+        if ((config.baselineRace && listCalls === 1) || config.historyReplay) {
           data = [{ ...currentTurn(), id: 'turn_old', status: 'completed' }];
         }
         return Response.json({ object: 'list', data, has_more: false });
       }
       if (path.includes('/turns/')) {
-        return Response.json(currentTurn());
+        return Response.json(
+          path.endsWith('/turn_old')
+            ? { ...currentTurn(), id: 'turn_old', status: 'completed' }
+            : currentTurn(),
+        );
       }
       if (path.endsWith('/items')) {
         if (config.historyFailure) {
@@ -197,6 +209,22 @@ function attachTransport(
           return new Response(null, { status: 204 });
         }
         subscribed = true;
+        if (config.earlyIdle) {
+          send({
+            type: 'agent.session.idle',
+            event_id: 'early_idle',
+            session: { ...session(), status: 'idle' },
+          });
+        }
+        if (config.historyReplay) {
+          send({
+            type: 'agent.session.turn.item.added',
+            event_id: 'historical_auth',
+            turn_id: 'turn_old',
+            output_index: 0,
+            item: { type: 'computer_use_approval_request', id: 'old_auth', turn_id: 'turn_old' },
+          });
+        }
         if (config.race || config.baselineRace) {
           finished = true;
         }
@@ -447,6 +475,39 @@ describe('beta agents stream attachment', () => {
           .stream(turn.session_id, { toolHandlers: { lookup: () => 'found' } })
           .finalResult(),
       ).rejects.toMatchObject({ reason: 'observation', cause: { message: 'Synthetic SSE read failed' } });
+    },
+  );
+  test.each(['staleEnvironment', 'staleIdle', 'earlyIdle'] as const)(
+    'keeps observing the selected active turn despite %s projection',
+    async (kind) => {
+      const { client } = attachTransport({ [kind]: true });
+      const handler = vi.fn(() => 'found');
+      const result = await client.beta.agents.sessions
+        .stream(turn.session_id, { toolHandlers: { lookup: handler } })
+        .finalResult();
+      expect(result.output_text).toBe('Recovered answer');
+      expect(handler).toHaveBeenCalledOnce();
+    },
+  );
+
+  test('historical authentication replay cannot select the old completed root', async () => {
+    const { client } = attachTransport({ historyReplay: true });
+    const handler = vi.fn(() => 'found');
+    const result = await client.beta.agents.sessions
+      .stream(turn.session_id, { toolHandlers: { lookup: handler } })
+      .finalResult();
+    expect(result.turn_id).toBe(turn.id);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+  test.each(['failed', 'cancelled'] as const)(
+    'raw recovery preserves the read error for %s work',
+    async (terminalStatus) => {
+      const { client } = attachTransport({ readEnd: 'error', terminalStatus });
+      await expect(
+        drain(
+          client.beta.agents.sessions.stream(turn.session_id, { toolHandlers: { lookup: () => 'found' } }),
+        ),
+      ).rejects.toThrow('Synthetic SSE read failed');
     },
   );
 });

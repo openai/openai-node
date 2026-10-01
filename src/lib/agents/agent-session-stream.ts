@@ -204,10 +204,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
         if (!state.accept(event)) {
           continue;
         }
-        const terminal =
-          state.terminal(event) ||
-          this.#attachment?.settled ||
-          (this.#attachment !== undefined && event.type === 'agent.session.idle');
+        const terminal = state.terminal(event) || this.#attachment?.terminal(event);
         const pendingCall = state.call(event);
         const handler = pendingCall && this.#handlers.get(pendingCall.name);
         // Freeze dispatch identity and arguments before exposing the original event.
@@ -322,12 +319,17 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
       const session = await this.#attachment.refresh();
       state.select(this.#attachment.turn);
       if (this.#collection.enabled) {
-        this.#attachment.snapshot(this.#collection.collector, session);
-        if (await this.#attachment.blockedManualAction(session)) {
+        const actions = await this.#attachment.manualActions(session);
+        this.#attachment.snapshot(this.#collection.collector, session, actions);
+        if (actions.length) {
           this.#collection.collector.checkAction(() => false);
         }
       }
-      if (this.#attachment.settled || session.status === 'idle' || session.status === 'failed') {
+      if (
+        this.#attachment.settled ||
+        (!this.#attachment.turn && session.status === 'idle') ||
+        session.status === 'failed'
+      ) {
         this.#settled = true;
         return undefined;
       }
