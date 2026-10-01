@@ -64,7 +64,17 @@ function selectedAgentFile({
       ) {
         throw new OpenAIError('Selected agent file changed before upload');
       }
-      yield* handle.createReadStream({ autoClose: false });
+      let received = 0;
+      if (info.size > 0) {
+        for await (const chunk of handle.createReadStream({ autoClose: false, end: info.size - 1 })) {
+          received += chunk.length;
+          yield chunk;
+        }
+      }
+      const finalInfo = await handle.stat();
+      if (received !== info.size || finalInfo.size !== info.size) {
+        throw new OpenAIError('Selected agent file changed while uploading');
+      }
     } finally {
       await handle.close();
     }
@@ -122,7 +132,43 @@ export function agentFileDestination(path: string): AgentWritableStream<Uint8Arr
     await handle?.close();
     handle = undefined;
   };
-  const file = async () => (handle ??= await open(absolute, 'w'));
+  const file = async () => {
+    if (handle) {
+      return handle;
+    }
+    let expected: Stats | undefined;
+    try {
+      expected = await lstat(absolute);
+    } catch (error) {
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+        throw error;
+      }
+    }
+    if (expected && !expected.isFile()) {
+      throw new OpenAIError('Agent artifact destinations must be regular files');
+    }
+    // Never truncate before verifying the opened entry. Exclusive creation also rejects dangling links.
+    /* oxlint-disable no-bitwise -- Combine native flags; identity validation also covers Windows. */
+    const flags =
+      constants.O_WRONLY |
+      (constants.O_NOFOLLOW ?? 0) |
+      (constants.O_NONBLOCK ?? 0) |
+      (expected ? 0 : constants.O_CREAT | constants.O_EXCL);
+    /* oxlint-enable no-bitwise */
+    const opened = await open(absolute, flags);
+    try {
+      const current = await opened.stat();
+      if (!current.isFile() || (expected && (current.dev !== expected.dev || current.ino !== expected.ino))) {
+        throw new OpenAIError('Agent artifact destination changed before opening');
+      }
+      await opened.truncate(0);
+      handle = opened;
+      return handle;
+    } catch (error) {
+      await opened.close();
+      throw error;
+    }
+  };
   return new WritableStream<Uint8Array>({
     async write(chunk) {
       try {

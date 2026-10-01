@@ -1,6 +1,6 @@
 import * as fsPromises from 'node:fs/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, mkdtemp, readFile, rm, symlink, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
 import OpenAI from 'openai';
@@ -16,7 +16,7 @@ import type { Turn } from 'openai/resources/beta/agents/sessions/turns';
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Keep real filesystem I/O while deterministically testing an identity change during path resolution.
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof fsPromises>();
-  return { ...actual, realpath: vi.fn(actual.realpath) };
+  return { ...actual, realpath: vi.fn(actual.realpath), lstat: vi.fn(actual.lstat) };
 });
 
 function fileTransport({
@@ -327,6 +327,34 @@ describe('beta agent file preparation', () => {
       resolution.mockRestore();
     }
   });
+  test.each(['append', 'truncate'] as const)(
+    'fails if a selected file changes size during upload: %s',
+    async (change) => {
+      const root = await directory();
+      const path = nodePath.join(root, 'source.txt');
+      await writeFile(path, new Uint8Array(256 * 1024));
+      const source = await agentFile(path);
+      const { data } = source;
+      if (!(Symbol.asyncIterator in data)) {
+        throw new Error('Expected an iterable source');
+      }
+      let received = 0;
+      const consume = async () => {
+        for await (const chunk of data) {
+          if (!(chunk instanceof Uint8Array)) {
+            throw new Error('Expected file bytes');
+          }
+          if (received === 0) {
+            // oxlint-disable-next-line no-await-in-loop -- Mutate after the source opens and yields its first chunk.
+            await (change === 'append' ? appendFile(path, new Uint8Array(128 * 1024)) : truncate(path, 0));
+          }
+          received += chunk.byteLength;
+        }
+      };
+      await expect(consume()).rejects.toThrow('changed while uploading');
+      expect(received).toBeLessThanOrEqual(source.size);
+    },
+  );
   test('a selected local file that changes identity before upload is not read', async () => {
     const root = await directory();
     const path = nodePath.join(root, 'source.txt');
@@ -388,6 +416,74 @@ describe('beta result artifacts', () => {
       .forResult(new AgentTurnResult(turn, []))
       .download({ path: artifact.path, to: agentFileDestination(destination) });
     expect(await readFile(destination, 'utf-8')).toBe('onetwo');
+  });
+  test.each(['existing', 'dangling'] as const)(
+    'rejects a %s destination symlink without changing its target',
+    async (kind) => {
+      const { client } = artifactTransport();
+      const root = await directory();
+      const target = nodePath.join(root, 'target.txt');
+      if (kind === 'existing') {
+        await writeFile(target, 'unchanged');
+      }
+      const destination = nodePath.join(root, 'report.md');
+      await symlink(target, destination);
+      await expect(
+        client.beta.agents.sessions.artifacts.forResult(new AgentTurnResult(turn, [])).download({
+          path: artifact.path,
+          to: agentFileDestination(destination),
+        }),
+      ).rejects.toThrow('regular files');
+      if (kind === 'existing') {
+        expect(await readFile(target, 'utf-8')).toBe('unchanged');
+      } else {
+        await expect(readFile(target)).rejects.toMatchObject({ code: 'ENOENT' });
+      }
+    },
+  );
+  test('validates the opened identity before truncating an existing destination', async () => {
+    const { client } = artifactTransport();
+    const root = await directory();
+    const previous = nodePath.join(root, 'previous.txt');
+    const destination = nodePath.join(root, 'report.md');
+    await writeFile(previous, 'previous');
+    await writeFile(destination, 'unchanged');
+    const expected = await fsPromises.lstat(previous);
+    const metadata = vi.spyOn(fsPromises, 'lstat').mockResolvedValueOnce(expected);
+    try {
+      await expect(
+        client.beta.agents.sessions.artifacts.forResult(new AgentTurnResult(turn, [])).download({
+          path: artifact.path,
+          to: agentFileDestination(destination),
+        }),
+      ).rejects.toThrow('changed before opening');
+      expect(await readFile(destination, 'utf-8')).toBe('unchanged');
+    } finally {
+      metadata.mockRestore();
+    }
+  });
+  test('overwrites regular files through ancestor aliases and truncates empty successful downloads', async () => {
+    const { client } = artifactTransport();
+    const root = await directory();
+    const physical = nodePath.join(root, 'physical');
+    const alias = nodePath.join(root, 'alias');
+    await mkdir(physical);
+    await symlink(physical, alias, 'dir');
+    const destination = nodePath.join(alias, 'report.md');
+    await writeFile(destination, 'previous longer contents');
+    await client.beta.agents.sessions.artifacts.forResult(new AgentTurnResult(turn, [])).download({
+      path: artifact.path,
+      to: agentFileDestination(destination),
+    });
+    expect(await readFile(nodePath.join(physical, 'report.md'), 'utf-8')).toBe('onetwo');
+    await agentFileDestination(destination).getWriter().close();
+    expect(await readFile(destination, 'utf-8')).toBe('');
+    const empty = nodePath.join(root, 'empty.md');
+    await agentFileDestination(empty).getWriter().close();
+    expect(await readFile(empty, 'utf-8')).toBe('');
+    const aborted = nodePath.join(root, 'aborted.md');
+    await agentFileDestination(aborted).abort();
+    await expect(readFile(aborted)).rejects.toMatchObject({ code: 'ENOENT' });
   });
   test('closes a content response when a locked destination cannot accept it', async () => {
     const cancel = vi.fn();
