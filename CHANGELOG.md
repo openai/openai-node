@@ -1,5 +1,36 @@
 # Changelog
 
+## [7.26.0](https://github.com/openai/openai-node/compare/v7.25.0...v7.26.0) (2026-10-01)
+
+
+### Features
+
+* **api:** Add agent session trace listing ([#2845](https://github.com/openai/openai-node/issues/2845)) ([c6dd4c7](https://github.com/openai/openai-node/commit/c6dd4c75d0c864ad2f7e7c9df9a10310fd34fe44))
+* **beta:** bind typed application functions to Agents tools ([#2852](https://github.com/openai/openai-node/issues/2852)) ([6198ba0](https://github.com/openai/openai-node/commit/6198ba0d659084e34f540e9e8fa6c9ef86306ba1))
+
+
+### Bug Fixes
+
+* **api:** allow original image detail in Chat Completions ([#2851](https://github.com/openai/openai-node/issues/2851)) ([a3c1af5](https://github.com/openai/openai-node/commit/a3c1af5506ccf1349ababf813a5b23ae49a19486))
+* **api:** correct the eval run cancellation endpoint ([#2847](https://github.com/openai/openai-node/issues/2847)) ([2f77415](https://github.com/openai/openai-node/commit/2f7741598593ac3f9d162807426e43a3f7de9557))
+* **deps-dev:** bump @swc/core from 1.16.1 to 1.16.2 ([#2827](https://github.com/openai/openai-node/issues/2827)) ([ff26e64](https://github.com/openai/openai-node/commit/ff26e64c9e509e3b744f6f11df98667d95389fac))
+* **deps-dev:** bump puppeteer from 25.10.0 to 25.11.0 in /ecosystem-tests/browser-direct-import ([#2823](https://github.com/openai/openai-node/issues/2823)) ([53f8877](https://github.com/openai/openai-node/commit/53f88770dd43ce8747014c45ee894df6671f15b2))
+* **deps-dev:** bump puppeteer from 25.10.0 to 25.11.0 in /ecosystem-tests/ts-browser-webpack ([#2830](https://github.com/openai/openai-node/issues/2830)) ([2ac0cf2](https://github.com/openai/openai-node/commit/2ac0cf227fc7bcae31173392378939c2b3e7c4a8))
+* **deps-dev:** bump webpack from 5.110.3 to 5.111.1 in /ecosystem-tests/ts-browser-webpack ([#2828](https://github.com/openai/openai-node/issues/2828)) ([89de47a](https://github.com/openai/openai-node/commit/89de47a46ca562cc2ede953c81e55790ffd6f0ee))
+* **deps-dev:** bump wrangler from 4.131.1 to 4.135.0 in /ecosystem-tests/cloudflare-worker ([#2824](https://github.com/openai/openai-node/issues/2824)) ([8c2e159](https://github.com/openai/openai-node/commit/8c2e1593dea895b4a18819446239b8a1f8912ef2))
+* **deps-dev:** update Vercel CLI to remove legacy proxy dependencies ([#2835](https://github.com/openai/openai-node/issues/2835)) ([94395e8](https://github.com/openai/openai-node/commit/94395e8babb191c712a8bc6741e2ffbb017d3e09))
+* **deps-dev:** upgrade Vitest and migrate performance benchmarks ([#2831](https://github.com/openai/openai-node/issues/2831)) ([a1421b1](https://github.com/openai/openai-node/commit/a1421b1025e4815f0c535d44423338d3449d81d9))
+* **deps:** bump @azure/identity from 4.13.2 to 4.13.3 ([#2825](https://github.com/openai/openai-node/issues/2825)) ([bfa2dec](https://github.com/openai/openai-node/commit/bfa2decd67042babe165c68d4bee8be248e447e8))
+* **deps:** bump dotenv from 17.4.2 to 18.0.1 ([#2822](https://github.com/openai/openai-node/issues/2822)) ([6d0a62c](https://github.com/openai/openai-node/commit/6d0a62c39c0a51963b90a20e257f733813d9fbf3))
+* **deps:** bump zod from 4.5.4 to 4.6.5 ([#2829](https://github.com/openai/openai-node/issues/2829)) ([d2e9a06](https://github.com/openai/openai-node/commit/d2e9a0614e2dc3975f44d20d814146466d243ae4))
+* **responses:** refresh credentials on WebSocket reconnects ([#2856](https://github.com/openai/openai-node/issues/2856)) ([0afb3da](https://github.com/openai/openai-node/commit/0afb3da338c3737e82f5404d046de3ea074cce5d))
+* **responses:** reserve lane IDs across WebSocket session replacements ([#2842](https://github.com/openai/openai-node/issues/2842)) ([8b5e176](https://github.com/openai/openai-node/commit/8b5e1767203cf1fda1e2fa35fdc86a3b734c5a2a))
+
+
+### Chores
+
+* **api:** retain WebRTC Live session transport types ([#2846](https://github.com/openai/openai-node/issues/2846)) ([9798c93](https://github.com/openai/openai-node/commit/9798c931c519f980970882255e806dac22ff4e74))
+
 ## [7.25.0](https://github.com/openai/openai-node/compare/v7.24.0...v7.25.0) (2026-09-29)
 
 
