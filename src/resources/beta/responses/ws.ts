@@ -37,8 +37,24 @@ export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
     return headers;
   }
 
+  /**
+   * Whether credentials passed to the Node transport use the SDK key.
+   * The SDK recognizes its key, including copies and additions in credential headers.
+   * Override and return true if your socket hook signs or otherwise irreversibly transforms it.
+   * Explicit caller options and header removals still take precedence on reconnect.
+   */
+  protected _usesSDKAPIKey(authHeaders: Record<string, string>): boolean {
+    return this._credentials.usesAPIKey(authHeaders);
+  }
+
   protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
-    const socketOptions = this._credentials.build(this._client, authHeaders, this._wsOptions);
+    const capturedAuthHeaders = { ...authHeaders };
+    const socketOptions = this._credentials.build(
+      this._client,
+      capturedAuthHeaders,
+      this._wsOptions,
+      !this.socket ? this._usesSDKAPIKey(capturedAuthHeaders) : undefined,
+    );
     return new NodeWebSocket(new WS.WebSocket(url, socketOptions));
   }
 

@@ -17,7 +17,9 @@ describe.each([
   test.each([
     'Authorization',
     'X-Gateway-Authorization',
+    'raw key in X-API-Key',
     'replace without reading',
+    'spread and replace',
     'read retained headers after open',
     'cached zero-argument auth hook',
   ])('reconnects with the correct credential source: %s', async (headerName) => {
@@ -29,10 +31,15 @@ describe.each([
     }
     const attempts: (string | string[] | undefined)[][] = [];
     server.on('connection', (_peer, request) => {
-      attempts.push([request.headers.authorization, request.headers['x-gateway-authorization']]);
+      attempts.push([
+        request.headers.authorization,
+        request.headers['x-gateway-authorization'],
+        request.headers['x-api-key'],
+      ]);
     });
     const callerCredential =
       headerName === 'replace without reading' ||
+      headerName === 'spread and replace' ||
       headerName === 'read retained headers after open' ||
       headerName === 'cached zero-argument auth hook';
     const provider = vi.fn().mockResolvedValueOnce('synthetic-A');
@@ -46,6 +53,14 @@ describe.each([
     let retainedHeaders: Record<string, string> | undefined;
     // SAFETY: The stable and beta transports implement the same lifecycle and protected socket hook.
     class GatewayResponses extends (Responses as typeof StableResponsesWS) {
+      protected override _usesSDKAPIKey(authHeaders: Record<string, string>) {
+        return (
+          headerName === 'Authorization' ||
+          headerName === 'X-Gateway-Authorization' ||
+          super._usesSDKAPIKey(authHeaders)
+        );
+      }
+
       protected override _authHeaders(...args: [apiKey?: string | null]) {
         if (headerName === 'cached zero-argument auth hook') {
           if (args.length) {
@@ -67,6 +82,14 @@ describe.each([
         if (headerName === 'replace without reading') {
           authHeaders['Authorization'] = 'Bearer synthetic-independent';
           return super._createSocket(url, authHeaders);
+        }
+        if (headerName === 'spread and replace') {
+          return super._createSocket(url, { ...authHeaders, Authorization: 'Bearer synthetic-independent' });
+        }
+        if (headerName === 'raw key in X-API-Key') {
+          return super._createSocket(url, {
+            'X-API-Key': authHeaders['Authorization']?.slice('Bearer '.length) ?? '',
+          });
         }
         return super._createSocket(url, { [headerName]: sign(authHeaders['Authorization'] ?? '') });
       }
@@ -91,16 +114,25 @@ describe.each([
       expect(await outcome).toBe('reconnected');
       if (callerCredential) {
         expect(attempts).toEqual([
-          ['Bearer synthetic-independent', undefined],
-          ['Bearer synthetic-independent', undefined],
+          ['Bearer synthetic-independent', undefined, undefined],
+          ['Bearer synthetic-independent', undefined, undefined],
         ]);
         expect(provider).toHaveBeenCalledTimes(1);
         expect(client.apiKey).toBe('synthetic-A');
       } else {
-        const expected = [sign('Bearer synthetic-A'), sign('Bearer synthetic-B')];
-        expect(attempts).toEqual(
-          expected.map((value) => (headerName === 'Authorization' ? [value, undefined] : [undefined, value])),
-        );
+        if (headerName === 'raw key in X-API-Key') {
+          expect(attempts).toEqual([
+            [undefined, undefined, 'synthetic-A'],
+            [undefined, undefined, 'synthetic-B'],
+          ]);
+        } else {
+          const expected = [sign('Bearer synthetic-A'), sign('Bearer synthetic-B')];
+          expect(attempts).toEqual(
+            expected.map((value) =>
+              headerName === 'Authorization' ? [value, undefined, undefined] : [undefined, value, undefined],
+            ),
+          );
+        }
         expect(provider).toHaveBeenCalledTimes(2);
         expect(client.apiKey).toBe('synthetic-B');
       }

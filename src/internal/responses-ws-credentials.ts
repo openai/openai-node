@@ -10,33 +10,6 @@ import {
 import type { CredentialedWebSocketOptions } from './ws';
 
 /**
- * Record reads of the initially supplied bearer before transport hooks can transform its bytes.
- * An override that assigns its own credential without reading the bearer remains caller-owned.
- */
-function trackWebSocketAPIKeyUse(headers: Record<string, string>, onUse: () => void): void {
-  const authorization = headers['Authorization'];
-  if (!authorization) {
-    return;
-  }
-  Object.defineProperty(headers, 'Authorization', {
-    configurable: true,
-    enumerable: true,
-    get: () => {
-      onUse();
-      return authorization;
-    },
-    set: (value: string) => {
-      Object.defineProperty(headers, 'Authorization', {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value,
-      });
-    },
-  });
-}
-
-/**
  * Keep caller credential admission distinct from the hook's final provider-key transform.
  * The latter reuses captured base headers so no caller getters are reread after the refresh.
  */
@@ -94,6 +67,7 @@ function prepareResponsesWebSocketReconnect<Options extends CredentialedWebSocke
 /** Per-connection Responses credential state shared by the stable and beta Node transports. */
 export class ResponsesWebSocketCredentials {
   private initialAuthUsedAPIKey = false;
+  private initialAPIKey: string | undefined;
   private prepared:
     | {
         options: ReturnType<typeof buildWebSocketOptions>;
@@ -108,24 +82,40 @@ export class ResponsesWebSocketCredentials {
 
   trackInitialHeaders(client: OpenAI, headers: Record<string, string>, hasSocket: () => boolean): void {
     if (!hasSocket() && client._hasApiKeyProvider()) {
-      trackWebSocketAPIKeyUse(headers, () => {
-        if (!hasSocket()) {
-          this.initialAuthUsedAPIKey = true;
-        }
-      });
+      this.initialAPIKey = headers['Authorization']?.slice('Bearer '.length);
     }
+  }
+
+  usesAPIKey(headers: Record<string, string>): boolean {
+    const apiKey = this.initialAPIKey;
+    if (!apiKey) {
+      return false;
+    }
+    // Metadata containing a copy of a credential does not make it the socket's authentication.
+    return snapshotWebSocketCredentials(
+      {
+        headers: Object.fromEntries(
+          Object.entries(headers).map(([name, value]) => [name, value?.includes(apiKey) ? value : '']),
+        ),
+      },
+      WEBSOCKET_METADATA_HEADERS,
+    );
   }
 
   build<Options extends CredentialedWebSocketOptions>(
     client: OpenAI,
     authHeaders: Record<string, string>,
     options: Options | null | undefined,
+    initialAuthUsedAPIKey?: boolean,
   ) {
-    const capturedAuthHeaders = { ...authHeaders };
-    const socketOptions = buildResponsesWebSocketOptions(client, capturedAuthHeaders, options, this.prepared);
+    if (initialAuthUsedAPIKey !== undefined) {
+      this.initialAuthUsedAPIKey = initialAuthUsedAPIKey;
+      this.initialAPIKey = undefined;
+    }
+    const socketOptions = buildResponsesWebSocketOptions(client, authHeaders, options, this.prepared);
     if (
       client._hasApiKeyProvider() &&
-      !capturedAuthHeaders['Authorization'] &&
+      !authHeaders['Authorization'] &&
       !snapshotWebSocketCredentials(socketOptions, WEBSOCKET_METADATA_HEADERS)
     ) {
       throw new OpenAIError(
