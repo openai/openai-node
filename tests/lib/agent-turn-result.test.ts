@@ -990,6 +990,28 @@ describe('beta Agents typed output', () => {
       ),
     ).not.toThrow();
   });
+  test.each(['inherited', 'non-enumerable', 'own'] as const)(
+    'matches native option spread for %s body getters',
+    async (kind) => {
+      const getter = vi.fn(() => (kind === 'own' ? undefined : { input: 'Unexpected' }));
+      const options = {};
+      if (kind === 'inherited') {
+        Object.setPrototypeOf(options, Object.defineProperty({}, 'body', { get: getter, enumerable: true }));
+      } else {
+        Object.defineProperty(options, 'body', { get: getter, enumerable: kind === 'own' });
+      }
+      const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+      const { client } = setup([created(), message('{"summary":"Expected"}'), completed(), idle()]);
+      const stream = await client.beta.agents.sessions.create(
+        { agent: { text: { format } }, environment: { type: 'none' }, input: 'Question', stream: true },
+        options,
+      );
+      const result = await stream.finalResult();
+      expect(result.output_parsed.summary).toBe('Expected');
+      expect(getter).toHaveBeenCalledTimes(kind === 'own' ? 1 : 0);
+    },
+  );
+
   test('typed creation rejects a request-options body override before dispatch', () => {
     const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
     const { client, requests } = setup([]);

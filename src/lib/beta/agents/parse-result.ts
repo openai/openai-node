@@ -64,11 +64,11 @@ export function captureAgentOutput(body: SessionCreateParams, options?: RequestO
       throw new OpenAIError('Typed agent requests cannot customize body, agent, or text serialization');
     }
   }
-  if (options?.body !== undefined) {
+  // Snapshot options once, matching the own enumerable fields native request spreading uses.
+  const capturedOptions = { ...options };
+  if (ownJSONValue(capturedOptions, 'body') !== undefined) {
     throw new OpenAIError('Typed agent requests cannot override the body in request options');
   }
-  // Snapshot options too: an asynchronous request must retain the captured schema contract.
-  const capturedOptions = { ...options };
   delete capturedOptions.body;
   return {
     options: capturedOptions,
