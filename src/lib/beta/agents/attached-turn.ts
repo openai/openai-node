@@ -53,7 +53,7 @@ export class AttachedTurn {
     }
     if (!this.turn) {
       const latest = await this.#latestRoot();
-      return latest
+      return latest && active(latest)
         ? []
         : session.required_actions.filter((action) => action.type === 'environment_connection');
     }

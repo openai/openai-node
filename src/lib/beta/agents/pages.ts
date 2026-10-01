@@ -8,7 +8,7 @@ import { isObj } from '../../../internal/utils/values';
  */
 export async function* agentItems<T extends { id?: string | null }>(
   load: (after: string | undefined) => PromiseLike<CursorPage<T>>,
-): AsyncGenerator<T> {
+): AsyncGenerator<T, void, undefined> {
   let after: string | undefined;
   while (true) {
     // oxlint-disable-next-line no-await-in-loop -- Each page determines the next cursor.

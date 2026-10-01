@@ -536,14 +536,21 @@ describe('beta agents stream attachment', () => {
       ).rejects.toThrow('Synthetic SSE read failed');
     },
   );
-  test('reports environment connection needed before any root exists', async () => {
-    const { client } = attachTransport({ emptyRoot: true, manualEnvironment: true });
-    await expect(client.beta.agents.sessions.stream(turn.session_id).finalResult()).rejects.toMatchObject({
-      reason: 'requires_action',
-      session_id: turn.session_id,
-      required_actions: [{ type: 'environment_connection', environment_id: 'env_test' }],
-    });
-  });
+  test.each([false, true])(
+    'reports environment connection with no selected work (historical roots %s)',
+    async (historyReplay) => {
+      const { client } = attachTransport({
+        emptyRoot: !historyReplay,
+        historyReplay,
+        manualEnvironment: true,
+      });
+      await expect(client.beta.agents.sessions.stream(turn.session_id).finalResult()).rejects.toMatchObject({
+        reason: 'requires_action',
+        session_id: turn.session_id,
+        required_actions: [{ type: 'environment_connection', environment_id: 'env_test' }],
+      });
+    },
+  );
   test('an explicit parsed attachment type cannot omit its format', () => {
     const { client } = attachTransport({ idle: true });
     const checkTypes = () =>
