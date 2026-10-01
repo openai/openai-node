@@ -290,7 +290,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
   }
 
   async #closeObservation(): Promise<void> {
-    if (this.#settled && this.#attachment) {
+    if (this.#settled) {
       this.#stream?.controller.abort();
       if (!this.#reading) {
         await cancelBody(this.#response);

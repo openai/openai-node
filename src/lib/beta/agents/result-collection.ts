@@ -103,6 +103,7 @@ export class ResultCollection {
 
   async #collect(): Promise<AgentTurnResult> {
     this.enable();
+    let finalized = false;
     try {
       const iterator = this.#iterator ?? this.iterate();
       while (!this.#ended && !this.collector.ready) {
@@ -119,9 +120,21 @@ export class ResultCollection {
       if (!this.collector.ready && this.#signal?.aborted) {
         throw this.collector.error('observation', this.#signal.reason);
       }
+      finalized = true;
       await this.#finalize?.();
       return this.collector.finish();
     } catch (error) {
+      if (
+        !finalized &&
+        error instanceof AgentTurnResultError &&
+        (error.reason === 'failed' || error.reason === 'cancelled')
+      ) {
+        // oxlint-disable-next-line unicorn/catch-error-name -- Keep the original failure distinct from a reconciliation error.
+        await this.#finalize?.().catch((cause: unknown) => {
+          throw this.collector.error('observation', cause);
+        });
+        throw this.collector.error(error.reason, error.cause);
+      }
       throw error instanceof AgentTurnResultError ? error : this.collector.error('observation', error);
     } finally {
       try {

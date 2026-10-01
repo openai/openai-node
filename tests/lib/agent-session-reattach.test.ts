@@ -51,6 +51,9 @@ function attachTransport(
     terminalStatus?: 'completed' | 'failed' | 'cancelled';
     multipleMessages?: boolean;
     baselineRace?: boolean;
+    baselineReadFailure?: boolean;
+    failedSession?: boolean;
+    liveSessionFailure?: boolean;
     readEnd?: 'eof' | 'error';
     activeReadFailure?: boolean;
     historyFailure?: boolean;
@@ -58,7 +61,7 @@ function attachTransport(
   } = {},
 ) {
   const requests: Request[] = [];
-  let finished = !!config.idle;
+  let finished = !!config.idle || !!config.failedSession;
   let subscribed = false;
   let listCalls = 0;
   let controller: ReadableStreamDefaultController<Uint8Array>;
@@ -100,6 +103,9 @@ function attachTransport(
       ];
     }
     let status = (finished && !config.successor) || config.staleIdle ? 'idle' : 'requires_action';
+    if (config.failedSession || (config.liveSessionFailure && finished)) {
+      status = 'failed';
+    }
     if (!finished && config.staleEnvironment) {
       status = 'in_progress';
     }
@@ -111,6 +117,10 @@ function attachTransport(
   };
   const complete = () => {
     finished = true;
+    if (config.liveSessionFailure) {
+      send({ type: 'agent.session.failed', event_id: 'session_failed', session: session() });
+      return;
+    }
     if (config.readEnd) {
       if (config.readEnd === 'eof') {
         controller.close();
@@ -179,11 +189,18 @@ function attachTransport(
       const path = new URL(req.url).pathname;
       if (path.endsWith('/turns')) {
         listCalls += 1;
+        if (config.baselineReadFailure && listCalls > 2) {
+          finished = true;
+        }
         let data =
           config.emptyRoot || config.firstApproval || (config.noInitial && listCalls === 1)
             ? []
             : [currentTurn()];
-        if ((config.baselineRace && listCalls === 1) || config.historyReplay) {
+        if (
+          (config.baselineRace && listCalls === 1) ||
+          (config.baselineReadFailure && listCalls <= 2) ||
+          config.historyReplay
+        ) {
           data = [{ ...currentTurn(), id: 'turn_old', status: 'completed' }];
         }
         return Response.json({ object: 'list', data, has_more: false });
@@ -295,10 +312,16 @@ function attachTransport(
         if (config.race || config.baselineRace) {
           finished = true;
         }
-        if (config.activeReadFailure) {
+        if (config.activeReadFailure || config.baselineReadFailure) {
           controller.error(new Error('Synthetic SSE read failed'));
         }
-        if (!finished && !config.manualEnvironment && !config.manualOrigin && !config.activeReadFailure) {
+        if (
+          !finished &&
+          !config.manualEnvironment &&
+          !config.manualOrigin &&
+          !config.activeReadFailure &&
+          !config.baselineReadFailure
+        ) {
           const call = {
             type: 'agent.session.turn.item.added',
             event_id: 'call',
@@ -360,6 +383,38 @@ describe('beta agents stream attachment', () => {
     expect(requests.some((request) => request.method === 'POST')).toBe(false);
     expect(cancelled).toHaveBeenCalled();
   });
+  test('recovers a root created after an idle baseline when the first SSE read fails', async () => {
+    const { client, requests } = attachTransport({ baselineReadFailure: true });
+    const result = await client.beta.agents.sessions.stream(turn.session_id).finalResult();
+    expect(result.turn_id).toBe(turn.id);
+    expect(result.output_text).toBe('Recovered answer');
+    expect(requests.some((request) => request.method === 'POST')).toBe(false);
+  });
+
+  test('retains the latest failed root and its history for an already failed session', async () => {
+    const { client } = attachTransport({ failedSession: true, terminalStatus: 'failed' });
+    await expect(client.beta.agents.sessions.stream(turn.session_id).finalResult()).rejects.toMatchObject({
+      reason: 'failed',
+      turn_id: turn.id,
+      messages: [expect.objectContaining({ id: history.id })],
+    });
+  });
+
+  test.each([false, true])('reconciles live session failure (progress: %s)', async (progress) => {
+    const { client } = attachTransport({ liveSessionFailure: true, terminalStatus: 'failed' });
+    const stream = client.beta.agents.sessions.stream(turn.session_id, {
+      toolHandlers: { lookup: () => 'found' },
+    });
+    if (progress) {
+      await drain(stream.withResultCollection());
+    }
+    await expect(stream.finalResult()).rejects.toMatchObject({
+      reason: 'failed',
+      turn_id: turn.id,
+      messages: [expect.objectContaining({ id: history.id })],
+    });
+  });
+
   test('idle attachment drains but never returns an arbitrary older result', async () => {
     const first = attachTransport({ idle: true });
     await drain(first.client.beta.agents.sessions.stream(turn.session_id));

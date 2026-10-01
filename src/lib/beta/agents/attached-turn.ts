@@ -104,6 +104,12 @@ export class AttachedTurn {
         : await this.#newRoot();
     }
     const session = await this.#sessions.retrieve(this.#sessionID, this.#options);
+    if (!this.turn && session.status === 'failed') {
+      const root = await this.#latestRoot();
+      if (root?.status === 'failed') {
+        this.turn = root;
+      }
+    }
     this.#idle = session.status === 'idle';
     return session;
   }
@@ -151,9 +157,6 @@ export class AttachedTurn {
 
   /** One durable check after a genuine SSE read failure; active work remains an observation error. */
   async recover(collector?: AgentTurnResultCollector): Promise<boolean> {
-    if (!this.turn) {
-      return false;
-    }
     try {
       await (collector ? this.reconcile(collector) : this.refresh());
       return collector ? this.settled : this.turn?.status === 'completed';
@@ -164,12 +167,12 @@ export class AttachedTurn {
   }
 
   async reconcile(collector: AgentTurnResultCollector): Promise<void> {
-    if (!this.turn || this.#reconciled) {
+    if (this.#reconciled) {
       return;
     }
     const session = await this.refresh();
     this.snapshot(collector, session);
-    if (!this.settled) {
+    if (!this.turn || (!this.settled && session.status !== 'failed')) {
       return;
     }
     let index = 0;

@@ -97,7 +97,7 @@ function setup(events: ReturnType<typeof event>[], { followup = false, eof = fal
   return { client, requests, cancel, body };
 }
 
-async function collect(branch: Stream<AgentSessionEvent>) {
+async function collect(branch: AsyncIterable<AgentSessionEvent>) {
   const items = [];
   for await (const item of branch) {
     items.push(item);
@@ -808,6 +808,26 @@ describe('beta Agents typed output', () => {
       const result = await stream.finalResult();
       expect(result.output_parsed).toBe(value);
       expect(parse).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  test('input stream preserves session failure after progress iteration cleanup', async () => {
+    const { client } = setup(
+      [
+        created(),
+        message('Partial answer'),
+        event('agent.session.failed', { session: { id: turn.session_id, status: 'failed' } }),
+      ],
+      { followup: true },
+    );
+    const stream = client.beta.agents.sessions
+      .stream(turn.session_id, { input: 'Question' })
+      .withResultCollection();
+    await collect(stream);
+    await expect(stream.finalResult()).rejects.toMatchObject({
+      reason: 'failed',
+      turn_id: turn.id,
+      messages: [expect.objectContaining({ id: 'message_test' })],
     });
   });
 
