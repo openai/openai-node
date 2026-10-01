@@ -323,7 +323,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
       state.select(this.#attachment.turn);
       if (this.#collection.enabled) {
         this.#attachment.snapshot(this.#collection.collector, session);
-        if (await this.#attachment.blockedEnvironment(session)) {
+        if (await this.#attachment.blockedManualAction(session)) {
           this.#collection.collector.checkAction(() => false);
         }
       }

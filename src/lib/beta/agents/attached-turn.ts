@@ -45,12 +45,18 @@ export class AttachedTurn {
     collector.snapshot(this.turn, selected, this.settled);
   }
 
-  async blockedEnvironment(session: AgentSession): Promise<boolean> {
+  async blockedManualAction(session: AgentSession): Promise<boolean> {
+    if (this.turn?.status !== 'waiting' || session.status !== 'requires_action') {
+      return false;
+    }
     if (
-      this.turn?.status !== 'waiting' ||
-      session.status !== 'requires_action' ||
-      !session.required_actions.some((action) => action.type === 'environment_connection')
+      session.required_actions.some(
+        (action) => action.type === 'computer_use_approval_request' && action.turn_id === this.turn?.id,
+      )
     ) {
+      return true;
+    }
+    if (!session.required_actions.some((action) => action.type === 'environment_connection')) {
       return false;
     }
     const root = await this.#latestRoot();

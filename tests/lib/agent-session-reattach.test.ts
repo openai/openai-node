@@ -37,6 +37,7 @@ function attachTransport(
     postFailure?: boolean;
     successor?: boolean;
     manualEnvironment?: boolean;
+    manualOrigin?: 'browser_origin_access' | 'browser_authentication';
     staleFunction?: boolean;
     terminalStatus?: 'completed' | 'failed' | 'cancelled';
     multipleMessages?: boolean;
@@ -66,17 +67,28 @@ function attachTransport(
     completed_at: finished ? 2 : null,
   });
   const session = () => {
-    const required_actions = config.manualEnvironment
-      ? [{ type: 'environment_connection', environment_id: 'env_test' }]
-      : [
-          {
-            type: 'function_call',
-            turn_id: config.successor && finished ? 'turn_successor' : turn.id,
-            call_id: 'call_lookup',
-            name: config.staleFunction ? 'stale_unknown' : 'lookup',
-            arguments: '{}',
-          },
-        ];
+    let required_actions: unknown[] = [
+      {
+        type: 'function_call',
+        turn_id: config.successor && finished ? 'turn_successor' : turn.id,
+        call_id: 'call_lookup',
+        name: config.staleFunction ? 'stale_unknown' : 'lookup',
+        arguments: '{}',
+      },
+    ];
+    if (config.manualEnvironment) {
+      required_actions = [{ type: 'environment_connection', environment_id: 'env_test' }];
+    }
+    if (config.manualOrigin) {
+      required_actions = [
+        {
+          type: 'computer_use_approval_request',
+          turn_id: turn.id,
+          request_id: 'approval_test',
+          request: { type: config.manualOrigin, origin: 'https://example.com', reason: null },
+        },
+      ];
+    }
     return {
       id: turn.session_id,
       status: finished && !config.successor ? 'idle' : 'requires_action',
@@ -191,7 +203,7 @@ function attachTransport(
         if (config.activeReadFailure) {
           controller.error(new Error('Synthetic SSE read failed'));
         }
-        if (!finished && !config.manualEnvironment && !config.activeReadFailure) {
+        if (!finished && !config.manualEnvironment && !config.manualOrigin && !config.activeReadFailure) {
           const call = {
             type: 'agent.session.turn.item.added',
             event_id: 'call',
@@ -369,6 +381,22 @@ describe('beta agents stream attachment', () => {
       required_actions: [{ type: 'environment_connection', environment_id: 'env_test' }],
     });
   });
+  test.each(['browser_origin_access', 'browser_authentication'] as const)(
+    'reports a selected pending %s approval from its session snapshot',
+    async (manualOrigin) => {
+      const { client } = attachTransport({ manualOrigin });
+      await expect(client.beta.agents.sessions.stream(turn.session_id).finalResult()).rejects.toMatchObject({
+        reason: 'requires_action',
+        required_actions: [
+          expect.objectContaining({
+            type: 'computer_use_approval_request',
+            turn_id: turn.id,
+            request: expect.objectContaining({ type: manualOrigin }),
+          }),
+        ],
+      });
+    },
+  );
   test('ignores stale function snapshots and dispatches only the replayed function', async () => {
     const { client } = attachTransport({ staleFunction: true });
     const lookup = vi.fn(() => 'found');
