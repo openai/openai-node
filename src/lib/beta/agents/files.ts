@@ -100,11 +100,20 @@ export async function prepareAgentFiles(
     headers.nulls.add('idempotency-key');
   }
   const prepared: PreparedAgentFiles = { files: [], uploadedFiles: [] };
+  let bytes = 0;
   try {
     for (const [path, file] of entries) {
       // oxlint-disable-next-line no-await-in-loop -- Stop on the first failure and expose precisely the uploads already created.
       const uploaded = await client.files.create({ file, purpose: 'user_data' }, requestOptions);
       prepared.uploadedFiles.push(uploaded);
+      // Streams may not have a known size until the Files API finishes the upload.
+      if (uploaded.bytes > MAX_BYTES) {
+        throw new OpenAIError('Agent file exceeds the 50 MiB limit');
+      }
+      bytes += uploaded.bytes;
+      if (bytes > MAX_BYTES) {
+        throw new OpenAIError('Initial agent files exceed the 50 MiB aggregate limit');
+      }
       prepared.files.push({ type: 'file_id', file_id: uploaded.id, path });
     }
     return prepared;

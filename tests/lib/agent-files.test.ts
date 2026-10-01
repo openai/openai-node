@@ -23,7 +23,13 @@ function fileTransport({
   failUpload = 0,
   failStage = false,
   defaultKey,
-}: { failUpload?: number; failStage?: boolean; defaultKey?: string } = {}) {
+  uploadedSizes,
+}: {
+  failUpload?: number;
+  failStage?: boolean;
+  defaultKey?: string;
+  uploadedSizes?: number[];
+} = {}) {
   const requests: Request[] = [];
   const uploaded: string[] = [];
   const staged: unknown[] = [];
@@ -52,7 +58,7 @@ function fileTransport({
           id: `file_${uploaded.length}`,
           object: 'file',
           filename: value.name,
-          bytes: value.size,
+          bytes: uploadedSizes?.[uploaded.length - 1] ?? value.size,
           purpose: 'user_data',
         });
       }
@@ -199,6 +205,41 @@ describe('beta agent file preparation', () => {
       prepare({ '/workspace/a': file, '/workspace/b': file }, { headers: { 'IDEMPOTENCY-KEY': 'same' } }),
     ).rejects.toThrow('Idempotency-Key');
     expect(requests).toHaveLength(0);
+  });
+  test('retains an oversized streamed upload without staging it', async () => {
+    const { client, requests, staged } = fileTransport({ uploadedSizes: [50 * 1024 * 1024 + 1] });
+    const failure = await client.beta.agents.environments.files
+      .upload('env_test', { file: new Response('streamed contents'), path: '/workspace/a' })
+      .catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(AgentFileUploadError);
+    if (!(failure instanceof AgentFileUploadError)) {
+      throw new Error('Expected upload error');
+    }
+    expect(failure.cause).toEqual(
+      expect.objectContaining({ message: 'Agent file exceeds the 50 MiB limit' }),
+    );
+    expect(failure.uploadedFiles.map((file) => file.id)).toEqual(['file_1']);
+    expect(requests).toHaveLength(1);
+    expect(staged).toHaveLength(0);
+  });
+  test('checks the returned aggregate size and retains every created upload', async () => {
+    const { client, requests } = fileTransport({ uploadedSizes: [30 * 1024 * 1024, 30 * 1024 * 1024] });
+    const failure = await client.beta.agents.environments.files
+      .prepare({
+        '/workspace/a': new Response('a'),
+        '/workspace/b': new Response('b'),
+        '/workspace/c': new Response('c'),
+      })
+      .catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(AgentFileUploadError);
+    if (!(failure instanceof AgentFileUploadError)) {
+      throw new Error('Expected upload error');
+    }
+    expect(failure.cause).toEqual(
+      expect.objectContaining({ message: 'Initial agent files exceed the 50 MiB aggregate limit' }),
+    );
+    expect(failure.uploadedFiles.map((file) => file.id)).toEqual(['file_1', 'file_2']);
+    expect(requests).toHaveLength(2);
   });
   test('rejects inherited batch keys but honors an explicit request omission', async () => {
     const { client, requests } = fileTransport({ defaultKey: 'default-key' });
