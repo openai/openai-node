@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import OpenAI from 'openai';
+import OpenAI, { APIUserAbortError } from 'openai';
 import { AgentTurnResultError } from 'openai/lib/beta/agents/agent-turn-result-error';
 import type { Turn } from 'openai/resources/beta/agents/sessions/turns';
 
@@ -53,6 +53,7 @@ function attachTransport(
     readEnd?: 'eof' | 'error';
     activeReadFailure?: boolean;
     historyFailure?: boolean;
+    abortDuringRecovery?: () => void;
   } = {},
 ) {
   const requests: Request[] = [];
@@ -171,6 +172,10 @@ function attachTransport(
         return Response.json({ object: 'list', data, has_more: false });
       }
       if (path.includes('/turns/')) {
+        if (finished && config.abortDuringRecovery) {
+          config.abortDuringRecovery();
+          throw new DOMException('Recovery request aborted', 'AbortError');
+        }
         if (path.endsWith('/turn_old')) {
           return Response.json({ ...currentTurn(), id: 'turn_old', status: 'completed' });
         }
@@ -487,6 +492,26 @@ describe('beta agents stream attachment', () => {
       expect(requests.filter((request) => new URL(request.url).pathname.endsWith('/items'))).toHaveLength(1);
     },
   );
+  test.each(['stream', 'request'] as const)('preserves %s cancellation during recovery', async (mode) => {
+    const controller = new AbortController();
+    const cause = new Error('Application cancelled recovery');
+    let abort = () => controller.abort(cause);
+    const { client } = attachTransport({
+      readEnd: 'error',
+      abortDuringRecovery: () => abort(),
+    });
+    const stream = client.beta.agents.sessions.stream(
+      turn.session_id,
+      { toolHandlers: { lookup: () => 'found' } },
+      { signal: controller.signal },
+    );
+    if (mode === 'stream') {
+      abort = () => stream.abort(cause);
+    }
+    const failure = await drain(stream).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(APIUserAbortError);
+    expect(failure).toMatchObject({ cause });
+  });
   test.each([false, true])(
     'preserves the original SSE error when recovery cannot establish completion (history failure %s)',
     async (historyFailure) => {

@@ -251,6 +251,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
           const recovered = await this.#attachment?.recover(
             this.#collection.enabled ? this.#collection.collector : undefined,
           );
+          this.#checkAbort();
           if (recovered) {
             this.#settled = true;
             return;
