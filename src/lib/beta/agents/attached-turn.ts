@@ -12,6 +12,8 @@ function active(turn: Turn): boolean {
 /** Selects the root work observed by one attachment; never dispatches snapshot actions. @internal */
 export class AttachedTurn {
   turn: Turn | undefined;
+  #baselineID: string | undefined;
+  #reconciled = false;
   readonly #sessions: Sessions;
   readonly #sessionID: string;
   readonly #options: RequestOptions;
@@ -27,7 +29,7 @@ export class AttachedTurn {
   }
 
   #ordered(order: 'asc' | 'desc'): RequestOptions {
-    return { ...this.#options, query: { ...this.#options.query, order } };
+    return { ...this.#options, query: { ...this.#options.query, order, after: undefined } };
   }
 
   snapshot(collector: AgentTurnResultCollector, session?: AgentSession): void {
@@ -51,28 +53,35 @@ export class AttachedTurn {
     ) {
       return false;
     }
-    const root = await this.#activeRoot();
+    const root = await this.#latestRoot();
     return root?.id === this.turn.id;
   }
 
-  async #activeRoot(): Promise<Turn | undefined> {
+  async #latestRoot(): Promise<Turn | undefined> {
     for await (const turn of this.#sessions.turns.list(this.#sessionID, {}, this.#ordered('desc'))) {
       if (turn.subagent_id === null) {
-        // Once the newest root has settled, an older completed answer is not this attachment's result.
-        return active(turn) ? turn : undefined;
+        // Root lookup stops at the newest root, including an idle baseline.
+        return turn;
       }
     }
     return undefined;
   }
 
   async prepare(): Promise<void> {
-    this.turn = await this.#activeRoot();
+    const root = await this.#latestRoot();
+    this.#baselineID = root?.id;
+    this.turn = root && active(root) ? root : undefined;
+  }
+
+  async #newRoot(): Promise<Turn | undefined> {
+    const root = await this.#latestRoot();
+    return root && (active(root) || root.id !== this.#baselineID) ? root : undefined;
   }
 
   async refresh(): Promise<AgentSession> {
     this.turn = this.turn
       ? await this.#sessions.turns.retrieve(this.turn.id, { session_id: this.#sessionID }, this.#options)
-      : await this.#activeRoot();
+      : await this.#newRoot();
     return this.#sessions.retrieve(this.#sessionID, this.#options);
   }
 
@@ -109,12 +118,26 @@ export class AttachedTurn {
       'turn' in event
         ? event.turn
         : await this.#sessions.turns.retrieve(id, { session_id: this.#sessionID }, this.#options);
-    this.turn = turn.subagent_id === null ? structuredClone(turn) : await this.#activeRoot();
+    this.turn = turn.subagent_id === null ? structuredClone(turn) : await this.#newRoot();
     return true;
   }
 
-  async reconcile(collector: AgentTurnResultCollector): Promise<void> {
+  /** One durable check after a genuine SSE read failure; active work remains an observation error. */
+  async recover(collector?: AgentTurnResultCollector): Promise<boolean> {
     if (!this.turn) {
+      return false;
+    }
+    try {
+      await (collector ? this.reconcile(collector) : this.refresh());
+      return this.settled;
+    } catch {
+      // Retain the original stream failure if the recovery read also fails.
+      return false;
+    }
+  }
+
+  async reconcile(collector: AgentTurnResultCollector): Promise<void> {
+    if (!this.turn || this.#reconciled) {
       return;
     }
     const session = await this.refresh();
@@ -135,5 +158,6 @@ export class AttachedTurn {
       }
       index += 1;
     }
+    this.#reconciled = true;
   }
 }

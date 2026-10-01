@@ -40,6 +40,10 @@ function attachTransport(
     staleFunction?: boolean;
     terminalStatus?: 'completed' | 'failed' | 'cancelled';
     multipleMessages?: boolean;
+    baselineRace?: boolean;
+    readEnd?: 'eof' | 'error';
+    activeReadFailure?: boolean;
+    historyFailure?: boolean;
   } = {},
 ) {
   const requests: Request[] = [];
@@ -81,6 +85,14 @@ function attachTransport(
   };
   const complete = () => {
     finished = true;
+    if (config.readEnd) {
+      if (config.readEnd === 'eof') {
+        controller.close();
+      } else {
+        controller.error(new Error('Synthetic SSE read failed'));
+      }
+      return;
+    }
     if (config.observed) {
       send({
         type: 'agent.session.turn.item.done',
@@ -118,19 +130,26 @@ function attachTransport(
   const client = new OpenAI({
     apiKey: 'synthetic',
     maxRetries: 0,
+    // oxlint-disable-next-line complexity -- One synthetic transport explicitly enumerates the reconnect race cases.
     fetch: async (url, init) => {
       const req = new Request(url, init);
       requests.push(req);
       const path = new URL(req.url).pathname;
       if (path.endsWith('/turns')) {
         listCalls += 1;
-        const data = config.noInitial && listCalls === 1 ? [] : [currentTurn()];
+        let data = config.noInitial && listCalls === 1 ? [] : [currentTurn()];
+        if (config.baselineRace && listCalls === 1) {
+          data = [{ ...currentTurn(), id: 'turn_old', status: 'completed' }];
+        }
         return Response.json({ object: 'list', data, has_more: false });
       }
       if (path.includes('/turns/')) {
         return Response.json(currentTurn());
       }
       if (path.endsWith('/items')) {
+        if (config.historyFailure) {
+          return Response.json({ error: { message: 'History read failed' } }, { status: 500 });
+        }
         if (config.multipleMessages) {
           const messages = ['First', 'Second'].map((text, index) => ({
             ...history,
@@ -166,10 +185,13 @@ function attachTransport(
           return new Response(null, { status: 204 });
         }
         subscribed = true;
-        if (config.race) {
+        if (config.race || config.baselineRace) {
           finished = true;
         }
-        if (!finished && !config.manualEnvironment) {
+        if (config.activeReadFailure) {
+          controller.error(new Error('Synthetic SSE read failed'));
+        }
+        if (!finished && !config.manualEnvironment && !config.activeReadFailure) {
           const call = {
             type: 'agent.session.turn.item.added',
             event_id: 'call',
@@ -288,12 +310,13 @@ describe('beta agents stream attachment', () => {
     expect(await post?.json()).toMatchObject({ events: [{ success: false, error: 'Tool handler failed.' }] });
   });
   test('failed result submission leaves recovery to a new attachment', async () => {
-    const { client } = attachTransport({ postFailure: true });
+    const { client, requests } = attachTransport({ postFailure: true });
     await expect(
       client.beta.agents.sessions
         .stream(turn.session_id, { toolHandlers: { lookup: () => 'found' } })
         .finalResult(),
     ).rejects.toMatchObject({ reason: 'observation' });
+    expect(requests.some((request) => new URL(request.url).pathname.endsWith('/items'))).toBe(false);
   });
   test('a new attachment can handle a call abandoned before dispatch; answered calls are not replayed', async () => {
     const handler = vi.fn(() => 'found');
@@ -368,4 +391,34 @@ describe('beta agents stream attachment', () => {
       true,
     );
   });
+  test('an idle baseline can select a distinct turn that starts and finishes during subscription', async () => {
+    const { client } = attachTransport({ baselineRace: true });
+    const result = await client.beta.agents.sessions.stream(turn.session_id).finalResult();
+    expect(result.turn_id).toBe(turn.id);
+    expect(result.output_text).toBe('Recovered answer');
+  });
+  test.each(['eof', 'error'] as const)(
+    'one durable pass recovers terminal output after SSE %s',
+    async (readEnd) => {
+      const { client, requests } = attachTransport({ readEnd });
+      const result = await client.beta.agents.sessions
+        .stream(turn.session_id, { toolHandlers: { lookup: () => 'found' } })
+        .finalResult();
+      expect(result.output_text).toBe('Recovered answer');
+      expect(requests.filter((request) => new URL(request.url).pathname.endsWith('/items'))).toHaveLength(1);
+    },
+  );
+  test.each([false, true])(
+    'preserves the original SSE error when recovery cannot establish completion (history failure %s)',
+    async (historyFailure) => {
+      const { client } = attachTransport(
+        historyFailure ? { readEnd: 'error', historyFailure: true } : { activeReadFailure: true },
+      );
+      await expect(
+        client.beta.agents.sessions
+          .stream(turn.session_id, { toolHandlers: { lookup: () => 'found' } })
+          .finalResult(),
+      ).rejects.toMatchObject({ reason: 'observation', cause: { message: 'Synthetic SSE read failed' } });
+    },
+  );
 });

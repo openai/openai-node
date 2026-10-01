@@ -195,7 +195,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
         return;
       }
       this.#reading = true;
-      for await (const event of stream) {
+      for await (const event of this.#events(stream)) {
         this.#checkAbort();
         if (!(await this.#observeAttachment(event, state))) {
           this.#settled = true;
@@ -229,11 +229,40 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
         await this.#submit(result, options);
       }
       this.#checkAbort();
-      throw new OpenAIError('Session event stream ended before the turn reached idle or failed');
     } finally {
       externalSignal?.removeEventListener('abort', abort);
       this.controller.signal.removeEventListener('abort', abort);
       await this.#closeObservation();
+    }
+  }
+
+  async *#events(stream: Stream<AgentSessionEvent>): AsyncGenerator<AgentSessionEvent> {
+    const iterator = stream[Symbol.asyncIterator]();
+    try {
+      while (true) {
+        let next: IteratorResult<AgentSessionEvent>;
+        try {
+          // oxlint-disable-next-line no-await-in-loop -- Pull one SSE event at a time.
+          next = await iterator.next();
+          if (next.done) {
+            throw new OpenAIError('Session event stream ended before the turn reached idle or failed');
+          }
+        } catch (error) {
+          this.#checkAbort();
+          // oxlint-disable-next-line no-await-in-loop -- One recovery read is allowed only after a failed SSE pull.
+          const recovered = await this.#attachment?.recover(
+            this.#collection.enabled ? this.#collection.collector : undefined,
+          );
+          if (recovered) {
+            this.#settled = true;
+            return;
+          }
+          throw error;
+        }
+        yield next.value;
+      }
+    } finally {
+      await iterator.return?.();
     }
   }
 

@@ -143,7 +143,8 @@ console.log((await stream.finalResult()).output_text);
 ```
 
 Reattachment sends no user message. Final-result collection recovers saved output
-for the selected turn; an already-idle attachment has no selected result. Use
+for the selected turn, including one recovery read if its event connection fails.
+An already-idle attachment has no selected result. Use
 `withResultCollection()` before progress iteration as above. A call whose result
 was not acknowledged may run again after reconnecting, so application side effects
 still need their own deduplication.
