@@ -81,6 +81,11 @@ describe.each([
     { name: 'cookie', options: { headers: { Cookie: 'session=secret' } } },
     { name: 'X-API-Key', options: { headers: { 'X-API-Key': 'key-secret' } } },
     {
+      name: 'explicit credential in a WebSocket protocol offer',
+      options: { headers: { 'Sec-WebSocket-Protocol': 'realtime, openai-insecure-api-key.ek_synthetic' } },
+    },
+    { name: 'custom Datadog-shaped credential', options: { headers: { 'X-Datadog-Token': 'synthetic' } } },
+    {
       name: 'distinct custom header spellings',
       options: { headers: { X_Auth_Token: 'synthetic-token', 'X-Auth-Token': '' } },
     },
@@ -116,6 +121,9 @@ describe.each([
 
   test.each([
     { headers: { 'OpenAI-Beta': 'responses_websockets=2026-02-06', 'X-Trace-Id': 'trace' } },
+    { headers: { 'Sec-WebSocket-Protocol': 'responses' } },
+    { headers: { 'X-Datadog-Trace-Id': '123456789', 'X-Datadog-Parent-Id': '987654321' } },
+    { headers: { 'X-Cloud-Trace-Context': '0123456789abcdef0123456789abcdef/123456789;o=1' } },
     { headers: { 'X-Auth-Token': '   ' } },
     { headers: { OpenAI_Organization: 'org-synthetic' } },
     { headers: { OpenAI_Project: 'project-synthetic' } },

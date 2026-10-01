@@ -1,9 +1,75 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type * as WS from 'ws';
 import type { WebSocketLike } from './ws-adapter';
 import { protectWebSocketOptionsFromCredentialRedirects } from './ws';
+import { setRealtimeAPIKeyCacheContext } from './realtime-credentials';
+import type { DeferredAPIKeyCache } from './realtime-credentials';
+
+setRealtimeAPIKeyCacheContext(new AsyncLocalStorage<DeferredAPIKeyCache | undefined>());
 
 /** A generic event listener callback. */
 type Listener = (...args: any[]) => void;
+
+function copyTLSMaterial(value: string | Buffer): string | Buffer {
+  return ArrayBuffer.isView(value)
+    ? Buffer.from(new Uint8Array(value.buffer, value.byteOffset, value.byteLength))
+    : value;
+}
+
+/** Snapshot caller headers and TLS identity before an async reconnect credential refresh. */
+export function snapshotNodeWebSocketOptions(
+  options: WS.ClientOptions | null | undefined,
+): Omit<WS.ClientOptions, 'headers'> & { headers: Record<string, string | string[]> } {
+  const captured = {
+    ...options,
+    headers: Object.fromEntries(
+      Object.entries(options?.headers ?? {}).map(([name, value]) => [
+        name,
+        Array.isArray(value) ? [...value] : value,
+      ]),
+    ),
+  };
+  const { ca, cert, crl, key, pfx } = captured;
+  if (ca !== undefined) {
+    captured.ca = Array.isArray(ca) ? ca.map(copyTLSMaterial) : copyTLSMaterial(ca);
+  }
+  if (cert !== undefined) {
+    captured.cert = Array.isArray(cert) ? cert.map(copyTLSMaterial) : copyTLSMaterial(cert);
+  }
+  if (crl !== undefined) {
+    captured.crl = Array.isArray(crl) ? crl.map(copyTLSMaterial) : copyTLSMaterial(crl);
+  }
+  if (key !== undefined) {
+    captured.key = Array.isArray(key)
+      ? key.map((value) =>
+          typeof value === 'string' || ArrayBuffer.isView(value)
+            ? copyTLSMaterial(value)
+            : { ...value, pem: copyTLSMaterial(value.pem) },
+        )
+      : copyTLSMaterial(key);
+  }
+  if (pfx !== undefined) {
+    captured.pfx = Array.isArray(pfx)
+      ? pfx.map((value) =>
+          typeof value === 'string' || ArrayBuffer.isView(value)
+            ? copyTLSMaterial(value)
+            : { ...value, buf: copyTLSMaterial(value.buf) },
+        )
+      : copyTLSMaterial(pfx);
+  }
+  if ('session' in captured && Buffer.isBuffer(captured.session)) {
+    captured.session = Buffer.from(captured.session);
+  }
+  if ('ALPNProtocols' in captured) {
+    if (Array.isArray(captured.ALPNProtocols)) {
+      captured.ALPNProtocols = [...captured.ALPNProtocols];
+    } else if (ArrayBuffer.isView(captured.ALPNProtocols)) {
+      const { buffer, byteOffset, byteLength } = captured.ALPNProtocols;
+      captured.ALPNProtocols = Buffer.from(new Uint8Array(buffer, byteOffset, byteLength));
+    }
+  }
+  return captured;
+}
 
 /**
  * Adapts a Node.js `ws` socket to the SDK's platform-neutral WebSocket API.

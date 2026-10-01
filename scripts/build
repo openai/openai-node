@@ -31,6 +31,7 @@ cp scripts/utils/x509-transport-state.mjs dist/internal/auth/x509-transport-stat
 node scripts/utils/fix-index-exports.cjs
 cp tsconfig.dist-src.json dist/src/tsconfig.json
 cp tsconfig.dist-src.d.ts dist/src/tsconfig.dist-src.d.ts
+cp tsconfig.dist-src-node.d.ts dist/src/tsconfig.dist-src-node.d.ts
 
 node scripts/utils/postprocess-files.cjs
 

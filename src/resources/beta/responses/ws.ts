@@ -1,11 +1,10 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import * as WS from 'ws';
-import { NodeWebSocket } from '../../../internal/ws-adapter-node';
+import { NodeWebSocket, snapshotNodeWebSocketOptions } from '../../../internal/ws-adapter-node';
 import { ResponsesWSBase, type ResponsesWSBaseOptions } from './ws-base';
 import { OpenAI } from '../../../client';
-import { OpenAIError } from '../../../core/error';
-import { snapshotWebSocketCredentials } from '../../../internal/ws';
+import { ResponsesWebSocketCredentials } from '../../../internal/responses-ws-credentials';
 
 export type { WebSocketStreamOptions } from '../../../internal/ws';
 
@@ -18,6 +17,7 @@ export interface ResponsesWSClientOptions extends WS.ClientOptions, ResponsesWSB
 
 export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
   private _wsOptions: WS.ClientOptions | null | undefined;
+  private _credentials = new ResponsesWebSocketCredentials();
 
   constructor(client: OpenAI, options?: ResponsesWSClientOptions | null | undefined) {
     if (!WS?.WebSocket) {
@@ -31,32 +31,42 @@ export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
     this._connectInitial();
   }
 
+  protected override _authHeaders(apiKey?: string | null): Record<string, string> {
+    const headers = super._authHeaders(apiKey === undefined ? this._credentials.preparedAPIKey : apiKey);
+    this._credentials.trackInitialHeaders(this._client, headers, () => !!this.socket);
+    return headers;
+  }
+
+  /**
+   * Whether credentials passed to the Node transport use the SDK key.
+   * The SDK recognizes its key, including copies and additions in credential headers.
+   * Override and return true if your socket hook signs or otherwise irreversibly transforms it.
+   * Explicit caller options and header removals still take precedence on reconnect.
+   */
+  protected _usesSDKAPIKey(authHeaders: Record<string, string>): boolean {
+    return this._credentials.usesAPIKey(this._client, authHeaders);
+  }
+
   protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
     const capturedAuthHeaders = { ...authHeaders };
-    const headers = new Map(Object.entries(this._client._buildWebSocketHeaders(capturedAuthHeaders)));
-    for (const [name, value] of Object.entries(this._wsOptions?.headers ?? {})) {
-      if (value === null) {
-        headers.delete(name.toLowerCase());
-      } else if (value !== undefined) {
-        headers.set(name.toLowerCase(), value);
-      }
-    }
-    const socketOptions: ResponsesWSClientOptions = {
-      ...this._wsOptions,
-      headers: Object.fromEntries(headers),
-      followRedirects: false,
-    };
-    if (
-      this._client._hasApiKeyProvider() &&
-      !capturedAuthHeaders['Authorization'] &&
-      !snapshotWebSocketCredentials(socketOptions)
-    ) {
-      throw new OpenAIError(
-        'Cannot open a Responses WebSocket with an unresolved function-based apiKey. Resolve it before constructing the WebSocket or provide explicit WebSocket credentials.',
-      );
-    }
+    const socketOptions = this._credentials.build(
+      this._client,
+      capturedAuthHeaders,
+      this._wsOptions,
+      !this.socket ? this._usesSDKAPIKey(capturedAuthHeaders) : undefined,
+    );
+    return new NodeWebSocket(new WS.WebSocket(url, socketOptions));
+  }
 
-    const ws = new WS.WebSocket(url, socketOptions);
-    return new NodeWebSocket(ws);
+  protected override async _prepareReconnectSocket(): Promise<(url: URL) => NodeWebSocket> {
+    if (!this._client._hasApiKeyProvider()) {
+      return super._prepareReconnectSocket();
+    }
+    return this._credentials.prepare(
+      this._client,
+      snapshotNodeWebSocketOptions(this._wsOptions),
+      (...args) => this._authHeaders(...args),
+      (url, headers) => this._createSocket(url, headers),
+    );
   }
 }
