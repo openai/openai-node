@@ -678,6 +678,16 @@ const packedPackagePath = require('node:path');
       '--eval',
       "import OpenAI from 'openai'; new OpenAI({ apiKey: 'synthetic-browser-api-key', dangerouslyAllowBrowser: true });",
     ]);
+    fs.symlinkSync(
+      path.join(root, 'node_modules/ws'),
+      path.join(temporaryDirectory, 'node_modules/ws'),
+      'dir',
+    );
+    fs.copyFileSync(
+      path.join(root, 'scripts/fixtures/responses-ws-module-formats.cjs'),
+      path.join(temporaryDirectory, 'responses-ws-module-formats.cjs'),
+    );
+    run(process.execPath, ['--test', 'responses-ws-module-formats.cjs']);
     fs.symlinkSync(path.join(root, 'node_modules/undici'), optionalUndici, 'dir');
     for (const [inputType, consumer] of [
       [
