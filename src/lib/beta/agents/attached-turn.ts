@@ -1,3 +1,4 @@
+import { agentItems } from './pages';
 import { OpenAIError } from '../../../core/error';
 import type { AgentSession, AgentSessionEvent } from '../../../resources/beta/agents/agents';
 import type { Sessions } from '../../../resources/beta/agents/sessions/sessions';
@@ -33,8 +34,8 @@ export class AttachedTurn {
     return this.settled || (!this.turn && this.#idle && event.type === 'agent.session.idle');
   }
 
-  #ordered(order: 'asc' | 'desc'): RequestOptions {
-    return { ...this.#options, query: { ...this.#options.query, order, after: undefined } };
+  #ordered(order: 'asc' | 'desc', after?: string): RequestOptions {
+    return { ...this.#options, query: { ...this.#options.query, order, after } };
   }
 
   snapshot(
@@ -47,7 +48,16 @@ export class AttachedTurn {
   }
 
   async manualActions(session: AgentSession): Promise<AgentSession['required_actions']> {
-    if (this.turn?.status !== 'waiting' || session.status !== 'requires_action') {
+    if (session.status !== 'requires_action') {
+      return [];
+    }
+    if (!this.turn) {
+      const latest = await this.#latestRoot();
+      return latest
+        ? []
+        : session.required_actions.filter((action) => action.type === 'environment_connection');
+    }
+    if (this.turn.status !== 'waiting') {
       return [];
     }
     const actions: AgentSession['required_actions'] = session.required_actions.filter(
@@ -64,7 +74,9 @@ export class AttachedTurn {
   }
 
   async #latestRoot(): Promise<Turn | undefined> {
-    for await (const turn of this.#sessions.turns.list(this.#sessionID, {}, this.#ordered('desc'))) {
+    for await (const turn of agentItems((after) =>
+      this.#sessions.turns.list(this.#sessionID, {}, this.#ordered('desc', after)),
+    )) {
       if (turn.subagent_id === null) {
         // Root lookup stops at the newest root, including an idle baseline.
         return turn;
@@ -158,7 +170,9 @@ export class AttachedTurn {
       return;
     }
     let index = 0;
-    for await (const item of this.#sessions.items.list(this.#sessionID, {}, this.#ordered('asc'))) {
+    for await (const item of agentItems((after) =>
+      this.#sessions.items.list(this.#sessionID, {}, this.#ordered('asc', after)),
+    )) {
       if (
         item.type === 'message' &&
         item.turn_id === this.turn.id &&

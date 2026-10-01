@@ -110,7 +110,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
   constructor(
     sessions: Sessions,
     sessionID: string,
-    params: AgentSessionStreamParams<T> = {},
+    params: AgentSessionStreamParams<T>,
     options?: RequestOptions,
   ) {
     const input: AgentSessionInputMessageParam[] | undefined =
@@ -267,12 +267,22 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
     if (!this.#attachment) {
       return true;
     }
+    const previousTurn = this.#attachment.turn;
     if (!(await this.#attachment.observe(event))) {
       return false;
     }
     state.select(this.#attachment.turn);
     if (this.#collection.enabled) {
-      this.#attachment.snapshot(this.#collection.collector);
+      if (!previousTurn && this.#attachment.turn) {
+        const session = await this.#attachment.refresh();
+        const actions = await this.#attachment.manualActions(session);
+        this.#attachment.snapshot(this.#collection.collector, session, actions);
+        if (actions.length) {
+          this.#collection.collector.checkAction(() => false);
+        }
+      } else {
+        this.#attachment.snapshot(this.#collection.collector);
+      }
     }
     return true;
   }

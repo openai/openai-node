@@ -158,12 +158,19 @@ function normalizeRequestOptionsForQuery(
 
 export class Sessions extends APIResource {
   /** Stream a new turn on an idle session, or omit input to reattach. See AgentSessionStream for lifecycle and tool handling. */
-  stream<T = never>(
+  stream<T>(
     sessionID: string,
-    params: AgentSessionStreamParams<T> = {},
+    params: AgentSessionStreamParams<T>,
     options?: RequestOptions,
-  ): AgentSessionStream<T> {
-    return new AgentSessionStream(this, sessionID, params, options);
+  ): AgentSessionStream<T>;
+  stream(sessionID: string, params?: AgentSessionStreamParams, options?: RequestOptions): AgentSessionStream;
+  stream(
+    sessionID: string,
+    params: AgentSessionStreamParams | AgentSessionStreamParams<unknown> = {},
+    options?: RequestOptions,
+  ): AgentSessionStream | AgentSessionStream<unknown> {
+    // SAFETY: The overloads bind the result type to format presence; the shared implementation handles both at runtime.
+    return new AgentSessionStream(this, sessionID, params as AgentSessionStreamParams<unknown>, options);
   }
 
   subagents: SubagentsAPI.Subagents = new SubagentsAPI.Subagents(this._client);

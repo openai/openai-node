@@ -43,6 +43,9 @@ function attachTransport(
     staleIdle?: boolean;
     historyReplay?: boolean;
     earlyIdle?: boolean;
+    emptyRoot?: boolean;
+    legacyCursor?: 'metadata' | 'missing' | 'repeat';
+    firstApproval?: boolean;
     terminalStatus?: 'completed' | 'failed' | 'cancelled';
     multipleMessages?: boolean;
     baselineRace?: boolean;
@@ -157,7 +160,10 @@ function attachTransport(
       const path = new URL(req.url).pathname;
       if (path.endsWith('/turns')) {
         listCalls += 1;
-        let data = config.noInitial && listCalls === 1 ? [] : [currentTurn()];
+        let data =
+          config.emptyRoot || config.firstApproval || (config.noInitial && listCalls === 1)
+            ? []
+            : [currentTurn()];
         if ((config.baselineRace && listCalls === 1) || config.historyReplay) {
           data = [{ ...currentTurn(), id: 'turn_old', status: 'completed' }];
         }
@@ -186,6 +192,14 @@ function attachTransport(
           return Response.json({ object: 'list', data: messages, has_more: false });
         }
         const after = new URL(req.url).searchParams.get('after');
+        if (config.legacyCursor && (!after || config.legacyCursor === 'repeat')) {
+          return Response.json({
+            object: 'list',
+            data: [history, { ...history, id: null, role: 'user', turn_id: 'turn_old' }],
+            has_more: true,
+            ...(config.legacyCursor === 'missing' ? {} : { last_id: 'cursor_legacy' }),
+          });
+        }
         if (config.paginated && !after) {
           return Response.json({
             object: 'list',
@@ -209,6 +223,15 @@ function attachTransport(
           return new Response(null, { status: 204 });
         }
         subscribed = true;
+        if (config.firstApproval) {
+          send({
+            type: 'agent.session.turn.item.added',
+            event_id: 'first_approval',
+            turn_id: null,
+            output_index: 0,
+            item: { type: 'computer_use_approval_request', id: 'approval_item', turn_id: turn.id },
+          });
+        }
         if (config.earlyIdle) {
           send({
             type: 'agent.session.idle',
@@ -513,4 +536,45 @@ describe('beta agents stream attachment', () => {
       ).rejects.toThrow('Synthetic SSE read failed');
     },
   );
+  test('reports environment connection needed before any root exists', async () => {
+    const { client } = attachTransport({ emptyRoot: true, manualEnvironment: true });
+    await expect(client.beta.agents.sessions.stream(turn.session_id).finalResult()).rejects.toMatchObject({
+      reason: 'requires_action',
+      session_id: turn.session_id,
+      required_actions: [{ type: 'environment_connection', environment_id: 'env_test' }],
+    });
+  });
+  test('an explicit parsed attachment type cannot omit its format', () => {
+    const { client } = attachTransport({ idle: true });
+    const checkTypes = () =>
+      // @ts-expect-error An explicit parsed type requires parameters containing outputFormat.
+      client.beta.agents.sessions.stream<{ summary: string }>(turn.session_id);
+    expect(checkTypes).toBeTypeOf('function');
+  });
+  test('continues through a legacy null item using the response cursor', async () => {
+    const { client, requests } = attachTransport({ race: true, legacyCursor: 'metadata' });
+    const result = await client.beta.agents.sessions.stream(turn.session_id).finalResult();
+    expect(result.output_text).toBe('Recovered answer');
+    expect(
+      requests.some((request) => new URL(request.url).searchParams.get('after') === 'cursor_legacy'),
+    ).toBe(true);
+  });
+  test.each(['missing', 'repeat'] as const)(
+    'does not return partial success when pagination cursor is %s',
+    async (legacyCursor) => {
+      const { client } = attachTransport({ race: true, legacyCursor });
+      await expect(client.beta.agents.sessions.stream(turn.session_id).finalResult()).rejects.toMatchObject({
+        reason: 'observation',
+        messages: [expect.objectContaining({ id: history.id })],
+      });
+    },
+  );
+  test('diagnoses an approval when its replay first identifies the selected root', async () => {
+    const { client } = attachTransport({ firstApproval: true, manualOrigin: 'browser_authentication' });
+    await expect(client.beta.agents.sessions.stream(turn.session_id).finalResult()).rejects.toMatchObject({
+      reason: 'requires_action',
+      turn: expect.objectContaining({ id: turn.id }),
+      required_actions: [expect.objectContaining({ type: 'computer_use_approval_request' })],
+    });
+  });
 });
