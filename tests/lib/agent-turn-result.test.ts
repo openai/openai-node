@@ -1,7 +1,7 @@
 import * as mini from 'zod/v4-mini';
 import { inspect } from 'node:util';
-import { zodResponsesFunction } from 'openai/helpers/zod';
-import { standardResponsesFunction } from 'openai/helpers/standard-schema';
+import { zodTextFormat, zodResponsesFunction } from 'openai/helpers/zod';
+import { standardTextFormat, standardResponsesFunction } from 'openai/helpers/standard-schema';
 import { functionTool } from 'openai/lib/beta/agents/function-tool';
 import { standardAgentTextFormat } from 'openai/helpers/beta/agents/standard-schema';
 import { z as z3 } from 'zod/v3';
@@ -9,7 +9,8 @@ import { z as z4 } from 'zod/v4';
 import { zodAgentTextFormat } from 'openai/helpers/beta/agents/zod';
 import { AgentOutputParseError, agentOutputFormat } from 'openai/lib/beta/agents/output-format';
 import { describe, expect, test, vi } from 'vitest';
-import OpenAI from 'openai';
+import OpenAI, { BadRequestError } from 'openai';
+import type { JSONSchema } from 'openai/lib/jsonschema';
 import { AgentTurnResultError } from 'openai/lib/beta/agents/agent-turn-result-error';
 import { Stream } from 'openai/core/streaming';
 import { AgentSessionStream } from 'openai/lib/agents/agent-session-stream';
@@ -692,20 +693,34 @@ describe('beta Agents typed output', () => {
     expect(parse).not.toHaveBeenCalled();
   });
 
-  test('rejects unsupported roots and normalizes nested supported output before requests', () => {
-    expect(() => zodAgentTextFormat(z3.array(z3.string()))).toThrow(/object/u);
-    expect(() =>
-      zodAgentTextFormat(z4.union([z4.object({ a: z4.string() }), z4.object({ b: z4.number() })])),
-    ).toThrow();
-    const format = zodAgentTextFormat(
-      z4.object({ nested: z4.object({ values: z4.array(z4.string().nullable()) }) }),
+  test.each([
+    ['v3 URLs', z3.object({ links: z3.array(z3.string().url()) })],
+    ['v4 URLs', z4.object({ nested: z4.object({ link: z4.url() }) })],
+    ['v4-mini', mini.object({ summary: mini.string() })],
+    ['v3 array root', z3.array(z3.string())],
+    ['v4 union root', z4.union([z4.object({ a: z4.string() }), z4.object({ b: z4.number() })])],
+  ] as const)('preserves native Responses conversion for %s', (_name, schema) => {
+    let native;
+    try {
+      native = zodTextFormat(schema, 'agent_output');
+    } catch (error) {
+      expect(() => zodAgentTextFormat(schema)).toThrow(error instanceof Error ? error.message : undefined);
+      return;
+    }
+    const format = zodAgentTextFormat(schema);
+    expect(format.schema).toEqual(native.schema);
+    expect(JSON.stringify(format)).toBe(JSON.stringify({ type: 'json_schema', schema: native.schema }));
+  });
+
+  test('preserves Standard Schema conversion and parsing from Responses', () => {
+    const schema = z4.object({ link: z4.url() });
+    const native = standardTextFormat(schema, 'agent_output');
+    const format = standardAgentTextFormat(schema);
+    expect(format.schema).toEqual(native.schema);
+    expect(format.$parseRaw('{"link":"https://example.com"}')).toEqual(
+      native.$parseRaw('{"link":"https://example.com"}'),
     );
-    expect(JSON.stringify(format)).toBe(JSON.stringify({ type: 'json_schema', schema: format.schema }));
-    const enumSchema = { type: 'object' as const, enum: [{}] };
-    expect(() =>
-      standardResponsesFunction({ name: 'select', parameters: z4.object({}), schema: enumSchema }),
-    ).not.toThrow();
-    expect(() => agentOutputFormat(enumSchema, JSON.parse)).toThrow(/enum/u);
+    expect(() => format.$parseRaw('{"link":42}')).toThrow();
   });
   test.each(['agent', 'text', 'format'] as const)(
     'does not promote an inherited %s into the request',
@@ -765,15 +780,59 @@ describe('beta Agents typed output', () => {
   );
 
   test.each([
-    { anyOf: [{ type: 'object' as const }, { type: 'string' as const }] },
-    { oneOf: [{ type: 'object' as const }, { type: 'string' as const }] },
-    { allOf: [{ type: 'string' as const }] },
-    { not: { type: 'object' as const } },
-  ])('uses shared strict conversion for unsupported root keywords: %j', (keyword) => {
-    const schema = { type: 'object' as const, ...keyword };
-    expect(() => standardResponsesFunction({ name: 'lookup', parameters: z4.object({}), schema })).toThrow();
-    expect(() => agentOutputFormat(schema, JSON.parse)).toThrow();
-  });
+    { type: 'object', additionalProperties: true, properties: { link: { type: 'string', format: 'uri' } } },
+    { type: 'object', enum: [{}] },
+    { type: 'array', items: { type: 'string' } },
+    { anyOf: [{ type: 'object' }, { type: 'string' }] },
+    { oneOf: [{ type: 'object' }, { type: 'string' }] },
+    {
+      type: 'object',
+      allOf: [{ not: { required: ['disabled'] } }],
+      patternProperties: { '^x': { type: 'number' } },
+    },
+  ] satisfies JSONSchema[])(
+    'forwards custom schema unchanged and propagates API rejection: %j',
+    async (schema) => {
+      const before = structuredClone(schema);
+      const parse = vi.fn(JSON.parse);
+      const format = agentOutputFormat(schema, parse);
+      expect(format.schema).toEqual(before);
+      let dispatched: unknown;
+      const client = new OpenAI({
+        apiKey: 'synthetic',
+        maxRetries: 0,
+        fetch: async (url, init) => {
+          dispatched = await new Request(url, init).json();
+          return Response.json(
+            {
+              error: {
+                message: 'Schema is not supported by this API',
+                type: 'invalid_request_error',
+                code: 'unsupported_schema',
+              },
+            },
+            { status: 400 },
+          );
+        },
+      });
+      await expect(
+        client.beta.agents.sessions.create({
+          agent: { text: { format } },
+          environment: { type: 'none' },
+          input: 'Question',
+          stream: true,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestError);
+      expect(dispatched).toEqual({
+        agent: { text: { format: { type: 'json_schema', schema: before } } },
+        environment: { type: 'none' },
+        input: 'Question',
+        stream: true,
+      });
+      expect(schema).toEqual(before);
+      expect(parse).not.toHaveBeenCalled();
+    },
+  );
 
   test('ignores inherited and accessor parsers on ordinary formats', async () => {
     const parse = vi.fn(() => ({ summary: 'Injected' }));
@@ -928,7 +987,7 @@ describe('beta Agents typed output', () => {
     expect(injected).not.toHaveBeenCalled();
     expect(getter).not.toHaveBeenCalled();
   });
-  test('schema keyword checks ignore ambient prototype properties', () => {
+  test('custom schema binding ignores ambient prototype properties', () => {
     const previous = Object.getOwnPropertyDescriptor(Object.prototype, 'enum');
     try {
       // oxlint-disable-next-line no-extend-native -- Reproduce ambient prototype pollution and restore it in finally.
@@ -962,32 +1021,6 @@ describe('beta Agents typed output', () => {
       expect(requests).toHaveLength(0);
     },
   );
-  test('rejects unsupported URL formats in nested schemas while keeping supported formats', () => {
-    expect(() =>
-      functionTool(
-        zodResponsesFunction({
-          name: 'lookup',
-          parameters: z4.object({ link: z4.url() }),
-          function: ({ link }) => link,
-        }),
-      ),
-    ).not.toThrow();
-    expect(() => zodAgentTextFormat(z3.object({ links: z3.array(z3.string().url()) }))).toThrow(
-      /format uri/u,
-    );
-    expect(() => zodAgentTextFormat(z4.object({ nested: z4.object({ link: z4.url() }) }))).toThrow(
-      /format uri/u,
-    );
-    expect(() => standardAgentTextFormat(z4.object({ link: z4.url() }))).toThrow(/format uri/u);
-    const schema = z4.object({ email: z4.email(), id: z4.uuid(), when: z4.iso.datetime() });
-    expect(() => zodAgentTextFormat(schema)).not.toThrow();
-    expect(() =>
-      agentOutputFormat(
-        { type: 'object', properties: { format: { type: 'string', enum: ['uri'] } }, required: ['format'] },
-        JSON.parse,
-      ),
-    ).not.toThrow();
-  });
   test.each(['inherited', 'non-enumerable', 'own'] as const)(
     'matches native option spread for %s body getters',
     async (kind) => {

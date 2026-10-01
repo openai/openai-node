@@ -8,6 +8,6 @@ export function standardAgentTextFormat<S extends Parameters<typeof standardText
   jsonSchema?: JSONSchema,
 ) {
   const format = standardTextFormat(schema, 'agent_output', { schema: jsonSchema });
-  // SAFETY: The existing Standard Schema converter produces the validated JSON Schema.
+  // SAFETY: The native Responses helper owns Standard Schema conversion and validation.
   return agentOutputFormat(format.schema as JSONSchema, format.$parseRaw);
 }
