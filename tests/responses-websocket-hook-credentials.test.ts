@@ -189,6 +189,8 @@ describe.each([
   test.each([
     { hook: 'authHeaders', resolved: false, mode: 'caller' },
     { hook: 'authHeaders', resolved: true, mode: 'caller' },
+    { hook: 'authHeaders', resolved: true, mode: 'SDK lowercase' },
+    { hook: 'authHeaders', resolved: true, mode: 'SDK raw key' },
     { hook: 'createSocket', resolved: false, mode: 'caller' },
     { hook: 'createSocket', resolved: true, mode: 'caller' },
     { hook: 'createSocket', resolved: true, mode: 'augmented' },
@@ -217,7 +219,15 @@ describe.each([
       }
       // SAFETY: Stable and beta provide identical subclass authentication and transport hook signatures.
       class HookResponses extends (Responses as typeof StableResponsesWS) {
-        protected override _authHeaders(apiKey?: string | null) {
+        protected override _authHeaders(
+          apiKey?: string | null,
+        ): Parameters<OpenAI['_buildWebSocketHeaders']>[0] {
+          if (mode === 'SDK lowercase') {
+            return { authorization: `Bearer ${this._client.apiKey}` };
+          }
+          if (mode === 'SDK raw key') {
+            return { 'X-Custom': this._client.apiKey ?? '' };
+          }
           return hook === 'authHeaders'
             ? { Authorization: 'Bearer synthetic-hook' }
             : super._authHeaders(apiKey);
@@ -259,6 +269,16 @@ describe.each([
           expect(attempts).toEqual([
             [undefined, 'Bearer synthetic-A'],
             [undefined, 'Bearer synthetic-B'],
+          ]);
+        } else if (mode === 'SDK lowercase') {
+          expect(attempts).toEqual([
+            ['Bearer synthetic-A', undefined],
+            ['Bearer synthetic-B', undefined],
+          ]);
+        } else if (mode === 'SDK raw key') {
+          expect(attempts).toEqual([
+            [undefined, 'synthetic-A'],
+            [undefined, 'synthetic-B'],
           ]);
         } else {
           expect(attempts).toEqual([

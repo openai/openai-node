@@ -44,7 +44,7 @@ export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
    * Explicit caller options and header removals still take precedence on reconnect.
    */
   protected _usesSDKAPIKey(authHeaders: Record<string, string>): boolean {
-    return this._credentials.usesAPIKey(authHeaders);
+    return this._credentials.usesAPIKey(this._client, authHeaders);
   }
 
   protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {

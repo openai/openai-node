@@ -86,8 +86,12 @@ export class ResponsesWebSocketCredentials {
     }
   }
 
-  usesAPIKey(headers: Record<string, string>): boolean {
-    const apiKey = this.initialAPIKey;
+  usesAPIKey(client: OpenAI, headers: Record<string, string>): boolean {
+    // Hooks can read the SDK key without delegating. Only use an ordinary cached property here:
+    // invoking custom/Bedrock getters could validate credentials a caller-owned socket never sends.
+    const apiKey =
+      this.initialAPIKey ??
+      (client._hasApiKeyProvider() ? Object.getOwnPropertyDescriptor(client, 'apiKey')?.value : undefined);
     if (!apiKey) {
       return false;
     }
