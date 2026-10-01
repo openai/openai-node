@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.27.0](https://github.com/openai/openai-node/compare/v7.26.0...v7.27.0) (2026-10-01)
+
+
+### Features
+
+* **agents:** prepare hosted files and download result artifacts ([#2855](https://github.com/openai/openai-node/issues/2855)) ([7b5a9e0](https://github.com/openai/openai-node/commit/7b5a9e0113ead1b35d43cbd86a2869481fce7e22))
+
 ## [7.26.0](https://github.com/openai/openai-node/compare/v7.25.0...v7.26.0) (2026-10-01)
 
 
