@@ -112,6 +112,7 @@ const WEBSOCKET_METADATA_HEADER_NAMES = new Set([
   'tracestate',
   'sentry-trace',
   'x-amzn-trace-id',
+  'x-cloud-trace-context',
   'x-datadog-trace-id',
   'x-datadog-parent-id',
   'x-datadog-sampling-priority',
