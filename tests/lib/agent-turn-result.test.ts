@@ -819,4 +819,21 @@ describe('beta Agents typed output', () => {
       expect(requests).toHaveLength(0);
     },
   );
+  test('rejects unsupported URL formats in nested schemas while keeping supported formats', () => {
+    expect(() => zodAgentTextFormat(z3.object({ links: z3.array(z3.string().url()) }))).toThrow(
+      /format uri/u,
+    );
+    expect(() => zodAgentTextFormat(z4.object({ nested: z4.object({ link: z4.url() }) }))).toThrow(
+      /format uri/u,
+    );
+    expect(() => standardAgentTextFormat(z4.object({ link: z4.url() }))).toThrow(/format uri/u);
+    const schema = z4.object({ email: z4.email(), id: z4.uuid(), when: z4.iso.datetime() });
+    expect(() => zodAgentTextFormat(schema)).not.toThrow();
+    expect(() =>
+      agentOutputFormat(
+        { type: 'object', properties: { format: { type: 'string', enum: ['uri'] } }, required: ['format'] },
+        JSON.parse,
+      ),
+    ).not.toThrow();
+  });
 });
