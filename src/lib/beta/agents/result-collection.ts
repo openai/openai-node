@@ -20,6 +20,7 @@ export class ResultCollection {
   readonly #signal: AbortSignal | undefined;
   readonly #finalize: (() => Promise<void>) | undefined;
   readonly #canHandle: (name: string) => boolean;
+  readonly #replayedFunctions: boolean;
 
   constructor(
     source: () => AsyncIterator<AgentSessionEvent>,
@@ -27,8 +28,10 @@ export class ResultCollection {
     sessionID?: string,
     signal?: AbortSignal,
     finalize?: () => Promise<void>,
+    replayedFunctions = false,
   ) {
     this.#source = source;
+    this.#replayedFunctions = replayedFunctions;
     this.#finalize = finalize;
     this.#signal = signal;
     this.#canHandle = canHandle;
@@ -69,6 +72,7 @@ export class ResultCollection {
         if (this.#enabled) {
           this.collector.accept(next.value);
           if (
+            this.#replayedFunctions &&
             next.value.type === 'agent.session.turn.item.added' &&
             next.value.item.type === 'function_call' &&
             !this.#canHandle(next.value.item.name)

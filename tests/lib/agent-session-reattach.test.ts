@@ -41,6 +41,7 @@ function attachTransport(
     staleFunction?: boolean;
     staleEnvironment?: boolean;
     staleIdle?: boolean;
+    staleCompletedRead?: boolean;
     historyReplay?: boolean;
     earlyIdle?: boolean;
     emptyRoot?: boolean;
@@ -170,11 +171,10 @@ function attachTransport(
         return Response.json({ object: 'list', data, has_more: false });
       }
       if (path.includes('/turns/')) {
-        return Response.json(
-          path.endsWith('/turn_old')
-            ? { ...currentTurn(), id: 'turn_old', status: 'completed' }
-            : currentTurn(),
-        );
+        if (path.endsWith('/turn_old')) {
+          return Response.json({ ...currentTurn(), id: 'turn_old', status: 'completed' });
+        }
+        return Response.json(config.staleCompletedRead && finished ? turn : currentTurn());
       }
       if (path.endsWith('/items')) {
         if (config.historyFailure) {
@@ -500,6 +500,15 @@ describe('beta agents stream attachment', () => {
       ).rejects.toMatchObject({ reason: 'observation', cause: { message: 'Synthetic SSE read failed' } });
     },
   );
+  test('keeps terminal SSE authoritative over a stale turn projection during reconciliation', async () => {
+    const { client, requests } = attachTransport({ staleCompletedRead: true });
+    const result = await client.beta.agents.sessions
+      .stream(turn.session_id, { toolHandlers: { lookup: () => 'found' } })
+      .finalResult();
+    expect(result.turn.status).toBe('completed');
+    expect(result.output_text).toBe('Recovered answer');
+    expect(requests.filter((request) => new URL(request.url).pathname.endsWith('/items'))).toHaveLength(1);
+  });
   test.each(['staleEnvironment', 'staleIdle', 'earlyIdle'] as const)(
     'keeps observing the selected active turn despite %s projection',
     async (kind) => {

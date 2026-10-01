@@ -145,6 +145,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
       sessionID,
       this.controller.signal,
       () => this.#reconcile(),
+      this.#input === undefined,
     );
   }
 

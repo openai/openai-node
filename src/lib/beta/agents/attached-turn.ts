@@ -97,9 +97,12 @@ export class AttachedTurn {
   }
 
   async refresh(): Promise<AgentSession> {
-    this.turn = this.turn
-      ? await this.#sessions.turns.retrieve(this.turn.id, { session_id: this.#sessionID }, this.#options)
-      : await this.#newRoot();
+    // A terminal SSE snapshot is authoritative; a stale projection must not demote it.
+    if (!this.settled) {
+      this.turn = this.turn
+        ? await this.#sessions.turns.retrieve(this.turn.id, { session_id: this.#sessionID }, this.#options)
+        : await this.#newRoot();
+    }
     const session = await this.#sessions.retrieve(this.#sessionID, this.#options);
     this.#idle = session.status === 'idle';
     return session;

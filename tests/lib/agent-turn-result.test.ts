@@ -270,6 +270,53 @@ describe('beta Agents finalResult', () => {
     expect(requests.filter((request) => request.method === 'POST')).toHaveLength(2);
   });
 
+  test('input-present collection dispatches known calls after a manual call before diagnosing required actions', async () => {
+    const handler = vi.fn(() => 'found');
+    const calls = ['manual', 'lookup'].map((name) =>
+      event('agent.session.turn.item.added', {
+        output_index: 0,
+        item: {
+          id: `item_${name}`,
+          type: 'function_call',
+          name,
+          call_id: `call_${name}`,
+          turn_id: turn.id,
+          arguments: '{}',
+          status: 'in_progress',
+        },
+      }),
+    );
+    const { client } = setup(
+      [
+        created(),
+        ...calls,
+        event('agent.session.requires_action', {
+          session: {
+            id: turn.session_id,
+            required_actions: [
+              {
+                type: 'function_call',
+                turn_id: turn.id,
+                call_id: 'call_manual',
+                name: 'manual',
+                arguments: '{}',
+              },
+            ],
+          },
+        }),
+      ],
+      { followup: true },
+    );
+    await expect(
+      client.beta.agents.sessions
+        .stream(turn.session_id, {
+          input: 'Question',
+          toolHandlers: { lookup: handler },
+        })
+        .finalResult(),
+    ).rejects.toMatchObject({ reason: 'requires_action' });
+    expect(handler).toHaveBeenCalledOnce();
+  });
   test('ignores child output, deduplicates done items, and keeps the selected result after later events', async () => {
     const answer = message();
     const child = message('child', 'final_answer', 'child_message', 0, true, 'child_turn');
