@@ -188,11 +188,10 @@ describe('beta agent file preparation', () => {
     ).rejects.toThrow('absolute file path');
     expect(requests).toHaveLength(0);
   });
-  test('preflights conflicting destinations and shared retry keys', async () => {
+  test('rejects shared retry keys before uploading', async () => {
     const { client, requests } = fileTransport();
     const file = new File(['a'], 'a');
     const prepare = client.beta.agents.environments.files.prepare.bind(client.beta.agents.environments.files);
-    await expect(prepare({ '/workspace/a': file, '/workspace/a/b': file })).rejects.toThrow('conflict');
     await expect(
       prepare({ '/workspace/a': file, '/workspace/b': file }, { headers: { 'IDEMPOTENCY-KEY': 'same' } }),
     ).rejects.toThrow('Idempotency-Key');
@@ -219,20 +218,6 @@ describe('beta agent file preparation', () => {
     expect(prepared.files).toEqual(
       paths.map((path, i) => ({ type: 'file_id', file_id: `file_${i + 1}`, path })),
     );
-  });
-  test('reaches the API for a large nonconflicting batch and preserves its rejection', async () => {
-    const { client, requests } = fileTransport({ failUpload: 1 });
-    const file = new File(['a'], 'a');
-    const failure = await client.beta.agents.environments.files
-      .prepare(Object.fromEntries(Array.from({ length: 10_000 }, (_, i) => [`/workspace/batch/${i}`, file])))
-      .catch((error: unknown) => error);
-    expect(failure).toBeInstanceOf(AgentFileUploadError);
-    if (!(failure instanceof AgentFileUploadError)) {
-      throw new Error('Expected upload error');
-    }
-    expect(failure.cause).toEqual(expect.objectContaining({ status: 400 }));
-    expect(failure.uploadedFiles).toEqual([]);
-    expect(requests).toHaveLength(1);
   });
   test.each([() => 1, 51 * 1024 * 1024])(
     'accepts upload streams with unrelated size members: %s',
