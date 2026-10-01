@@ -98,3 +98,31 @@ for await (const event of stream) {
 ```
 
 Reuse the handler with an existing idle session whose agent already has the matching definition. Raw handlers can share the same `toolHandlers` map.
+### Typed final output (beta)
+
+Bind a Zod v3/v4 object schema to creation and its final result:
+
+```ts
+import { z } from 'zod';
+import { zodAgentTextFormat } from 'openai/helpers/beta/agents/zod';
+
+const format = zodAgentTextFormat(z.object({ summary: z.string() }));
+const stream = await client.beta.agents.sessions.create({
+  agent: { model: 'gpt-6-astra', text: { format } },
+  environment: { type: 'none' },
+  input: 'Summarize the notes.',
+  stream: true,
+});
+const result = await stream.finalResult();
+console.log(result.output_parsed.summary);
+
+const followup = client.beta.agents.sessions.stream(result.session_id, {
+  input: 'Make it shorter.',
+  outputFormat: format,
+});
+console.log((await followup.finalResult()).output_parsed.summary);
+```
+
+Follow-up `outputFormat` only chooses the local parser; the session must already use
+that schema. `agentOutputFormat(schema, parse)` supports other validators.
+`AgentOutputParseError.raw_result` preserves completed raw output if parsing fails.

@@ -1,3 +1,7 @@
+import { z as z3 } from 'zod/v3';
+import { z as z4 } from 'zod/v4';
+import { zodAgentTextFormat } from 'openai/helpers/beta/agents/zod';
+import { AgentOutputParseError, agentOutputFormat } from 'openai/lib/beta/agents/output-format';
 import { describe, expect, test, vi } from 'vitest';
 import OpenAI from 'openai';
 import { AgentTurnResultError } from 'openai/lib/beta/agents/agent-turn-result-error';
@@ -521,5 +525,107 @@ describe('beta Agents finalResult', () => {
     }
     const result = await stream.finalResult();
     expect(result.output_text).toBe('Final answer');
+  });
+});
+
+describe('beta Agents typed output', () => {
+  test.each([
+    ['v3', z3.object({ summary: z3.string(), findings: z3.array(z3.string()) })],
+    ['v4', z4.object({ summary: z4.string(), findings: z4.array(z4.string()) })],
+  ] as const)('binds %s schema, request, and typed result', async (_version, schema) => {
+    const format = zodAgentTextFormat(schema);
+    const answer = { summary: 'Report', findings: ['First'] };
+    const { client, requests } = setup([created(), message(JSON.stringify(answer)), completed(), idle()]);
+    const stream = await client.beta.agents.sessions.create({
+      agent: { model: 'gpt-6-astra', text: { format } },
+      environment: { type: 'none' },
+      input: 'Research',
+      stream: true,
+    });
+    const result = await stream.finalResult();
+    const summary: string = result.output_parsed.summary;
+    expect(summary).toBe('Report');
+    expect(result.output_parsed).toEqual(answer);
+    expect(result.raw_result.messages).toBe(result.messages);
+    expect(await stream.finalResult()).toBe(result);
+    const request = await requests[0]?.json();
+    expect(request).toMatchObject({
+      agent: {
+        text: { format: { type: 'json_schema', schema: { type: 'object', additionalProperties: false } } },
+      },
+    });
+    expect(JSON.stringify(request)).not.toMatch(/parseRaw|strict|name/u);
+  });
+
+  test('follow-up parses locally without changing the hosted schema', async () => {
+    const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+    const { client, requests } = setup([created(), message('{"summary":"Followup"}'), completed(), idle()], {
+      followup: true,
+    });
+    const stream = client.beta.agents.sessions
+      .stream(turn.session_id, { input: 'Again', outputFormat: format })
+      .withResultCollection();
+    for await (const _event of stream) {
+      /* show progress */
+    }
+    const result = await stream.finalResult();
+    const summary: string = result.output_parsed.summary;
+    expect(summary).toBe('Followup');
+    const posts = requests.filter((request) => request.method === 'POST');
+    expect(posts).toHaveLength(1);
+    expect(JSON.stringify(await posts[0]?.json())).not.toMatch(/outputFormat|schema|parseRaw/u);
+  });
+
+  test.each(['not JSON', '{"summary":42}'])(
+    'parsing failure preserves the completed raw result: %s',
+    async (text) => {
+      const { client } = setup([created(), message(text), completed(), idle()]);
+      const format = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+      const stream = await client.beta.agents.sessions.create({
+        agent: { text: { format } },
+        environment: { type: 'none' },
+        input: 'Report',
+        stream: true,
+      });
+      const failure = await stream.finalResult().catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(AgentOutputParseError);
+      if (!(failure instanceof AgentOutputParseError)) {
+        throw new Error('Expected parse failure');
+      }
+      expect(failure.raw_result.turn.status).toBe('completed');
+      expect(failure.raw_result.output_text).toBe(text);
+      expect(failure.cause).toBeDefined();
+      expect(failure.message).not.toContain(text);
+      expect(await stream.finalResult().catch((error: unknown) => error)).toBe(failure);
+    },
+  );
+
+  test('hosted failure does not run the parser', async () => {
+    const parse = vi.fn(() => ({ summary: 'unused' }));
+    const format = agentOutputFormat(
+      { type: 'object', properties: { summary: { type: 'string' } }, required: ['summary'] },
+      parse,
+    );
+    const { client } = setup([created(), completed('failed'), idle()]);
+    const stream = await client.beta.agents.sessions.create({
+      agent: { text: { format } },
+      environment: { type: 'none' },
+      input: 'Report',
+      stream: true,
+    });
+    await expect(stream.finalResult()).rejects.toBeInstanceOf(AgentTurnResultError);
+    expect(parse).not.toHaveBeenCalled();
+  });
+
+  test('rejects unsupported roots and normalizes nested supported output before requests', () => {
+    expect(() => zodAgentTextFormat(z3.array(z3.string()))).toThrow(/object/u);
+    expect(() =>
+      zodAgentTextFormat(z4.union([z4.object({ a: z4.string() }), z4.object({ b: z4.number() })])),
+    ).toThrow();
+    const format = zodAgentTextFormat(
+      z4.object({ nested: z4.object({ values: z4.array(z4.string().nullable()) }) }),
+    );
+    expect(JSON.stringify(format)).toBe(JSON.stringify({ type: 'json_schema', schema: format.schema }));
+    expect(() => agentOutputFormat({ type: 'object', enum: [{}] }, JSON.parse)).toThrow(/enum/u);
   });
 });
