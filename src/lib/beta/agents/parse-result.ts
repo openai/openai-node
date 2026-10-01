@@ -10,10 +10,24 @@ import { AgentOutputParseError } from './output-parse-error';
 /** @internal */
 export function parseAgentResult<T>(result: AgentTurnResult, format?: AgentOutputFormat<T>): AgentResult<T> {
   try {
-    // SAFETY: Callers preserve the format's inferred T; absent formats use the default never/raw overload.
-    return (
-      format ? new ParsedAgentTurnResult(result, format.$parseRaw(result.output_text)) : result
-    ) as AgentResult<T>;
+    if (!format) {
+      // SAFETY: Absent formats use the default never/raw overload.
+      return result as AgentResult<T>;
+    }
+    let first: { value: T } | undefined;
+    for (const message of result.messages) {
+      for (const content of message.content) {
+        if (content.type === 'output_text') {
+          const value = format.$parseRaw(content.text);
+          first ??= { value };
+        }
+      }
+    }
+    if (!first) {
+      throw new AgentOutputParseError(result);
+    }
+    // SAFETY: Callers preserve the format's inferred T.
+    return new ParsedAgentTurnResult(result, first.value) as AgentResult<T>;
   } catch {
     throw new AgentOutputParseError(result);
   }

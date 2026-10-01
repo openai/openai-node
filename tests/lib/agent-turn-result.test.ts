@@ -676,6 +676,94 @@ describe('beta Agents typed output', () => {
     },
   );
 
+  describe.each([false, true])('per-item parsing (follow-up: %s)', (followup) => {
+    test.each(['messages', 'parts', 'invalid later', 'empty text', 'no text'] as const)(
+      'parses final output text independently: %s',
+      async (mode) => {
+        const first = '{"summary":"First"}';
+        const second = mode === 'invalid later' ? '{"summary":42}' : '{"summary":"Second"}';
+        let items: ReturnType<typeof event>[];
+        if (mode === 'no text') {
+          items = [];
+        } else if (mode === 'empty text') {
+          items = [message('')];
+        } else if (mode === 'parts') {
+          items = [
+            event('agent.session.turn.item.done', {
+              output_index: 0,
+              item: {
+                id: 'message_parts',
+                type: 'message',
+                role: 'assistant',
+                turn_id: turn.id,
+                phase: 'final_answer',
+                status: 'completed',
+                content: [first, second].map((text) => ({ type: 'output_text', text, annotations: [] })),
+              },
+            }),
+          ];
+        } else {
+          items = [message(first, 'final_answer', 'first', 0), message(second, 'final_answer', 'second', 1)];
+        }
+        const { client } = setup([created(), ...items, completed(), idle()], { followup });
+        const native = zodAgentTextFormat(z4.object({ summary: z4.string() }));
+        const parse = vi.fn(native.$parseRaw);
+        const format = agentOutputFormat(native.schema, parse);
+        const stream = followup
+          ? client.beta.agents.sessions.stream(turn.session_id, { input: 'Again', outputFormat: format })
+          : await client.beta.agents.sessions.create({
+              agent: { text: { format } },
+              environment: { type: 'none' },
+              stream: true,
+            });
+        if (mode === 'invalid later' || mode === 'empty text' || mode === 'no text') {
+          const failure = await stream.finalResult().catch((error: unknown) => error);
+          expect(failure).toBeInstanceOf(AgentOutputParseError);
+          if (!(failure instanceof AgentOutputParseError)) {
+            throw new Error('Expected parse failure');
+          }
+          expect(failure.raw_result.output_text).toBe(mode === 'invalid later' ? first + second : '');
+          const expectedCalls = mode === 'empty text' ? [''] : [];
+          expect(parse.mock.calls.map(([text]) => text)).toEqual(
+            mode === 'invalid later' ? [first, second] : expectedCalls,
+          );
+        } else {
+          const result = await stream.finalResult();
+          expect(result.output_parsed).toEqual({ summary: 'First' });
+          expect(result.output_text).toBe(first + second);
+          expect(result.messages).toHaveLength(mode === 'parts' ? 1 : 2);
+          expect(result.messages).toBe(result.raw_result.messages);
+          expect(parse.mock.calls.map(([text]) => text)).toEqual([first, second]);
+        }
+      },
+    );
+
+    test.each([false, null, undefined])('preserves the first parsed value: %s', async (value) => {
+      const parse = vi.fn().mockReturnValueOnce(value).mockReturnValueOnce('second');
+      const format = agentOutputFormat({ type: 'object' }, parse);
+      const { client } = setup(
+        [
+          created(),
+          message('{}', 'final_answer', 'first', 0),
+          message('{}', 'final_answer', 'second', 1),
+          completed(),
+          idle(),
+        ],
+        { followup },
+      );
+      const stream = followup
+        ? client.beta.agents.sessions.stream(turn.session_id, { input: 'Again', outputFormat: format })
+        : await client.beta.agents.sessions.create({
+            agent: { text: { format } },
+            environment: { type: 'none' },
+            stream: true,
+          });
+      const result = await stream.finalResult();
+      expect(result.output_parsed).toBe(value);
+      expect(parse).toHaveBeenCalledTimes(2);
+    });
+  });
+
   test('hosted failure does not run the parser', async () => {
     const parse = vi.fn(() => ({ summary: 'unused' }));
     const format = agentOutputFormat(

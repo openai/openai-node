@@ -128,4 +128,5 @@ Follow-up `outputFormat` only chooses the local parser; the session must already
 that schema. `standardAgentTextFormat` from
 `openai/helpers/beta/agents/standard-schema` supports synchronous Standard Schema
 validators; `agentOutputFormat(schema, parse)` supports other validators.
+`output_parsed` contains the first parsed final text part; every final text part is validated.
 `AgentOutputParseError.raw_result` preserves completed raw output if parsing fails.
