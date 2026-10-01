@@ -64,7 +64,12 @@ export function agentOutputFormat<T>(schema: JSONSchema, parse: (text: string) =
       throw new OpenAIError(`Agents output schemas cannot contain top-level ${keyword}`);
     }
   }
-  // Functions survive object spread but are omitted by JSON serialization.
+  // Keep spread-compatible parsing without exposing caller-owned serialization hooks.
+  const parser = Object.defineProperty((text: string) => parse(text), 'toJSON', {
+    value: () => {
+      /* Parser metadata is omitted from JSON requests. */
+    },
+  });
   // SAFETY: Strict normalization returns an object JSON Schema; the API schema type exposes its JSON keywords as a record.
-  return { type: 'json_schema', schema: normalized as AgentOutputFormat<T>['schema'], $parseRaw: parse };
+  return { type: 'json_schema', schema: normalized as AgentOutputFormat<T>['schema'], $parseRaw: parser };
 }

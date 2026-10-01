@@ -26,7 +26,7 @@ export type AgentToolHandler = (
 ) => AgentToolOutput | PromiseLike<AgentToolOutput>;
 
 /** Input and optional sequential tool handlers for one turn on an idle session. */
-export interface AgentSessionStreamParams<T = never> {
+export type AgentSessionStreamParams<T = never> = {
   /** Beta: parse this turn locally; does not change the existing session schema. */
   outputFormat?: AgentOutputFormat<T>;
   /** User messages, or text normalized to a single user message. Must not be empty. */
@@ -35,7 +35,7 @@ export interface AgentSessionStreamParams<T = never> {
   toolHandlers?: Record<string, AgentToolHandler>;
   /** Key for the input submission only; request headers take precedence, case-insensitively. */
   idempotencyKey?: string;
-}
+} & ([T] extends [never] ? unknown : { outputFormat: AgentOutputFormat<T> });
 
 type ToolResult = AgentSessionInputParam.SessionInputParamAgentSessionInputToolResult;
 

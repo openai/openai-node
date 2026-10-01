@@ -9,6 +9,8 @@ import { describe, expect, test, vi } from 'vitest';
 import OpenAI from 'openai';
 import { AgentTurnResultError } from 'openai/lib/beta/agents/agent-turn-result-error';
 import { Stream } from 'openai/core/streaming';
+import { AgentSessionStream } from 'openai/lib/agents/agent-session-stream';
+import type { AgentSessionStreamParams } from 'openai/lib/agents/agent-session-stream';
 import type { AgentSessionEvent } from 'openai/resources/beta/agents/agents';
 import type { Turn } from 'openai/resources/beta/agents/sessions/turns';
 
@@ -862,5 +864,34 @@ describe('beta Agents typed output', () => {
     ).toThrow('cannot customize');
     expect(hook).not.toHaveBeenCalled();
     expect(requests).toHaveLength(0);
+  });
+  test('parser serialization hooks stay local through agent create and update formats', () => {
+    const hook = vi.fn(() => 'private-parser-output');
+    const parse = Object.assign(JSON.parse.bind(JSON), { toJSON: hook });
+    const format = agentOutputFormat({ type: 'object', properties: {}, required: [] }, parse);
+    const serialized = JSON.stringify({ text: { format: { ...format } } });
+    expect(serialized).not.toContain('$parseRaw');
+    expect(serialized).not.toContain('private-parser-output');
+    expect(hook).not.toHaveBeenCalled();
+    expect(format.$parseRaw('{}')).toEqual({});
+  });
+  test('typed stream parameters require the parser that their result type promises', () => {
+    const { client } = setup([]);
+    const checkTypes = () => {
+      // @ts-expect-error A parsed result cannot be requested without its parser.
+      const params: AgentSessionStreamParams<{ summary: string }> = { input: 'Report' };
+      // @ts-expect-error Explicit generic type arguments do not supply a parser.
+      client.beta.agents.sessions.stream<{ summary: string }>(turn.session_id, { input: 'Report' });
+      const stream = new AgentSessionStream<{ summary: string }>(
+        client.beta.agents.sessions,
+        turn.session_id,
+        // @ts-expect-error Direct typed construction requires the same parser contract.
+        {
+          input: 'Report',
+        },
+      );
+      return { params, stream };
+    };
+    expect(checkTypes).toBeTypeOf('function');
   });
 });
