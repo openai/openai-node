@@ -25,7 +25,7 @@ describe('resource images', () => {
   test('createVariation: required and optional params', async () => {
     await client.images.createVariation({
       image: await toFile(Buffer.from('Example data'), 'README.md'),
-      model: 'gpt-image-1',
+      model: 'gpt-image-1.5',
       n: 1,
       response_format: 'url',
       size: '1024x1024',
@@ -54,14 +54,14 @@ describe('resource images', () => {
       background: 'transparent',
       input_fidelity: 'high',
       mask: await toFile(Buffer.from('Example data'), 'README.md'),
-      model: 'gpt-image-2',
+      model: 'gpt-image-1.5',
       n: 1,
       output_compression: 100,
       output_format: 'png',
       partial_images: 1,
       quality: 'high',
       response_format: 'url',
-      size: '256x256',
+      size: '1024x1024',
       stream: false,
       user: 'user-1234',
     });
@@ -82,7 +82,7 @@ describe('resource images', () => {
     await client.images.generate({
       prompt: 'A cute baby sea otter',
       background: 'transparent',
-      model: 'gpt-image-2',
+      model: 'gpt-image-2.5-flare',
       moderation: 'low',
       n: 1,
       output_compression: 100,
