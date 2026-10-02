@@ -31,11 +31,14 @@ import {
   TranslationVerbose,
   Translations,
 } from './translations';
+import * as VoicesAPI from './voices';
+import { Voice, VoiceCreateParams, Voices } from './voices';
 
 export class Audio extends APIResource {
   transcriptions: TranscriptionsAPI.Transcriptions = new TranscriptionsAPI.Transcriptions(this._client);
   translations: TranslationsAPI.Translations = new TranslationsAPI.Translations(this._client);
   speech: SpeechAPI.Speech = new SpeechAPI.Speech(this._client);
+  voices: VoicesAPI.Voices = new VoicesAPI.Voices(this._client);
 }
 
 export type AudioModel =
@@ -58,6 +61,7 @@ export type AudioResponseFormat = 'json' | 'text' | 'srt' | 'verbose_json' | 'vt
 Audio.Transcriptions = Transcriptions;
 Audio.Translations = Translations;
 Audio.Speech = Speech;
+Audio.Voices = Voices;
 
 export declare namespace Audio {
   export { type AudioModel as AudioModel, type AudioResponseFormat as AudioResponseFormat };
@@ -91,4 +95,6 @@ export declare namespace Audio {
   };
 
   export { Speech as Speech, type SpeechModel as SpeechModel, type SpeechCreateParams as SpeechCreateParams };
+
+  export { Voices as Voices, type Voice as Voice, type VoiceCreateParams as VoiceCreateParams };
 }

@@ -2,6 +2,11 @@
 
 Types:
 
+- <code><a href="./src/resources/webhooks/webhooks.ts">AgentSessionActionRequiredWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks/webhooks.ts">AgentSessionCreatedWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks/webhooks.ts">AgentSessionFailedWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks/webhooks.ts">AgentSessionIdleWebhookEvent</a></code>
+- <code><a href="./src/resources/webhooks/webhooks.ts">AgentSessionInProgressWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks/webhooks.ts">BatchCancelledWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks/webhooks.ts">BatchCompletedWebhookEvent</a></code>
 - <code><a href="./src/resources/webhooks/webhooks.ts">BatchExpiredWebhookEvent</a></code>
