@@ -205,6 +205,16 @@ Methods:
 
 - <code title="post /audio/speech">client.audio.speech.<a href="./src/resources/audio/speech.ts">create</a>({ ...params }) -> Response</code>
 
+## Voices
+
+Types:
+
+- <code><a href="./src/resources/audio/voices.ts">Voice</a></code>
+
+Methods:
+
+- <code title="post /audio/voices">client.audio.voices.<a href="./src/resources/audio/voices.ts">create</a>({ ...params }) -> Voice</code>
+
 # Moderations
 
 Types:

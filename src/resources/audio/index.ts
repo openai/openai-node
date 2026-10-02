@@ -28,3 +28,4 @@ export {
   type TranslationCreateResponse,
   type TranslationCreateParams,
 } from './translations';
+export { Voices, type Voice, type VoiceCreateParams } from './voices';
