@@ -4,7 +4,7 @@
 
 The custom-code reporter measures the SDK's remaining customization of generated
 files. The budget gate checks that measurement against the repository's policy.
-See [CONTRIBUTING.md](../../CONTRIBUTING.md#custom-code-budget) for budget changes
+See [CONTRIBUTING.md](../../.github/CONTRIBUTING.md#custom-code-budget) for budget changes
 and human review, and [AGENTS.md](../../AGENTS.md#custom-code-budget) for agent rules.
 
 ## What is counted
