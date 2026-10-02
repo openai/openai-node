@@ -159,7 +159,7 @@ export function makeFile(
  * Directory components separated by either `/` or `\\` are discarded unless an
  * explicitly supplied `name` or `filename` opts into preserving its path. Preserved
  * paths must be safe and relative, and use forward slashes. Paths inferred from URLs and filesystem streams
- * discard their directories.
+ * discard their directories. URL basenames are percent-decoded when their escapes are valid UTF-8.
  */
 export function getName(value: any, options?: { stripFilename?: boolean | undefined }): string | undefined {
   if (typeof value !== 'object' || value === null) {
@@ -175,11 +175,7 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
 
   const url = 'url' in value && value.url && String(value.url);
   if (url) {
-    try {
-      return basename(new URL(url).pathname);
-    } catch {
-      return basename(url);
-    }
+    return urlBasename(url);
   }
 
   const path = 'path' in value && value.path && String(value.path);
@@ -188,6 +184,29 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
 
 function basename(value: string): string | undefined {
   return value.split(/[\\/]/).pop() || undefined;
+}
+
+function urlBasename(url: string): string | undefined {
+  let encodedName: string | undefined;
+  try {
+    encodedName = basename(new URL(url).pathname);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return basename(url);
+    }
+    throw error;
+  }
+  if (encodedName === undefined) {
+    return undefined;
+  }
+  try {
+    return basename(decodeURIComponent(encodedName));
+  } catch (error) {
+    if (error instanceof URIError) {
+      return encodedName;
+    }
+    throw error;
+  }
 }
 
 function normalizeFilenamePath(value: string): string {
