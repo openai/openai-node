@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.28.0](https://github.com/openai/openai-node/compare/v7.27.0...v7.28.0) (2026-10-02)
+
+
+### Features
+
+* **api:** add custom voice creation and agent session events ([#2858](https://github.com/openai/openai-node/issues/2858)) ([11b9283](https://github.com/openai/openai-node/commit/11b9283f2a22737e273ccc1593d01af5cf584a0b))
+
 ## [7.27.0](https://github.com/openai/openai-node/compare/v7.26.0...v7.27.0) (2026-10-01)
 
 
