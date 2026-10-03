@@ -42,6 +42,10 @@ if (response.output_parsed) {
 output. For example, incomplete responses are left unparsed so their status and `incomplete_details` remain
 available.
 
+`responses.parse()` and `responses.stream().finalResponse()` parse text only in messages with
+`phase: 'final_answer'` or a missing/null phase. Commentary and other explicit phases retain their text and
+metadata with `parsed: null`, so they do not replace the final result in `output_parsed`.
+
 The Zod helpers support schemas imported from `zod/v3`, `zod/v4`, and `zod/v4-mini`. Use the import that
 matches the Zod version in your application.
 
