@@ -9,6 +9,9 @@ import type { RequestOptions } from '../../internal/request-options';
 import { uuid4 } from '../../internal/utils/uuid';
 import { isObj } from '../../internal/utils/values';
 import { isInputContent } from '../beta/agents/tool-output';
+import type { AgentToolError } from '../beta/agents/tool-error';
+import { toolStages } from '../beta/agents/tool-stages';
+import type { StagedToolHandler } from '../beta/agents/tool-stages';
 import type {
   AgentFunctionCallItem,
   AgentFunctionCallOutputParam,
@@ -33,6 +36,12 @@ export type AgentSessionStreamParams<T = never> = {
   input: string | AgentSessionInputMessageParam[];
   /** Registered functions run after their call event is yielded; unknown functions remain manual. */
   toolHandlers?: Record<string, AgentToolHandler>;
+  /**
+   * Beta: use alongside `toolHandlers` to log or monitor local argument validation,
+   * handler execution, and output serialization failures. Does not observe API or
+   * transport errors. Observer errors are ignored; model-visible errors remain sanitized.
+   */
+  onToolError?: (failure: AgentToolError) => void | PromiseLike<void>;
   /** Key for the input submission only; request headers take precedence, case-insensitively. */
   idempotencyKey?: string;
 } & ([T] extends [never] ? unknown : { outputFormat: AgentOutputFormat<T> });
@@ -101,6 +110,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
   #sessionID: string;
   #input: AgentSessionInputParam.SessionInputParamAgentSessionInputMessage;
   #handlers: Map<string, AgentToolHandler>;
+  #onToolError: AgentSessionStreamParams['onToolError'];
   #inputKey: string | undefined;
   #options: RequestOptions;
 
@@ -126,6 +136,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
     this.#sessionID = sessionID;
     this.#input = { type: 'agent.session.input.message', input };
     this.#handlers = new Map(Object.entries(params.toolHandlers ?? {}));
+    this.#onToolError = params.onToolError;
     const headers = buildHeaders([options?.headers]);
     this.#inputKey = headers.nulls.has('idempotency-key')
       ? undefined
@@ -244,16 +255,43 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
     }
   }
 
-  async #result(call: AgentFunctionCallItem, handler: AgentToolHandler): Promise<ToolResult> {
+  async #result(call: AgentFunctionCallItem, handler: StagedToolHandler): Promise<ToolResult> {
+    let stage: AgentToolError['stage'] = 'arguments';
     try {
       const args: unknown = typeof call.arguments === 'string' ? JSON.parse(call.arguments) : call.arguments;
       if (!isObj(args)) {
         throw new OpenAIError('Function arguments must be a JSON object');
       }
+      stage = 'execution';
       // SAFETY: Arguments were parsed as JSON and checked to be a non-null non-array object before invoking the handler.
-      return toolResult(call, await this.#wait(() => handler(args as Record<string, unknown>)));
-    } catch {
+      const arguments_ = args as Record<string, unknown>;
+      const output = await this.#wait(() =>
+        this.#onToolError && handler[toolStages]
+          ? handler(arguments_, (value) => {
+              stage = value;
+            })
+          : handler(arguments_),
+      );
+      stage = 'output';
+      return toolResult(call, output);
+    } catch (error) {
       this.#checkAbort();
+      if (this.#onToolError) {
+        const failure: AgentToolError = Object.freeze({
+          error,
+          stage,
+          tool_name: call.name,
+          session_id: this.#sessionID,
+          turn_id: call.turn_id,
+          call_id: call.call_id,
+        });
+        try {
+          await this.#wait(() => this.#onToolError?.(failure));
+        } catch {
+          // Observers must not prevent the original sanitized tool failure from being submitted.
+          this.#checkAbort();
+        }
+      }
       return {
         type: 'agent.session.input.tool_result',
         turn_id: call.turn_id,

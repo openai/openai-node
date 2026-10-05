@@ -55,11 +55,16 @@ const stream = client.beta.agents.sessions.stream(session.id, {
   toolHandlers: {
     add: async (args) => ({ sum: Number(args.a) + Number(args.b) }),
   },
+  onToolError: ({ tool_name, stage, call_id }) => {
+    console.error('Local tool failed', { tool_name, stage, call_id });
+  },
 });
 for await (const event of stream) {
   console.log(event.type);
 }
 ```
+
+`onToolError` optionally observes argument, execution, and output failures. It receives the original local `error` and call IDs; redact sensitive details before logging. The SDK does not log these errors or send their details to the model. Async observers are awaited; observer failures are ignored unless the stream was aborted.
 
 Register the corresponding function on the agent before using a handler. Each input and tool-result submission uses a distinct idempotency key preserved across retries. `idempotencyKey` applies to input only; a case-insensitive `Idempotency-Key` request header takes precedence. Request options are passed as the third argument.
 
