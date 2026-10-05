@@ -3,7 +3,11 @@
 import { APIResource } from '../../../../../core/resource';
 import * as AgentsAPI from '../../agents';
 import { AgentSessionItemsPage } from '../../agents';
-import { CursorPage, type CursorPageParams, PagePromise } from '../../../../../core/pagination';
+import {
+  ConversationCursorPage,
+  type ConversationCursorPageParams,
+  PagePromise,
+} from '../../../../../core/pagination';
 import { buildHeaders } from '../../../../../internal/headers';
 import { RequestOptions } from '../../../../../internal/request-options';
 import { path } from '../../../../../internal/utils/path';
@@ -40,7 +44,7 @@ export class Items extends APIResource {
     const { session_id, ...query } = params;
     return this._client.getAPIList(
       path`/agents/sessions/${session_id}/turns/${turnID}/items`,
-      CursorPage<AgentsAPI.AgentSessionItem>,
+      ConversationCursorPage<AgentsAPI.AgentSessionItem>,
       resolveResourceRequestOptions(options, (options) => ({
         query,
         ...options,
@@ -51,7 +55,7 @@ export class Items extends APIResource {
   }
 }
 
-export interface ItemListParams extends CursorPageParams {
+export interface ItemListParams extends ConversationCursorPageParams {
   /**
    * Path param: The ID of the session that owns the turn.
    */
