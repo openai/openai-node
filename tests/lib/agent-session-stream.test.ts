@@ -7,6 +7,7 @@ import type { AgentToolHandler } from 'openai/lib/agents/agent-session-stream';
 import { z } from 'zod/v4';
 import { zodResponsesFunction } from 'openai/helpers/zod';
 import { functionTool } from 'openai/lib/beta/agents/function-tool';
+import type { AgentToolError } from 'openai/lib/beta/agents/tool-error';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -490,6 +491,147 @@ describe('agents sessions.stream public transport', () => {
         .map(({ body }) => body.events?.[0]?.['error']),
     ).toEqual(['Tool handler failed.', 'Tool handler failed.']);
     expect(JSON.stringify(requests.map(({ body }) => body))).not.toContain('synthetic-secret');
+  });
+
+  test.each([false, true])(
+    'observes tool stages without exposing errors to the model (typed=%s)',
+    async (typed) => {
+      const executionError = new Error('synthetic-secret');
+      const outputError = new Error('synthetic-output-secret');
+      const invalidOutput = {
+        toJSON() {
+          throw outputError;
+        },
+      };
+      const execute = vi
+        .fn()
+        .mockRejectedValueOnce(executionError)
+        .mockReturnValueOnce(typed ? [invalidOutput] : invalidOutput)
+        .mockReturnValueOnce('ok');
+      const handler = typed
+        ? functionTool(
+            zodResponsesFunction({
+              name: 'lookup',
+              parameters: z.object({ value: z.number() }),
+              function: execute,
+            }),
+          ).handler
+        : execute;
+      const onToolError = vi.fn<(failure: AgentToolError) => Promise<void>>(async () => {
+        throw new Error('observer failure');
+      });
+      const failedCall = call('execution');
+      const { client, requests } = transport([
+        turn(),
+        call('arguments', typed ? { value: 'wrong type' } : 'invalid JSON'),
+        failedCall,
+        failedCall,
+        call('output'),
+        call('success'),
+        ...ending(),
+      ]);
+      await collect(
+        client.beta.agents.sessions.stream('session_test', {
+          input: 'x',
+          toolHandlers: { lookup: handler },
+          onToolError,
+        }),
+      );
+      const failures = onToolError.mock.calls.map(([failure]) => failure);
+      expect(failures).toEqual([
+        expect.objectContaining({ stage: 'arguments', error: expect.any(Error) }),
+        expect.objectContaining({ stage: 'execution', error: executionError }),
+        expect.objectContaining({ stage: 'output', error: outputError }),
+      ]);
+      for (const failure of failures) {
+        expect(failure).toMatchObject({
+          session_id: 'session_test',
+          turn_id: 'turn_main',
+          tool_name: 'lookup',
+          call_id: failure.stage,
+        });
+        expect(new Set(Object.keys(failure))).toEqual(
+          new Set(['call_id', 'error', 'session_id', 'stage', 'tool_name', 'turn_id']),
+        );
+      }
+      expect(failures[1]?.error).toBe(executionError);
+      expect(failures[2]?.error).toBe(outputError);
+      expect(execute).toHaveBeenCalledTimes(3);
+      expect(
+        posts(requests)
+          .slice(1)
+          .map(({ body }) => body.events?.[0]),
+      ).toEqual([
+        ...['arguments', 'execution', 'output'].map((call_id) => ({
+          type: 'agent.session.input.tool_result',
+          turn_id: 'turn_main',
+          call_id,
+          success: false,
+          error: 'Tool handler failed.',
+        })),
+        expect.objectContaining({ success: true, output: 'ok' }),
+      ]);
+    },
+  );
+
+  test('notifies once across submission retries and propagates submission errors', async () => {
+    const error = { reason: 'application failure' };
+    const onToolError = vi.fn();
+    const { client, requests } = transport([turn(), call(), ...ending()], {
+      post: (_entry, index) =>
+        index === 1
+          ? new Response(null, { status: 204 })
+          : Response.json(
+              { error: { message: 'submit failed' } },
+              { status: 500, headers: { 'retry-after-ms': '1' } },
+            ),
+    });
+    await expect(
+      collect(
+        client.beta.agents.sessions.stream(
+          'session_test',
+          {
+            input: 'x',
+            toolHandlers: {
+              lookup: () => {
+                throw error;
+              },
+            },
+            onToolError,
+          },
+          { maxRetries: 1 },
+        ),
+      ),
+    ).rejects.toThrow('submit failed');
+    expect(onToolError).toHaveBeenCalledOnce();
+    expect(onToolError.mock.calls[0]?.[0].error).toBe(error);
+    expect(posts(requests)).toHaveLength(3);
+  });
+
+  test('aborts a pending error observer without submitting or waiting for it', async () => {
+    const waiting = deferred<undefined>();
+    const started = deferred<boolean>();
+    const { client, requests } = transport([turn(), call(), ...ending()]);
+    const onToolError = vi.fn(() => {
+      started.resolve(true);
+      return waiting.promise;
+    });
+    const stream = client.beta.agents.sessions.stream('session_test', {
+      input: 'x',
+      toolHandlers: {
+        lookup: () => {
+          throw new Error('failure');
+        },
+      },
+      onToolError,
+    });
+    const result = collect(stream);
+    await started.promise;
+    stream.abort();
+    await expect(result).rejects.toBeInstanceOf(APIUserAbortError);
+    waiting.reject(new Error('late observer rejection'));
+    expect(onToolError).toHaveBeenCalledOnce();
+    expect(posts(requests)).toHaveLength(1);
   });
 
   test('reuses distinct input/result keys across ambiguous delivery and registration race retries', async () => {
