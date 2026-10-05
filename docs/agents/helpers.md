@@ -104,6 +104,23 @@ for await (const event of stream) {
 
 Reuse the handler with an existing idle session whose agent already has the matching definition. Raw handlers can share the same `toolHandlers` map.
 
+For deferred discovery, pass `defer_loading: true` to the Responses factory before adapting it:
+
+```ts
+const lookup = functionTool(
+  zodResponsesFunction({
+    name: 'lookup_item',
+    parameters: z.object({ item_id: z.string() }),
+    function: ({ item_id }) => catalog.lookup(item_id),
+    defer_loading: true,
+  }),
+);
+const agent = { model: MODEL, tools: [{ type: 'tool_search' as const }, lookup.definition] };
+const handlers = { [lookup.name]: lookup.handler };
+```
+
+The same option works with `standardResponsesFunction()`. Register the handler normally; discovery is hosted.
+
 ### Typed final output (beta)
 
 Bind a Zod v3/v4/Mini object schema to creation and its final result:

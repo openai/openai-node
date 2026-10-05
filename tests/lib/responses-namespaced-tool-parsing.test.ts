@@ -193,7 +193,13 @@ test.each(modes)('%s selects same-named tools by both namespace and name', async
 test.each(modes)('%s does not fall back across namespaces or from custom tools', async (mode) => {
   const parser = vi.fn(() => 'wrong tool');
   const top = makeParseableResponseTool(strictTool, { parser, callback: undefined });
-  const calls = [toolCall('unknown'), toolCall('CRM'), toolCall('crm', 'absent'), toolCall('custom')];
+  const calls = [
+    toolCall('unknown'),
+    toolCall('lookup'),
+    toolCall('CRM'),
+    toolCall('crm', 'absent'),
+    toolCall('custom'),
+  ];
   const tools = [
     top,
     namespace('crm', [strictTool]),
@@ -206,6 +212,25 @@ test.each(modes)('%s does not fall back across namespaces or from custom tools',
   }
   expect(parser).not.toHaveBeenCalled();
 });
+
+test.each(modes)(
+  '%s preserves declared namespace ownership over deferred top-level aliases',
+  async (mode) => {
+    const parser = vi.fn(() => 'wrong tool');
+    const top = makeParseableResponseTool(
+      { ...strictTool, defer_loading: true },
+      { parser, callback: undefined },
+    );
+    const calls = [toolCall('lookup'), toolCall('unknown')];
+    const tools = [top, namespace('lookup', [{ type: 'custom', name: 'lookup' }])];
+    const result = await request(mode, tools, calls);
+    expect(result.output).toEqual(calls.map((call) => ({ ...call, parsed_arguments: null })));
+    for (const call of calls) {
+      expect(shouldParseToolCall({ model: 'gpt-5.5', tools }, call)).toBe(false);
+    }
+    expect(parser).not.toHaveBeenCalled();
+  },
+);
 
 test.each([false, null, undefined])(
   'does not infer strictness from a nested strict=%s tool',
