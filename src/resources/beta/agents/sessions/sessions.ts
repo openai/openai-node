@@ -3,10 +3,12 @@
 import {
   AgentSessionStream,
   type AgentSessionStreamParams,
+  type AgentToolHandler,
 } from '../../../../lib/agents/agent-session-stream';
 import {
   type AgentSessionCreateStream,
   withAgentTurnResult,
+  captureCreationTools,
 } from '../../../../lib/beta/agents/agent-session-create-stream';
 import type { AgentOutputFormat } from '../../../../lib/beta/agents/output-format-types';
 import { captureAgentOutput } from '../../../../lib/beta/agents/parse-result';
@@ -200,7 +202,8 @@ export class Sessions extends APIResource {
     body: SessionCreateParams,
     options?: RequestOptions,
   ): APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream> {
-    const output = captureAgentOutput(body, options);
+    const creation = captureCreationTools(body, options);
+    const output = captureAgentOutput(creation.body, creation.options);
     return this._client
       .post<AgentsAPI.AgentSession | Stream<AgentsAPI.AgentSessionEvent>>(
         '/agents/sessions',
@@ -215,7 +218,13 @@ export class Sessions extends APIResource {
       ._thenUnwrap((data, { options }) =>
         // SAFETY: defaultParseResponse uses this same resolved flag to return the configured stream instance.
         options.stream
-          ? withAgentTurnResult(data as Stream<AgentsAPI.AgentSessionEvent>, output.format)
+          ? withAgentTurnResult(
+              data as Stream<AgentsAPI.AgentSessionEvent>,
+              output.format,
+              creation.handlers
+                ? { sessions: this, handlers: creation.handlers, options: output.options }
+                : undefined,
+            )
           : data,
       ) as APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream>;
   }
@@ -514,6 +523,7 @@ export namespace SessionCreateParams {
 }
 
 export interface SessionCreateParamsNonStreaming extends SessionCreateParamsBase {
+  toolHandlers?: never;
   /**
    * Whether to stream session events as server-sent events. Defaults to `false`.
    */
@@ -521,6 +531,8 @@ export interface SessionCreateParamsNonStreaming extends SessionCreateParamsBase
 }
 
 export interface SessionCreateParamsStreaming extends SessionCreateParamsBase {
+  /** Beta: local function handlers run during iteration and are never sent to the API. */
+  toolHandlers?: Record<string, AgentToolHandler>;
   /**
    * Whether to stream session events as server-sent events. Defaults to `false`.
    */

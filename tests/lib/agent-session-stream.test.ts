@@ -174,6 +174,37 @@ describe('agents sessions.stream public transport', () => {
     expect(JSON.stringify(tool.definition)).not.toContain('catalog_local');
   });
 
+  test('shares normalized accessor-backed request options with tool submissions', async () => {
+    const { signal } = new AbortController();
+    const alternate = AbortSignal.abort();
+    const signalGetter = vi.fn().mockReturnValueOnce(signal).mockReturnValue(alternate);
+    const headersGetter = vi
+      .fn()
+      .mockReturnValueOnce({ 'x-application': 'first' })
+      .mockReturnValue({ 'x-application': 'later' });
+    const { client, requests } = transport([turn(), call(), ...ending()]);
+    await collect(
+      client.beta.agents.sessions.stream(
+        'session_test',
+        {
+          input: 'Look up A123',
+          toolHandlers: { lookup: () => 'found' },
+        },
+        {
+          get signal() {
+            return signalGetter();
+          },
+          get headers() {
+            return headersGetter();
+          },
+        },
+      ),
+    );
+    expect(signalGetter).toHaveBeenCalledOnce();
+    expect(requests).toHaveLength(4);
+    expect(requests.every(({ request }) => request.headers.get('x-application') === 'first')).toBe(true);
+  });
+
   test('subscribes before normalized input and waits for selected coordinator terminal then idle', async () => {
     const events = [
       event('agent.session.idle', 'initial_idle'),

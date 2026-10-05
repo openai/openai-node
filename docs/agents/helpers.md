@@ -7,7 +7,10 @@ import OpenAI from 'openai';
 import { outputText } from 'openai/lib/agents/output-text';
 
 const client = new OpenAI();
-const session = await client.beta.agents.sessions.create({ environment: { type: 'none' } });
+const session = await client.beta.agents.sessions.create({
+  agent: { model: 'gpt-6-astra' },
+  environment: { type: 'openai_hosted' },
+});
 const stream = client.beta.agents.sessions.stream(session.id, {
   input: 'What is 2 + 2?',
 });
@@ -89,18 +92,17 @@ const lookup = functionTool(
     function: ({ item_id }) => catalog.lookup(item_id),
   }),
 );
-// Use this agent configuration when creating your session.
-const agent = { model: MODEL, tools: [lookup.definition] };
-
-// Attach the local handler once the configured session is idle.
-const stream = client.beta.agents.sessions.stream(SESSION_ID, {
+const stream = await client.beta.agents.sessions.create({
+  agent: { model: MODEL, tools: [lookup.definition] },
+  environment: { type: 'none' },
+  stream: true,
   input: 'Look up catalog item ITEM_A.',
   toolHandlers: { [lookup.name]: lookup.handler },
 });
-for await (const event of stream) {
-  console.log(event.type);
-}
+console.log((await stream.finalResult()).output_text);
 ```
+
+Creation handlers require `stream: true` and run while consuming events or collecting a final result. Callbacks stay local; only tool definitions and results are sent to the API.
 
 Reuse the handler with an existing idle session whose agent already has the matching definition. Raw handlers can share the same `toolHandlers` map.
 
