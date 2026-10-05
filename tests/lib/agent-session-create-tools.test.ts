@@ -243,6 +243,30 @@ describe('creation-stream tool handlers', () => {
       : expect(stream.finalResult()).rejects.toHaveProperty('reason', 'requires_action'));
   });
 
+  test('does not enable handlers inherited from the request prototype', async () => {
+    const { client, requests } = setup();
+    const handler = vi.fn(() => 'unexpected');
+    const body = Object.setPrototypeOf({ ...params }, { toolHandlers: { lookup: handler } });
+    const stream = await client.beta.agents.sessions.create(body);
+    await stream.finalResult();
+    expect(handler).not.toHaveBeenCalled();
+    expect(requests).toHaveLength(1);
+  });
+
+  test('rejects body serialization overrides that could send local handler data', () => {
+    const { client, requests } = setup();
+    const handler = Object.assign(() => null, { toJSON: () => 'private callback data' });
+    const body = { ...params, toolHandlers: { lookup: handler } };
+    const custom = { ...body, toJSON: () => body };
+    expect(() => client.beta.agents.sessions.create(custom)).toThrow(
+      'cannot customize request body serialization',
+    );
+    expect(() => client.beta.agents.sessions.create(body, { body })).toThrow(
+      'cannot customize request body serialization',
+    );
+    expect(requests).toHaveLength(0);
+  });
+
   test('rejects handlers without streaming before sending a request', () => {
     const { client, requests } = setup();
     expect(() =>

@@ -202,8 +202,8 @@ export class Sessions extends APIResource {
     body: SessionCreateParams,
     options?: RequestOptions,
   ): APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream> {
-    const creation = captureCreationTools(body);
-    const output = captureAgentOutput(creation.body, options);
+    const creation = captureCreationTools(body, options);
+    const output = captureAgentOutput(creation.body, creation.options);
     return this._client
       .post<AgentsAPI.AgentSession | Stream<AgentsAPI.AgentSessionEvent>>(
         '/agents/sessions',

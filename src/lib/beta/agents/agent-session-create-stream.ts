@@ -70,17 +70,25 @@ export function withAgentTurnResult<T = never>(
 }
 
 /** Remove local callbacks without changing ordinary creation requests. @internal */
-export function captureCreationTools(body: SessionCreateParams) {
-  if (!('toolHandlers' in body)) {
-    return { body };
+export function captureCreationTools(body: SessionCreateParams, options?: RequestOptions) {
+  if (!Object.getOwnPropertyDescriptor(body, 'toolHandlers')) {
+    return { body, options };
   }
   const handlers = body.toolHandlers;
   if (handlers !== undefined && body.stream !== true) {
     throw new OpenAIError('toolHandlers requires stream: true');
   }
+  const capturedOptions = { ...options };
+  if (handlers !== undefined && ('toJSON' in body || capturedOptions.body !== undefined)) {
+    throw new OpenAIError('Creation tool handlers cannot customize request body serialization');
+  }
   const descriptors = Object.getOwnPropertyDescriptors(body);
   delete descriptors.toolHandlers;
   // SAFETY: Preserve the request's prototype and data descriptors, omitting only the SDK-only property.
   const request = Object.create(Object.getPrototypeOf(body), descriptors) as SessionCreateParams;
-  return { body: request, handlers: handlers && Object.fromEntries(Object.entries(handlers)) };
+  return {
+    body: request,
+    options: capturedOptions,
+    handlers: handlers && Object.fromEntries(Object.entries(handlers)),
+  };
 }

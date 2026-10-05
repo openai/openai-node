@@ -94,7 +94,6 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
     this.#sessions = sessions;
     this.#sessionID = sessionID;
     this.#input = { type: 'agent.session.input.message', input };
-    this.#dispatcher = new AgentToolDispatcher(sessions, params.toolHandlers ?? {}, this.controller, options);
     const headers = buildHeaders([options?.headers]);
     this.#inputKey = headers.nulls.has('idempotency-key')
       ? undefined
@@ -106,6 +105,12 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
     headers.nulls.delete('idempotency-key');
     const { idempotencyKey: _key, ...rest } = options ?? {};
     this.#options = { ...rest, headers };
+    this.#dispatcher = new AgentToolDispatcher(
+      sessions,
+      params.toolHandlers ?? {},
+      this.controller,
+      this.#options,
+    );
     this.#collection = new ResultCollection(
       () => this.#iterate(),
       (name) => this.#dispatcher.canHandle(name),
