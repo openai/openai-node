@@ -95,17 +95,20 @@ export function captureCreationTools(body: SessionCreateParams, options?: Reques
   }
   const descriptors = Object.getOwnPropertyDescriptors(body);
   delete descriptors.toolHandlers;
+  const capturedOptions = { ...options };
+  if ('toJSON' in body || capturedOptions.body !== undefined) {
+    throw new OpenAIError('Creation tool handlers cannot customize request body serialization');
+  }
   if (handlers === undefined) {
     // SAFETY: Preserve request fields while removing the accessor so serialization cannot evaluate it again.
-    return { body: Object.create(Object.getPrototypeOf(body), descriptors) as SessionCreateParams, options };
+    return {
+      body: Object.create(Object.getPrototypeOf(body), descriptors) as SessionCreateParams,
+      options: capturedOptions,
+    };
   }
   const { stream } = body;
   if (stream !== true) {
     throw new OpenAIError('toolHandlers requires stream: true');
-  }
-  const capturedOptions = { ...options };
-  if ('toJSON' in body || capturedOptions.body !== undefined) {
-    throw new OpenAIError('Creation tool handlers cannot customize request body serialization');
   }
   capturedOptions.headers = buildHeaders([capturedOptions.headers]);
   descriptors.stream = { value: stream, enumerable: true, configurable: true, writable: true };

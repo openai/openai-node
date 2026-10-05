@@ -362,6 +362,28 @@ describe('creation-stream tool handlers', () => {
     expect(requests).toHaveLength(1);
   });
 
+  test.each(['body', 'toJSON'] as const)(
+    'rejects %s overrides that restore a stripped accessor',
+    (override) => {
+      const { client, requests } = setup();
+      const toJSON = vi.fn(() => 'private callback data');
+      const handlers = { lookup: Object.assign(() => null, { toJSON }) };
+      const getter = vi.fn<() => typeof handlers | undefined>();
+      getter.mockImplementationOnce(() => {}).mockReturnValue(handlers);
+      const body = { ...params };
+      Object.defineProperty(body, 'toolHandlers', { enumerable: true, get: getter });
+      if (override === 'toJSON') {
+        Object.defineProperty(body, 'toJSON', { value: () => body });
+      }
+      expect(() => client.beta.agents.sessions.create(body, override === 'body' ? { body } : {})).toThrow(
+        'cannot customize request body serialization',
+      );
+      expect(getter).toHaveBeenCalledOnce();
+      expect(toJSON).not.toHaveBeenCalled();
+      expect(requests).toHaveLength(0);
+    },
+  );
+
   test('does not enable handlers inherited from the request prototype', async () => {
     const { client, requests } = setup();
     const handler = vi.fn(() => 'unexpected');
