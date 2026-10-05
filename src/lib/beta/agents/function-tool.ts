@@ -3,8 +3,8 @@ import type { AgentToolHandler } from '../../agents/agent-session-stream';
 import type { AutoParseableResponseTool } from '../../ResponsesParser';
 import type { AgentToolParam } from '../../../resources/beta/agents/agents';
 import { isInputContent } from './tool-output';
-import type { AgentToolError } from './tool-error';
 import { toolStages } from './tool-stages';
+import type { StagedToolHandler } from './tool-stages';
 
 /** A beta Agents function definition paired with its local, validating handler. */
 export interface AgentFunctionTool {
@@ -34,15 +34,12 @@ export function functionTool<Arguments>(
   if (!execute || !tool.parameters) {
     throw new OpenAIError('Agents function tools require a callback and argument schema');
   }
-  const run = async (
-    arguments_: Parameters<AgentToolHandler>[0],
-    setStage: (stage: AgentToolError['stage']) => void,
-  ) => {
-    setStage('arguments');
+  const handler: StagedToolHandler = async (arguments_, setStage) => {
+    setStage?.('arguments');
     const parsed = parse(JSON.stringify(arguments_));
-    setStage('execution');
+    setStage?.('execution');
     const result: unknown = await execute(parsed);
-    setStage('output');
+    setStage?.('output');
     if (Array.isArray(result)) {
       return result.length > 0 && result.every(isInputContent) ? result : JSON.stringify(result);
     }
@@ -56,11 +53,7 @@ export function functionTool<Arguments>(
     }
     return text;
   };
-  const handler: AgentToolHandler = (arguments_) =>
-    run(arguments_, () => {
-      // Direct handler calls have no stream observer.
-    });
-  Object.defineProperty(handler, toolStages, { value: run });
+  Object.defineProperty(handler, toolStages, { value: true });
   return {
     name: tool.name,
     definition: {

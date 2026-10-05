@@ -577,6 +577,56 @@ describe('agents sessions.stream public transport', () => {
     },
   );
 
+  test.each([false, true])('invokes wrapped typed handlers with observer=%s', async (observe) => {
+    const execute = vi.fn(({ value }: { value: number }) => ({ value }));
+    const tool = functionTool(
+      zodResponsesFunction({
+        name: 'lookup',
+        parameters: z.object({ value: z.number() }),
+        function: execute,
+      }),
+    );
+    const apply = vi.fn(async (target, thisArg, argumentsList) => {
+      if (argumentsList[0].value === 0) {
+        return { cached: true };
+      }
+      // oxlint-disable-next-line anti-slop/no-reflect-apply -- Regression for transparent Proxy forwarding, including the internal stage reporter argument.
+      return { wrapped: await Reflect.apply(target, thisArg, argumentsList) };
+    });
+    const handler = new Proxy(tool.handler, { apply });
+    const onToolError = vi.fn();
+    const { client, requests } = transport([
+      turn(),
+      call('cached', { value: 0 }),
+      call('wrapped', { value: 1 }),
+      call('invalid', { value: 'invalid' }),
+      ...ending(),
+    ]);
+    await collect(
+      client.beta.agents.sessions.stream('session_test', {
+        input: 'x',
+        toolHandlers: { lookup: handler },
+        ...(observe ? { onToolError } : {}),
+      }),
+    );
+    expect(apply).toHaveBeenCalledTimes(3);
+    expect(apply.mock.calls.every((invocation) => invocation[2].length === (observe ? 2 : 1))).toBe(true);
+    expect(execute.mock.calls).toEqual([[{ value: 1 }]]);
+    expect(
+      posts(requests)
+        .slice(1)
+        .map(({ body }) => body.events?.[0]),
+    ).toEqual([
+      expect.objectContaining({ call_id: 'cached', success: true, output: '{"cached":true}' }),
+      expect.objectContaining({ call_id: 'wrapped', success: true, output: '{"wrapped":{"value":1}}' }),
+      expect.objectContaining({ call_id: 'invalid', success: false, error: 'Tool handler failed.' }),
+    ]);
+    expect(onToolError).toHaveBeenCalledTimes(observe ? 1 : 0);
+    if (observe) {
+      expect(onToolError).toHaveBeenCalledWith(expect.objectContaining({ stage: 'arguments' }));
+    }
+  });
+
   test('notifies once across submission retries and propagates submission errors', async () => {
     const error = { reason: 'application failure' };
     const onToolError = vi.fn();

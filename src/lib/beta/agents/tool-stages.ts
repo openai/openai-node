@@ -5,12 +5,10 @@ import type { AgentToolError } from './tool-error';
 export const toolStages = Symbol.for('openai.beta.agents.toolStages');
 
 /**
- * Handler metadata works across ESM/CJS imports without wrapping original errors.
+ * Marks handlers that accept stage updates, including across ESM/CJS imports.
  * @internal
  */
-export type StagedToolHandler = AgentToolHandler & {
-  [toolStages]?: (
-    arguments_: Parameters<AgentToolHandler>[0],
-    setStage: (stage: AgentToolError['stage']) => void,
-  ) => ReturnType<AgentToolHandler>;
-};
+export type StagedToolHandler = ((
+  arguments_: Parameters<AgentToolHandler>[0],
+  setStage?: (stage: AgentToolError['stage']) => void,
+) => ReturnType<AgentToolHandler>) & { [toolStages]?: true };

@@ -265,10 +265,9 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
       stage = 'execution';
       // SAFETY: Arguments were parsed as JSON and checked to be a non-null non-array object before invoking the handler.
       const arguments_ = args as Record<string, unknown>;
-      const staged = handler[toolStages];
       const output = await this.#wait(() =>
-        staged
-          ? staged(arguments_, (value) => {
+        this.#onToolError && handler[toolStages]
+          ? handler(arguments_, (value) => {
               stage = value;
             })
           : handler(arguments_),
