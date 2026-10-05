@@ -126,6 +126,7 @@ describe('agents sessions.stream public transport', () => {
       zodResponsesFunction({
         name: 'lookup_item',
         description: 'Look up an item in the connected catalog.',
+        defer_loading: true,
         parameters: z.object({ item_id: z.string() }),
         function: ({ item_id }) => catalog.lookup(item_id),
       }),
