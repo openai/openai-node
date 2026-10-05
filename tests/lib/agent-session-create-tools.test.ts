@@ -243,6 +243,47 @@ describe('creation-stream tool handlers', () => {
       : expect(stream.finalResult()).rejects.toHaveProperty('reason', 'requires_action'));
   });
 
+  test('snapshots streaming mode and shared header values before the request', async () => {
+    const { client, requests, bodies } = setup();
+    const streamGetter = vi.fn().mockReturnValueOnce(true).mockReturnValue(false);
+    const headerGetter = vi.fn().mockReturnValueOnce('initial').mockReturnValue('changed');
+    const body = { ...params, toolHandlers: { lookup: () => 'found' } };
+    Object.defineProperty(body, 'stream', { enumerable: true, get: streamGetter });
+    const stream = await client.beta.agents.sessions.create(body, {
+      headers: {
+        get 'x-application'() {
+          return headerGetter();
+        },
+      },
+    });
+    await stream.finalResult();
+    expect(streamGetter).toHaveBeenCalledOnce();
+    expect(headerGetter).toHaveBeenCalledOnce();
+    expect(bodies[0]).toHaveProperty('stream', true);
+    expect(requests).toHaveLength(2);
+    expect(requests.every((r) => r.headers.get('x-application') === 'initial')).toBe(true);
+  });
+
+  test('an undefined registry preserves ordinary body identity and deferred option evaluation', async () => {
+    const { client } = setup();
+    const body = { ...params };
+    Object.defineProperty(body, 'toolHandlers', { value: undefined, enumerable: true });
+    const timeout = vi.fn(() => 1000);
+    const prepare = vi.fn((options: { body?: unknown }) => {
+      expect(options.body).toBe(body);
+    });
+    Object.defineProperty(client, 'prepareOptions', { value: prepare });
+    const promise = client.beta.agents.sessions.create(body, {
+      get timeout() {
+        return timeout();
+      },
+    });
+    expect(timeout).not.toHaveBeenCalled();
+    const stream = await promise;
+    await stream.finalResult();
+    expect(prepare).toHaveBeenCalledOnce();
+  });
+
   test('does not enable handlers inherited from the request prototype', async () => {
     const { client, requests } = setup();
     const handler = vi.fn(() => 'unexpected');

@@ -1,4 +1,5 @@
 import { OpenAIError } from '../../../core/error';
+import { buildHeaders } from '../../../internal/headers';
 import type { RequestOptions } from '../../../internal/request-options';
 import type { Sessions, SessionCreateParams } from '../../../resources/beta/agents/sessions/sessions';
 import type { AgentToolHandler } from '../../agents/agent-session-stream';
@@ -75,16 +76,22 @@ export function captureCreationTools(body: SessionCreateParams, options?: Reques
     return { body, options };
   }
   const handlers = body.toolHandlers;
-  if (handlers !== undefined && body.stream !== true) {
+  if (handlers === undefined) {
+    return { body, options };
+  }
+  const { stream } = body;
+  if (stream !== true) {
     throw new OpenAIError('toolHandlers requires stream: true');
   }
   const capturedOptions = { ...options };
-  if (handlers !== undefined && ('toJSON' in body || capturedOptions.body !== undefined)) {
+  if ('toJSON' in body || capturedOptions.body !== undefined) {
     throw new OpenAIError('Creation tool handlers cannot customize request body serialization');
   }
+  capturedOptions.headers = buildHeaders([capturedOptions.headers]);
   const descriptors = Object.getOwnPropertyDescriptors(body);
+  descriptors.stream = { value: stream, enumerable: true, configurable: true, writable: true };
   delete descriptors.toolHandlers;
-  // SAFETY: Preserve the request's prototype and data descriptors, omitting only the SDK-only property.
+  // SAFETY: Preserve request fields, omitting callbacks and fixing the validated streaming mode.
   const request = Object.create(Object.getPrototypeOf(body), descriptors) as SessionCreateParams;
   return {
     body: request,
