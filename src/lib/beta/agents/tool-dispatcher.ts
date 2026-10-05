@@ -4,7 +4,14 @@ import type { RequestOptions } from '../../../internal/request-options';
 import { uuid4 } from '../../../internal/utils/uuid';
 import { isObj } from '../../../internal/utils/values';
 import { isInputContent } from './tool-output';
-import type { AgentToolHandler, AgentToolOutput } from '../../agents/agent-session-stream';
+import type { AgentToolError } from './tool-error';
+import { toolStages } from './tool-stages';
+import type { StagedToolHandler } from './tool-stages';
+import type {
+  AgentToolHandler,
+  AgentToolOutput,
+  AgentSessionStreamParams,
+} from '../../agents/agent-session-stream';
 import type {
   AgentFunctionCallItem,
   AgentFunctionCallOutputParam,
@@ -47,15 +54,18 @@ export class AgentToolDispatcher {
   readonly #options: RequestOptions;
   readonly #sessions: Sessions;
   readonly #controller: AbortController;
+  readonly #onToolError: AgentSessionStreamParams['onToolError'];
 
   constructor(
     sessions: Sessions,
     handlers: Record<string, AgentToolHandler>,
     controller: AbortController,
     options?: RequestOptions,
+    onToolError?: AgentSessionStreamParams['onToolError'],
   ) {
     this.#sessions = sessions;
     this.#controller = controller;
+    this.#onToolError = onToolError;
     this.#handlers = new Map(Object.entries(handlers));
     const headers = buildHeaders([options?.headers]);
     headers.values.delete('idempotency-key');
@@ -83,22 +93,53 @@ export class AgentToolDispatcher {
     const snapshot = structuredClone(call);
     return async () => {
       this.#checkAbort();
-      const result = await this.#result(snapshot, handler);
+      const result = await this.#result(snapshot, handler, sessionID);
       this.#checkAbort();
       await this.#submit(sessionID, result);
     };
   }
 
-  async #result(call: AgentFunctionCallItem, handler: AgentToolHandler): Promise<ToolResult> {
+  async #result(
+    call: AgentFunctionCallItem,
+    handler: StagedToolHandler,
+    sessionID: string,
+  ): Promise<ToolResult> {
+    let stage: AgentToolError['stage'] = 'arguments';
     try {
       const args: unknown = typeof call.arguments === 'string' ? JSON.parse(call.arguments) : call.arguments;
       if (!isObj(args)) {
         throw new OpenAIError('Function arguments must be a JSON object');
       }
+      stage = 'execution';
       // SAFETY: Arguments were parsed as JSON and checked to be a non-null non-array object before invoking the handler.
-      return toolResult(call, await this.#wait(() => handler(args as Record<string, unknown>)));
-    } catch {
+      const arguments_ = args as Record<string, unknown>;
+      const output = await this.#wait(() =>
+        this.#onToolError && handler[toolStages]
+          ? handler(arguments_, (value) => {
+              stage = value;
+            })
+          : handler(arguments_),
+      );
+      stage = 'output';
+      return toolResult(call, output);
+    } catch (error) {
       this.#checkAbort();
+      if (this.#onToolError) {
+        const failure: AgentToolError = Object.freeze({
+          error,
+          stage,
+          tool_name: call.name,
+          session_id: sessionID,
+          turn_id: call.turn_id,
+          call_id: call.call_id,
+        });
+        try {
+          await this.#wait(() => this.#onToolError?.(failure));
+        } catch {
+          // Observers must not prevent the original sanitized tool failure from being submitted.
+          this.#checkAbort();
+        }
+      }
       return {
         type: 'agent.session.input.tool_result',
         turn_id: call.turn_id,

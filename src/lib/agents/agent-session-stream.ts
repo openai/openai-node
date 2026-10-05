@@ -8,6 +8,7 @@ import type { Stream } from '../../core/streaming';
 import { buildHeaders } from '../../internal/headers';
 import type { RequestOptions } from '../../internal/request-options';
 import { uuid4 } from '../../internal/utils/uuid';
+import type { AgentToolError } from '../beta/agents/tool-error';
 import type {
   AgentFunctionCallOutputParam,
   AgentSessionEvent,
@@ -31,6 +32,12 @@ export type AgentSessionStreamParams<T = never> = {
   input: string | AgentSessionInputMessageParam[];
   /** Registered functions run after their call event is yielded; unknown functions remain manual. */
   toolHandlers?: Record<string, AgentToolHandler>;
+  /**
+   * Beta: use alongside `toolHandlers` to log or monitor local argument validation,
+   * handler execution, and output serialization failures. Does not observe API or
+   * transport errors. Observer errors are ignored; model-visible errors remain sanitized.
+   */
+  onToolError?: (failure: AgentToolError) => void | PromiseLike<void>;
   /** Key for the input submission only; request headers take precedence, case-insensitively. */
   idempotencyKey?: string;
 } & ([T] extends [never] ? unknown : { outputFormat: AgentOutputFormat<T> });
@@ -110,6 +117,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
       params.toolHandlers ?? {},
       this.controller,
       this.#options,
+      params.onToolError,
     );
     this.#collection = new ResultCollection(
       () => this.#iterate(),
