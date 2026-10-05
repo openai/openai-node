@@ -58,6 +58,7 @@ describe.each(factories)('$name deferred function tools', ({ create }) => {
                 id: 'fc_test',
                 call_id: 'call_test',
                 name: tool.name,
+                ...(defer_loading ? { namespace: tool.name } : {}),
                 arguments: arguments_,
                 status: 'completed',
               },
@@ -66,13 +67,35 @@ describe.each(factories)('$name deferred function tools', ({ create }) => {
           if (!(typeof body === 'object' && body !== null && 'stream' in body && body.stream)) {
             return Response.json(response);
           }
+          const [item] = response.output;
           const events = [
             {
               type: 'response.created',
               sequence_number: 0,
               response: { ...response, status: 'in_progress', output: [] },
             },
-            { type: 'response.completed', sequence_number: 1, response },
+            {
+              type: 'response.output_item.added',
+              sequence_number: 1,
+              output_index: 0,
+              item: { ...item, arguments: '', status: 'in_progress' },
+            },
+            {
+              type: 'response.function_call_arguments.delta',
+              sequence_number: 2,
+              output_index: 0,
+              item_id: 'fc_test',
+              delta: arguments_,
+            },
+            {
+              type: 'response.function_call_arguments.done',
+              sequence_number: 3,
+              output_index: 0,
+              item_id: 'fc_test',
+              arguments: arguments_,
+            },
+            { type: 'response.output_item.done', sequence_number: 4, output_index: 0, item },
+            { type: 'response.completed', sequence_number: 5, response },
           ];
           return new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
             headers: { 'content-type': 'text/event-stream' },
