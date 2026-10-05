@@ -331,7 +331,8 @@ export interface FileObject {
   id: string;
 
   /**
-   * The size of the file, in bytes.
+   * The size of the file, in bytes. In a completed file upload response, this can be
+   * null when the file size is not yet available.
    */
   bytes: number;
 
@@ -372,13 +373,15 @@ export interface FileObject {
   status: 'uploaded' | 'processed' | 'error';
 
   /**
-   * The Unix timestamp (in seconds) for when the file will expire.
+   * The Unix timestamp (in seconds) for when the file will expire. In a completed
+   * file upload response, this can be null when no expiry is set.
    */
   expires_at?: number;
 
   /**
    * @deprecated Deprecated. For details on why a fine-tuning training file failed
-   * validation, see the `error` field on `fine_tuning.job`.
+   * validation, see the `error` field on `fine_tuning.job`. Completed file upload
+   * responses can return null when these details are unset.
    */
   status_details?: string;
 }

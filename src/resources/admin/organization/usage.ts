@@ -355,6 +355,14 @@ export namespace UsageAudioSpeechesResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=batch`, this field tells whether the grouped usage result is
        * batch or not.
        */
@@ -768,6 +776,14 @@ export namespace UsageAudioSpeechesResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=context_level`, this field provides the search context size of
        * the grouped usage result.
        */
@@ -810,6 +826,14 @@ export namespace UsageAudioSpeechesResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=line_item`, this field provides the line item of the grouped
        * costs result.
        */
@@ -832,6 +856,12 @@ export namespace UsageAudioSpeechesResponse {
        * result, this field is `null`.
        */
       quantity_unit?: UsageAPI.CostQuantityUnit | null;
+
+      /**
+       * When `group_by=user_id`, this field provides the user ID of the grouped costs
+       * result.
+       */
+      user_id?: string | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -919,6 +949,14 @@ export namespace UsageAudioTranscriptionsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=batch`, this field tells whether the grouped usage result is
        * batch or not.
        */
@@ -1332,6 +1370,14 @@ export namespace UsageAudioTranscriptionsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=context_level`, this field provides the search context size of
        * the grouped usage result.
        */
@@ -1374,6 +1420,14 @@ export namespace UsageAudioTranscriptionsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=line_item`, this field provides the line item of the grouped
        * costs result.
        */
@@ -1396,6 +1450,12 @@ export namespace UsageAudioTranscriptionsResponse {
        * result, this field is `null`.
        */
       quantity_unit?: UsageAPI.CostQuantityUnit | null;
+
+      /**
+       * When `group_by=user_id`, this field provides the user ID of the grouped costs
+       * result.
+       */
+      user_id?: string | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -1483,6 +1543,14 @@ export namespace UsageCodeInterpreterSessionsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=batch`, this field tells whether the grouped usage result is
        * batch or not.
        */
@@ -1896,6 +1964,14 @@ export namespace UsageCodeInterpreterSessionsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=context_level`, this field provides the search context size of
        * the grouped usage result.
        */
@@ -1938,6 +2014,14 @@ export namespace UsageCodeInterpreterSessionsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=line_item`, this field provides the line item of the grouped
        * costs result.
        */
@@ -1960,6 +2044,12 @@ export namespace UsageCodeInterpreterSessionsResponse {
        * result, this field is `null`.
        */
       quantity_unit?: UsageAPI.CostQuantityUnit | null;
+
+      /**
+       * When `group_by=user_id`, this field provides the user ID of the grouped costs
+       * result.
+       */
+      user_id?: string | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -2047,6 +2137,14 @@ export namespace UsageCompletionsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=batch`, this field tells whether the grouped usage result is
        * batch or not.
        */
@@ -2460,6 +2558,14 @@ export namespace UsageCompletionsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=context_level`, this field provides the search context size of
        * the grouped usage result.
        */
@@ -2502,6 +2608,14 @@ export namespace UsageCompletionsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=line_item`, this field provides the line item of the grouped
        * costs result.
        */
@@ -2524,6 +2638,12 @@ export namespace UsageCompletionsResponse {
        * result, this field is `null`.
        */
       quantity_unit?: UsageAPI.CostQuantityUnit | null;
+
+      /**
+       * When `group_by=user_id`, this field provides the user ID of the grouped costs
+       * result.
+       */
+      user_id?: string | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -2611,6 +2731,14 @@ export namespace UsageCostsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=batch`, this field tells whether the grouped usage result is
        * batch or not.
        */
@@ -3024,6 +3152,14 @@ export namespace UsageCostsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=context_level`, this field provides the search context size of
        * the grouped usage result.
        */
@@ -3066,6 +3202,14 @@ export namespace UsageCostsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=line_item`, this field provides the line item of the grouped
        * costs result.
        */
@@ -3088,6 +3232,12 @@ export namespace UsageCostsResponse {
        * result, this field is `null`.
        */
       quantity_unit?: UsageAPI.CostQuantityUnit | null;
+
+      /**
+       * When `group_by=user_id`, this field provides the user ID of the grouped costs
+       * result.
+       */
+      user_id?: string | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -3175,6 +3325,14 @@ export namespace UsageEmbeddingsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=batch`, this field tells whether the grouped usage result is
        * batch or not.
        */
@@ -3588,6 +3746,14 @@ export namespace UsageEmbeddingsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=context_level`, this field provides the search context size of
        * the grouped usage result.
        */
@@ -3630,6 +3796,14 @@ export namespace UsageEmbeddingsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=line_item`, this field provides the line item of the grouped
        * costs result.
        */
@@ -3652,6 +3826,12 @@ export namespace UsageEmbeddingsResponse {
        * result, this field is `null`.
        */
       quantity_unit?: UsageAPI.CostQuantityUnit | null;
+
+      /**
+       * When `group_by=user_id`, this field provides the user ID of the grouped costs
+       * result.
+       */
+      user_id?: string | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -3739,6 +3919,14 @@ export namespace UsageFileSearchCallsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=batch`, this field tells whether the grouped usage result is
        * batch or not.
        */
@@ -4152,6 +4340,14 @@ export namespace UsageFileSearchCallsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=context_level`, this field provides the search context size of
        * the grouped usage result.
        */
@@ -4194,6 +4390,14 @@ export namespace UsageFileSearchCallsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=line_item`, this field provides the line item of the grouped
        * costs result.
        */
@@ -4216,6 +4420,12 @@ export namespace UsageFileSearchCallsResponse {
        * result, this field is `null`.
        */
       quantity_unit?: UsageAPI.CostQuantityUnit | null;
+
+      /**
+       * When `group_by=user_id`, this field provides the user ID of the grouped costs
+       * result.
+       */
+      user_id?: string | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -4303,6 +4513,14 @@ export namespace UsageImagesResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=batch`, this field tells whether the grouped usage result is
        * batch or not.
        */
@@ -4716,6 +4934,14 @@ export namespace UsageImagesResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=context_level`, this field provides the search context size of
        * the grouped usage result.
        */
@@ -4758,6 +4984,14 @@ export namespace UsageImagesResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=line_item`, this field provides the line item of the grouped
        * costs result.
        */
@@ -4780,6 +5014,12 @@ export namespace UsageImagesResponse {
        * result, this field is `null`.
        */
       quantity_unit?: UsageAPI.CostQuantityUnit | null;
+
+      /**
+       * When `group_by=user_id`, this field provides the user ID of the grouped costs
+       * result.
+       */
+      user_id?: string | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -4867,6 +5107,14 @@ export namespace UsageModerationsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=batch`, this field tells whether the grouped usage result is
        * batch or not.
        */
@@ -5280,6 +5528,14 @@ export namespace UsageModerationsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=context_level`, this field provides the search context size of
        * the grouped usage result.
        */
@@ -5322,6 +5578,14 @@ export namespace UsageModerationsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=line_item`, this field provides the line item of the grouped
        * costs result.
        */
@@ -5344,6 +5608,12 @@ export namespace UsageModerationsResponse {
        * result, this field is `null`.
        */
       quantity_unit?: UsageAPI.CostQuantityUnit | null;
+
+      /**
+       * When `group_by=user_id`, this field provides the user ID of the grouped costs
+       * result.
+       */
+      user_id?: string | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -5431,6 +5701,14 @@ export namespace UsageVectorStoresResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=batch`, this field tells whether the grouped usage result is
        * batch or not.
        */
@@ -5844,6 +6122,14 @@ export namespace UsageVectorStoresResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=context_level`, this field provides the search context size of
        * the grouped usage result.
        */
@@ -5886,6 +6172,14 @@ export namespace UsageVectorStoresResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=line_item`, this field provides the line item of the grouped
        * costs result.
        */
@@ -5908,6 +6202,12 @@ export namespace UsageVectorStoresResponse {
        * result, this field is `null`.
        */
       quantity_unit?: UsageAPI.CostQuantityUnit | null;
+
+      /**
+       * When `group_by=user_id`, this field provides the user ID of the grouped costs
+       * result.
+       */
+      user_id?: string | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -5995,6 +6295,14 @@ export namespace UsageWebSearchCallsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=batch`, this field tells whether the grouped usage result is
        * batch or not.
        */
@@ -6408,6 +6716,14 @@ export namespace UsageWebSearchCallsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=context_level`, this field provides the search context size of
        * the grouped usage result.
        */
@@ -6450,6 +6766,14 @@ export namespace UsageWebSearchCallsResponse {
       api_key_id?: string | null;
 
       /**
+       * When grouped by `api_source`, `agents_api` identifies attributed Agents API
+       * activity and `unlabeled` includes all records without published source
+       * attribution, including historical and unknown origins. Unlabeled does not imply
+       * direct API usage. Without source grouping, this field is null.
+       */
+      api_source?: 'agents_api' | 'unlabeled' | null;
+
+      /**
        * When `group_by=line_item`, this field provides the line item of the grouped
        * costs result.
        */
@@ -6472,6 +6796,12 @@ export namespace UsageWebSearchCallsResponse {
        * result, this field is `null`.
        */
       quantity_unit?: UsageAPI.CostQuantityUnit | null;
+
+      /**
+       * When `group_by=user_id`, this field provides the user ID of the grouped costs
+       * result.
+       */
+      user_id?: string | null;
     }
 
     export namespace OrganizationCostsResult {
@@ -6685,10 +7015,14 @@ export interface UsageCompletionsParams {
 
   /**
    * Group the usage data by the specified fields. Support fields include
-   * `project_id`, `user_id`, `api_key_id`, `model`, `batch`, `service_tier` or any
-   * combination of them.
+   * `project_id`, `user_id`, `api_key_id`, `model`, `batch`, `service_tier`,
+   * `api_source` or any combination of them. When grouped by `api_source`, results
+   * use `agents_api` for attributed Agents API activity and `unlabeled` for all
+   * other activity. Without source grouping, `api_source` is null.
    */
-  group_by?: Array<'project_id' | 'user_id' | 'api_key_id' | 'model' | 'batch' | 'service_tier'>;
+  group_by?: Array<
+    'project_id' | 'user_id' | 'api_key_id' | 'model' | 'batch' | 'service_tier' | 'api_source'
+  >;
 
   /**
    * Specifies the number of buckets to return.
@@ -6744,10 +7078,15 @@ export interface UsageCostsParams {
   end_time?: number;
 
   /**
-   * Group the costs by the specified fields. Support fields include `project_id`,
-   * `line_item`, `api_key_id` and any combination of them.
+   * Group the costs by the specified fields. Supported fields include `project_id`,
+   * `user_id`, `line_item`, `api_key_id`, and `api_source`. Support for combining
+   * `user_id` with `project_id` grouping or the `project_ids` filter depends on the
+   * organization and requested time range. Unsupported combinations return HTTP 400.
+   * When grouped by `api_source`, results use `agents_api` for attributed Agents API
+   * activity and `unlabeled` for all other activity. Without source grouping,
+   * `api_source` is null.
    */
-  group_by?: Array<'project_id' | 'line_item' | 'api_key_id'>;
+  group_by?: Array<'project_id' | 'user_id' | 'line_item' | 'api_key_id' | 'api_source'>;
 
   /**
    * A limit on the number of buckets to be returned. Limit can range between 1 and
@@ -7096,10 +7435,12 @@ export interface UsageWebSearchCallsParams {
 
   /**
    * Group the usage data by the specified fields. Support fields include
-   * `project_id`, `user_id`, `api_key_id`, `model`, `context_level` or any
-   * combination of them.
+   * `project_id`, `user_id`, `api_key_id`, `model`, `context_level`, `api_source` or
+   * any combination of them. When grouped by `api_source`, results use `agents_api`
+   * for attributed Agents API activity and `unlabeled` for all other activity.
+   * Without source grouping, `api_source` is null.
    */
-  group_by?: Array<'project_id' | 'user_id' | 'api_key_id' | 'model' | 'context_level'>;
+  group_by?: Array<'project_id' | 'user_id' | 'api_key_id' | 'model' | 'context_level' | 'api_source'>;
 
   /**
    * Specifies the number of buckets to return.

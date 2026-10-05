@@ -114,21 +114,31 @@ export namespace AudioFormat {
 export type BuiltInVoice =
   | 'alloy'
   | 'ash'
+  | 'aube'
   | 'ballad'
   | 'beacon'
   | 'bossa'
+  | 'brise'
   | 'cedar'
   | 'cinder'
   | 'coral'
   | 'delta'
   | 'echo'
+  | 'flitz'
   | 'gleam'
+  | 'harema'
+  | 'juni'
   | 'marin'
   | 'meridian'
+  | 'nira'
+  | 'noeul'
+  | 'nuri'
   | 'quartz'
   | 'ripple'
   | 'sage'
   | 'shimmer'
+  | 'shitan'
+  | 'sillage'
   | 'stone'
   | 'tempo'
   | 'verse'
@@ -1284,7 +1294,14 @@ export interface ResponsesDelegationConfig {
    * Tools available to the Responses backend while it handles tasks delegated by the
    * Live model.
    */
-  tools?: Array<FunctionTool | ResponsesDelegationConfig.WebSearch>;
+  tools?: Array<
+    | FunctionTool
+    | ResponsesDelegationConfig.WebSearch
+    | ResponsesDelegationConfig.FileSearch
+    | ResponsesDelegationConfig.CodeInterpreter
+    | ResponsesDelegationConfig.Shell
+    | ResponsesDelegationConfig.ImageGeneration
+  >;
 }
 
 export namespace ResponsesDelegationConfig {
@@ -1338,6 +1355,28 @@ export namespace ResponsesDelegationConfig {
      * The tool type. Always `web_search`.
      */
     type: 'web_search';
+  }
+
+  export interface FileSearch {
+    type: 'file_search';
+  }
+
+  export interface CodeInterpreter {
+    type: 'code_interpreter';
+  }
+
+  /**
+   * A Responses shell tool with a container_auto or container_reference environment.
+   * Local execution and domain secrets are not supported.
+   */
+  export interface Shell {
+    environment: { [key: string]: unknown };
+
+    type: 'shell';
+  }
+
+  export interface ImageGeneration {
+    type: 'image_generation';
   }
 }
 
@@ -1400,7 +1439,14 @@ export interface ResponsesDelegationUpdateConfig {
    * Tools available to the Responses backend while it handles tasks delegated by the
    * Live model.
    */
-  tools?: Array<FunctionTool | ResponsesDelegationUpdateConfig.WebSearch>;
+  tools?: Array<
+    | FunctionTool
+    | ResponsesDelegationUpdateConfig.WebSearch
+    | ResponsesDelegationUpdateConfig.FileSearch
+    | ResponsesDelegationUpdateConfig.CodeInterpreter
+    | ResponsesDelegationUpdateConfig.Shell
+    | ResponsesDelegationUpdateConfig.ImageGeneration
+  >;
 }
 
 export namespace ResponsesDelegationUpdateConfig {
@@ -1454,6 +1500,28 @@ export namespace ResponsesDelegationUpdateConfig {
      * The tool type. Always `web_search`.
      */
     type: 'web_search';
+  }
+
+  export interface FileSearch {
+    type: 'file_search';
+  }
+
+  export interface CodeInterpreter {
+    type: 'code_interpreter';
+  }
+
+  /**
+   * A Responses shell tool with a container_auto or container_reference environment.
+   * Local execution and domain secrets are not supported.
+   */
+  export interface Shell {
+    environment: { [key: string]: unknown };
+
+    type: 'shell';
+  }
+
+  export interface ImageGeneration {
+    type: 'image_generation';
   }
 }
 
