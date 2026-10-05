@@ -65,7 +65,7 @@ export class AgentToolDispatcher {
   }
 
   canHandle(name: string): boolean {
-    return this.#handlers.has(name);
+    return typeof this.#handlers.get(name) === 'function';
   }
 
   /** Capture routing and arguments before the caller can mutate the yielded event. */
@@ -74,7 +74,7 @@ export class AgentToolDispatcher {
     sessionID: string | undefined,
   ): (() => Promise<void>) | undefined {
     const handler = call && this.#handlers.get(call.name);
-    if (!call || !handler) {
+    if (!call || typeof handler !== 'function') {
       return;
     }
     if (!sessionID) {

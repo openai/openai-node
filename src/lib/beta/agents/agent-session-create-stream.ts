@@ -22,6 +22,7 @@ export type AgentSessionCreateStream<T = never> = Stream<AgentSessionEvent> & {
 async function* dispatchCreationTools(
   source: () => AsyncIterator<AgentSessionEvent>,
   dispatcher: AgentToolDispatcher,
+  signal: AbortSignal,
 ): AsyncGenerator<AgentSessionEvent> {
   const state = new TurnState();
   let sessionID: string | undefined;
@@ -31,6 +32,9 @@ async function* dispatchCreationTools(
     }
     const dispatch = state.accept(event) ? dispatcher.prepare(state.call(event), sessionID) : undefined;
     yield event;
+    if (signal.aborted) {
+      return;
+    }
     await dispatch?.();
   }
 }
@@ -49,10 +53,12 @@ export function withAgentTurnResult<T = never>(
 ): AgentSessionCreateStream<T> {
   let collection: ResultCollection;
   stream.__betaTransformIterator((source) => {
+    // A tool result has its own POST endpoint, independent of creation overrides.
+    const { path: _path, method: _method, ...options } = tools?.options ?? {};
     const dispatcher =
-      tools && new AgentToolDispatcher(tools.sessions, tools.handlers, stream.controller, tools.options);
+      tools && new AgentToolDispatcher(tools.sessions, tools.handlers, stream.controller, options);
     collection = new ResultCollection(
-      dispatcher ? () => dispatchCreationTools(source, dispatcher) : source,
+      dispatcher ? () => dispatchCreationTools(source, dispatcher, stream.controller.signal) : source,
       dispatcher ? (name) => dispatcher.canHandle(name) : undefined,
       undefined,
       stream.controller.signal,

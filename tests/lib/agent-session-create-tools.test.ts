@@ -63,7 +63,7 @@ function setup(events = [...initial(), call(), ...ending()], retry = false) {
       const request = new Request(url, init);
       requests.push(request);
       bodies.push(await request.json());
-      if (new URL(request.url).pathname.endsWith('/events')) {
+      if (requests.length > 1) {
         if (retry && failures === 0) {
           failures += 1;
           return Response.json(
@@ -152,6 +152,20 @@ describe('creation-stream tool handlers', () => {
     expect(cancel).toHaveBeenCalledOnce();
   });
 
+  test('uses the tool-result endpoint after overriding the creation route', async () => {
+    const { client, requests, bodies } = setup();
+    const stream = await client.beta.agents.sessions.create(
+      { ...params, toolHandlers: { lookup: () => 'found' } },
+      { path: '/custom/create', method: 'put' },
+    );
+    await stream.finalResult();
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual([
+      'PUT /v1/custom/create',
+      `POST /v1/agents/sessions/${sessionID}/events`,
+    ]);
+    expect(bodies[1]).toHaveProperty('events.0.type', 'agent.session.input.tool_result');
+  });
+
   test('captures routing and arguments before yielding and redacts handler failures', async () => {
     const handler = vi.fn(() => {
       throw new Error('private application detail');
@@ -186,16 +200,21 @@ describe('creation-stream tool handlers', () => {
     });
   });
 
-  test.each(['break', 'abort'] as const)('does not run a yielded tool after %s', async (close) => {
+  test.each(['break', 'abort', 'abort-and-continue'] as const)('skips tools after %s', async (close) => {
     const handler = vi.fn(() => 'found');
     const { client, requests, cancel } = setup();
-    const stream = await client.beta.agents.sessions.create({ ...params, toolHandlers: { lookup: handler } });
+    const stream = await client.beta.agents.sessions.create({
+      ...params,
+      toolHandlers: { lookup: handler },
+    });
     for await (const item of stream) {
       if (item.type === 'agent.session.turn.item.added') {
-        if (close === 'abort') {
+        if (close !== 'break') {
           stream.controller.abort();
         }
-        break;
+        if (close !== 'abort-and-continue') {
+          break;
+        }
       }
     }
     expect(handler).not.toHaveBeenCalled();
@@ -224,7 +243,7 @@ describe('creation-stream tool handlers', () => {
     expect(cancel).toHaveBeenCalledOnce();
   });
 
-  test.each([true, false])('collects with a registered required action: %s', async (handled) => {
+  test.each([true, false, undefined])('checks required actions: %s', async (handled) => {
     const required = event('agent.session.requires_action', {
       session: {
         id: sessionID,
@@ -234,10 +253,11 @@ describe('creation-stream tool handlers', () => {
       },
     });
     const { client } = setup([...initial(), required, call(), ...ending()]);
-    const stream = await client.beta.agents.sessions.create({
-      ...params,
-      toolHandlers: handled ? { lookup: () => 'found' } : {},
-    });
+    const handlers = handled === false ? {} : { lookup: () => 'found' };
+    if (handled === undefined) {
+      Object.defineProperty(handlers, 'lookup', { value: undefined });
+    }
+    const stream = await client.beta.agents.sessions.create({ ...params, toolHandlers: handlers });
     await (handled
       ? expect(stream.finalResult()).resolves.toHaveProperty('output_text', '{"answer":"found"}')
       : expect(stream.finalResult()).rejects.toHaveProperty('reason', 'requires_action'));
