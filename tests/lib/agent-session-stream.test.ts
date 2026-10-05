@@ -508,8 +508,11 @@ describe('agents sessions.stream public transport', () => {
         .mockRejectedValueOnce(executionError)
         .mockReturnValueOnce(typed ? [invalidOutput] : invalidOutput)
         .mockReturnValueOnce('ok');
+      // A separately loaded helper models mixed ESM/CJS package instances.
+      vi.resetModules();
+      const { functionTool: separateFunctionTool } = await import('openai/lib/beta/agents/function-tool');
       const handler = typed
-        ? functionTool(
+        ? separateFunctionTool(
             zodResponsesFunction({
               name: 'lookup',
               parameters: z.object({ value: z.number() }),

@@ -4,7 +4,7 @@ import type { AutoParseableResponseTool } from '../../ResponsesParser';
 import type { AgentToolParam } from '../../../resources/beta/agents/agents';
 import { isInputContent } from './tool-output';
 import type { AgentToolError } from './tool-error';
-import { stagedToolHandlers } from './tool-stages';
+import { toolStages } from './tool-stages';
 
 /** A beta Agents function definition paired with its local, validating handler. */
 export interface AgentFunctionTool {
@@ -60,7 +60,7 @@ export function functionTool<Arguments>(
     run(arguments_, () => {
       // Direct handler calls have no stream observer.
     });
-  stagedToolHandlers.set(handler, run);
+  Object.defineProperty(handler, toolStages, { value: run });
   return {
     name: tool.name,
     definition: {

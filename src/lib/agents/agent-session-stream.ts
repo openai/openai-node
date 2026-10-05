@@ -10,7 +10,8 @@ import { uuid4 } from '../../internal/utils/uuid';
 import { isObj } from '../../internal/utils/values';
 import { isInputContent } from '../beta/agents/tool-output';
 import type { AgentToolError } from '../beta/agents/tool-error';
-import { stagedToolHandlers } from '../beta/agents/tool-stages';
+import { toolStages } from '../beta/agents/tool-stages';
+import type { StagedToolHandler } from '../beta/agents/tool-stages';
 import type {
   AgentFunctionCallItem,
   AgentFunctionCallOutputParam,
@@ -254,7 +255,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
     }
   }
 
-  async #result(call: AgentFunctionCallItem, handler: AgentToolHandler): Promise<ToolResult> {
+  async #result(call: AgentFunctionCallItem, handler: StagedToolHandler): Promise<ToolResult> {
     let stage: AgentToolError['stage'] = 'arguments';
     try {
       const args: unknown = typeof call.arguments === 'string' ? JSON.parse(call.arguments) : call.arguments;
@@ -264,7 +265,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
       stage = 'execution';
       // SAFETY: Arguments were parsed as JSON and checked to be a non-null non-array object before invoking the handler.
       const arguments_ = args as Record<string, unknown>;
-      const staged = stagedToolHandlers.get(handler);
+      const staged = handler[toolStages];
       const output = await this.#wait(() =>
         staged
           ? staged(arguments_, (value) => {
