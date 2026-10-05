@@ -61,7 +61,7 @@ export function withAgentTurnResult<T = never>(
   let collection: ResultCollection;
   stream.__betaTransformIterator((source) => {
     // A tool result has its own POST endpoint, independent of creation overrides.
-    const { path: _path, method: _method, ...options } = tools?.options ?? {};
+    const { path: _path, method: _method, stream: _stream, ...options } = tools?.options ?? {};
     const dispatcher =
       tools && new AgentToolDispatcher(tools.sessions, tools.handlers, stream.controller, options);
     collection = new ResultCollection(

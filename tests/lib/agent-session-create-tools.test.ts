@@ -152,11 +152,12 @@ describe('creation-stream tool handlers', () => {
     expect(cancel).toHaveBeenCalledOnce();
   });
 
-  test('uses the tool-result endpoint after overriding the creation route', async () => {
+  test('keeps creation route and response mode overrides out of tool results', async () => {
     const { client, requests, bodies } = setup();
+    const submit = vi.spyOn(client.beta.agents.sessions.events, 'create');
     const stream = await client.beta.agents.sessions.create(
       { ...params, toolHandlers: { lookup: () => 'found' } },
-      { path: '/custom/create', method: 'put' },
+      { path: '/custom/create', method: 'put', stream: true },
     );
     await stream.finalResult();
     expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual([
@@ -164,6 +165,7 @@ describe('creation-stream tool handlers', () => {
       `POST /v1/agents/sessions/${sessionID}/events`,
     ]);
     expect(bodies[1]).toHaveProperty('events.0.type', 'agent.session.input.tool_result');
+    expect(submit.mock.calls[0]?.[2]).not.toHaveProperty('stream');
   });
 
   test('captures routing and arguments before yielding and redacts handler failures', async () => {
