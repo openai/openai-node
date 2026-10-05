@@ -1,4 +1,4 @@
-import { OpenAIError } from '../../../core/error';
+import { APIUserAbortError, OpenAIError } from '../../../core/error';
 import { buildHeaders } from '../../../internal/headers';
 import type { RequestOptions } from '../../../internal/request-options';
 import type { Sessions, SessionCreateParams } from '../../../resources/beta/agents/sessions/sessions';
@@ -35,7 +35,14 @@ async function* dispatchCreationTools(
     if (signal.aborted) {
       return;
     }
-    await dispatch?.();
+    try {
+      await dispatch?.();
+    } catch (error) {
+      if (signal.aborted && error instanceof APIUserAbortError) {
+        return;
+      }
+      throw error;
+    }
   }
 }
 
@@ -78,12 +85,19 @@ export function withAgentTurnResult<T = never>(
 
 /** Remove local callbacks without changing ordinary creation requests. @internal */
 export function captureCreationTools(body: SessionCreateParams, options?: RequestOptions) {
-  if (!Object.getOwnPropertyDescriptor(body, 'toolHandlers')) {
+  const descriptor = Object.getOwnPropertyDescriptor(body, 'toolHandlers');
+  if (!descriptor) {
     return { body, options };
   }
   const handlers = body.toolHandlers;
-  if (handlers === undefined) {
+  if (handlers === undefined && 'value' in descriptor) {
     return { body, options };
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(body);
+  delete descriptors.toolHandlers;
+  if (handlers === undefined) {
+    // SAFETY: Preserve request fields while removing the accessor so serialization cannot evaluate it again.
+    return { body: Object.create(Object.getPrototypeOf(body), descriptors) as SessionCreateParams, options };
   }
   const { stream } = body;
   if (stream !== true) {
@@ -94,9 +108,7 @@ export function captureCreationTools(body: SessionCreateParams, options?: Reques
     throw new OpenAIError('Creation tool handlers cannot customize request body serialization');
   }
   capturedOptions.headers = buildHeaders([capturedOptions.headers]);
-  const descriptors = Object.getOwnPropertyDescriptors(body);
   descriptors.stream = { value: stream, enumerable: true, configurable: true, writable: true };
-  delete descriptors.toolHandlers;
   // SAFETY: Preserve request fields, omitting callbacks and fixing the validated streaming mode.
   const request = Object.create(Object.getPrototypeOf(body), descriptors) as SessionCreateParams;
   return {

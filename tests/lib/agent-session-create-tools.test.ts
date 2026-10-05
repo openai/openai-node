@@ -222,6 +222,43 @@ describe('creation-stream tool handlers', () => {
     expect(cancel).toHaveBeenCalledOnce();
   });
 
+  test.each(['handler', 'registration'] as const)(
+    'raw iteration ends quietly when aborting pending %s',
+    async (pending) => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        const { client, requests, cancel } = setup(undefined, pending === 'registration');
+        const handler = vi.fn(() => {
+          if (pending === 'handler') {
+            // oxlint-disable-next-line promise/avoid-new -- Keep the application callback pending until observation is aborted.
+            return new Promise<null>(() => {});
+          }
+          return 'found';
+        });
+        const stream = await client.beta.agents.sessions.create({
+          ...params,
+          toolHandlers: { lookup: handler },
+        });
+        const observed = (async () => {
+          for await (const _event of stream) {
+            // Consume raw events without result collection.
+          }
+        })();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(handler).toHaveBeenCalledOnce();
+        expect(requests).toHaveLength(pending === 'registration' ? 2 : 1);
+        expect(vi.getTimerCount()).toBe(pending === 'registration' ? 1 : 0);
+        stream.controller.abort();
+        await expect(observed).resolves.toBeUndefined();
+        expect(vi.getTimerCount()).toBe(0);
+        expect(requests).toHaveLength(pending === 'registration' ? 2 : 1);
+        expect(cancel).toHaveBeenCalledOnce();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
   test('aborting a pending handler stops collection without posting its result', async () => {
     const { client, requests, cancel } = setup();
     const controller = new AbortController();
@@ -302,6 +339,27 @@ describe('creation-stream tool handlers', () => {
     const stream = await promise;
     await stream.finalResult();
     expect(prepare).toHaveBeenCalledOnce();
+  });
+
+  test('strips a handler accessor even when its first value is undefined', async () => {
+    const { client, requests, bodies } = setup();
+    const toJSON = vi.fn(() => 'private callback data');
+    const handler = Object.assign(
+      vi.fn(() => 'unexpected'),
+      { toJSON },
+    );
+    const getter = vi.fn<() => typeof handlers | undefined>();
+    const handlers = { lookup: handler };
+    getter.mockImplementationOnce(() => {}).mockReturnValue(handlers);
+    const body = { ...params };
+    Object.defineProperty(body, 'toolHandlers', { enumerable: true, get: getter });
+    const stream = await client.beta.agents.sessions.create(body);
+    await stream.finalResult();
+    expect(getter).toHaveBeenCalledOnce();
+    expect(handler).not.toHaveBeenCalled();
+    expect(toJSON).not.toHaveBeenCalled();
+    expect(bodies[0]).not.toHaveProperty('toolHandlers');
+    expect(requests).toHaveLength(1);
   });
 
   test('does not enable handlers inherited from the request prototype', async () => {
