@@ -2611,7 +2611,7 @@ export namespace ResponseComputerToolCall {
 
 export interface ResponseComputerToolCallOutputItem {
   /**
-   * The unique ID of the computer call tool output.
+   * The ID of the computer tool call output.
    */
   id: string;
 
@@ -3202,6 +3202,12 @@ export namespace ResponseError {
       | 'potentially_unintended_data_access'
       | 'potentially_unintended_destructive_activity'
       | 'other';
+
+    /**
+     * An opaque target for explicitly continuing this review, or null when
+     * unavailable.
+     */
+    review_target?: string | null;
 
     /**
      * An optional public continuation instruction.
@@ -10140,6 +10146,12 @@ export namespace ResponsesServerEvent {
           | 'potentially_unintended_data_access'
           | 'potentially_unintended_destructive_activity'
           | 'other';
+
+        /**
+         * An opaque target for explicitly continuing this review, or null when
+         * unavailable.
+         */
+        review_target?: string | null;
 
         /**
          * An optional public continuation instruction.

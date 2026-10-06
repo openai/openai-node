@@ -334,7 +334,7 @@ export interface FileObject {
    * The size of the file, in bytes. In a completed file upload response, this can be
    * null when the file size is not yet available.
    */
-  bytes: number;
+  bytes: number | null;
 
   /**
    * The Unix timestamp (in seconds) for when the file was created.

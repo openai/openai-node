@@ -40,7 +40,7 @@ export class Items extends APIResource {
     turnID: string,
     params: ItemListParams,
     options?: RequestOptions,
-  ): PagePromise<AgentSessionItemsPage, AgentsAPI.AgentSessionItem> {
+  ): PagePromise<ConversationCursorPage<AgentsAPI.AgentSessionItem>, AgentsAPI.AgentSessionItem> {
     const { session_id, ...query } = params;
     return this._client.getAPIList(
       path`/agents/sessions/${session_id}/turns/${turnID}/items`,

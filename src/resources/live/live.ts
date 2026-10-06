@@ -114,7 +114,6 @@ export namespace AudioFormat {
 export type BuiltInVoice =
   | 'alloy'
   | 'ash'
-  | 'aube'
   | 'ballad'
   | 'beacon'
   | 'bossa'
@@ -1283,12 +1282,7 @@ export interface ResponsesDelegationConfig {
    * Controls which tool the Responses backend uses when handling a task delegated by
    * the Live model.
    */
-  tool_choice?:
-    | 'auto'
-    | 'none'
-    | 'required'
-    | ResponsesDelegationConfig.LiveFunctionToolChoiceParam
-    | ResponsesDelegationConfig.LiveMCPToolChoiceParam;
+  tool_choice?: 'auto' | 'none' | 'required' | { [key: string]: unknown };
 
   /**
    * Tools available to the Responses backend while it handles tasks delegated by the
@@ -1301,6 +1295,13 @@ export interface ResponsesDelegationConfig {
     | ResponsesDelegationConfig.CodeInterpreter
     | ResponsesDelegationConfig.Shell
     | ResponsesDelegationConfig.ImageGeneration
+    | ResponsesDelegationConfig.Mcp
+    | ResponsesDelegationConfig.Custom
+    | ResponsesDelegationConfig.Namespace
+    | ResponsesDelegationConfig.ToolSearch
+    | ResponsesDelegationConfig.ProgrammaticToolCalling
+    | ResponsesDelegationConfig.Computer
+    | ResponsesDelegationConfig.ApplyPatch
   >;
 }
 
@@ -1333,20 +1334,6 @@ export namespace ResponsesDelegationConfig {
     verbosity?: 'low' | 'medium' | 'high' | null;
   }
 
-  export interface LiveFunctionToolChoiceParam {
-    name: string;
-
-    type: 'function';
-  }
-
-  export interface LiveMCPToolChoiceParam {
-    name: string;
-
-    server_label: string;
-
-    type: 'mcp';
-  }
-
   /**
    * A web search tool available to the Live session’s Responses backend.
    */
@@ -1366,17 +1353,199 @@ export namespace ResponsesDelegationConfig {
   }
 
   /**
-   * A Responses shell tool with a container_auto or container_reference environment.
-   * Local execution and domain secrets are not supported.
+   * A Responses shell tool. Use a hosted container or return local shell results
+   * with response.item.create. Domain secrets are not supported.
    */
   export interface Shell {
-    environment: { [key: string]: unknown };
-
     type: 'shell';
+
+    environment?: Shell.ContainerAuto | Shell.ContainerReference | Shell.Local | null;
+  }
+
+  export namespace Shell {
+    export interface ContainerAuto {
+      /**
+       * Automatically creates a container for this request
+       */
+      type: 'container_auto';
+
+      /**
+       * An optional list of uploaded files to make available to your code.
+       */
+      file_ids?: Array<string> | null;
+
+      /**
+       * The memory limit for the container.
+       */
+      memory_limit?: '1g' | '4g' | '16g' | '64g' | null;
+
+      /**
+       * Network access policy for the container.
+       */
+      network_policy?: ContainerAuto.Disabled | ContainerAuto.Allowlist | null;
+
+      /**
+       * An optional list of skills referenced by id or inline data.
+       */
+      skills?: Array<ContainerAuto.SkillReference | ContainerAuto.Inline> | null;
+    }
+
+    export namespace ContainerAuto {
+      export interface Disabled {
+        /**
+         * Disable outbound network access. Always `disabled`.
+         */
+        type: 'disabled';
+      }
+
+      export interface Allowlist {
+        /**
+         * A list of allowed domains when type is `allowlist`.
+         */
+        allowed_domains: Array<string>;
+
+        /**
+         * Allow outbound network access only to specified domains. Always `allowlist`.
+         */
+        type: 'allowlist';
+      }
+
+      export interface SkillReference {
+        /**
+         * The ID of the referenced skill.
+         */
+        skill_id: string;
+
+        /**
+         * References a skill created with the /v1/skills endpoint.
+         */
+        type: 'skill_reference';
+
+        /**
+         * Optional skill version. Use a positive integer or 'latest'. Omit for default.
+         */
+        version?: string | null;
+      }
+
+      export interface Inline {
+        /**
+         * The description of the skill.
+         */
+        description: string;
+
+        /**
+         * The name of the skill.
+         */
+        name: string;
+
+        /**
+         * Inline skill payload
+         */
+        source: Inline.Source;
+
+        /**
+         * Defines an inline skill for this request.
+         */
+        type: 'inline';
+      }
+
+      export namespace Inline {
+        /**
+         * Inline skill payload
+         */
+        export interface Source {
+          /**
+           * Base64-encoded skill zip bundle.
+           */
+          data: string;
+
+          /**
+           * The media type of the inline skill payload. Must be `application/zip`.
+           */
+          media_type: 'application/zip';
+
+          /**
+           * The type of the inline skill source. Must be `base64`.
+           */
+          type: 'base64';
+        }
+      }
+    }
+
+    export interface ContainerReference {
+      /**
+       * The ID of the referenced container.
+       */
+      container_id: string;
+
+      /**
+       * References a container created with the /v1/containers endpoint
+       */
+      type: 'container_reference';
+    }
+
+    export interface Local {
+      /**
+       * Use a local computer environment.
+       */
+      type: 'local';
+
+      /**
+       * An optional list of skills.
+       */
+      skills?: Array<Local.Skill> | null;
+    }
+
+    export namespace Local {
+      export interface Skill {
+        /**
+         * The description of the skill.
+         */
+        description: string;
+
+        /**
+         * The name of the skill.
+         */
+        name: string;
+
+        /**
+         * The path to the directory containing the skill.
+         */
+        path: string;
+      }
+    }
   }
 
   export interface ImageGeneration {
     type: 'image_generation';
+  }
+
+  export interface Mcp {
+    type: 'mcp';
+  }
+
+  export interface Custom {
+    type: 'custom';
+  }
+
+  export interface Namespace {
+    type: 'namespace';
+  }
+
+  export interface ToolSearch {
+    type: 'tool_search';
+  }
+
+  export interface ProgrammaticToolCalling {
+    type: 'programmatic_tool_calling';
+  }
+
+  export interface Computer {
+    type: 'computer';
+  }
+
+  export interface ApplyPatch {
+    type: 'apply_patch';
   }
 }
 
@@ -1428,12 +1597,7 @@ export interface ResponsesDelegationUpdateConfig {
    * Controls which tool the Responses backend uses when handling a task delegated by
    * the Live model.
    */
-  tool_choice?:
-    | 'auto'
-    | 'none'
-    | 'required'
-    | ResponsesDelegationUpdateConfig.LiveFunctionToolChoiceParam
-    | ResponsesDelegationUpdateConfig.LiveMCPToolChoiceParam;
+  tool_choice?: 'auto' | 'none' | 'required' | { [key: string]: unknown };
 
   /**
    * Tools available to the Responses backend while it handles tasks delegated by the
@@ -1446,6 +1610,13 @@ export interface ResponsesDelegationUpdateConfig {
     | ResponsesDelegationUpdateConfig.CodeInterpreter
     | ResponsesDelegationUpdateConfig.Shell
     | ResponsesDelegationUpdateConfig.ImageGeneration
+    | ResponsesDelegationUpdateConfig.Mcp
+    | ResponsesDelegationUpdateConfig.Custom
+    | ResponsesDelegationUpdateConfig.Namespace
+    | ResponsesDelegationUpdateConfig.ToolSearch
+    | ResponsesDelegationUpdateConfig.ProgrammaticToolCalling
+    | ResponsesDelegationUpdateConfig.Computer
+    | ResponsesDelegationUpdateConfig.ApplyPatch
   >;
 }
 
@@ -1478,20 +1649,6 @@ export namespace ResponsesDelegationUpdateConfig {
     verbosity?: 'low' | 'medium' | 'high' | null;
   }
 
-  export interface LiveFunctionToolChoiceParam {
-    name: string;
-
-    type: 'function';
-  }
-
-  export interface LiveMCPToolChoiceParam {
-    name: string;
-
-    server_label: string;
-
-    type: 'mcp';
-  }
-
   /**
    * A web search tool available to the Live session’s Responses backend.
    */
@@ -1511,17 +1668,199 @@ export namespace ResponsesDelegationUpdateConfig {
   }
 
   /**
-   * A Responses shell tool with a container_auto or container_reference environment.
-   * Local execution and domain secrets are not supported.
+   * A Responses shell tool. Use a hosted container or return local shell results
+   * with response.item.create. Domain secrets are not supported.
    */
   export interface Shell {
-    environment: { [key: string]: unknown };
-
     type: 'shell';
+
+    environment?: Shell.ContainerAuto | Shell.ContainerReference | Shell.Local | null;
+  }
+
+  export namespace Shell {
+    export interface ContainerAuto {
+      /**
+       * Automatically creates a container for this request
+       */
+      type: 'container_auto';
+
+      /**
+       * An optional list of uploaded files to make available to your code.
+       */
+      file_ids?: Array<string> | null;
+
+      /**
+       * The memory limit for the container.
+       */
+      memory_limit?: '1g' | '4g' | '16g' | '64g' | null;
+
+      /**
+       * Network access policy for the container.
+       */
+      network_policy?: ContainerAuto.Disabled | ContainerAuto.Allowlist | null;
+
+      /**
+       * An optional list of skills referenced by id or inline data.
+       */
+      skills?: Array<ContainerAuto.SkillReference | ContainerAuto.Inline> | null;
+    }
+
+    export namespace ContainerAuto {
+      export interface Disabled {
+        /**
+         * Disable outbound network access. Always `disabled`.
+         */
+        type: 'disabled';
+      }
+
+      export interface Allowlist {
+        /**
+         * A list of allowed domains when type is `allowlist`.
+         */
+        allowed_domains: Array<string>;
+
+        /**
+         * Allow outbound network access only to specified domains. Always `allowlist`.
+         */
+        type: 'allowlist';
+      }
+
+      export interface SkillReference {
+        /**
+         * The ID of the referenced skill.
+         */
+        skill_id: string;
+
+        /**
+         * References a skill created with the /v1/skills endpoint.
+         */
+        type: 'skill_reference';
+
+        /**
+         * Optional skill version. Use a positive integer or 'latest'. Omit for default.
+         */
+        version?: string | null;
+      }
+
+      export interface Inline {
+        /**
+         * The description of the skill.
+         */
+        description: string;
+
+        /**
+         * The name of the skill.
+         */
+        name: string;
+
+        /**
+         * Inline skill payload
+         */
+        source: Inline.Source;
+
+        /**
+         * Defines an inline skill for this request.
+         */
+        type: 'inline';
+      }
+
+      export namespace Inline {
+        /**
+         * Inline skill payload
+         */
+        export interface Source {
+          /**
+           * Base64-encoded skill zip bundle.
+           */
+          data: string;
+
+          /**
+           * The media type of the inline skill payload. Must be `application/zip`.
+           */
+          media_type: 'application/zip';
+
+          /**
+           * The type of the inline skill source. Must be `base64`.
+           */
+          type: 'base64';
+        }
+      }
+    }
+
+    export interface ContainerReference {
+      /**
+       * The ID of the referenced container.
+       */
+      container_id: string;
+
+      /**
+       * References a container created with the /v1/containers endpoint
+       */
+      type: 'container_reference';
+    }
+
+    export interface Local {
+      /**
+       * Use a local computer environment.
+       */
+      type: 'local';
+
+      /**
+       * An optional list of skills.
+       */
+      skills?: Array<Local.Skill> | null;
+    }
+
+    export namespace Local {
+      export interface Skill {
+        /**
+         * The description of the skill.
+         */
+        description: string;
+
+        /**
+         * The name of the skill.
+         */
+        name: string;
+
+        /**
+         * The path to the directory containing the skill.
+         */
+        path: string;
+      }
+    }
   }
 
   export interface ImageGeneration {
     type: 'image_generation';
+  }
+
+  export interface Mcp {
+    type: 'mcp';
+  }
+
+  export interface Custom {
+    type: 'custom';
+  }
+
+  export interface Namespace {
+    type: 'namespace';
+  }
+
+  export interface ToolSearch {
+    type: 'tool_search';
+  }
+
+  export interface ProgrammaticToolCalling {
+    type: 'programmatic_tool_calling';
+  }
+
+  export interface Computer {
+    type: 'computer';
+  }
+
+  export interface ApplyPatch {
+    type: 'apply_patch';
   }
 }
 
