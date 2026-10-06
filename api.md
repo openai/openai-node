@@ -21,6 +21,20 @@ Types:
 - <code><a href="./src/resources/shared.ts">ResponseFormatTextPython</a></code>
 - <code><a href="./src/resources/shared.ts">ResponsesModel</a></code>
 
+# Decisions
+
+Types:
+
+- <code><a href="./src/resources/decisions.ts">Decision</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionInputImage</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionInputMessage</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionInputPart</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionInputText</a></code>
+
+Methods:
+
+- <code title="post /decisions">client.decisions.<a href="./src/resources/decisions.ts">create</a>({ ...params }) -> Decision</code>
+
 # Completions
 
 Types:
@@ -861,6 +875,7 @@ Types:
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceOptions</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceShell</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceTypes</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaToolSearchOutputNamespaceTool</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaToolSearchTool</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaWebSearchPreviewTool</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaWebSearchTool</a></code>

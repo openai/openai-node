@@ -8679,7 +8679,24 @@ export interface ResponseToolSearchOutputItemParam {
   /**
    * The loaded tool definitions returned by the tool search output.
    */
-  tools: Array<Tool>;
+  tools: Array<
+    | FunctionTool
+    | FileSearchTool
+    | ComputerTool
+    | ComputerUsePreviewTool
+    | WebSearchTool
+    | ResponseToolSearchOutputItemParam.Mcp
+    | ResponseToolSearchOutputItemParam.CodeInterpreter
+    | ResponseToolSearchOutputItemParam.ProgrammaticToolCalling
+    | ResponseToolSearchOutputItemParam.ImageGeneration
+    | ResponseToolSearchOutputItemParam.LocalShell
+    | FunctionShellTool
+    | CustomTool
+    | ToolSearchOutputNamespaceTool
+    | ToolSearchTool
+    | WebSearchPreviewTool
+    | ApplyPatchTool
+  >;
 
   /**
    * The item type. Always `tool_search_output`.
@@ -8705,6 +8722,373 @@ export interface ResponseToolSearchOutputItemParam {
    * The status of the tool search output.
    */
   status?: 'in_progress' | 'completed' | 'incomplete' | null;
+}
+
+export namespace ResponseToolSearchOutputItemParam {
+  /**
+   * Give the model access to additional tools via remote Model Context Protocol
+   * (MCP) servers.
+   * [Learn more about MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
+   */
+  export interface Mcp {
+    /**
+     * A label for this MCP server, used to identify it in tool calls.
+     */
+    server_label: string;
+
+    /**
+     * The type of the MCP tool. Always `mcp`.
+     */
+    type: 'mcp';
+
+    /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+    /**
+     * List of allowed tool names or a filter object.
+     */
+    allowed_tools?: Array<string> | Mcp.McpToolFilter | null;
+
+    /**
+     * An OAuth access token that can be used with a remote MCP server, either with a
+     * custom MCP server URL or a service connector. Your application must handle the
+     * OAuth authorization flow and provide the token here.
+     */
+    authorization?: string;
+
+    /**
+     * @deprecated Identifier for service connectors, like those available in ChatGPT.
+     * One of `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more
+     * about service connectors
+     * [here](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#connectors).
+     *
+     * This field is deprecated for models released after September 1, 2026. Use
+     * `server_url` to connect to a remote MCP server, or `tunnel_id` to connect
+     * through a Secure MCP Tunnel.
+     *
+     * Currently supported `connector_id` values are:
+     *
+     * - Dropbox: `connector_dropbox`
+     * - Gmail: `connector_gmail`
+     * - Google Calendar: `connector_googlecalendar`
+     * - Google Drive: `connector_googledrive`
+     * - Microsoft Teams: `connector_microsoftteams`
+     * - Outlook Calendar: `connector_outlookcalendar`
+     * - Outlook Email: `connector_outlookemail`
+     * - SharePoint: `connector_sharepoint`
+     */
+    connector_id?:
+      | 'connector_dropbox'
+      | 'connector_gmail'
+      | 'connector_googlecalendar'
+      | 'connector_googledrive'
+      | 'connector_microsoftteams'
+      | 'connector_outlookcalendar'
+      | 'connector_outlookemail'
+      | 'connector_sharepoint';
+
+    /**
+     * Whether this MCP tool is deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
+
+    /**
+     * Optional HTTP headers to send to the MCP server. Use for authentication or other
+     * purposes.
+     */
+    headers?: { [key: string]: string } | null;
+
+    /**
+     * Specify which of the MCP server's tools require approval.
+     */
+    require_approval?: Mcp.McpToolApprovalFilter | 'always' | 'never' | null;
+
+    /**
+     * Optional description of the MCP server, used to provide more context.
+     */
+    server_description?: string;
+
+    /**
+     * The URL for the MCP server. One of `server_url`, `connector_id`, or `tunnel_id`
+     * must be provided.
+     */
+    server_url?: string;
+
+    /**
+     * The Secure MCP Tunnel ID to use instead of a direct server URL. One of
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided.
+     */
+    tunnel_id?: string;
+  }
+
+  export namespace Mcp {
+    /**
+     * A filter object to specify which tools are allowed.
+     */
+    export interface McpToolFilter {
+      /**
+       * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+       * is
+       * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+       * it will match this filter.
+       */
+      read_only?: boolean;
+
+      /**
+       * List of allowed tool names.
+       */
+      tool_names?: Array<string>;
+    }
+
+    /**
+     * Specify which of the MCP server's tools require approval. Can be `always`,
+     * `never`, or a filter object associated with tools that require approval.
+     */
+    export interface McpToolApprovalFilter {
+      /**
+       * A filter object to specify which tools are allowed.
+       */
+      always?: McpToolApprovalFilter.Always;
+
+      /**
+       * A filter object to specify which tools are allowed.
+       */
+      never?: McpToolApprovalFilter.Never;
+    }
+
+    export namespace McpToolApprovalFilter {
+      /**
+       * A filter object to specify which tools are allowed.
+       */
+      export interface Always {
+        /**
+         * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+         * is
+         * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+         * it will match this filter.
+         */
+        read_only?: boolean;
+
+        /**
+         * List of allowed tool names.
+         */
+        tool_names?: Array<string>;
+      }
+
+      /**
+       * A filter object to specify which tools are allowed.
+       */
+      export interface Never {
+        /**
+         * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+         * is
+         * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+         * it will match this filter.
+         */
+        read_only?: boolean;
+
+        /**
+         * List of allowed tool names.
+         */
+        tool_names?: Array<string>;
+      }
+    }
+  }
+
+  /**
+   * A tool that runs Python code to help generate a response to a prompt.
+   */
+  export interface CodeInterpreter {
+    /**
+     * The code interpreter container. Can be a container ID or an object that
+     * specifies uploaded file IDs to make available to your code, along with an
+     * optional `memory_limit` setting.
+     */
+    container: string | CodeInterpreter.CodeInterpreterToolAuto;
+
+    /**
+     * The type of the code interpreter tool. Always `code_interpreter`.
+     */
+    type: 'code_interpreter';
+
+    /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
+  }
+
+  export namespace CodeInterpreter {
+    /**
+     * Configuration for a code interpreter container. Optionally specify the IDs of
+     * the files to run the code on.
+     */
+    export interface CodeInterpreterToolAuto {
+      /**
+       * Always `auto`.
+       */
+      type: 'auto';
+
+      /**
+       * An optional list of uploaded files to make available to your code.
+       */
+      file_ids?: Array<string>;
+
+      /**
+       * The memory limit for the code interpreter container.
+       */
+      memory_limit?: '1g' | '4g' | '16g' | '64g' | null;
+
+      /**
+       * Network access policy for the container.
+       */
+      network_policy?:
+        | ResponsesAPI.ContainerNetworkPolicyDisabled
+        | ResponsesAPI.ContainerNetworkPolicyAllowlist;
+    }
+  }
+
+  export interface ProgrammaticToolCalling {
+    /**
+     * The type of the tool. Always `programmatic_tool_calling`.
+     */
+    type: 'programmatic_tool_calling';
+  }
+
+  /**
+   * A tool that generates images using the GPT image models.
+   */
+  export interface ImageGeneration {
+    /**
+     * The type of the image generation tool. Always `image_generation`.
+     */
+    type: 'image_generation';
+
+    /**
+     * Whether to generate a new image or edit an existing image. Default: `auto`.
+     */
+    action?: 'generate' | 'edit' | 'auto';
+
+    /**
+     * Allows to set transparency for the background of the generated image(s). Must be
+     * one of `transparent`, `opaque`, or `auto` (default value). When `auto` is used,
+     * the model will automatically determine the best background for the image.
+     *
+     * `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare`, including their `2026-09-08`
+     * snapshots, support `opaque` and `transparent` backgrounds. Transparent
+     * backgrounds are available for supported GPT Image models. For `gpt-image-2` and
+     * `gpt-image-2-2026-04-21`, this support is in preview. When using `transparent`,
+     * set the output format to `png` or `webp`.
+     */
+    background?: 'transparent' | 'opaque' | 'auto';
+
+    /**
+     * Control how much effort the model will exert to match the style and features,
+     * especially facial features, of input images. Supports `high` and `low` on
+     * `gpt-image-1` and `gpt-image-1.5`; `gpt-image-1-mini` supports only `low`. For
+     * `gpt-image-2`, omit this parameter. Defaults to `low` on supported models.
+     */
+    input_fidelity?: 'high' | 'low' | null;
+
+    /**
+     * Optional mask for inpainting. Contains `image_url` (string, optional) and
+     * `file_id` (string, optional).
+     */
+    input_image_mask?: ImageGeneration.InputImageMask;
+
+    /**
+     * The image generation model to use. One of `gpt-image-1`, `gpt-image-1-mini`,
+     * `gpt-image-1.5`, `gpt-image-2`, `gpt-image-2-2026-04-21`,
+     * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
+     * `gpt-image-2.5-flare`, `gpt-image-2.5-flare-2026-09-08`, or
+     * `chatgpt-image-latest`. Default: `gpt-image-1`.
+     */
+    model?:
+      | (string & {})
+      | 'gpt-image-1'
+      | 'gpt-image-1-mini'
+      | 'gpt-image-2'
+      | 'gpt-image-2-2026-04-21'
+      | 'gpt-image-2.5-sunburst'
+      | 'gpt-image-2.5-sunburst-2026-09-08'
+      | 'gpt-image-2.5-flare'
+      | 'gpt-image-2.5-flare-2026-09-08'
+      | 'gpt-image-1.5'
+      | 'chatgpt-image-latest';
+
+    /**
+     * Moderation level for the generated image. Default: `auto`.
+     */
+    moderation?: 'auto' | 'low';
+
+    /**
+     * Compression level for the output image. Default: 100.
+     */
+    output_compression?: number;
+
+    /**
+     * The output format of the generated image. One of `png`, `webp`, or `jpeg`.
+     * Default: `png`.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg';
+
+    /**
+     * Number of partial images to generate in streaming mode, from 0 (default value)
+     * to 3.
+     */
+    partial_images?: number;
+
+    /**
+     * The quality of the generated image. The GPT image models support `low`,
+     * `medium`, and `high`. `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare`,
+     * including their `2026-09-08` snapshots, also support `xhigh` and `max`. Default:
+     * `auto`.
+     */
+    quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto';
+
+    /**
+     * The size of the generated images. For `gpt-image-2`, `gpt-image-2-2026-04-21`,
+     * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
+     * `gpt-image-2.5-flare`, and `gpt-image-2.5-flare-2026-09-08`, arbitrary
+     * resolutions are supported as `WIDTHxHEIGHT` strings, for example `1536x864`.
+     * Width and height must both be divisible by 16 and the requested aspect ratio
+     * must be between 1:3 and 3:1. Resolutions above `2560x1440` are experimental, and
+     * the maximum supported resolution is `3840x2160`. The requested size must also
+     * satisfy the model's current pixel and edge limits. The standard sizes
+     * `1024x1024`, `1536x1024`, and `1024x1536` are supported by the GPT image models;
+     * `auto` is supported for models that allow automatic sizing.
+     */
+    size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+  }
+
+  export namespace ImageGeneration {
+    /**
+     * Optional mask for inpainting. Contains `image_url` (string, optional) and
+     * `file_id` (string, optional).
+     */
+    export interface InputImageMask {
+      /**
+       * File ID for the mask image.
+       */
+      file_id?: string;
+
+      /**
+       * Base64-encoded mask image.
+       */
+      image_url?: string;
+    }
+  }
+
+  /**
+   * A tool that allows the model to execute shell commands in a local environment.
+   */
+  export interface LocalShell {
+    /**
+     * The type of the local shell tool. Always `local_shell`.
+     */
+    type: 'local_shell';
+  }
 }
 
 /**
@@ -10758,6 +11142,75 @@ export interface ToolChoiceTypes {
 }
 
 /**
+ * Groups function/custom tools under a shared namespace.
+ */
+export interface ToolSearchOutputNamespaceTool {
+  /**
+   * A description of the namespace shown to the model.
+   */
+  description: string;
+
+  /**
+   * The namespace name used in tool calls (for example, `crm`).
+   */
+  name: string;
+
+  /**
+   * The function/custom tools loaded inside this namespace.
+   */
+  tools: Array<ToolSearchOutputNamespaceTool.Function | CustomTool>;
+
+  /**
+   * The type of the tool. Always `namespace`.
+   */
+  type: 'namespace';
+}
+
+export namespace ToolSearchOutputNamespaceTool {
+  export interface Function {
+    /**
+     * The name of the loaded function tool.
+     */
+    name: string;
+
+    type: 'function';
+
+    /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+    /**
+     * Whether the tool response can be returned asynchronously versus immediately
+     * returned on next response creation.
+     */
+    async?: boolean;
+
+    /**
+     * Whether this function should be deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
+
+    description?: string | null;
+
+    /**
+     * A JSON Schema describing the JSON value encoded in string outputs for this
+     * function tool. This does not describe content-array outputs.
+     */
+    output_schema?: { [key: string]: unknown } | null;
+
+    parameters?: unknown | null;
+
+    /**
+     * Whether to enforce strict parameter validation. If omitted, Responses attempts
+     * to use strict validation when the schema is compatible, and falls back to
+     * non-strict validation otherwise.
+     */
+    strict?: boolean | null;
+  }
+}
+
+/**
  * Hosted or BYOT tool search configuration for deferred tools.
  */
 export interface ToolSearchTool {
@@ -11889,6 +12342,7 @@ export declare namespace Responses {
     type ToolChoiceOptions as ToolChoiceOptions,
     type ToolChoiceShell as ToolChoiceShell,
     type ToolChoiceTypes as ToolChoiceTypes,
+    type ToolSearchOutputNamespaceTool as ToolSearchOutputNamespaceTool,
     type ToolSearchTool as ToolSearchTool,
     type WebSearchPreviewTool as WebSearchPreviewTool,
     type WebSearchTool as WebSearchTool,
