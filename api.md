@@ -688,7 +688,7 @@ Methods:
 
 Methods:
 
-- <code title="get /agents/sessions/{session_id}/turns/{turn_id}/items">client.beta.agents.sessions.turns.items.<a href="./src/resources/beta/agents/sessions/turns/items.ts">list</a>(turnID, { ...params }) -> AgentSessionItemsPage</code>
+- <code title="get /agents/sessions/{session_id}/turns/{turn_id}/items">client.beta.agents.sessions.turns.items.<a href="./src/resources/beta/agents/sessions/turns/items.ts">list</a>(turnID, { ...params }) -> AgentSessionItemsConversationCursorPage</code>
 
 ## Responses
 
