@@ -8,9 +8,11 @@ const client = new OpenAI({
   baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
 });
 
-describe('resource moderations', () => {
-  test('create: only required params', async () => {
-    const responsePromise = client.moderations.create({ input: 'I want to kill them.' });
+describe('resource items', () => {
+  test('list: only required params', async () => {
+    const responsePromise = client.beta.agents.sessions.turns.items.list('turn_id', {
+      session_id: 'session_id',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -20,10 +22,12 @@ describe('resource moderations', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
-  test('create: required and optional params', async () => {
-    await client.moderations.create({
-      input: 'I want to kill them.',
-      model: 'omni-moderation-2024-09-26',
+  test('list: required and optional params', async () => {
+    await client.beta.agents.sessions.turns.items.list('turn_id', {
+      session_id: 'session_id',
+      after: 'after',
+      limit: 1,
+      order: 'asc',
     });
   });
 });

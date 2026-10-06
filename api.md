@@ -697,12 +697,18 @@ Methods:
 
 Types:
 
-- <code><a href="./src/resources/beta/agents/sessions/turns.ts">Turn</a></code>
+- <code><a href="./src/resources/beta/agents/sessions/turns/turns.ts">Turn</a></code>
 
 Methods:
 
-- <code title="get /agents/sessions/{session_id}/turns/{turn_id}">client.beta.agents.sessions.turns.<a href="./src/resources/beta/agents/sessions/turns.ts">retrieve</a>(turnID, { ...params }) -> Turn</code>
-- <code title="get /agents/sessions/{session_id}/turns">client.beta.agents.sessions.turns.<a href="./src/resources/beta/agents/sessions/turns.ts">list</a>(sessionID, { ...params }) -> TurnsPage</code>
+- <code title="get /agents/sessions/{session_id}/turns/{turn_id}">client.beta.agents.sessions.turns.<a href="./src/resources/beta/agents/sessions/turns/turns.ts">retrieve</a>(turnID, { ...params }) -> Turn</code>
+- <code title="get /agents/sessions/{session_id}/turns">client.beta.agents.sessions.turns.<a href="./src/resources/beta/agents/sessions/turns/turns.ts">list</a>(sessionID, { ...params }) -> TurnsPage</code>
+
+##### Items
+
+Methods:
+
+- <code title="get /agents/sessions/{session_id}/turns/{turn_id}/items">client.beta.agents.sessions.turns.items.<a href="./src/resources/beta/agents/sessions/turns/items.ts">list</a>(turnID, { ...params }) -> AgentSessionItemsConversationCursorPage</code>
 
 ## Responses
 

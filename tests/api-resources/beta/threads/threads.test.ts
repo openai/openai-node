@@ -104,7 +104,7 @@ describe('resource threads', () => {
       max_completion_tokens: 256,
       max_prompt_tokens: 256,
       metadata: { foo: 'string' },
-      model: 'gpt-6-astra',
+      model: 'gpt-4.1',
       parallel_tool_calls: true,
       response_format: 'auto',
       stream: false,

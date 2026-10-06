@@ -2698,7 +2698,7 @@ export namespace ResponseComputerToolCall {
 
 export interface ResponseComputerToolCallOutputItem {
   /**
-   * The unique ID of the computer call tool output.
+   * The ID of the computer tool call output.
    */
   id: string;
 
@@ -3289,6 +3289,12 @@ export namespace ResponseError {
       | 'potentially_unintended_data_access'
       | 'potentially_unintended_destructive_activity'
       | 'other';
+
+    /**
+     * An opaque target for explicitly continuing this review, or null when
+     * unavailable.
+     */
+    review_target?: string | null;
 
     /**
      * An optional public continuation instruction.
@@ -10263,6 +10269,12 @@ export namespace ResponsesServerEvent {
           | 'other';
 
         /**
+         * An opaque target for explicitly continuing this review, or null when
+         * unavailable.
+         */
+        review_target?: string | null;
+
+        /**
          * An optional public continuation instruction.
          */
         steer?: Misalignment.Steer;
@@ -10611,9 +10623,10 @@ export namespace Tool {
     background?: 'transparent' | 'opaque' | 'auto';
 
     /**
-     * Controls fidelity to the original input image(s). This parameter is supported
-     * for GPT image models that support input fidelity. `gpt-image-2` and
-     * `gpt-image-2-2026-04-21` ignore this parameter.
+     * Control how much effort the model will exert to match the style and features,
+     * especially facial features, of input images. Supports `high` and `low` on
+     * `gpt-image-1` and `gpt-image-1.5`; `gpt-image-1-mini` supports only `low`. For
+     * `gpt-image-2`, omit this parameter. Defaults to `low` on supported models.
      */
     input_fidelity?: 'high' | 'low' | null;
 
