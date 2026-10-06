@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.30.0](https://github.com/openai/openai-node/compare/v7.29.0...v7.30.0) (2026-10-06)
+
+
+### Features
+
+* **api:** add standalone Decisions support ([#2886](https://github.com/openai/openai-node/issues/2886)) ([7195644](https://github.com/openai/openai-node/commit/7195644a4fa98d4d379903a00e6ba6350136ab02))
+
 ## [7.29.0](https://github.com/openai/openai-node/compare/v7.28.0...v7.29.0) (2026-10-05)
 
 
