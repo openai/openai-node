@@ -8,6 +8,8 @@ import { expect, test } from 'vitest';
 test.each([
   ['report%20name.txt', 'report name.txt'],
   ['r%C3%A9sum%C3%A9.txt', 'résumé.txt'],
+  ['a%2F', 'unknown_file'],
+  ['a%5C', 'unknown_file'],
 ])('preserves the downloaded filename %s over HTTP', async (path, expected) => {
   const received: { name: string; contents: string }[] = [];
   const server = createServer(async (request, response) => {
