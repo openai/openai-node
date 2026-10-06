@@ -300,6 +300,7 @@ export {
   type BetaToolChoiceOptions,
   type BetaToolChoiceShell,
   type BetaToolChoiceTypes,
+  type BetaToolSearchOutputNamespaceTool,
   type BetaToolSearchTool,
   type BetaWebSearchPreviewTool,
   type BetaWebSearchTool,
