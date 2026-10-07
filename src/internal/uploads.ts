@@ -159,7 +159,8 @@ export function makeFile(
  * Directory components separated by either `/` or `\\` are discarded unless an
  * explicitly supplied `name` or `filename` opts into preserving its path. Preserved
  * paths must be safe and relative, and use forward slashes. Paths inferred from URLs and filesystem streams
- * discard their directories.
+ * discard their directories. URL filenames decode valid UTF-8 percent escapes,
+ * except that ASCII control characters stay escaped for multipart compatibility.
  */
 export function getName(value: any, options?: { stripFilename?: boolean | undefined }): string | undefined {
   if (typeof value !== 'object' || value === null) {
@@ -176,7 +177,18 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
   const url = 'url' in value && value.url && String(value.url);
   if (url) {
     try {
-      return basename(new URL(url).pathname);
+      let filename = basename(new URL(url).pathname);
+      if (filename === undefined) {
+        return undefined;
+      }
+      try {
+        filename = decodeURIComponent(filename);
+      } catch {
+        // A malformed escape leaves the original URL segment usable as a filename.
+      }
+      // oxlint-disable-next-line no-control-regex -- Multipart parsers reject unescaped ASCII controls in filenames.
+      filename = filename.replace(/[\u0000-\u001F\u007F]/gu, encodeURIComponent);
+      return basename(filename);
     } catch {
       return basename(url);
     }
