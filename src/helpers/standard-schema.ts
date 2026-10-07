@@ -162,6 +162,12 @@ type StandardToolOptions<Parameters extends StandardSchemaLike> = {
   description?: string | undefined;
 };
 
+/** Responses-specific hosted discovery settings, preserving the shared parser options. */
+type StandardResponsesToolOptions<Parameters extends StandardSchemaLike> = StandardToolOptions<Parameters> & {
+  /** Defer loading until tool search discovers this function. */
+  defer_loading?: boolean | undefined;
+};
+
 /** Type-level function-tool metadata preserving validated arguments and callback availability. */
 type StandardToolReturnOptions<
   Parameters extends StandardSchemaLike,
@@ -756,7 +762,7 @@ export function standardResponsesFunction<
   Parameters extends StandardSchemaLike,
   ToolFunction extends StandardToolFunction<Parameters>,
 >(
-  options: StandardToolOptions<Parameters> & {
+  options: StandardResponsesToolOptions<Parameters> & {
     /** Callback retained on the tool; `responses.parse()` does not execute it. */
     function: ToolFunction;
   },
@@ -773,7 +779,7 @@ export function standardResponsesFunction<
  * @throws {TypeError} If malformed JSON Schema values have unexpected structural types.
  */
 export function standardResponsesFunction<Parameters extends StandardSchemaLike>(
-  options: StandardToolOptions<Parameters> & {
+  options: StandardResponsesToolOptions<Parameters> & {
     /** No execution callback is attached to this parse-only function tool. */
     function?: undefined;
   },
@@ -790,14 +796,14 @@ export function standardResponsesFunction<Parameters extends StandardSchemaLike>
  * @throws {TypeError} If malformed JSON Schema values have unexpected structural types.
  */
 export function standardResponsesFunction<Parameters extends StandardSchemaLike>(
-  options: StandardToolOptions<Parameters>,
+  options: StandardResponsesToolOptions<Parameters>,
 ): AutoParseableResponseTool<
   StandardToolReturnOptions<Parameters, StandardToolFunction<Parameters> | undefined>
 >;
 
 /** Builds a strict Responses API function tool from a synchronous Standard Schema validator. */
 export function standardResponsesFunction<Parameters extends StandardSchemaLike>(
-  options: StandardToolOptions<Parameters>,
+  options: StandardResponsesToolOptions<Parameters>,
 ) {
   const name = options.name;
   const parameters = options.parameters;
@@ -809,6 +815,7 @@ export function standardResponsesFunction<Parameters extends StandardSchemaLike>
       name,
       parameters: resolveStandardJSONSchema(getBinding, options.schema),
       strict: true,
+      ...(options.defer_loading === undefined ? {} : { defer_loading: options.defer_loading }),
       ...(options.description ? { description: options.description } : undefined),
     },
     {

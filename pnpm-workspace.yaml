@@ -9,6 +9,8 @@ minimumReleaseAgeStrict: true
 minimumReleaseAgeExclude:
   # Security exception: qs 6.16.0 fixes GHSA-4mjr-xmp4-gh2g and GHSA-x5fp-wj9c-mxmx.
   - 'qs@6.16.0'
+  # Security exception: reviewed source-map-js 1.2.2 fixes GHSA-68fv-2mgg-jv7q.
+  - 'source-map-js@1.2.2'
 trustPolicy: no-downgrade
 trustPolicyExclude:
   # semver@6.3.1 is an established transitive dependency, but pnpm's trust-policy

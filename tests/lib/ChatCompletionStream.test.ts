@@ -5,6 +5,7 @@ import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 import type {
   ChatCompletionSnapshot,
+  ChatCompletionReadableStreamItem,
   FunctionToolCallArgumentsDoneEvent,
 } from 'openai/lib/ChatCompletionStream';
 import { ChatCompletionStreamingRunner } from 'openai/lib/ChatCompletionStreamingRunner';
@@ -340,8 +341,7 @@ describe('.stream()', () => {
   });
 
   it('finalizes audio streams that end with an expires_at-only chunk', async () => {
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Audio delta fields are intentionally ahead of the generated chunk type and exercise supported runtime accumulation.
-    const chunks = [
+    const chunks: ChatCompletionReadableStreamItem[] = [
       {
         id: 'chatcmpl-test',
         object: 'chat.completion.chunk',
@@ -351,7 +351,6 @@ describe('.stream()', () => {
           {
             index: 0,
             delta: { audio: { transcript: 'hel' } },
-            finish_reason: null,
           },
         ],
       },
@@ -398,7 +397,7 @@ describe('.stream()', () => {
           },
         ],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ];
     const readable = new Stream(async function* readable() {
       for (const chunk of chunks) {
         yield chunk;
@@ -406,6 +405,10 @@ describe('.stream()', () => {
     }, new AbortController()).toReadableStream();
 
     const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
+    const finishReasons: (string | null | undefined)[] = [];
+    stream.on('chunk', (_chunk, snapshot) => {
+      finishReasons.push(snapshot.choices[0]?.finish_reason);
+    });
 
     await expect(stream.finalChatCompletion()).resolves.toMatchObject({
       id: 'chatcmpl-test',
@@ -426,6 +429,7 @@ describe('.stream()', () => {
         },
       ],
     });
+    expect(finishReasons[0]).toBeNull();
   });
 
   it('does not infer a finish_reason if audio continues after expires_at', async () => {
