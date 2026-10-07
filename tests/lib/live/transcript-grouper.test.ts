@@ -149,12 +149,12 @@ describe('public Live transcript grouping', () => {
     grouper.push(text('assistant', 'yes', 200, 201));
     const { toLowerCase } = String.prototype;
     let normalizedCharacters = 0;
-    const normalize = vi
-      .spyOn(String.prototype, 'toLowerCase')
-      .mockImplementation(function normalize(this: string) {
-        normalizedCharacters += this.length;
-        return toLowerCase.call(this);
-      });
+    const normalize = vi.spyOn(String.prototype, 'toLowerCase').mockImplementation(function normalize(
+      this: string,
+    ) {
+      normalizedCharacters += this.length;
+      return toLowerCase.call(this);
+    });
     const count = 4000;
     try {
       for (let index = 0; index < count; index += 1) {
