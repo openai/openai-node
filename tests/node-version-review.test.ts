@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -77,7 +78,7 @@ describeOnUnix('monthly Node review proposal boundary', () => {
   }
 
   beforeEach(() => {
-    fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-review-'));
+    fixture = realpathSync(mkdtempSync(path.join(tmpdir(), 'openai-node-review-')));
     checkout = path.join(fixture, 'checkout');
     proposalPath = path.join(fixture, 'proposal.json');
     bodyPath = path.join(fixture, 'body.md');
