@@ -276,6 +276,14 @@ function getInputToolByName(
       );
     }
   }
+  // Hosted discovery exposes a deferred top-level function under its own name.
+  // A declared namespace above owns that identity, even if it has no matching function.
+  if (namespace === name) {
+    return input_tools.find(
+      (tool): tool is FunctionTool =>
+        tool.type === 'function' && tool.name === name && tool.defer_loading === true,
+    );
+  }
   return undefined;
 }
 

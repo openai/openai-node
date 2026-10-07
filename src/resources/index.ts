@@ -40,6 +40,15 @@ export {
 } from './content-provenance-checks';
 export { Conversations } from './conversations/conversations';
 export {
+  Decisions,
+  type Decision,
+  type DecisionInputImage,
+  type DecisionInputMessage,
+  type DecisionInputPart,
+  type DecisionInputText,
+  type DecisionCreateParams,
+} from './decisions';
+export {
   Embeddings,
   type CreateEmbeddingResponse,
   type Embedding,
