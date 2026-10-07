@@ -78,6 +78,15 @@ import {
   ContentProvenanceChecks,
 } from './resources/content-provenance-checks';
 import {
+  Decision,
+  DecisionCreateParams,
+  DecisionInputImage,
+  DecisionInputMessage,
+  DecisionInputPart,
+  DecisionInputText,
+  Decisions,
+} from './resources/decisions';
+import {
   CreateEmbeddingResponse,
   Embedding,
   EmbeddingCreateParams,
@@ -2419,6 +2428,7 @@ export class OpenAI {
   static toFile = Uploads.toFile;
   static toStreamingFile = Uploads.toStreamingFile;
 
+  decisions: API.Decisions = new API.Decisions(this);
   /**
    * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
    */
@@ -2483,6 +2493,7 @@ export class OpenAI {
   videos: API.Videos = new API.Videos(this);
 }
 
+OpenAI.Decisions = Decisions;
 OpenAI.Completions = Completions;
 OpenAI.Chat = Chat;
 OpenAI.Embeddings = Embeddings;
@@ -2603,6 +2614,16 @@ export declare namespace OpenAI {
 
   export import TokenPage = Pagination.TokenPage;
   export { type TokenPageParams as TokenPageParams, type TokenPageResponse as TokenPageResponse };
+
+  export {
+    Decisions as Decisions,
+    type Decision as Decision,
+    type DecisionInputImage as DecisionInputImage,
+    type DecisionInputMessage as DecisionInputMessage,
+    type DecisionInputPart as DecisionInputPart,
+    type DecisionInputText as DecisionInputText,
+    type DecisionCreateParams as DecisionCreateParams,
+  };
 
   export {
     Completions as Completions,

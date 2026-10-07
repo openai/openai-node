@@ -475,6 +475,9 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
 
   /** Optional model-visible explanation of when and how the function should be used. */
   description?: string | undefined;
+
+  /** Defer loading until tool search discovers this function. */
+  defer_loading?: boolean | undefined;
 }): AutoParseableResponseTool<{
   /** Inferred argument type produced by the Zod parameter schema. */
   arguments: InferZodType<Parameters>;
@@ -498,6 +501,7 @@ export function zodResponsesFunction<Parameters extends ZodTypeLike>(options: {
         ? zodV4ToJsonSchema(zodSchema)
         : zodV3ToJsonSchema(zodSchema, { name: options.name }),
       strict: true,
+      ...(options.defer_loading === undefined ? {} : { defer_loading: options.defer_loading }),
       ...(options.description ? { description: options.description } : undefined),
     },
     {
