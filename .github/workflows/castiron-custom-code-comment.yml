@@ -11,6 +11,7 @@ permissions: {}
 concurrency:
   group: castiron-custom-code-comment-${{ github.event.workflow_run.head_repository.id }}-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: false
+  queue: max # Preserve newer pending evaluations if older runs arrive out of order.
 
 jobs:
   compute:
@@ -31,13 +32,15 @@ jobs:
       isolation: ${{ steps.budget.outputs.isolation }}
       budget: ${{ steps.budget.outputs.budget }}
     steps:
+      # Selecting main here pins both the executable checker and PR policy base.
+      # Subsequent steps use this checkout's SHA even if main advances.
       - name: Check out the trusted reporter
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           persist-credentials: false
 
-      - name: Compute from the current pull request Git objects
+      - name: Compute from the selected main and pull request Git objects
         id: report
         if: github.event.workflow_run.event == 'pull_request'
         env:
@@ -53,6 +56,7 @@ jobs:
         run: |
           python3 -I scripts/castiron/custom_code_report.py trusted-report \
             --repo "$RUNNER_TEMP/castiron-objects.git" \
+            --base "$(git rev-parse HEAD)" \
             --repository "$REPOSITORY" --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" \
             --out "$RUNNER_TEMP/castiron-custom-code"
           if test -f "$RUNNER_TEMP/castiron-custom-code/context.json"; then
@@ -127,65 +131,67 @@ jobs:
     steps:
       # This workflow definition is from main. No candidate checkout/artifacts.
       - name: Publish exact-head statuses after checking freshness
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           BASE_SHA: ${{ needs.compute.outputs.base-sha }}
           HEAD_SHA: ${{ needs.compute.outputs.head-sha }}
           ISOLATION_RESULT: ${{ needs.compute.outputs.isolation }}
           BUDGET_RESULT: ${{ needs.compute.outputs.budget }}
+          PUBLISH_ATTEMPT: ${{ github.run_attempt }}
         with:
           script: |
             const event = context.payload.workflow_run;
             const {data: run} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: event.id});
-            const upstream = `${context.repo.owner}/${context.repo.repo}`;
-            if (run.head_sha !== event.head_sha || run.run_attempt !== event.run_attempt ||
+            if (run.event !== event.event || run.head_sha !== event.head_sha || run.run_attempt !== event.run_attempt ||
                 run.status !== 'completed' || run.path.split('@', 1)[0] !== '.github/workflows/castiron-custom-code.yml' ||
-                run.repository.full_name !== upstream) return;
+                run.repository.full_name !== `${context.repo.owner}/${context.repo.repo}`) return;
             const head = run.head_sha;
             if (!/^[0-9a-f]{40}$/.test(head)) throw new Error('Invalid candidate SHA');
-            const {data: main} = await github.rest.git.getRef({...context.repo, ref: 'heads/main'});
-            const base = main.object.sha;
+            const base = process.env.BASE_SHA;
+            let fresh = /^[0-9a-f]{40}$/.test(base) && head === process.env.HEAD_SHA;
             if (run.event === 'pull_request') {
-              const source = run.head_repository;
-              const identity = typeof source?.full_name === 'string' &&
-                /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(source.full_name);
-              if (!identity || identity.slice(1).some(part => part === '.' || part === '..') ||
-                  (source.name !== undefined && source.name !== identity[2]) ||
-                  (source.owner != null &&
-                    (typeof source.owner !== 'object' || source.owner.login !== identity[1])) ||
-                  !Array.isArray(run.pull_requests)) return;
-              const pulls = run.pull_requests.length ? run.pull_requests : await github.paginate(
-                github.rest.repos.listPullRequestsAssociatedWithCommit,
-                {owner: identity[1], repo: identity[2], commit_sha: head});
-              const numbers = new Set();
-              for (const pull of pulls) {
-                if (!Number.isSafeInteger(pull?.number) || pull.number <= 0) return;
-                numbers.add(pull.number);
-              }
+              let pulls = run.pull_requests.length ? run.pull_requests : await github.paginate(
+                github.rest.repos.listPullRequestsAssociatedWithCommit, {...context.repo, commit_sha: head});
+              if (!pulls.length) pulls = await github.paginate(github.rest.pulls.list, {
+                ...context.repo, state: 'open', head: `${run.head_repository.owner.login}:${run.head_branch}`,
+              });
               const current = [];
-              for (const number of numbers) {
-                const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: number});
-                if (pr.number === number && pr.state === 'open' && pr.head.sha === head &&
-                    /^[0-9a-f]{40}$/.test(pr.base.sha) &&
-                    pr.head.repo?.full_name === source.full_name && pr.base.ref === 'main' &&
-                    pr.base.repo.full_name === upstream) current.push(pr);
+              for (const pull of pulls) {
+                const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: pull.number});
+                if (pr.state === 'open' && pr.head.sha === head &&
+                    pr.base.ref === 'main' && pr.base.repo.full_name === `${context.repo.owner}/${context.repo.repo}`) current.push(pr);
               }
               if (current.length !== 1) return;
             } else if (run.event !== 'merge_group' || !run.head_branch.startsWith('gh-readonly-queue/main/')) {
               return;
+            } else {
+              const {data: main} = await github.rest.git.getRef({...context.repo, ref: 'heads/main'});
+              fresh = fresh && base === main.object.sha;
             }
-            const fresh = base === process.env.BASE_SHA && head === process.env.HEAD_SHA;
             const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            // Concurrency serializes writes, but does not order runs or retries.
+            // Keep an older evaluation from overwriting a newer result for this head.
+            const order = [run.id, run.run_attempt, Number(context.runId), Number(process.env.PUBLISH_ATTEMPT)];
+            const marker = `[evaluation ${order.join(':')}]`;
+            const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {...context.repo, ref: head});
+            const names = ['Castiron / budget-only change', 'Castiron / custom-code budget'];
+            for (const status of statuses) {
+              if (!names.includes(status.context) || status.creator?.login !== 'github-actions[bot]') continue;
+              const prior = status.description?.match(/\[evaluation (\d+):(\d+):(\d+):(\d+)\]$/);
+              if (!prior || status.target_url !== `${url.slice(0, url.lastIndexOf('/') + 1)}${prior[3]}`) continue;
+              const previous = prior.slice(1).map(Number);
+              const different = previous.findIndex((value, index) => value !== order[index]);
+              if (different !== -1 && previous[different] > order[different]) return;
+            }
             for (const [name, result] of [
               ['Castiron / budget-only change', process.env.ISOLATION_RESULT],
               ['Castiron / custom-code budget', process.env.BUDGET_RESULT],
             ]) {
               const state = fresh && result === 'success' ? 'success' : 'failure';
-              const description = !fresh ? 'Evaluation unavailable or base changed; rerun against current main.'
-                : state === 'success' ? 'Passed against main policy. See the trusted run summary.'
-                : 'Budget check failed. See the trusted run summary.';
+              const description = !fresh ? 'Evaluation unavailable or queue base changed; inspect the trusted run and rerun.'
+                : `${state === 'success' ? 'Passed' : 'Failed'} against main ${base.slice(0, 12)}. See the trusted run summary.`;
               await github.rest.repos.createCommitStatus({...context.repo, sha: head, context: name,
-                state, description, target_url: url});
+                state, description: `${description} ${marker}`, target_url: url});
             }
 
   comment:
@@ -200,7 +206,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Check out the trusted publisher
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
@@ -233,47 +239,25 @@ jobs:
 
       - name: Publish a trusted failure status
         if: always() && !cancelled() && steps.publish.outcome != 'success'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const marker = '<!-- castiron:custom-code-report:v1 -->';
-            const event = context.payload.workflow_run;
-            const {data: run} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: event.id});
-            const upstream = `${context.repo.owner}/${context.repo.repo}`;
-            if (run.event !== 'pull_request' || run.head_sha !== event.head_sha ||
-                run.run_attempt !== event.run_attempt || run.status !== 'completed' ||
-                run.path.split('@', 1)[0] !== '.github/workflows/castiron-custom-code.yml' ||
-                run.repository.full_name !== upstream || !/^[0-9a-f]{40}$/.test(run.head_sha)) return;
-            const source = run.head_repository;
-            const identity = typeof source?.full_name === 'string' &&
-              /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(source.full_name);
-            if (!identity || identity.slice(1).some(part => part === '.' || part === '..') ||
-                (source.name !== undefined && source.name !== identity[2]) ||
-                (source.owner != null &&
-                  (typeof source.owner !== 'object' || source.owner.login !== identity[1])) ||
-                !Array.isArray(run.pull_requests)) return;
-            const pulls = run.pull_requests.length ? run.pull_requests : await github.paginate(
-              github.rest.repos.listPullRequestsAssociatedWithCommit,
-              {owner: identity[1], repo: identity[2], commit_sha: run.head_sha});
-            const numbers = new Set();
+            const run = context.payload.workflow_run;
+            if (run.event !== 'pull_request' || run.path !== '.github/workflows/castiron-custom-code.yml') return;
+            let pulls = run.pull_requests?.length ? run.pull_requests : await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {...context.repo, commit_sha: run.head_sha});
+            if (!pulls.length) pulls = await github.paginate(github.rest.pulls.list, {
+              ...context.repo, state: 'open', head: `${run.head_repository.owner.login}:${run.head_branch}`,
+            });
             for (const pull of pulls) {
-              if (!Number.isSafeInteger(pull?.number) || pull.number <= 0) return;
-              numbers.add(pull.number);
+              const {data: current} = await github.rest.pulls.get({...context.repo, pull_number: pull.number});
+              if (current.state !== 'open' || current.head.sha !== run.head_sha) continue;
+              const comments = await github.paginate(github.rest.issues.listComments, {...context.repo, issue_number: pull.number});
+              const previous = comments.find(c => c.user?.type === 'Bot' && c.user?.login === 'github-actions[bot]' && c.body?.startsWith(marker));
+              const prior = previous?.body?.match(/<!-- castiron:run:v1:(\d+):(\d+) -->/);
+              if (prior && (Number(prior[1]) > run.id || (Number(prior[1]) === run.id && Number(prior[2]) > run.run_attempt))) continue;
+              const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${run.id}`;
+              const body = `${marker}\n\n## Castiron custom code\n\n⚠️ Report unavailable for \`${run.head_sha.slice(0, 12)}\`.\n\nThe report setup or validation failed. [Inspect the workflow run](${url}).\n\n<!-- castiron:run:v1:${run.id}:${run.run_attempt} -->`;
+              if (previous) await github.rest.issues.updateComment({...context.repo, comment_id: previous.id, body});
+              else await github.rest.issues.createComment({...context.repo, issue_number: pull.number, body});
             }
-            const current = [];
-            for (const number of numbers) {
-              const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: number});
-              if (pr.number === number && pr.state === 'open' && pr.head.sha === run.head_sha &&
-                  pr.head.repo?.full_name === source.full_name && pr.base.ref === 'main' &&
-                  pr.base.repo.full_name === upstream) current.push({number, pr});
-            }
-            if (current.length !== 1) return;
-            const number = current[0].number;
-            const comments = await github.paginate(github.rest.issues.listComments, {...context.repo, issue_number: number});
-            const previous = comments.find(c => c.user?.type === 'Bot' && c.user?.login === 'github-actions[bot]' && c.body?.startsWith(marker));
-            const prior = previous?.body?.match(/<!-- castiron:run:v1:(\d+):(\d+) -->/);
-            if (prior && (Number(prior[1]) > run.id || (Number(prior[1]) === run.id && Number(prior[2]) > run.run_attempt))) return;
-            const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${run.id}`;
-            const body = `${marker}\n\n## Castiron custom code\n\n⚠️ Report unavailable for \`${run.head_sha.slice(0, 12)}\`.\n\nThe report setup or validation failed. [Inspect the workflow run](${url}).\n\n<!-- castiron:run:v1:${run.id}:${run.run_attempt} -->`;
-            if (previous) await github.rest.issues.updateComment({...context.repo, comment_id: previous.id, body});
-            else await github.rest.issues.createComment({...context.repo, issue_number: number, body});
