@@ -5391,7 +5391,8 @@ export interface AgentCreateParams {
   text?: AgentTextParam | null;
 
   /**
-   * Tools available to the agent. Defaults to an empty list.
+   * Tools available to the agent. Defaults to an empty list. The tool list must fit
+   * within 3 MiB (3,145,728 bytes) of compact UTF-8 JSON.
    */
   tools?: Array<PersistedAgentToolParam> | null;
 }
@@ -5448,7 +5449,8 @@ export interface AgentUpdateParams {
   text?: AgentTextParam | null;
 
   /**
-   * Tools available to the agent.
+   * Replaces the tool list. Omit to leave it unchanged, or pass null to clear it.
+   * The replacement must fit within 3 MiB (3,145,728 bytes) of compact UTF-8 JSON.
    */
   tools?: Array<PersistedAgentToolParam> | null;
 }
