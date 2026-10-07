@@ -21,6 +21,20 @@ Types:
 - <code><a href="./src/resources/shared.ts">ResponseFormatTextPython</a></code>
 - <code><a href="./src/resources/shared.ts">ResponsesModel</a></code>
 
+# Decisions
+
+Types:
+
+- <code><a href="./src/resources/decisions.ts">Decision</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionInputImage</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionInputMessage</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionInputPart</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionInputText</a></code>
+
+Methods:
+
+- <code title="post /decisions">client.decisions.<a href="./src/resources/decisions.ts">create</a>({ ...params }) -> Decision</code>
+
 # Completions
 
 Types:
@@ -697,12 +711,18 @@ Methods:
 
 Types:
 
-- <code><a href="./src/resources/beta/agents/sessions/turns.ts">Turn</a></code>
+- <code><a href="./src/resources/beta/agents/sessions/turns/turns.ts">Turn</a></code>
 
 Methods:
 
-- <code title="get /agents/sessions/{session_id}/turns/{turn_id}">client.beta.agents.sessions.turns.<a href="./src/resources/beta/agents/sessions/turns.ts">retrieve</a>(turnID, { ...params }) -> Turn</code>
-- <code title="get /agents/sessions/{session_id}/turns">client.beta.agents.sessions.turns.<a href="./src/resources/beta/agents/sessions/turns.ts">list</a>(sessionID, { ...params }) -> TurnsPage</code>
+- <code title="get /agents/sessions/{session_id}/turns/{turn_id}">client.beta.agents.sessions.turns.<a href="./src/resources/beta/agents/sessions/turns/turns.ts">retrieve</a>(turnID, { ...params }) -> Turn</code>
+- <code title="get /agents/sessions/{session_id}/turns">client.beta.agents.sessions.turns.<a href="./src/resources/beta/agents/sessions/turns/turns.ts">list</a>(sessionID, { ...params }) -> TurnsPage</code>
+
+##### Items
+
+Methods:
+
+- <code title="get /agents/sessions/{session_id}/turns/{turn_id}/items">client.beta.agents.sessions.turns.items.<a href="./src/resources/beta/agents/sessions/turns/items.ts">list</a>(turnID, { ...params }) -> AgentSessionItemsConversationCursorPage</code>
 
 ## Responses
 
@@ -875,6 +895,7 @@ Types:
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceOptions</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceShell</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaToolChoiceTypes</a></code>
+- <code><a href="./src/resources/beta/responses/responses.ts">BetaToolSearchOutputNamespaceTool</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaToolSearchTool</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaWebSearchPreviewTool</a></code>
 - <code><a href="./src/resources/beta/responses/responses.ts">BetaWebSearchTool</a></code>

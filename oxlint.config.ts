@@ -41,6 +41,7 @@ const sdkBoundaryFiles = [
   'src/lib/parser.ts',
   'src/lib/transform.ts',
   'src/lib/agents/agent-session-stream.ts',
+  'src/lib/beta/agents/tool-dispatcher.ts',
 ];
 
 module.exports = defineConfig({
@@ -104,6 +105,7 @@ module.exports = defineConfig({
         'src/auth/x509-transport.ts',
         'src/lib/AssistantStream.ts',
         'src/lib/agents/agent-session-stream.ts',
+        'src/lib/beta/agents/tool-dispatcher.ts',
       ],
       rules: {
         'anti-slop/no-unsafe-dictionary-type': 'off',

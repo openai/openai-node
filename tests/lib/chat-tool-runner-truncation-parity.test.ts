@@ -71,7 +71,7 @@ function completionTurn({ kind, finishReason }: Turn): ChatCompletion {
 
 function chunk(
   delta: ChatCompletionChunk.Choice.Delta,
-  finish: ChatCompletionChunk.Choice['finish_reason'],
+  finish: Exclude<ChatCompletionChunk.Choice['finish_reason'], undefined>,
 ): ChatCompletionChunk {
   return {
     id: 'chatcmpl-truncated',

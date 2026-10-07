@@ -2,7 +2,7 @@
 
 import { APIResource } from '../../../core/resource';
 import * as AgentsAPI from './agents';
-import * as TurnsAPI from './sessions/turns';
+import * as TurnsAPI from './sessions/turns/turns';
 import * as EnvironmentsAPI from './environments/environments';
 import { EnvironmentInfo, Environments } from './environments/environments';
 import * as SessionsAPI from './sessions/sessions';
@@ -3825,8 +3825,8 @@ export namespace EnvironmentParam {
     files?: Array<AgentsAPI.HostedEnvironmentFileParam> | null;
 
     /**
-     * Network access policy for the environment. Defaults to disabled for GA requests
-     * and enabled for beta requests.
+     * Network access policy for the environment. If omitted, the API version
+     * determines whether network access is enabled or disabled.
      */
     network?: EnvironmentParamOpenAIHosted.Network | null;
 
@@ -3865,8 +3865,8 @@ export namespace EnvironmentParam {
     }
 
     /**
-     * Network access policy for the environment. Defaults to disabled for GA requests
-     * and enabled for beta requests.
+     * Network access policy for the environment. If omitted, the API version
+     * determines whether network access is enabled or disabled.
      */
     export interface Network {
       /**
@@ -5003,6 +5003,12 @@ export interface SessionTurnError {
    * - `session_budget_exceeded` - The session has reached its usage budget.
    * - `usage_limit_exceeded` - The organization has reached a usage, plan, or
    *   billing limit.
+   * - `project_spend_limit_exceeded` - The project has reached its enforced spend
+   *   limit.
+   * - `organization_spend_limit_exceeded` - The organization has reached its
+   *   enforced spend limit.
+   * - `organization_usage_limit_exceeded` - The organization has reached its
+   *   OpenAI-assigned usage limit.
    * - `credit_balance_exhausted` - The organization has no API credits remaining.
    * - `rate_limit_exceeded` - The request exceeds the available rate limit.
    * - `flex_unavailable` - Flex processing is temporarily unavailable.
@@ -5029,6 +5035,9 @@ export interface SessionTurnError {
     | 'context_length_exceeded'
     | 'session_budget_exceeded'
     | 'usage_limit_exceeded'
+    | 'project_spend_limit_exceeded'
+    | 'organization_spend_limit_exceeded'
+    | 'organization_usage_limit_exceeded'
     | 'credit_balance_exhausted'
     | 'rate_limit_exceeded'
     | 'flex_unavailable'

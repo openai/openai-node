@@ -1,8 +1,8 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../../../../../core/resource';
-import * as TurnsAPI from '../../turns';
-import { TurnsPage } from '../../turns';
+import * as TurnsAPI from '../../turns/turns';
+import { TurnsPage } from '../../turns/turns';
 import * as ItemsAPI from './items';
 import { ItemListParams, Items } from './items';
 import { APIPromise } from '../../../../../../core/api-promise';
