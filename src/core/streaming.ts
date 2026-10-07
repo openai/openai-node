@@ -301,6 +301,15 @@ export class Stream<Item> implements AsyncIterable<Item> {
     return this.iterator();
   }
 
+  /** Beta-only iterator decoration for Agents helpers, preserving custom stream identity.
+   * @internal
+   */
+  __betaTransformIterator(
+    transform: (iterator: () => AsyncIterator<Item>) => () => AsyncIterator<Item>,
+  ): void {
+    this.iterator = transform(this.iterator.bind(this));
+  }
+
   /**
    * Splits the stream into two streams which can be
    * independently read from at different speeds.

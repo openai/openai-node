@@ -7,7 +7,9 @@ import OpenAI from 'openai';
 import { ResponsesWS } from 'openai/resources/responses/ws';
 import { ResponsesWebSocketSession } from 'openai/lib/responses/responses-websocket-session';
 import type { ResponsesWebSocketLane } from 'openai/lib/responses/responses-websocket-session';
-import type { Response, ResponsesServerEvent } from 'openai/resources/responses/responses';
+import { ResponsesWebSocketAccumulator } from 'openai/lib/responses/responses-websocket-accumulator';
+import { toResponseInputItems } from 'openai/lib/responses/ResponseInputItems';
+import type { Response, ResponseInputItem, ResponsesServerEvent } from 'openai/resources/responses/responses';
 import { rawByteLength } from 'openai/internal/ws';
 import * as webSocketInternals from 'openai/internal/ws';
 import scenarios from './fixtures/websocket_scenarios.json';
@@ -74,6 +76,475 @@ function response(id: string, status: Response['status'] = 'completed') {
     tools: [],
   };
 }
+
+test('caller-fed provisional output borrows no reader and leaves other lanes and raw events available', async () => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const previewLane = session.lane('preview');
+    const defaultLane = session.lane('default');
+    const preview = new ResponsesWebSocketAccumulator();
+    const raw: string[] = [];
+    connection.on('event', (event) => raw.push(event.type));
+    const signal = AbortSignal.timeout(3000);
+    try {
+      peer.send(JSON.stringify({ type: 'response.created', response: { id: 'p' }, stream_id: 'preview' }));
+      peer.send(
+        JSON.stringify({
+          type: 'response.output_item.added',
+          output_index: 0,
+          stream_id: 'preview',
+          item: {
+            type: 'function_call',
+            id: 'fc_preview',
+            name: 'never_run',
+            call_id: 'call_p',
+            arguments: '',
+          },
+        }),
+      );
+      peer.send(
+        JSON.stringify({
+          type: 'response.function_call_arguments.delta',
+          item_id: 'fc_preview',
+          output_index: 0,
+          delta: '{"preview":true}',
+          stream_id: 'preview',
+        }),
+      );
+      peer.send(
+        JSON.stringify({ type: 'response.completed', response: response('default'), stream_id: 'default' }),
+      );
+      preview.add(await previewLane.receive({ signal }));
+      preview.add(await previewLane.receive({ signal }));
+      preview.add(await previewLane.receive({ signal }));
+      expect(preview.current).toMatchObject({
+        phase: 'provisional',
+        snapshot: { output: [{ arguments: '{"preview":true}' }] },
+      });
+      expect(await defaultLane.finalResponse({ signal })).toMatchObject({ id: 'default', output: [] });
+      preview.reset();
+      expect(preview.current).toBeUndefined();
+      const terminal = {
+        type: 'response.failed',
+        response: { id: 'p', error: { message: 'synthetic failure' } },
+        stream_id: 'preview',
+      };
+      peer.send(JSON.stringify(terminal));
+      const rawTerminal = await previewLane.receive({ signal });
+      preview.add(rawTerminal);
+      expect(preview.current).toEqual({ phase: 'terminal', event: terminal });
+      expect(raw).toEqual([
+        'response.created',
+        'response.output_item.added',
+        'response.function_call_arguments.delta',
+        'response.completed',
+        'response.failed',
+      ]);
+      preview.reset();
+      peer.send(
+        JSON.stringify({ type: 'response.completed', response: response('next'), stream_id: 'preview' }),
+      );
+      expect(await previewLane.finalResponse({ signal })).toMatchObject({ id: 'next', output: [] });
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test('preview preserves supported logprobs while incomplete raw logprobs and another lane remain readable', async () => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane('preview');
+    const neighbor = session.lane('neighbor');
+    const preview = new ResponsesWebSocketAccumulator();
+    const signal = AbortSignal.timeout(3000);
+    try {
+      const created = {
+        type: 'response.created',
+        stream_id: 'preview',
+        response: {
+          id: 'p',
+          metadata: { present: '', count: 0 },
+          future_optional: null,
+          output: [
+            {
+              type: 'message',
+              id: 'm',
+              content: [{ type: 'output_text', text: '', annotations: [], logprobs: [] }],
+            },
+          ],
+        },
+      };
+      peer.send(JSON.stringify(created));
+      const received = await lane.receive({ signal });
+      expect(received).toEqual(created);
+      preview.add(received);
+      expect(preview.current).toMatchObject({
+        snapshot: { id: 'p', metadata: created.response.metadata, future_optional: null },
+      });
+      const complete = {
+        type: 'response.output_text.delta',
+        item_id: 'm',
+        output_index: 0,
+        content_index: 0,
+        delta: 'Hi',
+        stream_id: 'preview',
+        logprobs: [{ token: 'Hi', logprob: -0.5, bytes: [72, 105], top_logprobs: [], extra: null }],
+      };
+      peer.send(JSON.stringify(complete));
+      peer.send(
+        JSON.stringify({ type: 'response.completed', stream_id: 'neighbor', response: response('other') }),
+      );
+      const rawComplete = await lane.receive({ signal });
+      expect(rawComplete).toEqual(complete);
+      preview.add(rawComplete);
+      const earlier = preview.outputAt(0, { content_index: 0 });
+      expect(earlier).toEqual({
+        type: 'output_text',
+        text: 'Hi',
+        annotations: [],
+        logprobs: complete.logprobs,
+      });
+
+      // Valid in the streamed model, but missing bytes required by the final model.
+      const partial = { ...complete, delta: '!', logprobs: [{ token: '!', logprob: -1, top_logprobs: [] }] };
+      peer.send(JSON.stringify(partial));
+      const rawPartial = await lane.receive({ signal });
+      preview.add(rawPartial);
+      expect(rawPartial).toEqual(partial);
+      expect(preview.outputAt(0, { content_index: 0 })).toMatchObject({
+        text: 'Hi!',
+        logprobs: complete.logprobs,
+      });
+      expect(earlier).toMatchObject({ text: 'Hi', logprobs: complete.logprobs });
+      expect(await neighbor.finalResponse({ signal })).toMatchObject({ id: 'other', output: [] });
+
+      const terminal = {
+        type: 'response.completed',
+        stream_id: 'preview',
+        response: { id: 'p', output: [] },
+      };
+      peer.send(JSON.stringify(terminal));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toEqual({ phase: 'terminal', event: terminal });
+      expect(preview.outputAt(0, { content_index: 0 })).toBeUndefined();
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test('idle and reset previews ignore non-output wire events but still reject unscaffolded output', async () => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane('preview');
+    const preview = new ResponsesWebSocketAccumulator();
+    const signal = AbortSignal.timeout(3000);
+    try {
+      for (const frame of [
+        { type: 'keepalive', sequence_number: 1, stream_id: 'preview' },
+        { type: 'response.compaction.compacting', sequence_number: 2, stream_id: 'preview' },
+        { type: 'response.future_event', extra: { visible: true }, stream_id: 'preview' },
+      ]) {
+        peer.send(JSON.stringify(frame));
+        // oxlint-disable-next-line eslint/no-await-in-loop -- The lane permits one reader, and each event must leave the idle preview unchanged.
+        const received = await lane.receive({ signal });
+        expect(received).toEqual(frame);
+        preview.add(received);
+        expect(preview.current).toBeUndefined();
+      }
+      peer.send(JSON.stringify({ type: 'response.created', response: { id: 'r' }, stream_id: 'preview' }));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toEqual({
+        phase: 'provisional',
+        snapshot: { id: 'r', output: [], output_text: '' },
+      });
+      preview.reset();
+      peer.send(JSON.stringify({ type: 'keepalive', sequence_number: 3, stream_id: 'preview' }));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toBeUndefined();
+      peer.send(
+        JSON.stringify({
+          type: 'response.output_text.delta',
+          item_id: 'missing',
+          output_index: 0,
+          content_index: 0,
+          delta: 'actual unscaffolded output',
+          stream_id: 'preview',
+        }),
+      );
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current?.phase).toBe('unavailable');
+      const terminal = {
+        type: 'response.completed',
+        response: { id: 'r', output: [] },
+        stream_id: 'preview',
+      };
+      peer.send(JSON.stringify(terminal));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toEqual({ phase: 'terminal', event: terminal });
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test.each([
+  ['missing arguments', { type: 'function_call', id: 'fc', name: 'data', call_id: 'c' }],
+  ['numeric arguments', { type: 'function_call', id: 'fc', name: 'data', call_id: 'c', arguments: 1 }],
+  ['null arguments', { type: 'function_call', id: 'fc', name: 'data', call_id: 'c', arguments: null }],
+  ['missing name', { type: 'function_call', id: 'fc', call_id: 'c', arguments: '' }],
+  ['non-string name', { type: 'function_call', id: 'fc', name: 123, call_id: 'c', arguments: '' }],
+  ['custom non-string input', { type: 'custom_tool_call', id: 'fc', name: 'data', call_id: 'c', input: {} }],
+  ['custom missing input', { type: 'custom_tool_call', id: 'fc', name: 'data', call_id: 'c' }],
+  ['MCP missing arguments', { type: 'mcp_call', id: 'fc', name: 'data', server_label: 'synthetic' }],
+  [
+    'MCP numeric arguments',
+    { type: 'mcp_call', id: 'fc', name: 'data', server_label: 'synthetic', arguments: 1 },
+  ],
+  [
+    'MCP null arguments',
+    { type: 'mcp_call', id: 'fc', name: 'data', server_label: 'synthetic', arguments: null },
+  ],
+  ['MCP missing name', { type: 'mcp_call', id: 'fc', server_label: 'synthetic', arguments: '' }],
+  [
+    'MCP non-string name',
+    { type: 'mcp_call', id: 'fc', name: 123, server_label: 'synthetic', arguments: '' },
+  ],
+  ['MCP missing server label', { type: 'mcp_call', id: 'fc', name: 'data', arguments: '' }],
+  [
+    'MCP non-string server label',
+    { type: 'mcp_call', id: 'fc', name: 'data', server_label: false, arguments: '' },
+  ],
+  ['future discriminator', { type: 'future_item', id: 'x' }],
+  ['Object prototype discriminator', { type: 'constructor', id: 'x' }],
+  ['non-string discriminator', { type: 123, id: 'x' }],
+])('raw output with %s never enters a typed provisional snapshot', async (_label, item) => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane();
+    const preview = new ResponsesWebSocketAccumulator();
+    const signal = AbortSignal.timeout(3000);
+    try {
+      // Both lifecycle output and output-item frames cross the same raw boundary.
+      const created = { type: 'response.created', response: { id: 'r', output: [item] } };
+      peer.send(JSON.stringify(created));
+      const raw = await lane.receive({ signal });
+      expect(raw).toEqual(created);
+      preview.add(raw);
+      expect(preview.current?.phase).toBe('unavailable');
+      peer.send(JSON.stringify({ type: 'response.created', response: { id: 'r2' } }));
+      preview.add(await lane.receive({ signal }));
+      const added = { type: 'response.output_item.added', output_index: 0, item };
+      peer.send(JSON.stringify(added));
+      const rawAdded = await lane.receive({ signal });
+      expect(rawAdded).toEqual(added);
+      preview.add(rawAdded);
+      expect(preview.current?.phase).toBe('unavailable');
+      peer.send(JSON.stringify({ type: 'response.created', response: { id: 'r3' } }));
+      preview.add(await lane.receive({ signal }));
+      const done = { type: 'response.output_item.done', output_index: 0, item };
+      peer.send(JSON.stringify(done));
+      const rawDone = await lane.receive({ signal });
+      expect(rawDone).toEqual(done);
+      preview.add(rawDone);
+      expect(preview.current?.phase).toBe('unavailable');
+      const terminal = { type: 'response.failed', response: { id: 'r2', error: { message: 'synthetic' } } };
+      peer.send(JSON.stringify(terminal));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toEqual({ phase: 'terminal', event: terminal });
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test.each([
+  ['function_call', 'response.function_call_arguments.delta', { delta: 123 }],
+  ['function_call', 'response.function_call_arguments.done', { arguments: 123 }],
+  ['function_call', 'response.function_call_arguments.done', { arguments: null }],
+  ['function_call', 'response.function_call_arguments.done', {}],
+  ['mcp_call', 'response.mcp_call_arguments.delta', { delta: 123 }],
+  ['mcp_call', 'response.mcp_call_arguments.done', { arguments: 1 }],
+  ['mcp_call', 'response.mcp_call_arguments.done', { arguments: null }],
+  ['mcp_call', 'response.mcp_call_arguments.done', {}],
+  ['custom_tool_call', 'response.custom_tool_call_input.delta', { delta: null }],
+  ['custom_tool_call', 'response.custom_tool_call_input.done', { input: {} }],
+  ['custom_tool_call', 'response.custom_tool_call_input.done', {}],
+])('%s with invalid %s raw payload leaves the preview unavailable', async (itemType, type, payload) => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane();
+    const preview = new ResponsesWebSocketAccumulator();
+    const signal = AbortSignal.timeout(3000);
+    try {
+      peer.send(
+        JSON.stringify({
+          type: 'response.created',
+          response: {
+            id: 'r',
+            output: [
+              {
+                type: itemType,
+                id: 'tool_1',
+                call_id: 'call_1',
+                name: 'as_data',
+                server_label: 'synthetic-mcp',
+                arguments: '',
+                input: '',
+              },
+            ],
+          },
+        }),
+      );
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current?.phase).toBe('provisional');
+      const invalid = { type, item_id: 'tool_1', output_index: 0, ...payload };
+      peer.send(JSON.stringify(invalid));
+      const raw = await lane.receive({ signal });
+      expect(raw).toEqual(invalid);
+      preview.add(raw);
+      expect(preview.current?.phase).toBe('unavailable');
+      const final = { type: 'response.incomplete', response: { id: 'r' } };
+      peer.send(JSON.stringify(final));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toEqual({ phase: 'terminal', event: final });
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test.each([
+  ['null content', { content: null }],
+  ['missing content', {}],
+  ['non-array content', { content: { type: 'output_text', text: 'not an array' } }],
+  ['null content part', { content: [null] }],
+  ['numeric text', { content: [{ type: 'output_text', text: 123, annotations: [] }] }],
+  ['missing text', { content: [{ type: 'output_text', annotations: [] }] }],
+])('message with %s cannot invalidate a later provisional output_text read', async (_label, fields) => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane();
+    const preview = new ResponsesWebSocketAccumulator();
+    const signal = AbortSignal.timeout(3000);
+    try {
+      const initial = {
+        type: 'response.created',
+        response: { id: 'r', output_text: 'from wire', output: [{ type: 'message', id: 'm', ...fields }] },
+      };
+      peer.send(JSON.stringify(initial));
+      const received = await lane.receive({ signal });
+      expect(received).toEqual(initial);
+      preview.add(received);
+      peer.send(
+        JSON.stringify({
+          type: 'response.output_item.added',
+          output_index: 1,
+          item: { type: 'message', id: 'later', content: [] },
+        }),
+      );
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current?.phase).toBe('unavailable');
+      const terminal = { type: 'response.failed', response: { id: 'r', error: { message: 'synthetic' } } };
+      peer.send(JSON.stringify(terminal));
+      preview.add(await lane.receive({ signal }));
+      expect(preview.current).toEqual({ phase: 'terminal', event: terminal });
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test.each(['response.content_part.added', 'response.content_part.done'])(
+  'raw numeric output_text in %s never becomes an aggregate string',
+  async (type) => {
+    await withSocket(async (connection, peer) => {
+      const session = new ResponsesWebSocketSession(connection, limits);
+      const lane = session.lane();
+      const preview = new ResponsesWebSocketAccumulator();
+      const signal = AbortSignal.timeout(3000);
+      try {
+        const original = { type: 'output_text', text: 'previous', annotations: [] };
+        peer.send(
+          JSON.stringify({
+            type: 'response.created',
+            response: { id: 'r', output: [{ type: 'message', id: 'm', content: [original] }] },
+          }),
+        );
+        preview.add(await lane.receive({ signal }));
+        const before = preview.current;
+        expect(before).toMatchObject({ phase: 'provisional', snapshot: { output_text: 'previous' } });
+        const frame = {
+          type,
+          item_id: 'm',
+          output_index: 0,
+          content_index: type === 'response.content_part.added' ? 1 : 0,
+          part: { type: 'output_text', text: 123, annotations: [] },
+        };
+        peer.send(JSON.stringify(frame));
+        const received = await lane.receive({ signal });
+        expect(received).toEqual(frame);
+        preview.add(received);
+        expect(preview.current?.phase).toBe('unavailable');
+        expect(before).toMatchObject({
+          snapshot: { output_text: 'previous', output: [{ content: [original] }] },
+        });
+        const terminal = { type: 'response.completed', response: { id: 'r' } };
+        peer.send(JSON.stringify(terminal));
+        preview.add(await lane.receive({ signal }));
+        expect(preview.current).toEqual({ phase: 'terminal', event: terminal });
+      } finally {
+        session.close();
+      }
+    });
+  },
+);
+
+test.each([
+  ['output_text', 'response.output_text.delta', { delta: 1 }],
+  ['output_text', 'response.output_text.done', { text: 1 }],
+  ['output_text', 'response.output_text.done', { text: null }],
+  ['output_text', 'response.output_text.done', {}],
+  ['refusal', 'response.refusal.delta', { delta: 1 }],
+  ['refusal', 'response.refusal.done', { refusal: {} }],
+])('malformed %s %s stays raw instead of becoming message text', async (partType, type, payload) => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane();
+    const preview = new ResponsesWebSocketAccumulator();
+    const signal = AbortSignal.timeout(3000);
+    try {
+      const content =
+        partType === 'output_text'
+          ? { type: 'output_text', text: 'previous', annotations: [], logprobs: [] }
+          : { type: 'refusal', refusal: 'previous' };
+      peer.send(
+        JSON.stringify({
+          type: 'response.created',
+          response: {
+            id: 'r',
+            output: [
+              { type: 'message', id: 'm', role: 'assistant', status: 'in_progress', content: [content] },
+            ],
+          },
+        }),
+      );
+      preview.add(await lane.receive({ signal }));
+      const before = preview.current;
+      expect(before?.phase).toBe('provisional');
+      const frame = { type, item_id: 'm', output_index: 0, content_index: 0, ...payload };
+      peer.send(JSON.stringify(frame));
+      const raw = await lane.receive({ signal });
+      expect(raw).toEqual(frame);
+      preview.add(raw);
+      expect(preview.current?.phase).toBe('unavailable');
+      expect(before).toMatchObject({ snapshot: { output: [{ content: [content] }] } });
+    } finally {
+      session.close();
+    }
+  });
+});
 
 test.each([null, 123, { toString: () => 'coerced' }])(
   'rejects non-string lane ID %j',
@@ -362,6 +833,273 @@ test('routes interleaved lanes, preserves canceled waits, and detaches without c
     await expect(raw).resolves.toEqual(first);
   });
 });
+
+test('continues a generate:false warmup from its returned terminal ID on the same socket', async () => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const lane = session.lane('warmup');
+    try {
+      const warming = once(peer, 'message');
+      const warmupRequest = { model: 'test-model', input: 'Remember Tuesday.', generate: false };
+      lane.create(warmupRequest);
+      const [warmupWire] = await warming;
+      expect(JSON.parse(String(warmupWire))).toEqual({
+        type: 'response.create',
+        stream_id: 'warmup',
+        model: 'test-model',
+        input: 'Remember Tuesday.',
+        generate: false,
+      });
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'warmup',
+          response: response('server_warmup'),
+        }),
+      );
+      const warmup = await lane.finalResponse();
+      expect(warmup.output).toEqual([]);
+
+      const continuing = once(peer, 'message');
+      lane.create({ model: 'test-model', input: 'Which day?', previous_response_id: warmup.id });
+      const [continuationWire] = await continuing;
+      expect(JSON.parse(String(continuationWire))).toEqual({
+        type: 'response.create',
+        stream_id: 'warmup',
+        model: 'test-model',
+        input: 'Which day?',
+        previous_response_id: 'server_warmup',
+      });
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'warmup',
+          response: response('server_answer'),
+        }),
+      );
+      expect(await lane.finalResponse()).toMatchObject({ id: 'server_answer', status: 'completed' });
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test('forks from a completed response while the source lane continues independently', async () => {
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    const source = session.lane('source');
+    const fork = session.lane('fork');
+    try {
+      const original = once(peer, 'message');
+      source.create({ model: 'test-model', input: 'Choose a day.', store: false });
+      await original;
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'source',
+          response: response('server_parent'),
+        }),
+      );
+      const parent = await source.finalResponse();
+
+      const forking = once(peer, 'message');
+      fork.create({
+        model: 'test-model',
+        input: 'Try another answer.',
+        previous_response_id: parent.id,
+        store: false,
+      });
+      const [forkWire] = await forking;
+      expect(JSON.parse(String(forkWire))).toEqual({
+        type: 'response.create',
+        stream_id: 'fork',
+        model: 'test-model',
+        input: 'Try another answer.',
+        previous_response_id: 'server_parent',
+        store: false,
+      });
+      peer.send(
+        JSON.stringify({
+          type: 'response.created',
+          stream_id: 'fork',
+          response: response('server_fork', 'in_progress'),
+        }),
+      );
+      expect(await fork.receive()).toMatchObject({ type: 'response.created', stream_id: 'fork' });
+
+      const advancing = once(peer, 'message');
+      source.create({
+        model: 'test-model',
+        input: 'Continue.',
+        previous_response_id: parent.id,
+        store: false,
+      });
+      const [sourceWire] = await advancing;
+      expect(JSON.parse(String(sourceWire))).toEqual({
+        type: 'response.create',
+        stream_id: 'source',
+        model: 'test-model',
+        input: 'Continue.',
+        previous_response_id: 'server_parent',
+        store: false,
+      });
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'fork',
+          response: response('server_fork'),
+        }),
+      );
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'source',
+          response: response('server_source_next'),
+        }),
+      );
+      expect(await source.finalResponse()).toMatchObject({ id: 'server_source_next' });
+      expect(await fork.finalResponse()).toMatchObject({ id: 'server_fork' });
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test('sends the complete standalone compaction output on a new response chain', async () => {
+  const compaction = {
+    type: 'compaction' as const,
+    id: 'compaction_item',
+    encrypted_content: 'synthetic-opaque-compaction',
+    future_field: { preserve: [1, 'two'] },
+  };
+  const userMessage = {
+    type: 'message' as const,
+    id: 'message_retained',
+    role: 'user' as const,
+    status: 'completed' as const,
+    content: [{ type: 'input_text' as const, text: 'Remember Tuesday.' }],
+  };
+  const output: ResponseInputItem[] = [userMessage, compaction];
+  const client = new OpenAI({
+    apiKey: 'synthetic-key',
+    fetch: async () =>
+      globalThis.Response.json({
+        id: 'compaction_result',
+        created_at: 1,
+        object: 'response.compaction',
+        output,
+        usage: {
+          input_tokens: 1,
+          input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
+          output_tokens: 1,
+          output_tokens_details: { reasoning_tokens: 0 },
+          total_tokens: 2,
+        },
+      }),
+  });
+  const compacted = await client.responses.compact({ model: 'test-model', input: [userMessage] });
+  await withSocket(async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    try {
+      const lane = session.lane('compacted');
+      const beginning = once(peer, 'message');
+      lane.create({ model: 'test-model', input: toResponseInputItems(compacted.output) });
+      const [wire] = await beginning;
+      expect(JSON.parse(String(wire))).toEqual({
+        type: 'response.create',
+        stream_id: 'compacted',
+        model: 'test-model',
+        input: output,
+      });
+      peer.send(
+        JSON.stringify({
+          type: 'response.completed',
+          stream_id: 'compacted',
+          response: response('server_fresh'),
+        }),
+      );
+      expect(await lane.finalResponse()).toMatchObject({ id: 'server_fresh', status: 'completed' });
+    } finally {
+      session.close();
+    }
+  });
+});
+
+test.each([true, false])(
+  'restores on a new connection using caller-owned history: store=%s',
+  async (store) => {
+    await withSocket(async (connection, peer) => {
+      const session = new ResponsesWebSocketSession(connection, limits);
+      const initial = { type: 'message' as const, role: 'user' as const, content: 'Remember Tuesday.' };
+      try {
+        const lane = session.lane('turn');
+        const beginning = once(peer, 'message');
+        lane.create({ model: 'test-model', input: [initial], store });
+        await beginning;
+        peer.send(
+          JSON.stringify({
+            type: 'response.completed',
+            stream_id: 'turn',
+            response: {
+              ...response('server_previous'),
+              output: [
+                {
+                  type: 'message',
+                  id: 'message_answer',
+                  role: 'assistant',
+                  status: 'completed',
+                  content: [{ type: 'output_text', text: 'Tuesday.', annotations: [] }],
+                },
+              ],
+            },
+          }),
+        );
+        const previous = await lane.finalResponse();
+        session.close();
+        connection.close();
+        await withSocket(async (nextConnection, nextPeer) => {
+          const nextSession = new ResponsesWebSocketSession(nextConnection, limits);
+          try {
+            const followup = { type: 'message' as const, role: 'user' as const, content: 'Which day?' };
+            const input = store ? [followup] : toResponseInputItems([initial, ...previous.output, followup]);
+            const sending = once(nextPeer, 'message');
+            const nextLane = nextSession.lane('turn');
+            nextLane.create({
+              model: 'test-model',
+              input,
+              store,
+              ...(store ? { previous_response_id: previous.id } : {}),
+            });
+            const [wire] = await sending;
+            expect(JSON.parse(String(wire))).toEqual({
+              type: 'response.create',
+              stream_id: 'turn',
+              model: 'test-model',
+              input: store ? [followup] : [initial, ...previous.output, followup],
+              store,
+              ...(store ? { previous_response_id: 'server_previous' } : {}),
+            });
+            nextPeer.send(
+              JSON.stringify({
+                type: 'response.completed',
+                stream_id: 'turn',
+                response: response('server_restored'),
+              }),
+            );
+            expect(await nextLane.finalResponse()).toMatchObject({
+              id: 'server_restored',
+              status: 'completed',
+            });
+          } finally {
+            nextSession.close();
+          }
+        });
+      } finally {
+        session.close();
+      }
+    });
+  },
+);
 
 test('binds untyped create input to the default lane without accepting its stream_id', async () => {
   await withSocket(async (connection, peer) => {

@@ -1,7 +1,6 @@
 import { once } from 'node:events';
 import { setImmediate } from 'node:timers/promises';
-import { WebSocketServer } from 'ws';
-import type { WebSocket } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import OpenAI from 'openai';
 import { ResponsesWS } from 'openai/resources/responses/ws';
 import { ResponsesWS as BetaResponsesWS } from 'openai/resources/beta/responses/ws';
@@ -62,6 +61,84 @@ async function sendEvent(connection: SocketConnection, peer: WebSocket, event: u
 function futureEvent(streamID: string, padding = '') {
   return { type: 'response.future_event', stream_id: streamID, padding };
 }
+
+describe.each([
+  { name: 'stable', Responses: ResponsesWS },
+  { name: 'beta', Responses: BetaResponsesWS },
+])('$name helper replacement', ({ Responses }) => {
+  test.each([undefined, 'x'])('retires stream %j for the physical socket lifetime', async (streamID) => {
+    const routing = streamID === undefined ? {} : { stream_id: streamID };
+    await withSocket<ResponsesWS | BetaResponsesWS>(Responses, async (connection, peer) => {
+      // SAFETY: This tests the shared wire subset, as with the beta routing tests below.
+      const managed = connection as ResponsesWS;
+      const first = new ResponsesWebSocketSession(managed, limits);
+      const a = first.lane(streamID);
+      const sentA = once(peer, 'message');
+      a.create({ input: 'A' });
+      await sentA;
+      a.close();
+      expect(() => first.lane(streamID)).toThrow('already registered');
+      first.close();
+      expect(connection.socket.readyState).toBe(WebSocket.OPEN);
+
+      const replacement = new ResponsesWebSocketSession(managed, limits);
+      try {
+        // If unsafe reuse is allowed, capture what B actually resolves to.
+        let retired: unknown;
+        let b;
+        try {
+          b = replacement.lane(streamID);
+        } catch (error) {
+          retired = error;
+        }
+        if (b) {
+          const sentB = once(peer, 'message');
+          b.create({ input: 'B' });
+          await sentB;
+        }
+        await sendEvent(connection, peer, {
+          type: 'response.completed',
+          ...routing,
+          response: { id: 'response-A', output: [] },
+        });
+        if (b) {
+          await expect(b.finalResponse({ signal: AbortSignal.timeout(1000) })).resolves.not.toMatchObject({
+            id: 'response-A',
+          });
+        }
+        expect(retired).toMatchObject({ message: 'Responses WebSocket lane is already registered' });
+        const neighbor = replacement.lane('neighbor');
+        await sendEvent(connection, peer, {
+          type: 'response.completed',
+          stream_id: 'neighbor',
+          response: { id: 'response-neighbor', output: [] },
+        });
+        await expect(neighbor.finalResponse()).resolves.toMatchObject({ id: 'response-neighbor' });
+      } finally {
+        replacement.close();
+      }
+    });
+
+    await withSocket<ResponsesWS | BetaResponsesWS>(Responses, async (connection, peer) => {
+      // SAFETY: This test only sends and receives the shared stable/beta wire subset.
+      const fresh = new ResponsesWebSocketSession(connection as ResponsesWS, limits);
+      try {
+        const b = fresh.lane(streamID);
+        const sentB = once(peer, 'message');
+        b.create({ input: 'B' });
+        await sentB;
+        await sendEvent(connection, peer, {
+          type: 'response.completed',
+          ...routing,
+          response: { id: 'response-B', output: [] },
+        });
+        await expect(b.finalResponse()).resolves.toMatchObject({ id: 'response-B' });
+      } finally {
+        fresh.close();
+      }
+    });
+  });
+});
 
 test.each([undefined, 'original'])(
   'keeps custom event routing when Object.prototype.toJSON replaces stream_id %j',

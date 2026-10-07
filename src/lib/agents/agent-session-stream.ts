@@ -1,17 +1,19 @@
+import type { AgentOutputFormat, AgentResult } from '../beta/agents/output-format-types';
 import { TurnState } from './turn-state';
-import { APIUserAbortError, BadRequestError, OpenAIError } from '../../core/error';
+import { AgentToolDispatcher } from '../beta/agents/tool-dispatcher';
+import { agentFormatParser, parseAgentResultPromise } from '../beta/agents/parse-result';
+import { ResultCollection } from '../beta/agents/result-collection';
+import { APIUserAbortError, OpenAIError } from '../../core/error';
 import type { Stream } from '../../core/streaming';
 import { buildHeaders } from '../../internal/headers';
 import type { RequestOptions } from '../../internal/request-options';
 import { uuid4 } from '../../internal/utils/uuid';
-import { hasOwn, isObj } from '../../internal/utils/values';
+import type { AgentToolError } from '../beta/agents/tool-error';
 import type {
-  AgentFunctionCallItem,
   AgentFunctionCallOutputParam,
   AgentSessionEvent,
   AgentSessionInputMessageParam,
   AgentSessionInputParam,
-  InputContentParam,
 } from '../../resources/beta/agents/agents';
 import type { Sessions } from '../../resources/beta/agents/sessions/sessions';
 
@@ -23,59 +25,22 @@ export type AgentToolHandler = (
 ) => AgentToolOutput | PromiseLike<AgentToolOutput>;
 
 /** Input and optional sequential tool handlers for one turn on an idle session. */
-export interface AgentSessionStreamParams {
+export type AgentSessionStreamParams<T = never> = {
+  /** Beta: parse this turn locally; does not change the existing session schema. */
+  outputFormat?: AgentOutputFormat<T>;
   /** User messages, or text normalized to a single user message. Must not be empty. */
   input: string | AgentSessionInputMessageParam[];
   /** Registered functions run after their call event is yielded; unknown functions remain manual. */
   toolHandlers?: Record<string, AgentToolHandler>;
+  /**
+   * Beta: use alongside `toolHandlers` to log or monitor local argument validation,
+   * handler execution, and output serialization failures. Does not observe API or
+   * transport errors. Observer errors are ignored; model-visible errors remain sanitized.
+   */
+  onToolError?: (failure: AgentToolError) => void | PromiseLike<void>;
   /** Key for the input submission only; request headers take precedence, case-insensitively. */
   idempotencyKey?: string;
-}
-
-type ToolResult = AgentSessionInputParam.SessionInputParamAgentSessionInputToolResult;
-
-function isInputContent(value: unknown): value is InputContentParam {
-  if (!isObj(value)) {
-    return false;
-  }
-  const content = value;
-  let field: string;
-  if (content['type'] === 'input_text') {
-    field = 'text';
-  } else if (content['type'] === 'input_image') {
-    field = 'image_url';
-  } else {
-    return false;
-  }
-  return hasOwn(content, 'type') && hasOwn(content, field) && typeof content[field] === 'string';
-}
-
-function normalizedOutput(value: unknown): AgentFunctionCallOutputParam | null {
-  if (value === null) {
-    return null;
-  }
-  if (typeof value === 'string' || (Array.isArray(value) && value.every(isInputContent))) {
-    return value;
-  }
-  throw new OpenAIError('Tool output must be text, content, a JSON object, or null');
-}
-
-// oxlint-disable-next-line anti-slop/no-object-parameters -- The public AgentToolOutput contract accepts arbitrary JSON-serializable object results.
-function toolResult(call: AgentFunctionCallItem, value: AgentToolOutput): ToolResult {
-  const output = isObj(value) ? JSON.stringify(value) : value;
-  // Detect unserializable callback results inside the redacted failure boundary.
-  const serialized = JSON.stringify(output);
-  if (serialized === undefined) {
-    throw new OpenAIError('Tool output must be JSON serializable');
-  }
-  return {
-    type: 'agent.session.input.tool_result',
-    turn_id: call.turn_id,
-    call_id: call.call_id,
-    success: true,
-    output: normalizedOutput(typeof output === 'string' ? output : JSON.parse(serialized)),
-  };
-}
+} & ([T] extends [never] ? unknown : { outputFormat: AgentOutputFormat<T> });
 
 async function cancelBody(response: Response | undefined): Promise<void> {
   try {
@@ -98,17 +63,20 @@ async function cancelBody(response: Response | undefined): Promise<void> {
  * idempotency key. Breaking iteration or calling abort closes local requests;
  * neither cancels the backend turn. No work starts until iteration begins.
  */
-export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
+export class AgentSessionStream<T = never> implements AsyncIterable<AgentSessionEvent> {
   /** Aborts local requests and iteration without cancelling the backend turn. */
   readonly controller = new AbortController();
   #consumed = false;
+  #format: AgentOutputFormat<T> | undefined;
+  #parsedResult: Promise<AgentResult<T>> | undefined;
+  #collection: ResultCollection;
   #stream: Stream<AgentSessionEvent> | undefined;
   #response: Response | undefined;
   #reading = false;
   #sessions: Sessions;
   #sessionID: string;
   #input: AgentSessionInputParam.SessionInputParamAgentSessionInputMessage;
-  #handlers: Map<string, AgentToolHandler>;
+  #dispatcher: AgentToolDispatcher;
   #inputKey: string | undefined;
   #options: RequestOptions;
 
@@ -116,7 +84,7 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
   constructor(
     sessions: Sessions,
     sessionID: string,
-    params: AgentSessionStreamParams,
+    params: AgentSessionStreamParams<T>,
     options?: RequestOptions,
   ) {
     const input: AgentSessionInputMessageParam[] =
@@ -126,10 +94,13 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
     if (params.input.length === 0) {
       throw new OpenAIError('input must not be empty');
     }
+    this.#format = agentFormatParser<T>(params.outputFormat);
+    if (params.outputFormat && !this.#format) {
+      throw new OpenAIError('outputFormat must have its own parser function');
+    }
     this.#sessions = sessions;
     this.#sessionID = sessionID;
     this.#input = { type: 'agent.session.input.message', input };
-    this.#handlers = new Map(Object.entries(params.toolHandlers ?? {}));
     const headers = buildHeaders([options?.headers]);
     this.#inputKey = headers.nulls.has('idempotency-key')
       ? undefined
@@ -141,6 +112,18 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
     headers.nulls.delete('idempotency-key');
     const { idempotencyKey: _key, ...rest } = options ?? {};
     this.#options = { ...rest, headers };
+    this.#dispatcher = new AgentToolDispatcher(
+      sessions,
+      params.toolHandlers ?? {},
+      this.controller,
+      this.#options,
+      params.onToolError,
+    );
+    this.#collection = new ResultCollection(
+      () => this.#iterate(),
+      (name) => this.#dispatcher.canHandle(name),
+      sessionID,
+    );
   }
 
   /** Closes local requests without cancelling the turn; an optional reason becomes the abort error's cause. */
@@ -158,7 +141,18 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
       throw new OpenAIError('An AgentSessionStream can only be consumed once');
     }
     this.#consumed = true;
-    return this.#iterate();
+    return this.#collection.iterate();
+  }
+
+  /** Beta: opt into retaining completed final messages before iterating progress events. */
+  withResultCollection(): this {
+    this.#collection.enable();
+    return this;
+  }
+
+  /** Beta: drain this turn, dispatch registered tools, and collect its final assistant messages. */
+  finalResult(): Promise<AgentResult<T>> {
+    return (this.#parsedResult ??= parseAgentResultPromise(this.#collection.finalResult(), this.#format));
   }
 
   async *#iterate(): AsyncGenerator<AgentSessionEvent> {
@@ -204,10 +198,7 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
           continue;
         }
         const terminal = state.terminal(event);
-        const pendingCall = state.call(event);
-        const handler = pendingCall && this.#handlers.get(pendingCall.name);
-        // Freeze dispatch identity and arguments before exposing the original event.
-        const call = pendingCall && handler ? structuredClone(pendingCall) : undefined;
+        const dispatch = this.#dispatcher.prepare(state.call(event), this.#sessionID);
         if (terminal) {
           this.#stream.controller.abort();
         }
@@ -216,12 +207,7 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
           return;
         }
         this.#checkAbort();
-        if (!call || !handler) {
-          continue;
-        }
-        const result = await this.#result(call, handler);
-        this.#checkAbort();
-        await this.#submit(result, options);
+        await dispatch?.();
       }
       this.#checkAbort();
       throw new OpenAIError('Session event stream ended before the turn reached idle or failed');
@@ -229,26 +215,6 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
       externalSignal?.removeEventListener('abort', abort);
       this.controller.signal.removeEventListener('abort', abort);
       this.abort();
-    }
-  }
-
-  async #result(call: AgentFunctionCallItem, handler: AgentToolHandler): Promise<ToolResult> {
-    try {
-      const args: unknown = typeof call.arguments === 'string' ? JSON.parse(call.arguments) : call.arguments;
-      if (!isObj(args)) {
-        throw new OpenAIError('Function arguments must be a JSON object');
-      }
-      // SAFETY: Arguments were parsed as JSON and checked to be a non-null non-array object before invoking the handler.
-      return toolResult(call, await this.#wait(() => handler(args as Record<string, unknown>)));
-    } catch {
-      this.#checkAbort();
-      return {
-        type: 'agent.session.input.tool_result',
-        turn_id: call.turn_id,
-        call_id: call.call_id,
-        success: false,
-        error: 'Tool handler failed.',
-      };
     }
   }
 
@@ -266,63 +232,5 @@ export class AgentSessionStream implements AsyncIterable<AgentSessionEvent> {
       configurable: true,
     });
     return error;
-  }
-
-  async #wait<T>(action: () => T | PromiseLike<T>): Promise<T> {
-    let onAbort: (() => void) | undefined;
-    // oxlint-disable-next-line promise/avoid-new -- Bridge the caller's AbortSignal while a handler or registration delay is pending.
-    const aborted = new Promise<never>((_resolve, reject) => {
-      onAbort = () => reject(this.#abortError());
-      this.controller.signal.addEventListener('abort', onAbort, { once: true });
-    });
-    try {
-      this.#checkAbort();
-      // Capture synchronous throws before racing cancellation, so both promises
-      // always have rejection handlers even if the callback aborts and throws.
-      const invoke = async () => await action();
-      return await Promise.race([invoke(), aborted]);
-    } finally {
-      if (onAbort) {
-        this.controller.signal.removeEventListener('abort', onAbort);
-      }
-    }
-  }
-
-  async #submit(result: ToolResult, options: RequestOptions, key = uuid4(), attempt = 0): Promise<void> {
-    this.#checkAbort();
-    try {
-      await this.#sessions.events.create(
-        this.#sessionID,
-        { events: [result], 'Idempotency-Key': key },
-        options,
-      );
-    } catch (error) {
-      const delay = [100, 300, 600][attempt];
-      if (
-        delay === undefined ||
-        !(error instanceof BadRequestError) ||
-        error.code !== 'invalid_request_error' ||
-        !error.error ||
-        !('message' in error.error) ||
-        error.error.message !== `Unknown pending tool call: ${result.call_id}`
-      ) {
-        throw error;
-      }
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        await this.#wait(
-          () =>
-            // oxlint-disable-next-line promise/avoid-new -- Own the registration timer so cancellation clears it promptly.
-            new Promise<void>((resolve) => {
-              timer = setTimeout(resolve, delay);
-            }),
-        );
-      } finally {
-        if (timer !== undefined) {
-          clearTimeout(timer);
-        }
-      }
-      await this.#submit(result, options, key, attempt + 1);
-    }
   }
 }

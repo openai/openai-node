@@ -117,6 +117,7 @@ test.each(cases)('structured-output tool example: $name', async ({ output, succe
       const responseBody: Omit<Response, 'output_text'> = {
         id: 'resp_synthetic',
         object: 'response',
+        access_programs: null,
         created_at: 0,
         ...(status === undefined ? {} : { status }),
         error: status === 'failed' ? { code: 'server_error', message: 'Synthetic response failure' } : null,

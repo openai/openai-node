@@ -1,7 +1,8 @@
 import type { Response, ResponseOutputText, ResponseStreamEvent } from '../../resources/responses/responses';
-import type { ResponseAccumulatorContext } from './canonical-output-text';
+import type { ResponseAccumulatorContext, ResponseOutputSnapshot } from './canonical-output-text';
 import { OpenAIError } from '../../error';
 import { hasOwn } from '../utils';
+import { isObj } from '../utils/values';
 import {
   cloneResponse,
   createCanonicalResponseContext,
@@ -139,7 +140,7 @@ type ResponseIgnoredEvent = Extract<
 >;
 
 interface ResponseOutputIdentityIndex {
-  snapshot: Response;
+  snapshot: ResponseOutputSnapshot;
   output: Response['output'];
   length: number;
   identities: Set<string>;
@@ -175,7 +176,7 @@ function validateArrayAppend(
   validateArrayIndex(collection, index, kind, true);
 }
 
-function getOutput(snapshot: Response, outputIndex: number): Response['output'][number] {
+function getOutput(snapshot: ResponseOutputSnapshot, outputIndex: number): Response['output'][number] {
   validateArrayIndex(snapshot.output, outputIndex, 'output');
   const output = snapshot.output[outputIndex];
   if (!output) {
@@ -243,7 +244,7 @@ function addOutputItemIdentities(identities: Set<string>, keys: readonly string[
   }
 }
 
-function createResponseOutputIdentityIndex(snapshot: Response): ResponseOutputIdentityIndex {
+function createResponseOutputIdentityIndex(snapshot: ResponseOutputSnapshot): ResponseOutputIdentityIndex {
   const identityIndex: ResponseOutputIdentityIndex = {
     snapshot,
     output: snapshot.output,
@@ -261,7 +262,7 @@ function createResponseOutputIdentityIndex(snapshot: Response): ResponseOutputId
 
 function getResponseOutputIdentityIndex(
   context: ResponseAccumulatorContext,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): ResponseOutputIdentityIndex {
   const cached = responseOutputIdentityIndexes.get(context);
   if (
@@ -278,7 +279,10 @@ function getResponseOutputIdentityIndex(
   return identityIndex;
 }
 
-function cloneValidatedResponse(context: ResponseAccumulatorContext, response: Response): Response {
+export function cloneValidatedResponse<T extends ResponseOutputSnapshot>(
+  context: ResponseAccumulatorContext,
+  response: T,
+): T {
   const nextContext = createCanonicalResponseContext();
   const snapshot = cloneResponse(nextContext, response);
   const identityIndex = createResponseOutputIdentityIndex(snapshot);
@@ -348,7 +352,7 @@ function getExpectedOutputItemType(event: ResponseItemScopedEvent): Response['ou
 
 function validateCompletedOutputItemIdentity(
   event: Extract<ResponseOutputItemEvent, { type: 'response.output_item.done' }>,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): void {
   const output = getOutput(snapshot, event.output_index);
   const replacement = event.item;
@@ -376,7 +380,7 @@ function validateCompletedOutputItemIdentity(
 
 function validateOutputItemIdentity(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   rejectInvalidShellTargets: boolean,
 ): void {
   if (event.type === 'response.output_item.done') {
@@ -434,7 +438,7 @@ function getContent<T>(content: T[], contentIndex: number): T {
 }
 
 function getShellOutputContent(
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   output: Extract<Response['output'][number], { type: 'shell_call_output' }>,
   commandIndex: number,
 ): (typeof output.output)[number] {
@@ -616,7 +620,7 @@ function sanitizeResponseEvent(
 
 function accumulateOutputItemEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   context: ResponseAccumulatorContext,
 ): event is ResponseOutputItemEvent {
   switch (event.type) {
@@ -637,7 +641,11 @@ function accumulateOutputItemEvent(
         context.outputTextIndex.append(text.length);
       }
       if (text) {
-        snapshot.output_text += text;
+        if (context.deferOutputText) {
+          context.outputTextDirty = true;
+        } else {
+          snapshot.output_text += text;
+        }
       }
       return true;
     }
@@ -664,7 +672,7 @@ function accumulateOutputItemEvent(
 
 function accumulateContentPartAddedEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   context: ResponseAccumulatorContext,
 ): event is ResponseContentPartAddedEvent {
   switch (event.type) {
@@ -701,7 +709,7 @@ function accumulateContentPartAddedEvent(
 
 function accumulateContentPartDoneEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   context: ResponseAccumulatorContext,
 ): event is ResponseContentPartDoneEvent {
   switch (event.type) {
@@ -735,9 +743,57 @@ function accumulateContentPartDoneEvent(
   }
 }
 
+// Streamed logprobs have a looser type than final output: bytes and even the
+// top token fields may be missing. Do not fabricate them in typed SSE snapshots.
+function isLogprobWithBytes(value: unknown): value is ResponseOutputText.Logprob.TopLogprob {
+  return (
+    isObj(value) &&
+    typeof value['token'] === 'string' &&
+    typeof value['logprob'] === 'number' &&
+    Array.isArray(value['bytes']) &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- This boundary checks each byte against the generated final-output contract before exposing a typed SSE snapshot.
+    value['bytes'].every((byte) => typeof byte === 'number')
+  );
+}
+
+function isOutputLogprobs(value: unknown): value is ResponseOutputText.Logprob[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry) =>
+        isLogprobWithBytes(entry) &&
+        'top_logprobs' in entry &&
+        Array.isArray(entry.top_logprobs) &&
+        entry.top_logprobs.every(isLogprobWithBytes),
+    )
+  );
+}
+
+function accumulateOutputLogprobs(
+  content: ResponseOutputText,
+  event: Extract<ResponseOutputTextEvent, { logprobs: unknown }>,
+): void {
+  const logprobs = structuredClone(event.logprobs);
+  if (!isOutputLogprobs(logprobs)) {
+    return;
+  }
+  if (event.type === 'response.output_text.done') {
+    if (logprobs.length > 0 || (Array.isArray(content.logprobs) && content.logprobs.length > 0)) {
+      content.logprobs = logprobs;
+    }
+  } else if (logprobs.length > 0) {
+    if (!Array.isArray(content.logprobs)) {
+      content.logprobs = [];
+    }
+    for (const logprob of logprobs) {
+      content.logprobs.push(logprob);
+    }
+  }
+}
+
 function accumulateOutputTextEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   context: ResponseAccumulatorContext,
 ): event is ResponseOutputTextEvent {
   switch (event.type) {
@@ -748,6 +804,7 @@ function accumulateOutputTextEvent(
         if (content.type !== 'output_text') {
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
+        accumulateOutputLogprobs(content, event);
         const previousText = content.text;
         ensureCanonicalOutputText(context, snapshot);
         content.text = previousText + event.delta;
@@ -756,7 +813,13 @@ function accumulateOutputTextEvent(
           event.output_index === snapshot.output.length - 1 &&
           event.content_index === output.content.length - 1
         ) {
-          snapshot.output_text += event.delta;
+          if (context.deferOutputText) {
+            if (event.delta !== '') {
+              context.outputTextDirty = true;
+            }
+          } else {
+            snapshot.output_text += event.delta;
+          }
         } else {
           updateOutputText(
             context,
@@ -777,6 +840,7 @@ function accumulateOutputTextEvent(
         if (content.type !== 'output_text') {
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
+        accumulateOutputLogprobs(content, event);
         const previousText = content.text;
         ensureCanonicalOutputText(context, snapshot);
         content.text = event.text;
@@ -815,7 +879,7 @@ function accumulateOutputTextEvent(
 
 function accumulateRefusalAndArgumentsEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): event is ResponseRefusalAndArgumentsEvent {
   switch (event.type) {
     case 'response.refusal.delta': {
@@ -890,7 +954,7 @@ function accumulateRefusalAndArgumentsEvent(
 
 function accumulateShellEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): event is ResponseShellEvent {
   switch (event.type) {
     case 'response.shell_call_command.added':
@@ -937,7 +1001,7 @@ function accumulateShellEvent(
 
 function accumulateReasoningEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): event is ResponseReasoningEvent {
   switch (event.type) {
     case 'response.reasoning_text.delta': {
@@ -1008,7 +1072,7 @@ function accumulateReasoningEvent(
 
 function accumulateCodeInterpreterEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): event is ResponseCodeInterpreterEvent {
   switch (event.type) {
     case 'response.code_interpreter_call_code.delta': {
@@ -1054,7 +1118,7 @@ function accumulateCodeInterpreterEvent(
 
 function accumulateSearchStatusEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): event is ResponseSearchStatusEvent {
   switch (event.type) {
     case 'response.file_search_call.in_progress': {
@@ -1107,7 +1171,7 @@ function accumulateSearchStatusEvent(
 
 function accumulateImageAndMcpStatusEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): event is ResponseImageAndMcpStatusEvent {
   switch (event.type) {
     case 'response.image_generation_call.in_progress': {
@@ -1158,7 +1222,7 @@ function accumulateImageAndMcpStatusEvent(
   }
 }
 
-function isResponseLifecycleEvent(event: ResponseAccumulatorEvent): event is ResponseLifecycleEvent {
+function isResponseLifecycleEvent(event: { type: string }): event is ResponseLifecycleEvent {
   switch (event.type) {
     case 'response.created':
     case 'response.queued':
@@ -1174,7 +1238,7 @@ function isResponseLifecycleEvent(event: ResponseAccumulatorEvent): event is Res
   }
 }
 
-function isIgnoredResponseEvent(event: ResponseAccumulatorEvent): event is ResponseIgnoredEvent {
+function isIgnoredResponseEvent(event: { type: string }): event is ResponseIgnoredEvent {
   switch (event.type) {
     case 'response.audio.delta':
     case 'response.audio.done':
@@ -1199,6 +1263,74 @@ export function createResponseContext(): ResponseAccumulatorContext {
   return createCanonicalResponseContext();
 }
 
+type ResponseOutputEvent = Exclude<ResponseAccumulatorEvent, ResponseLifecycleEvent>;
+
+function accumulateResponseOutput(
+  dispatchEvent: ResponseAccumulatorEvent,
+  snapshot: ResponseOutputSnapshot,
+  context: ResponseAccumulatorContext,
+  rejectInvalidShellTargets: boolean,
+): dispatchEvent is ResponseOutputEvent {
+  validateOutputItemIdentity(dispatchEvent, snapshot, rejectInvalidShellTargets);
+  if (accumulateOutputItemEvent(dispatchEvent, snapshot, context)) {
+    return true;
+  }
+  if (accumulateContentPartAddedEvent(dispatchEvent, snapshot, context)) {
+    return true;
+  }
+  if (accumulateContentPartDoneEvent(dispatchEvent, snapshot, context)) {
+    return true;
+  }
+  if (accumulateOutputTextEvent(dispatchEvent, snapshot, context)) {
+    return true;
+  }
+  if (accumulateRefusalAndArgumentsEvent(dispatchEvent, snapshot)) {
+    return true;
+  }
+  if (accumulateShellEvent(dispatchEvent, snapshot)) {
+    return true;
+  }
+  if (accumulateReasoningEvent(dispatchEvent, snapshot)) {
+    return true;
+  }
+  if (accumulateCodeInterpreterEvent(dispatchEvent, snapshot)) {
+    return true;
+  }
+  if (accumulateSearchStatusEvent(dispatchEvent, snapshot)) {
+    return true;
+  }
+  if (accumulateImageAndMcpStatusEvent(dispatchEvent, snapshot)) {
+    return true;
+  }
+
+  if (isIgnoredResponseEvent(dispatchEvent)) {
+    return true;
+  }
+  return false;
+}
+
+/** Matches shared events that can change output. Validation still occurs before mutation. */
+export function isResponseOutputEvent(event: { type: string }): event is ResponseOutputEvent {
+  // SAFETY: Membership of the existing SSE tag set is checked before using shared output validators.
+  return (
+    supportedResponseEventTypes.has(event.type as ResponseAccumulatorEvent['type']) &&
+    !isResponseLifecycleEvent(event) &&
+    !isIgnoredResponseEvent(event)
+  );
+}
+
+/** Applies the same strict output validation and mutations without requiring response metadata. */
+export function accumulateWebSocketOutput(
+  event: ResponseOutputEvent,
+  snapshot: ResponseOutputSnapshot,
+  context: ResponseAccumulatorContext,
+): void {
+  const dispatchEvent = sanitizeResponseEvent(event);
+  if (!accumulateResponseOutput(dispatchEvent, snapshot, context, true)) {
+    throw new OpenAIError('Unsupported WebSocket output event');
+  }
+}
+
 export function accumulateResponseWithContext(
   event: ResponseAccumulatorEvent,
   snapshot: Response | undefined,
@@ -1220,44 +1352,11 @@ export function accumulateResponseWithContext(
     return cloneValidatedResponse(context, dispatchEvent.response);
   }
 
-  validateOutputItemIdentity(dispatchEvent, snapshot, rejectInvalidShellTargets);
-
-  if (accumulateOutputItemEvent(dispatchEvent, snapshot, context)) {
+  if (accumulateResponseOutput(dispatchEvent, snapshot, context, rejectInvalidShellTargets)) {
     return snapshot;
   }
-  if (accumulateContentPartAddedEvent(dispatchEvent, snapshot, context)) {
-    return snapshot;
-  }
-  if (accumulateContentPartDoneEvent(dispatchEvent, snapshot, context)) {
-    return snapshot;
-  }
-  if (accumulateOutputTextEvent(dispatchEvent, snapshot, context)) {
-    return snapshot;
-  }
-  if (accumulateRefusalAndArgumentsEvent(dispatchEvent, snapshot)) {
-    return snapshot;
-  }
-  if (accumulateShellEvent(dispatchEvent, snapshot)) {
-    return snapshot;
-  }
-  if (accumulateReasoningEvent(dispatchEvent, snapshot)) {
-    return snapshot;
-  }
-  if (accumulateCodeInterpreterEvent(dispatchEvent, snapshot)) {
-    return snapshot;
-  }
-  if (accumulateSearchStatusEvent(dispatchEvent, snapshot)) {
-    return snapshot;
-  }
-  if (accumulateImageAndMcpStatusEvent(dispatchEvent, snapshot)) {
-    return snapshot;
-  }
-
   if (isResponseLifecycleEvent(dispatchEvent)) {
     return cloneValidatedResponse(context, dispatchEvent.response);
-  }
-  if (isIgnoredResponseEvent(dispatchEvent)) {
-    return snapshot;
   }
   return assertNever(dispatchEvent);
 }

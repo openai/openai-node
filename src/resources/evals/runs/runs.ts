@@ -300,7 +300,7 @@ export class Runs extends APIResource {
   cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<RunCancelResponse> {
     const { eval_id } = params;
     return this._client.post(
-      path`/evals/${eval_id}/runs/${runID}`,
+      path`/evals/${eval_id}/runs/${runID}/cancel`,
       resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
     );
   }

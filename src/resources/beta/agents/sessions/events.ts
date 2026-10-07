@@ -17,11 +17,12 @@ function resolveResourceRequestOptions(
 
 export class Events extends APIResource {
   /**
-   * Submits message, cancellation, or tool-result events to a managed agent session.
-   * Cancellation can recover a still-open turn whose backend execution has ended by
-   * marking it cancelled and abandoning unpublished outputs. Saved results,
-   * published files, and existing terminal outcomes are preserved. HTTP 202 confirms
-   * acceptance, not durable completion. See
+   * Submits message, cancellation, tool-result, or computer-use approval-response
+   * events to a managed agent session. Cancellation can recover a still-open turn
+   * whose backend execution has ended by marking it cancelled and abandoning
+   * unpublished outputs. Saved results, published files, and existing terminal
+   * outcomes are preserved. HTTP 202 confirms acceptance, not durable completion.
+   * See
    * [session events](https://developers.openai.com/api/docs/guides/agents-api/sessions/events).
    *
    * @example
@@ -31,13 +32,16 @@ export class Events extends APIResource {
    *   {
    *     events: [
    *       {
-   *         input: [
-   *           {
-   *             content: [{ text: 'text', type: 'input_text' }],
-   *             role: 'user',
-   *           },
-   *         ],
-   *         type: 'agent.session.input.message',
+   *         request_id: 'request_id',
+   *         response: {
+   *           action: 'submit',
+   *           fields: [
+   *             { field_id: 'field_id', value: 'value' },
+   *           ],
+   *           type: 'browser_authentication',
+   *         },
+   *         type:
+   *           'agent.session.input.computer_use_approval_request_result',
    *       },
    *     ],
    *   },

@@ -567,6 +567,12 @@ export interface VideoCreateError {
    */
   message: string;
 
+  /**
+   * The Retry-After and Retry-After-Ms headers returned with the original error, if
+   * any.
+   */
+  headers?: { [key: string]: string };
+
   misalignment?: VideoCreateError.Misalignment;
 }
 
@@ -586,6 +592,12 @@ export namespace VideoCreateError {
       | 'potentially_unintended_data_access'
       | 'potentially_unintended_destructive_activity'
       | 'other';
+
+    /**
+     * An opaque target for explicitly continuing this review, or null when
+     * unavailable.
+     */
+    review_target?: string | null;
 
     /**
      * An optional public continuation instruction.

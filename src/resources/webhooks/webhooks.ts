@@ -455,6 +455,252 @@ export class Webhooks extends APIResource {
 export type WebhookEndpointsPage = CursorPage<WebhookEndpoint>;
 
 /**
+ * Sent when an agent session requires an action. Retrieve the session for action
+ * details.
+ */
+export interface AgentSessionActionRequiredWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  data: AgentSessionActionRequiredWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.session.action_required`.
+   */
+  type: 'agent.session.action_required';
+}
+
+export namespace AgentSessionActionRequiredWebhookEvent {
+  export interface Data {
+    /**
+     * The ID of the session.
+     */
+    id: string;
+
+    /**
+     * The action type. Retrieve the session for action details.
+     */
+    required_action: Data.RequiredAction;
+  }
+
+  export namespace Data {
+    /**
+     * The action type. Retrieve the session for action details.
+     */
+    export interface RequiredAction {
+      type: 'computer_use_approval_request' | 'function_call' | 'environment_connection';
+    }
+  }
+}
+
+/**
+ * Sent when an agent session is created.
+ */
+export interface AgentSessionCreatedWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  data: AgentSessionCreatedWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.session.created`.
+   */
+  type: 'agent.session.created';
+}
+
+export namespace AgentSessionCreatedWebhookEvent {
+  export interface Data {
+    /**
+     * The ID of the session.
+     */
+    id: string;
+
+    /**
+     * The environment type: `none`, `openai_hosted`, or `self_hosted`.
+     */
+    environment_type: string;
+
+    connect?: Data.Connect;
+
+    /**
+     * The ID of the environment, when one exists.
+     */
+    environment_id?: string;
+  }
+
+  export namespace Data {
+    export interface Connect {
+      /**
+       * The URL used to connect the self-hosted environment.
+       */
+      remote_url: string;
+    }
+  }
+}
+
+/**
+ * Sent when an agent session fails.
+ */
+export interface AgentSessionFailedWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  data: AgentSessionFailedWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.session.failed`.
+   */
+  type: 'agent.session.failed';
+}
+
+export namespace AgentSessionFailedWebhookEvent {
+  export interface Data {
+    /**
+     * The ID of the session.
+     */
+    id: string;
+
+    /**
+     * The environment type: `none`, `openai_hosted`, or `self_hosted`.
+     */
+    environment_type: string;
+
+    /**
+     * The ID of the environment, when one exists.
+     */
+    environment_id?: string;
+  }
+}
+
+/**
+ * Sent when an agent session becomes idle.
+ */
+export interface AgentSessionIdleWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  data: AgentSessionIdleWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.session.idle`.
+   */
+  type: 'agent.session.idle';
+}
+
+export namespace AgentSessionIdleWebhookEvent {
+  export interface Data {
+    /**
+     * The ID of the session.
+     */
+    id: string;
+
+    /**
+     * The environment type: `none`, `openai_hosted`, or `self_hosted`.
+     */
+    environment_type: string;
+
+    /**
+     * The ID of the environment, when one exists.
+     */
+    environment_id?: string;
+  }
+}
+
+/**
+ * Sent when an agent session enters the in-progress state.
+ */
+export interface AgentSessionInProgressWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  data: AgentSessionInProgressWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.session.in_progress`.
+   */
+  type: 'agent.session.in_progress';
+}
+
+export namespace AgentSessionInProgressWebhookEvent {
+  export interface Data {
+    /**
+     * The ID of the session.
+     */
+    id: string;
+
+    /**
+     * The environment type: `none`, `openai_hosted`, or `self_hosted`.
+     */
+    environment_type: string;
+
+    /**
+     * The ID of the environment, when one exists.
+     */
+    environment_id?: string;
+  }
+}
+
+/**
  * Sent when a batch API request has been cancelled.
  */
 export interface BatchCancelledWebhookEvent {
@@ -1444,9 +1690,15 @@ export namespace SafetyWarningIssuedWebhookEvent {
 }
 
 /**
- * Sent when a batch API request has been cancelled.
+ * Sent when an agent session requires an action. Retrieve the session for action
+ * details.
  */
 export type UnwrapWebhookEvent =
+  | AgentSessionActionRequiredWebhookEvent
+  | AgentSessionCreatedWebhookEvent
+  | AgentSessionFailedWebhookEvent
+  | AgentSessionIdleWebhookEvent
+  | AgentSessionInProgressWebhookEvent
   | BatchCancelledWebhookEvent
   | BatchCompletedWebhookEvent
   | BatchExpiredWebhookEvent
@@ -1650,6 +1902,11 @@ export interface WebhookCreateParams {
     | 'realtime.call.incoming'
     | 'video.completed'
     | 'video.failed'
+    | 'agent.session.created'
+    | 'agent.session.action_required'
+    | 'agent.session.in_progress'
+    | 'agent.session.idle'
+    | 'agent.session.failed'
     | 'safety.alert.created'
   >;
 
@@ -1686,6 +1943,11 @@ export interface WebhookUpdateParams {
     | 'realtime.call.incoming'
     | 'video.completed'
     | 'video.failed'
+    | 'agent.session.created'
+    | 'agent.session.action_required'
+    | 'agent.session.in_progress'
+    | 'agent.session.idle'
+    | 'agent.session.failed'
     | 'safety.alert.created'
   >;
 
@@ -1737,6 +1999,11 @@ export interface WebhookTestParams {
     | 'realtime.call.incoming'
     | 'video.completed'
     | 'video.failed'
+    | 'agent.session.created'
+    | 'agent.session.action_required'
+    | 'agent.session.in_progress'
+    | 'agent.session.idle'
+    | 'agent.session.failed'
     | 'safety.alert.created';
 }
 
@@ -1744,6 +2011,11 @@ Webhooks.EventTypes = EventTypes;
 
 export declare namespace Webhooks {
   export {
+    type AgentSessionActionRequiredWebhookEvent as AgentSessionActionRequiredWebhookEvent,
+    type AgentSessionCreatedWebhookEvent as AgentSessionCreatedWebhookEvent,
+    type AgentSessionFailedWebhookEvent as AgentSessionFailedWebhookEvent,
+    type AgentSessionIdleWebhookEvent as AgentSessionIdleWebhookEvent,
+    type AgentSessionInProgressWebhookEvent as AgentSessionInProgressWebhookEvent,
     type BatchCancelledWebhookEvent as BatchCancelledWebhookEvent,
     type BatchCompletedWebhookEvent as BatchCompletedWebhookEvent,
     type BatchExpiredWebhookEvent as BatchExpiredWebhookEvent,

@@ -16,10 +16,13 @@ import {
   RealtimeTranscriptionSessionTurnDetection,
 } from './client-secrets';
 import * as ResponsesAPI from '../responses/responses';
+import * as TranslationsAPI from './translations/translations';
+import { Translations } from './translations/translations';
 
 export class Realtime extends APIResource {
   clientSecrets: ClientSecretsAPI.ClientSecrets = new ClientSecretsAPI.ClientSecrets(this._client);
   calls: CallsAPI.Calls = new CallsAPI.Calls(this._client);
+  translations: TranslationsAPI.Translations = new TranslationsAPI.Translations(this._client);
 }
 
 export interface AudioTranscription {
@@ -1299,8 +1302,9 @@ export interface RealtimeAudioConfigOutput {
    * `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`, and
    * `cedar`. You may also provide a custom voice object with an `id`, for example
    * `{ "id": "voice_1234" }`. Voice cannot be changed during the session once the
-   * model has responded with audio at least once. We recommend `marin` and `cedar`
-   * for best quality.
+   * model has responded with audio at least once. Custom voices must be created from
+   * audio samples. Voices created from text prompts are supported only in Live. We
+   * recommend `marin` and `cedar` for best quality.
    */
   voice?:
     | string
@@ -2199,8 +2203,9 @@ export namespace RealtimeResponseCreateAudioOutput {
      * `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`, and
      * `cedar`. You may also provide a custom voice object with an `id`, for example
      * `{ "id": "voice_1234" }`. Voice cannot be changed during the session once the
-     * model has responded with audio at least once. We recommend `marin` and `cedar`
-     * for best quality.
+     * model has responded with audio at least once. Custom voices must be created from
+     * audio samples. Voices created from text prompts are supported only in Live. We
+     * recommend `marin` and `cedar` for best quality.
      */
     voice?:
       | string
@@ -5170,6 +5175,16 @@ export interface SessionCreatedEvent {
  * fields that are present in the `session.update` are updated. To clear a field
  * like `instructions`, pass an empty string. To clear a field like `tools`, pass
  * an empty array. To clear a field like `turn_detection`, pass `null`.
+ *
+ * To turn off input audio noise reduction, send this Realtime event:
+ *
+ * ```json
+ * {"type":"session.update","session":{"type":"realtime","audio":{"input":{"noise_reduction":null}}}}
+ * ```
+ *
+ * For a transcription session, use `"type":"transcription"` inside `session`.
+ * Omitting `audio.input.noise_reduction` from an update leaves its current setting
+ * unchanged.
  */
 export interface SessionUpdateEvent {
   /**
@@ -5444,6 +5459,7 @@ export namespace TranscriptionSessionUpdatedEvent {
 
 Realtime.ClientSecrets = ClientSecrets;
 Realtime.Calls = Calls;
+Realtime.Translations = Translations;
 
 export declare namespace Realtime {
   export {
@@ -5584,4 +5600,6 @@ export declare namespace Realtime {
     type CallReferParams as CallReferParams,
     type CallRejectParams as CallRejectParams,
   };
+
+  export { Translations as Translations };
 }
