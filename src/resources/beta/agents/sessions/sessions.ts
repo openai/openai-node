@@ -513,7 +513,9 @@ export namespace SessionCreateParams {
     text?: AgentsAPI.AgentTextParam | null;
 
     /**
-     * Tools available to the agent. Omit to inherit, or pass null to clear them.
+     * Tools available to the agent. Omit to inherit, or pass null to clear them. The
+     * resolved tool list must fit within 3 MiB (3,145,728 bytes) of compact UTF-8
+     * JSON.
      */
     tools?: Array<AgentsAPI.AgentToolParam> | null;
   }

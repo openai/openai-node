@@ -138,6 +138,8 @@ export namespace Decision {
     output_tokens_details: Usage.OutputTokensDetails;
 
     total_tokens: number;
+
+    compute_units?: number | null;
   }
 
   export namespace Usage {
