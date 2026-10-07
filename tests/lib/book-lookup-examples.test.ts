@@ -71,7 +71,7 @@ async function runExample(file: string, baseURL: string) {
 
 function completionChunk(
   delta: ChatCompletionChunk.Choice.Delta,
-  finishReason: ChatCompletionChunk.Choice['finish_reason'],
+  finishReason: Exclude<ChatCompletionChunk.Choice['finish_reason'], undefined>,
 ): ChatCompletionChunk {
   return {
     id: 'chatcmpl_synthetic',

@@ -343,7 +343,7 @@ export interface CompletionCreateParamsBase {
    * Up to 4 sequences where the API will stop generating further tokens. The
    * returned text will not contain the stop sequence.
    */
-  stop?: string | null | Array<string>;
+  stop?: string | Array<string> | null;
 
   /**
    * Whether to stream back partial progress. If set, tokens will be sent as

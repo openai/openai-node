@@ -90,7 +90,7 @@ describe('resource images', () => {
       partial_images: 1,
       quality: 'medium',
       response_format: 'url',
-      size: 'auto',
+      size: '1024x1024',
       stream: false,
       style: 'vivid',
       user: 'user-1234',

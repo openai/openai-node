@@ -601,8 +601,8 @@ export interface TemplateCreateParams {
   name?: string | null;
 
   /**
-   * Network access policy for the environment. Defaults to disabled for GA requests
-   * and enabled for beta requests.
+   * Network access policy for the environment. If omitted, the API version
+   * determines whether network access is enabled or disabled.
    */
   network?: TemplateCreateParams.Network | null;
 
@@ -641,8 +641,8 @@ export namespace TemplateCreateParams {
   }
 
   /**
-   * Network access policy for the environment. Defaults to disabled for GA requests
-   * and enabled for beta requests.
+   * Network access policy for the environment. If omitted, the API version
+   * determines whether network access is enabled or disabled.
    */
   export interface Network {
     /**
@@ -716,8 +716,7 @@ export interface TemplateUpdateParams {
 
   /**
    * Network access available after setup completes. Omit to preserve the current
-   * policy, or pass `null` to reset to disabled for GA requests or enabled for beta
-   * requests.
+   * policy, or pass `null` to reset to the default policy.
    */
   network?: TemplateUpdateParams.Network | null;
 
@@ -755,8 +754,7 @@ export namespace TemplateUpdateParams {
 
   /**
    * Network access available after setup completes. Omit to preserve the current
-   * policy, or pass `null` to reset to disabled for GA requests or enabled for beta
-   * requests.
+   * policy, or pass `null` to reset to the default policy.
    */
   export interface Network {
     /**

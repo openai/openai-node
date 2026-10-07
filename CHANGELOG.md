@@ -1,5 +1,21 @@
 # Changelog
 
+## [7.30.0](https://github.com/openai/openai-node/compare/v7.29.0...v7.30.0) (2026-10-06)
+
+
+### Features
+
+* **api:** add standalone Decisions support ([#2886](https://github.com/openai/openai-node/issues/2886)) ([7195644](https://github.com/openai/openai-node/commit/7195644a4fa98d4d379903a00e6ba6350136ab02))
+
+## [7.29.0](https://github.com/openai/openai-node/compare/v7.28.0...v7.29.0) (2026-10-05)
+
+
+### Features
+
+* **agents:** observe local tool failures ([#2861](https://github.com/openai/openai-node/issues/2861)) ([3808241](https://github.com/openai/openai-node/commit/3808241ef383864689df7fd3a7fda35000df0bc1))
+* **agents:** run local tools during session creation streams ([#2862](https://github.com/openai/openai-node/issues/2862)) ([7423ac3](https://github.com/openai/openai-node/commit/7423ac3e9351c46300cd094479cded5551a72eb4))
+* **tools:** support tool search (defer_loading=true) in typed function helpers ([#2880](https://github.com/openai/openai-node/issues/2880)) ([3fb01eb](https://github.com/openai/openai-node/commit/3fb01eb05fbc16d9953670264ea3b63c16e4af87))
+
 ## [7.28.0](https://github.com/openai/openai-node/compare/v7.27.0...v7.28.0) (2026-10-02)
 
 
