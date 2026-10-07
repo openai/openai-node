@@ -161,6 +161,7 @@ export function makeFile(
  * paths must be safe and relative, and use forward slashes. Paths inferred from URLs and filesystem streams
  * discard their directories. URL filenames decode valid UTF-8 percent escapes,
  * except that ASCII control characters stay escaped for multipart compatibility.
+ * A basename stays encoded if decoding would introduce literal multipart escape sequences.
  */
 export function getName(value: any, options?: { stripFilename?: boolean | undefined }): string | undefined {
   if (typeof value !== 'object' || value === null) {
@@ -177,18 +178,8 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
   const url = 'url' in value && value.url && String(value.url);
   if (url) {
     try {
-      let filename = basename(new URL(url).pathname);
-      if (filename === undefined) {
-        return undefined;
-      }
-      try {
-        filename = decodeURIComponent(filename);
-      } catch {
-        // A malformed escape leaves the original URL segment usable as a filename.
-      }
-      // oxlint-disable-next-line no-control-regex -- Multipart parsers reject unescaped ASCII controls in filenames.
-      filename = filename.replace(/[\u0000-\u001F\u007F]/gu, encodeURIComponent);
-      return basename(filename);
+      const filename = basename(new URL(url).pathname);
+      return filename === undefined ? undefined : basename(decodeURLFilename(filename));
     } catch {
       return basename(url);
     }
@@ -200,6 +191,21 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
 
 function basename(value: string): string | undefined {
   return value.split(/[\\/]/).pop() || undefined;
+}
+
+function decodeURLFilename(filename: string): string {
+  try {
+    const decodedFilename = decodeURIComponent(filename);
+    // Fetch multipart receivers interpret these spellings as CR, LF, or a quote.
+    if (/%(?:0[AD]|22)/i.test(decodedFilename)) {
+      return filename;
+    }
+    // oxlint-disable-next-line no-control-regex -- Multipart parsers reject unescaped ASCII controls in filenames.
+    return decodedFilename.replace(/[\u0000-\u001F\u007F]/gu, encodeURIComponent);
+  } catch {
+    // A malformed escape leaves the original URL segment usable as a filename.
+    return filename;
+  }
 }
 
 function normalizeFilenamePath(value: string): string {
