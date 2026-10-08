@@ -18,17 +18,17 @@ function resolveResourceRequestOptions(
  */
 export class Voices extends APIResource {
   /**
-   * Creates a voice from a text prompt or from a consent recording and an audio
-   * sample.
+   * Create a custom voice you can use for audio output (for example, in
+   * Text-to-Speech and the Realtime API). This requires an audio sample and a
+   * previously uploaded consent recording.
    *
-   * For prompt-based creation, send `type: "prompt"` with a `name` and `prompt` as
-   * JSON or multipart form data. For creation from an audio sample, send
-   * `type: "audio_sample"` with a `name`, `audio_sample`, and `consent` recording ID
-   * as multipart form data. The type defaults to `audio_sample` when omitted.
+   * Send `name`, `audio_sample`, and the `consent` recording ID as multipart form
+   * data. The optional `type` defaults to `audio_sample`.
    *
-   * Returns the saved voice's metadata. Voices created from text prompts are
-   * supported only in Live, not in Realtime or the speech endpoint. The response
-   * does not include preview audio.
+   * Returns the saved voice's metadata. See the
+   * [custom voices guide](https://developers.openai.com/api/docs/guides/text-to-speech#custom-voices)
+   * for requirements and best practices. Custom voices are limited to eligible
+   * customers.
    *
    * @example
    * ```ts
@@ -50,8 +50,7 @@ export class Voices extends APIResource {
 }
 
 /**
- * A custom voice that can be used for audio output. Voices created from text
- * prompts are supported only in Live.
+ * A custom voice that can be used for audio output.
  */
 export interface Voice {
   /**
@@ -75,13 +74,12 @@ export interface Voice {
   object: 'audio.voice';
 
   /**
-   * How the voice was created. Voices created from text prompts are supported only
-   * in Live.
+   * How the voice was created.
    */
-  type: 'audio_sample' | 'prompt';
+  type: 'audio_sample';
 }
 
-export type VoiceCreateParams = VoiceCreateParams.Consent | VoiceCreateParams.Prompt;
+export type VoiceCreateParams = VoiceCreateParams.Consent;
 
 export declare namespace VoiceCreateParams {
   /**
@@ -111,39 +109,6 @@ export declare namespace VoiceCreateParams {
      * The voice creation method. Defaults to `audio_sample` when omitted.
      */
     type?: 'audio_sample';
-  }
-
-  /**
-   * Creates a synthetic voice from a text description. Supports application/json or
-   * multipart/form-data.
-   */
-  export interface Prompt {
-    /**
-     * The name of the new voice.
-     */
-    name: string;
-
-    /**
-     * A description of the desired voice. Must not contain only whitespace.
-     */
-    prompt: string;
-
-    /**
-     * Set to `prompt` to create a voice from a text description.
-     */
-    type: 'prompt';
-
-    /**
-     * The voice creation model to use. Defaults to `auto`.
-     */
-    model?: string | 'auto' | '2026-10-01';
-
-    /**
-     * Optional text for the voice to speak during creation. If omitted, a script is
-     * generated from the prompt. Must not be blank after trimming whitespace; scripts
-     * that are too short are rejected.
-     */
-    script_hint?: string;
   }
 }
 
