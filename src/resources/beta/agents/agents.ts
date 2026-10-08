@@ -4,7 +4,13 @@ import { APIResource } from '../../../core/resource';
 import * as AgentsAPI from './agents';
 import * as TurnsAPI from './sessions/turns/turns';
 import * as EnvironmentsAPI from './environments/environments';
-import { EnvironmentInfo, Environments } from './environments/environments';
+import {
+  EnvironmentCreateParams,
+  EnvironmentInfo,
+  EnvironmentInfosPage,
+  EnvironmentListParams,
+  Environments,
+} from './environments/environments';
 import * as SessionsAPI from './sessions/sessions';
 import {
   SessionCreateParams,
@@ -3814,6 +3820,12 @@ export namespace EnvironmentParam {
     env?: { [key: string]: string } | null;
 
     /**
+     * An existing prewarmed environment. Cannot be combined with a template or inline
+     * configuration.
+     */
+    environment_id?: string;
+
+    /**
      * A reusable hosted template applied before inline session configuration. Omitted
      * fields inherit the template; network overrides cannot broaden its policy.
      */
@@ -5580,7 +5592,13 @@ export declare namespace Agents {
     type AgentListParams as AgentListParams,
   };
 
-  export { Environments as Environments, type EnvironmentInfo as EnvironmentInfo };
+  export {
+    Environments as Environments,
+    type EnvironmentInfo as EnvironmentInfo,
+    type EnvironmentInfosPage as EnvironmentInfosPage,
+    type EnvironmentCreateParams as EnvironmentCreateParams,
+    type EnvironmentListParams as EnvironmentListParams,
+  };
 
   export {
     Vaults as Vaults,

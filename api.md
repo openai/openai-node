@@ -547,7 +547,9 @@ Types:
 
 Methods:
 
+- <code title="post /agents/environments">client.beta.agents.environments.<a href="./src/resources/beta/agents/environments/environments.ts">create</a>({ ...params }) -> EnvironmentInfo</code>
 - <code title="get /agents/environments/{environment_id}">client.beta.agents.environments.<a href="./src/resources/beta/agents/environments/environments.ts">retrieve</a>(environmentID) -> EnvironmentInfo</code>
+- <code title="get /agents/environments">client.beta.agents.environments.<a href="./src/resources/beta/agents/environments/environments.ts">list</a>({ ...params }) -> EnvironmentInfosPage</code>
 
 #### Files
 
