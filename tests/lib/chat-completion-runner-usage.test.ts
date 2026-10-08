@@ -177,8 +177,12 @@ describe.each([false, true])('runner totalUsage with stream: %s', (stream) => {
     };
     const totalUsage = vi.fn();
     const originalUsages: (OpenAI.CompletionUsage | undefined)[] = [];
-    const recordUsage = (completion: OpenAI.ChatCompletion) =>
+    const recordUsage = (completion: OpenAI.ChatCompletion) => {
       originalUsages.push(structuredClone(completion.usage));
+      Object.freeze(completion.usage?.prompt_tokens_details);
+      Object.freeze(completion.usage?.completion_tokens_details);
+      Object.freeze(completion.usage);
+    };
     const runner = stream
       ? client.chat.completions
           .runTools({ ...params, stream: true, stream_options: { include_usage: true } })
@@ -189,12 +193,19 @@ describe.each([false, true])('runner totalUsage with stream: %s', (stream) => {
           .on('totalUsage', totalUsage)
           .on('chatCompletion', recordUsage);
 
-    expect(await runner.totalUsage()).toStrictEqual(expected);
+    const firstTotal = await runner.totalUsage();
+    expect(firstTotal).toStrictEqual(expected);
     if (usages.some((item) => item !== undefined)) {
       expect(totalUsage).toHaveBeenCalledTimes(1);
       expect(totalUsage).toHaveBeenCalledWith(expected);
     } else {
       expect(totalUsage).not.toHaveBeenCalled();
+    }
+    if (firstTotal.prompt_tokens_details) {
+      firstTotal.prompt_tokens_details.cached_tokens = 999;
+    }
+    if (firstTotal.completion_tokens_details) {
+      firstTotal.completion_tokens_details.reasoning_tokens = 999;
     }
     expect(await runner.totalUsage()).toStrictEqual(expected);
     expect(fetch).toHaveBeenCalledTimes(usages.length);
