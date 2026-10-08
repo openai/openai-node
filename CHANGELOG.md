@@ -1,5 +1,29 @@
 # Changelog
 
+## [7.30.1](https://github.com/openai/openai-node/compare/v7.30.0...v7.30.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* **api:** correct custom voice creation parameters ([#2895](https://github.com/openai/openai-node/issues/2895)) ([3edaf0f](https://github.com/openai/openai-node/commit/3edaf0f3c3f9a366b6993773d231002fa59c3b4d))
+* **deps-dev:** bump @aws-sdk/credential-provider-node from 3.972.83 to 3.972.84 ([#2877](https://github.com/openai/openai-node/issues/2877)) ([0878349](https://github.com/openai/openai-node/commit/08783493ba6d633abfcd31fdc80d85ae0c44cb56))
+* **deps-dev:** bump @smithy/signature-v4 from 5.7.3 to 5.7.4 ([#2870](https://github.com/openai/openai-node/issues/2870)) ([12ce5f2](https://github.com/openai/openai-node/commit/12ce5f2608dfd16b39d2534f523d059a40c2f6d5))
+* **deps-dev:** bump jest from 30.5.1 to 30.5.2 ([#2867](https://github.com/openai/openai-node/issues/2867)) ([48b5c2a](https://github.com/openai/openai-node/commit/48b5c2a643d9e3a19789e584b4d90d6afd9ddf8f))
+* **deps-dev:** bump oxfmt from 0.67.0 to 0.70.0 ([#2864](https://github.com/openai/openai-node/issues/2864)) ([91a226d](https://github.com/openai/openai-node/commit/91a226d4b1054748e169b6fb9d032dc503b9022b))
+* **deps-dev:** bump puppeteer from 25.11.0 to 25.12.0 in /ecosystem-tests/browser-direct-import ([#2863](https://github.com/openai/openai-node/issues/2863)) ([89ded6b](https://github.com/openai/openai-node/commit/89ded6bd221c2f814a9453408549bc3ed31f36e8))
+* **deps-dev:** bump puppeteer from 25.11.0 to 25.12.0 in /ecosystem-tests/ts-browser-webpack ([#2876](https://github.com/openai/openai-node/issues/2876)) ([6ef1b6e](https://github.com/openai/openai-node/commit/6ef1b6e0ac3787a43d436b7c880a0d8e26b2f8ae))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/cloudflare-worker ([#2865](https://github.com/openai/openai-node/issues/2865)) ([ef61ce0](https://github.com/openai/openai-node/commit/ef61ce088e74df00db6b8758d384f64e9b8b92a5))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/node-ts-cjs ([#2869](https://github.com/openai/openai-node/issues/2869)) ([5aab61c](https://github.com/openai/openai-node/commit/5aab61c9c0d23f3239b3d6401af6543ce423be65))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/node-ts-cjs-web ([#2871](https://github.com/openai/openai-node/issues/2871)) ([285f879](https://github.com/openai/openai-node/commit/285f8798c7bf394f4ebf7837db4551919d0f19a5))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/node-ts-esm ([#2872](https://github.com/openai/openai-node/issues/2872)) ([3ea3374](https://github.com/openai/openai-node/commit/3ea337432a637d79d58251fd888b7a47089f3d90))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/node-ts-esm-auto ([#2873](https://github.com/openai/openai-node/issues/2873)) ([34e0877](https://github.com/openai/openai-node/commit/34e0877933821827f2af32f660d18b1030be1c32))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/node-ts-esm-web ([#2875](https://github.com/openai/openai-node/issues/2875)) ([03342c5](https://github.com/openai/openai-node/commit/03342c5b7887c4760529d4d18712101b19fa8803))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/vercel-edge ([#2878](https://github.com/openai/openai-node/issues/2878)) ([1149531](https://github.com/openai/openai-node/commit/11495311c57e00b262d6d37995d8e222b9631f3a))
+* **deps-dev:** bump yargs from 18.1.0 to 18.2.0 ([#2874](https://github.com/openai/openai-node/issues/2874)) ([b1916d4](https://github.com/openai/openai-node/commit/b1916d4851e1c3ab551ef3ad157b031566511cb7))
+* **deps:** refresh development and ecosystem dependencies ([#2889](https://github.com/openai/openai-node/issues/2889)) ([68d22b9](https://github.com/openai/openai-node/commit/68d22b9d770f46f332270582c302b0618d7318f3))
+* **responses:** parse structured text only in final message phases ([#2893](https://github.com/openai/openai-node/issues/2893)) ([534e691](https://github.com/openai/openai-node/commit/534e691da6979e75c17a14bc04f1daff81fdbeef))
+* **uploads:** decode inferred URL filenames safely ([#2892](https://github.com/openai/openai-node/issues/2892)) ([30d50ab](https://github.com/openai/openai-node/commit/30d50ab301f4c348726d1fcb9c51a84cb8feb71a))
+
 ## [7.30.0](https://github.com/openai/openai-node/compare/v7.29.0...v7.30.0) (2026-10-06)
 
 
