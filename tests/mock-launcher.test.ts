@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import {
+import fs, {
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -35,10 +35,15 @@ function writeShellExecutable(filename: string, source: string) {
 function isProcessRunning(pid: number): boolean {
   try {
     process.kill(pid, 0);
+    if (process.platform === 'linux') {
+      // Orphaned daemons can remain as zombies under a container's non-reaping PID 1.
+      return !/^State:\s+Z\b/mu.test(fs.readFileSync(`/proc/${pid}/status`, 'utf-8'));
+    }
     return true;
   } catch (error) {
-    // SAFETY: process.kill reports missing processes with the Node errno code ESRCH; this check only reads that optional error code.
-    if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+    // SAFETY: The process may disappear before the signal probe or the subsequent /proc read.
+    const { code } = error as NodeJS.ErrnoException;
+    if (code === 'ESRCH' || code === 'ENOENT') {
       return false;
     }
     throw error;
@@ -71,6 +76,20 @@ async function cleanupFixture(fixture: string, pid: number | undefined) {
 }
 
 describe('Steady mock launcher', () => {
+  const linuxTest = process.platform === 'linux' ? test : test.skip;
+  linuxTest.each([
+    ['S (sleeping)', true],
+    ['Z (zombie)', false],
+  ])('recognizes Linux process state %s', (state, running) => {
+    const status = vi.spyOn(fs, 'readFileSync').mockReturnValue(`Name:\tnode\nState:\t${state}\n`);
+    try {
+      expect(isProcessRunning(process.pid)).toBe(running);
+      expect(status).toHaveBeenCalledWith(`/proc/${process.pid}/status`, 'utf-8');
+    } finally {
+      status.mockRestore();
+    }
+  });
+
   test.each([
     ['foreground', false],
     ['daemon', true],
@@ -94,7 +113,7 @@ describe('Steady mock launcher', () => {
         [
           "const fs = require('node:fs');",
           'const args = process.argv.slice(2);',
-          'const observation = { args, cwd: process.cwd(), node: process.version };',
+          'const observation = { args, cwd: fs.realpathSync.native(process.cwd()), node: process.version };',
           "if (args[0] !== '--version' && process.env.STEADY_DAEMON === 'true') {",
           '  fs.writeFileSync(process.env.STEADY_PID_FILE, String(process.pid));',
           '}',
@@ -156,7 +175,7 @@ describe('Steady mock launcher', () => {
         .trim()
         .split('\n')
         .map((line) => JSON.parse(line) as { args: string[]; cwd: string; node: string });
-      const cwd = realpathSync(checkout);
+      const cwd = realpathSync.native(checkout);
       const expected = { args: [...steadyArguments, url], cwd, node: process.version };
 
       expect(observations).toEqual(
