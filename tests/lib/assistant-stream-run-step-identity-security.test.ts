@@ -36,11 +36,13 @@ function unencodedAssistantStream(events: Event[]): AssistantStream {
   const controller = new AbortController();
   return AssistantStream.createAssistantStream(
     'thread_123',
+    // SAFETY: The partial Runs mock supplies create with this test event stream; no other resource method is used by the factory.
     {
       create: vi.fn().mockResolvedValue({
         controller,
         async *[Symbol.asyncIterator]() {
           for (const event of events) {
+            // SAFETY: These synthetic wire events intentionally omit or corrupt identity fields so the stream validates them at runtime.
             yield event as AssistantStreamEvent;
           }
         },
@@ -83,6 +85,104 @@ function toolCallDelta(id: string) {
 }
 
 describe('AssistantStream run-step identity security', () => {
+  describe.each([
+    ['SSE', publicAssistantStream],
+    ['serialized stream', assistantStream],
+  ] as const)('%s run-step delta identity', (_transport, createStream) => {
+    test.each(['replacement', '', null, 123])(
+      'rejects a root id containing %j before raw dispatch',
+      async (id) => {
+        const step = runStep('step_original');
+        const created = { event: 'thread.run.step.created', data: step };
+        const runner = createStream([
+          created,
+          {
+            event: 'thread.run.step.delta',
+            data: { id: step.id, delta: { id, metadata: { changed: true } } },
+          },
+          completedRun(),
+        ]);
+        const rawEvent = vi.fn();
+        const stepDelta = vi.fn();
+        runner.on('event', rawEvent);
+        runner.on('runStepDelta', stepDelta);
+
+        await expect(runner.done()).rejects.toThrow('Run-step deltas must not contain an id field');
+
+        expect(rawEvent).toHaveBeenCalledTimes(1);
+        expect(stepDelta).not.toHaveBeenCalled();
+        expect(runner.currentEvent()).toEqual(created);
+        expect(runner.currentRunStepSnapshot()).toEqual(step);
+      },
+    );
+
+    test.each(['mutate', 'replace'] as const)(
+      'rejects a root id introduced by a raw listener: %s',
+      async (mode) => {
+        const step = runStep('step_original');
+        const runner = createStream([
+          { event: 'thread.run.step.created', data: step },
+          toolCallDelta(step.id),
+          completedRun(),
+        ]);
+        const stepDelta = vi.fn();
+        const toolCreated = vi.fn();
+        runner.on('event', (event) => {
+          if (event.event === 'thread.run.step.delta') {
+            const delta = Object.assign(mode === 'mutate' ? event.data.delta : {}, event.data.delta, {
+              id: 'listener_id',
+            });
+            event.data.delta = delta;
+          }
+        });
+        runner.on('runStepDelta', stepDelta);
+        runner.on('toolCallCreated', toolCreated);
+
+        await expect(runner.done()).rejects.toThrow('Run-step deltas must not contain an id field');
+
+        expect(stepDelta).not.toHaveBeenCalled();
+        expect(toolCreated).not.toHaveBeenCalled();
+        expect(runner.currentRunStepSnapshot()).toEqual(step);
+      },
+    );
+
+    test('preserves valid delta identity, nested tool IDs, and extension fields', async () => {
+      const step = runStep('step_original');
+      const delta = {
+        metadata: { marker: 'retained' },
+        step_details: {
+          type: 'tool_calls',
+          tool_calls: [{ index: 0, id: '_suffix', function: { arguments: ' updated' } }],
+        },
+      };
+      const runner = createStream([
+        { event: 'thread.run.step.created', data: step },
+        { event: 'thread.run.step.delta', data: { id: step.id, delta } },
+        completedRun(),
+      ]);
+      let rawDelta: unknown;
+      runner.on('event', (event) => {
+        if (event.event === 'thread.run.step.delta') {
+          rawDelta = event.data.delta;
+        }
+      });
+      const stepDelta = vi.fn();
+      runner.on('runStepDelta', stepDelta);
+
+      await runner.done();
+
+      expect(stepDelta).toHaveBeenCalledTimes(1);
+      expect(stepDelta.mock.calls[0]?.[0]).toBe(rawDelta);
+      expect(stepDelta.mock.calls[0]?.[1]).toMatchObject({
+        id: step.id,
+        metadata: { marker: 'retained' },
+        step_details: {
+          tool_calls: [{ id: 'call_trusted_suffix', function: { arguments: '{"to":"trusted"} updated' } }],
+        },
+      });
+    });
+  });
+
   test.each(['step_trusted', 'step_foreign'])(
     'rejects creation of %s while a trusted run step remains active',
     async (injectedID) => {
@@ -152,6 +252,7 @@ describe('AssistantStream run-step identity security', () => {
       let rejectedEvent: { event: string; data: Event };
 
       if (phase === 'next tool call') {
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- This event slot holds intentionally partial and malformed wire events from several lifecycle phases.
         rejectedEvent = {
           event: 'thread.run.step.delta',
           data: {
@@ -172,6 +273,7 @@ describe('AssistantStream run-step identity security', () => {
           },
         };
       } else if (phase === 'terminal step') {
+        // oxlint-disable-next-line anti-slop/no-known-value-widening -- The same fixture slot also holds terminal-run and delta events with different data contracts.
         rejectedEvent = {
           event: 'thread.run.step.completed',
           data: { ...runStep(active.id, 'call_active', privateArguments), status: 'completed' },
@@ -227,7 +329,8 @@ describe('AssistantStream run-step identity security', () => {
       const failure = await runner.done().catch((error: unknown) => error);
 
       expect(failure).toBeInstanceOf(OpenAIError);
-      expect((failure as Error).message).toMatch(/already been created/u);
+      expect(failure).toHaveProperty('message', expect.stringMatching(/already been created/u));
+      // SAFETY: The captured failure is asserted to be Error above before its message is checked for credential disclosure.
       expect((failure as Error).message).not.toContain('sk-synthetic-never-dispatch');
       expect(stepCreated).toHaveBeenCalledTimes(2);
       expect(stepDone).toHaveBeenCalledTimes(1);
@@ -412,6 +515,7 @@ describe('AssistantStream run-step identity security', () => {
     'rejects an %s run-step ID without invoking an attacker-controlled getter',
     async (kind) => {
       const readID = vi.fn(() => 'step_injected');
+      // SAFETY: Object.create installs the hostile inherited id getter; the fixture tests rejection before invoking that getter.
       const data: Event =
         kind === 'inherited'
           ? Object.assign(Object.create(Object.defineProperty({}, 'id', { get: readID })) as Event, {
@@ -475,6 +579,7 @@ describe('AssistantStream run-step identity security', () => {
     const source = runStep('step_proxy_canonical');
     const first = new Proxy(source, {
       get(target, property, receiver) {
+        // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
         return property === 'id' ? readID() : Reflect.get(target, property, receiver);
       },
     });

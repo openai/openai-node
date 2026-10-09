@@ -240,7 +240,7 @@ export interface ScoreModelGrader {
   type: 'score_model';
 
   /**
-   * The range of the score. Defaults to `[0, 1]`.
+   * The service requires two numbers for the score range. Defaults to `[0, 1]`.
    */
   range?: Array<number>;
 
@@ -335,7 +335,7 @@ export namespace ScoreModelGrader {
      * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
      * reasoning effort can result in faster responses and fewer tokens used on
      * reasoning in a response. Not all reasoning models support every value. See the
-     * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+     * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
      * model-specific support.
      */
     reasoning_effort?: Shared.ReasoningEffort | null;

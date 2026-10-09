@@ -96,6 +96,7 @@ const response = await client.responses.create({
         { type: 'input_text', text: 'What is in this image?' },
         {
           type: 'input_image',
+          detail: 'auto',
           image_url:
             'https://api.nga.gov/iiif/a2e6da57-3cd1-4235-b20e-95dcaefed6c8/full/!800,800/0/default.jpg',
         },
@@ -318,7 +319,7 @@ const client = new OpenAI({
 });
 
 export async function webhook(request: Request) {
-  const headersList = headers();
+  const headersList = await headers();
   const body = await request.text();
 
   try {
@@ -358,7 +359,7 @@ const client = new OpenAI({
 });
 
 export async function webhook(request: Request) {
-  const headersList = headers();
+  const headersList = await headers();
   const body = await request.text();
 
   try {
@@ -388,10 +389,10 @@ const job = await client.fineTuning.jobs
   .create({ model: 'gpt-4o', training_file: 'file-abc123' })
   .catch(async (err) => {
     if (err instanceof OpenAI.APIError) {
-      console.log(err.request_id);
+      console.log(err.requestID);
       console.log(err.status); // 400
-      console.log(err.name); // BadRequestError
-      console.log(err.headers); // {server: 'nginx', ...}
+      console.log(err instanceof OpenAI.BadRequestError); // true for an HTTP 400 response
+      console.log(err.headers); // response Headers
     } else {
       throw err;
     }
@@ -406,6 +407,7 @@ Error codes are as follows:
 | 401         | `AuthenticationError`      |
 | 403         | `PermissionDeniedError`    |
 | 404         | `NotFoundError`            |
+| 409         | `ConflictError`            |
 | 422         | `UnprocessableEntityError` |
 | 429         | `RateLimitError`           |
 | >=500       | `InternalServerError`      |
@@ -452,6 +454,12 @@ await client.chat.completions.create({ messages: [{ role: 'user', content: 'How 
 On timeout, an `APIConnectionTimeoutError` is thrown.
 
 Note that requests which time out will be [retried twice by default](#retries).
+
+### Cancellation
+
+Pass an `AbortSignal` in the request's `signal` option to cancel a request, including while its response body is being read.
+
+When native signal composition is unavailable or incompatible with the supplied signal, the SDK shares one listener per caller signal and holds request callbacks weakly. Cleanup depends on garbage collection; keeping a raw response or its body alive can keep its cancellation subscription alive after consumption. Older runtimes without `WeakRef` or `FinalizationRegistry` keep the existing fallback, which can retain a listener for each successful request until the caller aborts.
 
 ## Request IDs
 
@@ -651,9 +659,14 @@ Available log levels, from most to least verbose:
 - `'error'` - Show only errors
 - `'off'` - Disable all logging
 
-At the `'debug'` level, all HTTP requests and responses are logged, including headers and bodies.
-Some authentication-related headers are redacted, but sensitive data in request and response bodies
-may still be visible.
+At the `'debug'` level, HTTP request and response metadata and headers are logged.
+Authentication-related headers are redacted. Serialized string request bodies, including JSON, and
+parsed JSON response bodies are summarized by their format and JavaScript string length instead of
+being logged in full. This avoids inspecting or copying large payloads for logging and leaves the
+actual request and response data unchanged. Log arguments are additionally sanitized to redact
+credential-like fields and URL credentials. Multipart bodies and raw responses are logged as
+sanitized diagnostic objects; streams and binary values are redacted without being read or consumed.
+Remaining diagnostics may still contain sensitive data.
 
 #### Custom logger
 
@@ -888,4 +901,7 @@ for lifecycle, deprecation, and release rules.
 
 ## Contributing
 
-See [the contributing documentation](./.github/CONTRIBUTING.md).
+Please share bug reports and feature requests through [GitHub issues](https://github.com/openai/openai-node/issues).
+Pull requests are limited to repository collaborators; we do not accept pull requests from non-collaborators.
+See [CONTRIBUTING.md](./.github/CONTRIBUTING.md) for the contribution policy and development guide.
+For security vulnerabilities, follow [SECURITY.md](.github/SECURITY.md).

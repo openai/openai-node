@@ -1,7 +1,10 @@
 import { vi } from 'vitest';
-import { APIUserAbortError, OpenAIError } from 'openai/core/error';
+import { APIError, APIUserAbortError, OpenAIError } from 'openai/core/error';
 import { AssistantStream } from 'openai/lib/AssistantStream';
 import type { AssistantStreamEvent } from 'openai/resources/beta/assistants';
+import type { Message } from 'openai/resources/beta/threads/messages';
+import type { Run } from 'openai/resources/beta/threads/runs/runs';
+import { Stream } from 'openai/streaming';
 import { assistantStream, completedRun } from './assistant-stream-test-utils';
 
 type Event = Record<string, any>;
@@ -11,10 +14,70 @@ function iterableEvents(events: Event[], controller = new AbortController()) {
     controller,
     async *[Symbol.asyncIterator]() {
       for (const event of events) {
+        // SAFETY: Raw fixtures intentionally include incomplete and invalid wire events; only the stream validation under test consumes them.
         yield event as AssistantStreamEvent;
       }
     },
   };
+}
+
+function terminalMessageFixture(status: 'completed' | 'incomplete') {
+  const initialMessage: Message = {
+    id: 'msg_terminal',
+    assistant_id: 'asst_terminal',
+    attachments: [],
+    completed_at: null,
+    content: [],
+    created_at: 1_700_000_000,
+    incomplete_at: null,
+    incomplete_details: null,
+    metadata: {},
+    object: 'thread.message',
+    role: 'assistant',
+    run_id: 'run_terminal',
+    status: 'in_progress',
+    thread_id: 'thread_terminal',
+  };
+  const finalText = { value: 'Synthetic response.', annotations: [] };
+  const finalMessage: Message = {
+    ...initialMessage,
+    status,
+    completed_at: status === 'completed' ? 1_700_000_001 : null,
+    incomplete_at: status === 'incomplete' ? 1_700_000_001 : null,
+    incomplete_details: status === 'incomplete' ? { reason: 'max_tokens' } : null,
+    content: [{ type: 'text', text: finalText }],
+  };
+  const finalRun: Run = {
+    id: 'run_terminal',
+    assistant_id: 'asst_terminal',
+    cancelled_at: null,
+    completed_at: finalMessage.completed_at,
+    created_at: initialMessage.created_at,
+    expires_at: 1_700_000_600,
+    failed_at: null,
+    incomplete_details: status === 'incomplete' ? { reason: 'max_completion_tokens' } : null,
+    instructions: '',
+    last_error: null,
+    max_completion_tokens: 100,
+    max_prompt_tokens: null,
+    metadata: {},
+    model: 'gpt-4o',
+    object: 'thread.run',
+    parallel_tool_calls: true,
+    required_action: null,
+    response_format: 'auto',
+    started_at: initialMessage.created_at,
+    status,
+    thread_id: initialMessage.thread_id,
+    tool_choice: 'auto',
+    tools: [],
+    truncation_strategy: { type: 'auto' },
+    usage:
+      status === 'incomplete'
+        ? { prompt_tokens: 20, completion_tokens: 100, total_tokens: 120 }
+        : { prompt_tokens: 20, completion_tokens: 5, total_tokens: 25 },
+  };
+  return { initialMessage, finalMessage, finalText, finalRun };
 }
 
 describe('AssistantStream delta accumulation', () => {
@@ -56,7 +119,7 @@ describe('AssistantStream delta accumulation', () => {
 
   test('creates own fields without changing ordinary inherited values', () => {
     const inherited = { label: 'inherited' };
-    const accumulator: Record<string, unknown> = Object.create(inherited);
+    const accumulator: Record<string, string> = Object.create(inherited);
 
     const result = AssistantStream.accumulateDelta(accumulator, { label: 'updated', status: 'ready' });
 
@@ -72,7 +135,7 @@ describe('AssistantStream delta accumulation', () => {
     const nested: Record<string, string> = Object.create(null);
     nested['text'] = 'hello';
 
-    const accumulator: Record<string, unknown> = Object.create(null);
+    const accumulator: Record<string, string | typeof nested> = Object.create(null);
     accumulator['details'] = nested;
 
     const result = AssistantStream.accumulateDelta(accumulator, {
@@ -224,6 +287,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     events.push({ event: 'thread.message.completed', data: message }, completedRun());
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       { create: vi.fn().mockResolvedValue(iterableEvents(events)) } as any,
       { assistant_id: 'assistant_123' },
     );
@@ -241,6 +305,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     const createdEvent = { event: 'thread.message.created', data: message };
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       {
         create: vi
           .fn()
@@ -267,10 +332,145 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     expect(finalMessages[0]).toBe(message);
   });
 
+  test.each(['completed', 'incomplete'] as const)(
+    'adopts the terminal %s message snapshot without mutating retained delta snapshots',
+    async (status) => {
+      const { initialMessage, finalMessage, finalText, finalRun } = terminalMessageFixture(status);
+      const events: AssistantStreamEvent[] = [
+        { event: 'thread.message.created', data: initialMessage },
+        { event: 'thread.message.in_progress', data: initialMessage },
+        {
+          event: 'thread.message.delta',
+          data: {
+            id: initialMessage.id,
+            object: 'thread.message.delta',
+            delta: {
+              content: [{ index: 0, type: 'text', text: { value: 'Synthetic response.', annotations: [] } }],
+            },
+          },
+        },
+        { event: `thread.message.${status}`, data: finalMessage },
+        { event: `thread.run.${status}`, data: finalRun },
+      ];
+      const runner = assistantStream(events);
+      const created = vi.fn();
+      const textDone = vi.fn();
+      const messageDone = vi.fn();
+      const rawEvents: AssistantStreamEvent[] = [];
+      const order: string[] = [];
+      let deltaSnapshot: Message | undefined;
+      let retainedBeforeCompletion: Message | undefined;
+      let snapshotDuringRawTerminal: Message | undefined;
+
+      runner.on('event', (event) => {
+        rawEvents.push(event);
+        order.push(event.event);
+        if (event.event === `thread.message.${status}`) {
+          snapshotDuringRawTerminal = runner.currentMessageSnapshot();
+        }
+      });
+      runner.on('messageCreated', created);
+      runner.on('messageDelta', (_delta, snapshot) => {
+        deltaSnapshot = snapshot;
+        retainedBeforeCompletion = structuredClone(snapshot);
+      });
+      runner.on('textDone', (text, snapshot) => {
+        order.push('textDone');
+        textDone(text, snapshot, runner.currentMessageSnapshot(), runner.currentEvent());
+      });
+      runner.on('messageDone', (message) => {
+        order.push('messageDone');
+        messageDone(message, runner.currentMessageSnapshot(), runner.currentEvent());
+      });
+
+      await runner.done();
+      const finalMessages = await runner.finalMessages();
+      const [terminalEvent, finalRunEvent] = rawEvents.slice(-2);
+      if (
+        terminalEvent?.event !== 'thread.message.completed' &&
+        terminalEvent?.event !== 'thread.message.incomplete'
+      ) {
+        throw new Error('Expected a terminal message event');
+      }
+      const terminalMessage = terminalEvent.data;
+
+      expect(finalMessages).toEqual([finalMessage]);
+      expect(finalMessages[0]).toBe(terminalMessage);
+      expect(finalMessages[0]?.content).toBe(terminalMessage.content);
+      expect(textDone).toHaveBeenCalledTimes(1);
+      expect(textDone).toHaveBeenCalledWith(finalText, terminalMessage, terminalMessage, terminalEvent);
+      expect(textDone.mock.calls[0]?.[1]).toBe(terminalMessage);
+      expect(textDone.mock.calls[0]?.[2]).toBe(terminalMessage);
+      expect(textDone.mock.calls[0]?.[3]).toBe(terminalEvent);
+      expect(messageDone).toHaveBeenCalledTimes(1);
+      expect(messageDone).toHaveBeenCalledWith(terminalMessage, terminalMessage, terminalEvent);
+      expect(messageDone.mock.calls[0]?.[0]).toBe(terminalMessage);
+      expect(messageDone.mock.calls[0]?.[1]).toBe(terminalMessage);
+      expect(messageDone.mock.calls[0]?.[2]).toBe(terminalEvent);
+      expect(created).toHaveBeenCalledTimes(1);
+      expect(created.mock.calls[0]?.[0]).toBe(deltaSnapshot);
+      expect(snapshotDuringRawTerminal).toBe(deltaSnapshot);
+      expect(finalMessages[0]).not.toBe(deltaSnapshot);
+      expect(deltaSnapshot).toEqual(retainedBeforeCompletion);
+      expect(deltaSnapshot?.status).toBe('in_progress');
+      expect(runner.currentMessageSnapshot()).toBeUndefined();
+      expect(runner.currentEvent()).toBe(finalRunEvent);
+      await expect(runner.finalRun()).resolves.toEqual(finalRun);
+      expect(order).toEqual([
+        'thread.message.created',
+        'thread.message.in_progress',
+        'thread.message.delta',
+        `thread.message.${status}`,
+        'textDone',
+        'messageDone',
+        `thread.run.${status}`,
+      ]);
+    },
+  );
+
+  test.each(['completed', 'incomplete'] as const)(
+    'reserves a retained message alias changed during the raw %s event',
+    async (status) => {
+      const { initialMessage, finalMessage, finalRun } = terminalMessageFixture(status);
+      const alias = 'msg_terminal_alias';
+      const events: AssistantStreamEvent[] = [
+        { event: 'thread.message.created', data: initialMessage },
+        { event: `thread.message.${status}`, data: finalMessage },
+        { event: 'thread.message.created', data: { ...initialMessage, id: alias } },
+        { event: `thread.message.${status}`, data: { ...finalMessage, id: alias } },
+        { event: `thread.run.${status}`, data: finalRun },
+      ];
+      const runner = assistantStream(events);
+      const created = vi.fn();
+      const exposed: string[] = [];
+      let retainedSnapshot: Message | undefined;
+      runner.on('messageCreated', created);
+      runner.on('event', (event) => {
+        exposed.push(event.event);
+        if (
+          (event.event === 'thread.message.completed' || event.event === 'thread.message.incomplete') &&
+          event.data.id === initialMessage.id
+        ) {
+          retainedSnapshot = runner.currentMessageSnapshot();
+          if (!retainedSnapshot) {
+            throw new Error('Expected the active message snapshot');
+          }
+          retainedSnapshot.id = alias;
+        }
+      });
+
+      await expect(runner.done()).rejects.toThrow('already been created');
+      expect(created).toHaveBeenCalledTimes(1);
+      expect(retainedSnapshot).toBe(created.mock.calls[0]?.[0]);
+      expect(retainedSnapshot?.id).toBe(alias);
+      expect(exposed).toEqual(['thread.message.created', `thread.message.${status}`]);
+    },
+  );
+
   test('captures accessor-backed event data once before exposing or routing its message', async () => {
     const first = { id: 'msg_first', role: 'assistant', content: [] };
     const second = { id: 'msg_second', role: 'assistant', content: [] };
-    const createdEvent: Event = { event: 'thread.message.created' };
+    const createdEvent = { event: 'thread.message.created' };
     const readData = vi.fn(function readStableData(this: Event) {
       expect(this).toBe(createdEvent);
       return readData.mock.calls.length === 1 ? first : second;
@@ -278,6 +478,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     Object.defineProperty(createdEvent, 'data', { enumerable: true, get: readData });
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       {
         create: vi
           .fn()
@@ -318,6 +519,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     const createdEvent = { event: 'thread.message.created', data: message };
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       {
         create: vi
           .fn()
@@ -334,7 +536,9 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     const createdMessages: unknown[] = [];
     runner.on('event', (event) => {
       if (Object.is(event, createdEvent)) {
+        // SAFETY: The callback deliberately changes the dispatched wire event to test that the stream retains its original event identity.
         (event as Event)['event'] = 'thread.run.completed';
+        // SAFETY: The callback deliberately changes the dispatched wire event to test that the stream retains its original event identity.
         (event as Event)['data'] = replacement;
       }
     });
@@ -349,7 +553,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
 
   test('captures an accessor-backed assistant event discriminator exactly once', async () => {
     const message = { id: 'msg_discriminator', role: 'assistant', content: [] };
-    const createdEvent: Event = { data: message };
+    const createdEvent = { data: message };
     const readEvent = vi.fn(function readStableEvent(this: Event) {
       expect(this).toBe(createdEvent);
       return readEvent.mock.calls.length === 1 ? 'thread.message.created' : 'thread.run.completed';
@@ -357,6 +561,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     Object.defineProperty(createdEvent, 'event', { enumerable: true, get: readEvent });
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       {
         create: vi
           .fn()
@@ -390,11 +595,13 @@ describe('AssistantStream snapshots and message lifecycle', () => {
           dataReads += 1;
           return message;
         }
+        // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
         return Reflect.get(target, key, receiver);
       },
     });
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       {
         create: vi
           .fn()
@@ -460,6 +667,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
       const firstEvent = { event: 'thread.message.created', data: first };
       const runner = AssistantStream.createAssistantStream(
         'thread_123',
+        // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
         {
           create: vi.fn().mockResolvedValue(
             iterableEvents([
@@ -553,12 +761,14 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     const source = { id: 'msg_proxy_canonical', role: 'assistant', content: [] };
     const first = new Proxy(source, {
       get(target, property, receiver) {
+        // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
         return property === 'id' ? readID() : Reflect.get(target, property, receiver);
       },
     });
     const alias = { id: 'msg_proxy_alias', role: 'assistant', content: [] };
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       {
         create: vi.fn().mockResolvedValue(
           iterableEvents([
@@ -594,6 +804,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     'rejects an %s message ID before exposing the event or invoking a getter',
     async (kind) => {
       const readID = vi.fn(() => 'msg_injected');
+      // SAFETY: Object.create installs the hostile inherited id getter; the fixture supplies role/content and tests rejection before reading that getter.
       const message: Event =
         kind === 'inherited'
           ? Object.assign(Object.create(Object.defineProperty({}, 'id', { get: readID })) as Event, {
@@ -607,6 +818,7 @@ describe('AssistantStream snapshots and message lifecycle', () => {
 
       const runner = AssistantStream.createAssistantStream(
         'thread_123',
+        // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
         {
           create: vi
             .fn()
@@ -896,8 +1108,12 @@ describe('AssistantStream snapshots and message lifecycle', () => {
     async (id) => {
       const message = { id, role: 'assistant', content: [] };
       const runner = assistantStream([{ event: 'thread.message.created', data: message }, completedRun()]);
+      const created = vi.fn();
+      runner.on('messageCreated', created);
 
-      await expect(runner.finalMessages()).resolves.toEqual([message]);
+      const finalMessages = await runner.finalMessages();
+      expect(finalMessages).toEqual([message]);
+      expect(finalMessages[0]).toBe(created.mock.calls[0]?.[0]);
     },
   );
 
@@ -1156,8 +1372,8 @@ describe('AssistantStream run-step lifecycle', () => {
 
       await expect(runner.done()).rejects.toThrow('Received a RunStepDelta before creation of a snapshot');
       expect(Object.getOwnPropertyDescriptor(Object.prototype, pollutionKey)).toBeUndefined();
-      expect(({} as Record<string, unknown>)[pollutionKey]).toBeUndefined();
-      expect(([] as unknown as Record<string, unknown>)[pollutionKey]).toBeUndefined();
+      expect({}).not.toHaveProperty(pollutionKey);
+      expect([]).not.toHaveProperty(pollutionKey);
     } finally {
       Reflect.deleteProperty(Object.prototype, pollutionKey);
     }
@@ -1225,11 +1441,72 @@ describe('AssistantStream run-step lifecycle', () => {
 });
 
 describe('AssistantStream factories and async iteration', () => {
+  test.each(['on', 'once'] as const)('preserves callback receivers for %s listeners', async (method) => {
+    const events = [{ event: 'thread.created', data: { id: 'thread_synthetic' } }, completedRun()];
+    const stream = assistantStream(events);
+    const unbound = vi.fn();
+    const bound = vi.fn();
+    const context = { name: 'caller-owned context' };
+
+    stream[method]('event', unbound);
+    stream[method]('event', bound.bind(context));
+    await stream.done();
+
+    const calls = (method === 'once' ? events.slice(0, 1) : events).map((event) => [event]);
+    expect(bound.mock.calls).toEqual(calls);
+    expect(bound.mock.contexts).toEqual(calls.map(() => context));
+    expect(unbound.mock.calls).toEqual(calls);
+    expect(unbound.mock.contexts).toHaveLength(calls.length);
+    expect(unbound.mock.contexts.every((receiver) => receiver === undefined)).toBe(true);
+  });
+
+  test('surfaces a server error event from a readable stream as an APIError', async () => {
+    const errorBody = {
+      message: 'upstream exploded',
+      type: 'server_error',
+      code: 'server_error',
+      param: 'thread_id',
+    };
+    const readable = new Stream(async function* errorEvents() {
+      yield { event: 'error' as const, data: errorBody };
+    }, new AbortController()).toReadableStream();
+
+    const runner = AssistantStream.fromReadableStream(readable);
+    const failure = await runner.done().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(APIError);
+    expect(failure).toMatchObject({
+      message: 'upstream exploded',
+      code: 'server_error',
+      param: 'thread_id',
+      type: 'server_error',
+      error: errorBody,
+    });
+  });
+
+  test('surfaces an error event with malformed data as an APIError instead of crashing', async () => {
+    const readable = new Stream(async function* errorEvents() {
+      yield { event: 'error' as const, data: null };
+    }, new AbortController()).toReadableStream();
+
+    const runner = AssistantStream.fromReadableStream(readable);
+    const failure = await runner.done().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(APIError);
+  });
+
   test('creates a run stream with helper metadata and preserves Headers instances', async () => {
     const runs = { create: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
     const headers = new Headers({ 'x-custom': 'value' });
     const runner = AssistantStream.createAssistantStream(
       'thread_123',
+      // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
       runs as any,
       { assistant_id: 'assistant_123' },
       { headers, __metadata: { requestID: 'request_123' } },
@@ -1252,6 +1529,7 @@ describe('AssistantStream factories and async iteration', () => {
     const headers: [string, string][] = [['x-custom', 'value']];
     const runner = AssistantStream.createThreadAssistantStream(
       { assistant_id: 'assistant_123' },
+      // SAFETY: The partial Threads fixture implements createAndRun, the only resource method used by this stream factory.
       threads as any,
       { headers },
     );
@@ -1272,6 +1550,7 @@ describe('AssistantStream factories and async iteration', () => {
     const runs = { submitToolOutputs: vi.fn().mockResolvedValue(iterableEvents([completedRun()])) };
     const runner = AssistantStream.createToolAssistantStream(
       'run_123',
+      // SAFETY: The partial Runs fixture implements submitToolOutputs, the only resource method used by this stream factory.
       runs as any,
       { thread_id: 'thread_123', tool_outputs: [] },
       { headers: { 'x-custom': 'value' } },
@@ -1338,6 +1617,7 @@ describe('AssistantStream factories and async iteration', () => {
     const event = completedRun('run_original');
     const error = new OpenAIError('stream failed after an event');
 
+    // SAFETY: This fixture deliberately emits its synthetic raw event through the public event path to exercise queue behavior.
     runner._emit('event', event as AssistantStreamEvent);
     event.data.id = 'run_mutated_after_emit';
     runner._emit('error', error);
@@ -1356,6 +1636,7 @@ describe('AssistantStream factories and async iteration', () => {
     const event = completedRun();
     const error = new APIUserAbortError();
 
+    // SAFETY: This fixture deliberately emits its synthetic raw event through the public event path to exercise queue behavior.
     runner._emit('event', event as AssistantStreamEvent);
     runner._emit('abort', error);
 
@@ -1426,12 +1707,14 @@ describe('AssistantStream factories and async iteration', () => {
         case 'run': {
           runner = AssistantStream.createAssistantStream(
             'thread_123',
+            // SAFETY: The partial Runs fixture implements create and returns the controlled event stream; this factory does not use the other resource methods.
             { create: vi.fn().mockResolvedValue(stream) } as any,
             { assistant_id: 'assistant_123' },
           );
           break;
         }
         case 'thread': {
+          // SAFETY: The partial Threads fixture implements createAndRun, the only resource method used by this stream factory.
           runner = AssistantStream.createThreadAssistantStream({ assistant_id: 'assistant_123' }, {
             createAndRun: vi.fn().mockResolvedValue(stream),
           } as any);
@@ -1440,6 +1723,7 @@ describe('AssistantStream factories and async iteration', () => {
         case 'tool': {
           runner = AssistantStream.createToolAssistantStream(
             'run_123',
+            // SAFETY: The partial Runs fixture implements submitToolOutputs, the only resource method used by this stream factory.
             { submitToolOutputs: vi.fn().mockResolvedValue(stream) } as any,
             { thread_id: 'thread_123', tool_outputs: [] },
             undefined,
@@ -1459,9 +1743,21 @@ describe('AssistantStream factories and async iteration', () => {
     await expect(runner.finalRun()).resolves.toMatchObject({ id: 'run_123' });
   });
 
-  test('rejects unexpected streamed error events', async () => {
-    const runner = assistantStream([{ event: 'error', data: { message: 'unexpected' } }, completedRun()]);
+  test('surfaces streamed error events as APIError', async () => {
+    const error = {
+      message: 'unexpected',
+      type: 'server_error',
+      code: 'server_error',
+      param: 'thread_id',
+    };
+    const runner = assistantStream([{ event: 'error', data: error }, completedRun()]);
 
-    await expect(runner.done()).rejects.toThrow('Encountered an error event in event processing');
+    await expect(runner.done()).rejects.toMatchObject({
+      message: 'unexpected',
+      code: 'server_error',
+      param: 'thread_id',
+      type: 'server_error',
+      error,
+    });
   });
 });

@@ -9,6 +9,13 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Build Assistants that can call models and use tools.
  *
@@ -22,12 +29,15 @@ export class Steps extends APIResource {
    */
   retrieve(stepID: string, params: StepRetrieveParams, options?: RequestOptions): APIPromise<RunStep> {
     const { thread_id, run_id, ...query } = params;
-    return this._client.get(path`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -37,12 +47,16 @@ export class Steps extends APIResource {
    */
   list(runID: string, params: StepListParams, options?: RequestOptions): PagePromise<RunStepsPage, RunStep> {
     const { thread_id, ...query } = params;
-    return this._client.getAPIList(path`/threads/${thread_id}/runs/${runID}/steps`, CursorPage<RunStep>, {
-      query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.getAPIList(
+      path`/threads/${thread_id}/runs/${runID}/steps`,
+      CursorPage<RunStep>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 
@@ -85,8 +99,8 @@ export interface CodeInterpreterOutputImage {
 export namespace CodeInterpreterOutputImage {
   export interface Image {
     /**
-     * The [file](https://platform.openai.com/docs/api-reference/files) ID of the
-     * image.
+     * The [file](https://developers.openai.com/api/reference/resources/files) ID of
+     * the image.
      */
     file_id?: string;
   }
@@ -159,8 +173,8 @@ export namespace CodeInterpreterToolCall {
     export namespace Image {
       export interface Image {
         /**
-         * The [file](https://platform.openai.com/docs/api-reference/files) ID of the
-         * image.
+         * The [file](https://developers.openai.com/api/reference/resources/files) ID of
+         * the image.
          */
         file_id: string;
       }
@@ -366,8 +380,7 @@ export namespace FunctionToolCall {
 
     /**
      * The output of the function. This will be `null` if the outputs have not been
-     * [submitted](https://platform.openai.com/docs/api-reference/runs/submitToolOutputs)
-     * yet.
+     * [submitted](https://developers.openai.com/api/docs/assistants/migration) yet.
      */
     output: string | null;
   }
@@ -413,8 +426,7 @@ export namespace FunctionToolCallDelta {
 
     /**
      * The output of the function. This will be `null` if the outputs have not been
-     * [submitted](https://platform.openai.com/docs/api-reference/runs/submitToolOutputs)
-     * yet.
+     * [submitted](https://developers.openai.com/api/docs/assistants/migration) yet.
      */
     output?: string | null;
   }
@@ -452,7 +464,7 @@ export interface RunStep {
 
   /**
    * The ID of the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants)
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration)
    * associated with the run step.
    */
   assistant_id: string;
@@ -505,8 +517,8 @@ export interface RunStep {
   object: 'thread.run.step';
 
   /**
-   * The ID of the [run](https://platform.openai.com/docs/api-reference/runs) that
-   * this run step is a part of.
+   * The ID of the [run](https://developers.openai.com/api/docs/assistants/migration)
+   * that this run step is a part of.
    */
   run_id: string;
 
@@ -522,8 +534,9 @@ export interface RunStep {
   step_details: MessageCreationStepDetails | ToolCallsStepDetails;
 
   /**
-   * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
-   * that was run.
+   * The ID of the
+   * [thread](https://developers.openai.com/api/docs/assistants/migration) that was
+   * run.
    */
   thread_id: string;
 
@@ -694,7 +707,7 @@ export interface StepRetrieveParams {
    * search result content.
    *
    * See the
-   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
+   * [file search tool documentation](https://developers.openai.com/api/docs/guides/tools-file-search#retrieval-customization)
    * for more information.
    */
   include?: Array<RunStepInclude>;
@@ -721,7 +734,7 @@ export interface StepListParams extends CursorPageParams {
    * search result content.
    *
    * See the
-   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
+   * [file search tool documentation](https://developers.openai.com/api/docs/guides/tools-file-search#retrieval-customization)
    * for more information.
    */
   include?: Array<RunStepInclude>;

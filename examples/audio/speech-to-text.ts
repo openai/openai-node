@@ -5,7 +5,7 @@ const openai = new OpenAI();
 
 async function main(): Promise<void> {
   console.log('Recording for 5 seconds...');
-  const response = await recordAudio({ timeout: 5000, device: 4 });
+  const response = await recordAudio({ timeout: 5000 });
 
   console.log('Transcribing...');
   const transcription = await openai.audio.transcriptions.create({
@@ -16,4 +16,13 @@ async function main(): Promise<void> {
   console.log(transcription.text);
 }
 
-main().catch(console.error);
+async function run() {
+  try {
+    await main();
+  } catch (error) {
+    console.error(error);
+    process.exitCode = 1;
+  }
+}
+
+void run();

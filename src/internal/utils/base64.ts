@@ -46,6 +46,9 @@ export const toFloat32Array = (base64Str: string): Array<number> => {
   if (typeof Buffer !== 'undefined') {
     // for Node.js environment
     const buf = Buffer.from(base64Str, 'base64');
+    if (buf.length % Float32Array.BYTES_PER_ELEMENT !== 0) {
+      throw new RangeError('Invalid base64-encoded float32 array: byte length must be a multiple of 4');
+    }
     return Array.from(
       new Float32Array(buf.buffer, buf.byteOffset, buf.length / Float32Array.BYTES_PER_ELEMENT),
     );

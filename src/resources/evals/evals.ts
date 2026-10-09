@@ -27,6 +27,120 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagin
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 /**
  * Manage and run evals in the OpenAI platform.
  */
@@ -39,45 +153,161 @@ export class Evals extends APIResource {
    * data source, which dictates the schema of the data used in the evaluation. After
    * creating an evaluation, you can run it on different models and model parameters.
    * We support several types of graders and datasources. For more information, see
-   * the [Evals guide](https://platform.openai.com/docs/guides/evals).
+   * the [Evals guide](https://developers.openai.com/api/docs/guides/evals).
    */
   create(body: EvalCreateParams, options?: RequestOptions): APIPromise<EvalCreateResponse> {
-    return this._client.post('/evals', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/evals',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Get an evaluation by ID.
    */
   retrieve(evalID: string, options?: RequestOptions): APIPromise<EvalRetrieveResponse> {
-    return this._client.get(path`/evals/${evalID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.get(
+      path`/evals/${evalID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
    * Update certain properties of an evaluation.
    */
   update(evalID: string, body: EvalUpdateParams, options?: RequestOptions): APIPromise<EvalUpdateResponse> {
-    return this._client.post(path`/evals/${evalID}`, { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      path`/evals/${evalID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * List evaluations for a project.
    */
   list(
-    query: EvalListParams | null | undefined = {},
+    query?:
+      | (EvalListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<EvalListResponsesPage, EvalListResponse>;
+  list(
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<EvalListResponsesPage, EvalListResponse>;
+  list(
+    query:
+      | EvalListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<EvalListResponsesPage, EvalListResponse> {
-    return this._client.getAPIList('/evals', CursorPage<EvalListResponse>, {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+      ['after', 'limit', 'order', 'order_by'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as EvalListParams | null | undefined;
+    return this._client.getAPIList(
+      '/evals',
+      CursorPage<EvalListResponse>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Delete an evaluation.
    */
   delete(evalID: string, options?: RequestOptions): APIPromise<EvalDeleteResponse> {
-    return this._client.delete(path`/evals/${evalID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.delete(
+      path`/evals/${evalID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 
@@ -136,7 +366,7 @@ export interface EvalStoredCompletionsDataSourceConfig {
  *
  * - Improve the quality of my chatbot
  * - See how well my chatbot handles customer support
- * - Check if o4-mini is better at my usecase than gpt-4o
+ * - Check if o4-mini is better at my usecase than gpt-6-astra
  */
 export interface EvalCreateResponse {
   /**
@@ -257,7 +487,7 @@ export namespace EvalCreateResponse {
  *
  * - Improve the quality of my chatbot
  * - See how well my chatbot handles customer support
- * - Check if o4-mini is better at my usecase than gpt-4o
+ * - Check if o4-mini is better at my usecase than gpt-6-astra
  */
 export interface EvalRetrieveResponse {
   /**
@@ -378,7 +608,7 @@ export namespace EvalRetrieveResponse {
  *
  * - Improve the quality of my chatbot
  * - See how well my chatbot handles customer support
- * - Check if o4-mini is better at my usecase than gpt-4o
+ * - Check if o4-mini is better at my usecase than gpt-6-astra
  */
 export interface EvalUpdateResponse {
   /**
@@ -499,7 +729,7 @@ export namespace EvalUpdateResponse {
  *
  * - Improve the quality of my chatbot
  * - See how well my chatbot handles customer support
- * - Check if o4-mini is better at my usecase than gpt-4o
+ * - Check if o4-mini is better at my usecase than gpt-6-astra
  */
 export interface EvalListResponse {
   /**

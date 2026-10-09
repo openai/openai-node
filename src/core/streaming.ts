@@ -9,22 +9,34 @@ import type { OpenAI } from '../client';
 
 type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
+function isTransportAbortError(error: unknown): boolean {
+  return !(error instanceof APIError) && isAbortError(error);
+}
+
 type StreamTeeQueue<Item> = {
   readonly length: number;
+  readonly canceled: boolean;
   enqueue: (value: Promise<IteratorResult<Item>>) => void;
   dequeue: () => Promise<IteratorResult<Item>> | undefined;
+  cancel: () => void;
 };
 
 function createStreamTeeQueue<Item>(): StreamTeeQueue<Item> {
   let entries: (Promise<IteratorResult<Item>> | undefined)[] = [];
   let head = 0;
+  let canceled = false;
 
   return {
     get length() {
       return entries.length - head;
     },
+    get canceled() {
+      return canceled;
+    },
     enqueue(value) {
-      entries.push(value);
+      if (!canceled) {
+        entries.push(value);
+      }
     },
     dequeue() {
       if (head === entries.length) {
@@ -44,6 +56,11 @@ function createStreamTeeQueue<Item>(): StreamTeeQueue<Item> {
       }
 
       return value;
+    },
+    cancel() {
+      canceled = true;
+      entries.length = 0;
+      head = 0;
     },
   };
 }
@@ -69,6 +86,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
   /** Abort controller for the underlying request and all branches created with `tee()`. */
   controller: AbortController;
   #client: OpenAI | undefined;
+  #isTeeBranch = false;
   private iterator: () => AsyncIterator<Item>;
 
   /** Wraps an asynchronous event iterator and the controller that owns its request. */
@@ -101,8 +119,17 @@ export class Stream<Item> implements AsyncIterable<Item> {
       consumed = true;
       let done = false;
       let receivedCompletionSentinel = false;
+      const messages = _iterSSEMessages(response, controller);
+      const closeMessages = messages.return.bind(messages);
+      messages.return = (value) => {
+        // Abort before nested iterator cleanup can wait on the response body's cancellation.
+        if (!receivedCompletionSentinel) {
+          controller.abort();
+        }
+        return closeMessages(value);
+      };
       try {
-        for await (const sse of _iterSSEMessages(response, controller)) {
+        for await (const sse of messages) {
           if (sse.data === '[DONE]') {
             receivedCompletionSentinel = true;
             break;
@@ -112,7 +139,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
             let data;
 
             try {
-              data = JSON.parse(sse.data) as any;
+              data = JSON.parse(sse.data);
             } catch {
               logger.error(`Could not parse message into JSON:`);
               logger.error(`From chunk:`);
@@ -137,6 +164,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
               logger.error(`From chunk:`);
               throw new SyntaxError('Error reading response: malformed server-sent event JSON.');
             }
+            // SAFETY: Named SSE events use the public stream's event/data envelope; Item is the caller-selected API event contract.
             yield { event: sse.event, data } as any;
           }
         }
@@ -145,7 +173,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
         // Abort errors and cleanup failures after the completion sentinel are non-fatal.
         if (
           receivedCompletionSentinel ||
-          isAbortError(e) ||
+          isTransportAbortError(e) ||
           (controller.signal.aborted && e === controller.signal.reason)
         ) {
           return;
@@ -234,12 +262,10 @@ export class Stream<Item> implements AsyncIterable<Item> {
       let done = false;
       try {
         for await (const line of iterLines()) {
-          if (done) {
-            continue;
-          }
           if (line) {
             let data: Item;
             try {
+              // SAFETY: Item is the caller's NDJSON response contract; JSON syntax is parsed here without a per-resource runtime schema.
               data = JSON.parse(line) as Item;
             } catch (error) {
               if (error instanceof SyntaxError) {
@@ -275,17 +301,36 @@ export class Stream<Item> implements AsyncIterable<Item> {
     return this.iterator();
   }
 
+  /** Beta-only iterator decoration for Agents helpers, preserving custom stream identity.
+   * @internal
+   */
+  __betaTransformIterator(
+    transform: (iterator: () => AsyncIterator<Item>) => () => AsyncIterator<Item>,
+  ): void {
+    this.iterator = transform(this.iterator.bind(this));
+  }
+
   /**
    * Splits the stream into two streams which can be
    * independently read from at different speeds.
+   * Closing a branch discards its buffered events without stopping its sibling.
+   * Future reads on that branch finish immediately; previously issued `next()`
+   * promises remain shared with its sibling and may still resolve with events.
+   * Closing both branches invokes the source iterator's `return()` when available.
+   * For {@link Stream.fromReadableStream}, closing both branches before iteration
+   * starts does not cancel the supplied readable; cancel that readable directly.
    */
   tee(): [Stream<Item>, Stream<Item>] {
+    const { controller } = this;
     const left = createStreamTeeQueue<Item>();
     const right = createStreamTeeQueue<Item>();
     const iterator = this.iterator();
 
     const teeIterator = (queue: StreamTeeQueue<Item>): AsyncIterator<Item> => ({
       next: () => {
+        if (queue.canceled) {
+          return Promise.resolve({ value: undefined, done: true });
+        }
         if (queue.length === 0) {
           const result = iterator.next();
           left.enqueue(result);
@@ -293,21 +338,38 @@ export class Stream<Item> implements AsyncIterable<Item> {
         }
         return queue.dequeue()!;
       },
+      return: async () => {
+        if (!queue.canceled) {
+          queue.cancel();
+          if (left.canceled && right.canceled) {
+            await this.#cancelIterator(iterator, controller);
+          }
+        }
+        return { value: undefined, done: true };
+      },
     });
 
-    return [
-      new Stream(() => teeIterator(left), this.controller, this.#client),
-      new Stream(() => teeIterator(right), this.controller, this.#client),
-    ];
+    const branch = (queue: StreamTeeQueue<Item>) => {
+      const stream = new Stream(() => teeIterator(queue), controller, this.#client);
+      stream.#isTeeBranch = true;
+      return stream;
+    };
+    return [branch(left), branch(right)];
   }
 
   /**
    * Converts this stream to a newline-separated ReadableStream of
    * JSON stringified values in the stream
    * which can be turned back into a Stream with `Stream.fromReadableStream()`.
+   * Canceling a response-backed readable aborts its request. Canceling a tee
+   * branch discards its buffered events and leaves sibling consumers running.
+   * Read or serialization failures also release the iterator without replacing the original error.
    */
   toReadableStream(): ReadableStream {
+    const { controller } = this;
     let iter: AsyncIterator<Item>;
+    let cancellation: Promise<void> | undefined;
+    const cancel = () => (cancellation ??= this.#cancelIterator(iter, controller));
 
     return makeReadableStream({
       start: async () => {
@@ -325,12 +387,24 @@ export class Stream<Item> implements AsyncIterable<Item> {
           ctrl.enqueue(bytes);
         } catch (err) {
           ctrl.error(err);
+          // An errored readable never invokes its cancel hook. Release the source ourselves,
+          // without letting failed or stalled cleanup replace the read/serialization error.
+          void cancel().catch(() => undefined);
         }
       },
-      async cancel() {
-        await iter.return?.();
-      },
+      cancel,
     });
+  }
+
+  async #cancelIterator(iterator: AsyncIterator<Item>, controller: AbortController): Promise<void> {
+    const returnMethod = iterator.return;
+    if (returnMethod) {
+      if (!this.#isTeeBranch) {
+        controller.abort();
+      }
+      // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the captured iterator method with its receiver even if a caller-supplied function shadows call.
+      await Reflect.apply(returnMethod, iterator, []);
+    }
   }
 }
 
@@ -468,6 +542,7 @@ export async function* _iterSSEMessages(
 ): AsyncGenerator<ServerSentEvent, void, unknown> {
   if (!response.body) {
     controller.abort();
+    // SAFETY: navigator is optional across SDK runtimes; this compatibility branch checks its presence before identifying React Native.
     if (
       (globalThis as any).navigator !== undefined &&
       (globalThis as any).navigator.product === 'ReactNative'
@@ -512,6 +587,15 @@ export async function* _iterSSEMessages(
       if (sse) {
         yield sse;
       }
+    }
+    // Servers sometimes omit the trailing blank line that normally
+    // terminates the last event. Flush any in-progress event exactly once.
+    if (signal.aborted) {
+      return;
+    }
+    const pending = sseDecoder.flush();
+    if (pending) {
+      yield pending;
     }
   } catch (error) {
     failed = true;
@@ -642,6 +726,15 @@ class SSEDecoder {
     }
 
     return null;
+  }
+
+  /**
+   * Emits a pending event at EOF when the stream omitted the trailing blank
+   * line. Returns `null` when no event is in progress so a record that already
+   * ended with a blank line is not delivered twice.
+   */
+  flush(): ServerSentEvent | null {
+    return this.decode('');
   }
 }
 

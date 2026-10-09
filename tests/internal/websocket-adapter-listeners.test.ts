@@ -22,6 +22,8 @@ function createNodeHarness(): AdapterHarness {
     send: vi.fn(),
     close: vi.fn(),
   });
+  // SAFETY: The EventEmitter fixture implements the Node socket events used by this listener test; no network operations are performed.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The real EventEmitter fixture supplies the ws operations needed to audit listener ownership.
   const adapter = new NodeWebSocket(socket as unknown as ConstructorParameters<typeof NodeWebSocket>[0]);
 
   return {
@@ -70,6 +72,8 @@ function createBrowserHarness(): AdapterHarness {
 }
 
 function listenerBookkeeping(adapter: WebSocketLike): Map<string, Map<unknown, unknown>> {
+  // SAFETY: Both adapter implementations own this listener bookkeeping map; the regression inspects it to verify listener cleanup.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inspect private adapter bookkeeping to verify listener entries are released; keep the public adapter interface unchanged.
   return (adapter as unknown as { _listenerMap: Map<string, Map<unknown, unknown>> })._listenerMap;
 }
 
@@ -345,6 +349,7 @@ describe.each(adapterFactories)('%s listener lifecycle', (_name, createHarness) 
     emitError(new Error('socket failed'));
 
     expect(listener).toHaveBeenCalledTimes(2);
+    // SAFETY: The test emits new Error objects through this adapter; the recorded listener arguments are those forwarded errors.
     expect(listener.mock.calls.map(([error]) => (error as Error).message)).toEqual([
       'socket failed',
       'socket failed',

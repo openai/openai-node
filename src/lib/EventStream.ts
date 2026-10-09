@@ -18,6 +18,7 @@ import {
   SubjectTokenProviderError,
   UnprocessableEntityError,
 } from '../error';
+import type { EmittedEventResult } from './EventEmitter';
 
 const MAX_BUFFERED_ITERATOR_EVENTS = 4096;
 const MAX_BUFFERED_ITERATOR_BYTES = 8 * 1024 * 1024;
@@ -29,10 +30,12 @@ const bufferedJSONStringify = JSON.stringify;
 const bufferedJSONParse = JSON.parse;
 const sdkOwnedBufferedEventArguments = new WeakSet<object>();
 
+// SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
 const typedArrayBufferGetter = Object.getOwnPropertyDescriptor(
   Object.getPrototypeOf(Uint8Array.prototype) as object,
   'buffer',
 )?.get;
+// SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
 const typedArrayLengthGetter = Object.getOwnPropertyDescriptor(
   Object.getPrototypeOf(Uint8Array.prototype) as object,
   'length',
@@ -50,6 +53,8 @@ const errorStackDescriptor = Object.getOwnPropertyDescriptor(new Error('native s
 const functionToString = Function.prototype.toString;
 const objectToString = Object.prototype.toString;
 const errorBrandDescriptor = Object.getOwnPropertyDescriptor(Error, 'isError');
+// The native Error.isError predicate brands arbitrary values before an Error contract can be assumed.
+// SAFETY: The captured native Error.isError property was checked to be a function before it is used as a brand predicate.
 const nativeErrorBrand =
   errorBrandDescriptor && 'value' in errorBrandDescriptor && typeof errorBrandDescriptor.value === 'function'
     ? (errorBrandDescriptor.value as (value: unknown) => boolean)
@@ -81,8 +86,10 @@ const trustedNativeConstructorSources = new Set<string>();
 const canonicalIntrinsicDescriptors = new Map<string, ReadonlyMap<PropertyKey, PropertyDescriptor>>();
 const foreignErrorStackDescriptors = new WeakMap<object, PropertyDescriptor>();
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Native and cross-realm constructor identities are inspected without assuming an unvalidated result type.
 type NativeErrorConstructor = (...args: never[]) => unknown;
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The native proxy predicate accepts arbitrary object identities without invoking their handlers.
 function captureNativeProxyDetector(): ((value: object) => boolean) | undefined {
   if (typeof process === 'undefined') {
     return undefined;
@@ -93,6 +100,7 @@ function captureNativeProxyDetector(): ((value: object) => boolean) | undefined 
     if (!loader || !('value' in loader) || typeof loader.value !== 'function') {
       return undefined;
     }
+    // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the descriptor value without reading a potentially overridden call property.
     const util: unknown = Reflect.apply(loader.value, process, ['node:util']);
     if (typeof util !== 'object' || util === null) {
       return undefined;
@@ -105,6 +113,8 @@ function captureNativeProxyDetector(): ((value: object) => boolean) | undefined 
     if (!detector || !('value' in detector) || typeof detector.value !== 'function') {
       return undefined;
     }
+    // SAFETY: The native detector data property was checked to be callable; it is invoked only to test the corresponding intrinsic object brand.
+    // oxlint-disable-next-line anti-slop/no-object-parameters -- The captured native predicate is called only for objects, before their properties are inspected.
     return detector.value as (value: object) => boolean;
   } catch {
     return undefined;
@@ -129,6 +139,7 @@ function rememberTrustedIntrinsic(constructor: unknown): void {
     return;
   }
 
+  // SAFETY: The prototype data descriptor was checked as a non-null object before adding its identity to the trusted-intrinsic set.
   trustedIntrinsicPrototypes.add(prototypeDescriptor.value as object);
   const source = functionToString.call(constructor);
   if (
@@ -193,6 +204,7 @@ for (const name of [
   }
 }
 
+// SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
 const typedArrayConstructorDescriptor = Object.getOwnPropertyDescriptor(
   Object.getPrototypeOf(Uint8Array.prototype) as object,
   'constructor',
@@ -215,6 +227,7 @@ const blobInternalHandlePrototype = (() => {
     for (const key of Object.getOwnPropertySymbols(blob)) {
       const descriptor = Object.getOwnPropertyDescriptor(blob, key);
       if (descriptor && 'value' in descriptor && typeof descriptor.value === 'object' && descriptor.value) {
+        // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
         return Object.getPrototypeOf(descriptor.value) as object;
       }
     }
@@ -228,6 +241,7 @@ const mapEntries = Map.prototype.entries;
 const setValues = Set.prototype.values;
 const headersEntriesDescriptor =
   typeof Headers === 'function' ? Object.getOwnPropertyDescriptor(Headers.prototype, 'entries') : undefined;
+// SAFETY: The own Headers entries data property was checked to be callable and retains the native method signature.
 const headersEntries =
   headersEntriesDescriptor &&
   'value' in headersEntriesDescriptor &&
@@ -251,12 +265,14 @@ interface TrustedForeignIntrinsic {
   functionPrototype: object;
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Foreign prototypes are untrusted objects until their constructor descriptors are verified.
 function getTrustedForeignIntrinsic(prototype: object): TrustedForeignIntrinsic | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
   if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') {
     return undefined;
   }
 
+  // SAFETY: The descriptor contains a function; the following native-source and prototype checks verify the Error constructor before use.
   const constructor = descriptor.value as NativeErrorConstructor;
   const source = functionToString.call(constructor);
   const descriptors = canonicalIntrinsicDescriptors.get(source);
@@ -275,9 +291,11 @@ function getTrustedForeignIntrinsic(prototype: object): TrustedForeignIntrinsic 
     return undefined;
   }
 
+  // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
   return { constructor, descriptors, functionPrototype: Object.getPrototypeOf(constructor) as object };
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Intrinsic trust is established by object identity or verified cross-realm descriptors.
 function isTrustedIntrinsicPrototype(prototype: object): boolean {
   return trustedIntrinsicPrototypes.has(prototype) || getTrustedForeignIntrinsic(prototype) !== undefined;
 }
@@ -285,6 +303,7 @@ function isTrustedIntrinsicPrototype(prototype: object): boolean {
 function isCanonicalIntrinsicFunction(
   value: unknown,
   canonical: unknown,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Cross-realm function prototypes are compared by identity without trusting a callable signature.
   functionPrototype: object,
 ): boolean {
   if (canonical === undefined) {
@@ -300,6 +319,7 @@ function isCanonicalIntrinsicFunction(
     return false;
   }
 
+  // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
   const actualFunctionPrototype = Object.getPrototypeOf(value) as object;
   if (actualFunctionPrototype === functionPrototype) {
     return true;
@@ -318,6 +338,7 @@ function isCanonicalIntrinsicFunction(
 function isCanonicalIntrinsicDescriptor(
   descriptor: PropertyDescriptor,
   canonical: PropertyDescriptor | undefined,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Descriptor validation compares the verified function-prototype identity without reading its fields.
   functionPrototype: object,
 ): boolean {
   if (
@@ -348,6 +369,7 @@ function isCanonicalIntrinsicDescriptor(
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Native error branding must inspect arbitrary objects before assuming an Error contract.
 function hasNativeErrorBrand(current: object): boolean {
   if (nativeErrorBrand) {
     return nativeErrorBrand.call(Error, current);
@@ -358,6 +380,7 @@ function hasNativeErrorBrand(current: object): boolean {
     if (Object.getOwnPropertyDescriptor(prototype, Symbol.toStringTag)) {
       return false;
     }
+    // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
     prototype = Object.getPrototypeOf(prototype) as object | null;
   }
 
@@ -365,6 +388,7 @@ function hasNativeErrorBrand(current: object): boolean {
 }
 
 function getVerifiedForeignErrorConstructor(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Foreign error constructors are verified from descriptors of an otherwise untrusted object.
   current: object,
   stackDescriptor: PropertyDescriptor,
 ): { constructor: NativeErrorConstructor; prototype: object } | undefined {
@@ -372,15 +396,18 @@ function getVerifiedForeignErrorConstructor(
     return undefined;
   }
 
+  // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
   let prototype = Object.getPrototypeOf(current) as object | null;
   for (let depth = 0; prototype !== null && depth < MAX_BUFFERED_EVENT_DEPTH; depth += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
     if (descriptor && 'value' in descriptor && typeof descriptor.value === 'function') {
+      // SAFETY: The descriptor contains a function; the following intrinsic and constructor-prototype checks decide whether it is a trusted Error constructor.
       const constructor = descriptor.value as NativeErrorConstructor;
       if (
         functionToString.call(constructor) === nativeErrorConstructorSource &&
         isTrustedIntrinsicPrototype(prototype)
       ) {
+        // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
         const functionPrototype = Object.getPrototypeOf(constructor) as object;
         if (
           Object.getPrototypeOf(stackDescriptor.get) === functionPrototype &&
@@ -391,12 +418,14 @@ function getVerifiedForeignErrorConstructor(
         return undefined;
       }
     }
+    // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
     prototype = Object.getPrototypeOf(prototype) as object | null;
   }
 
   return undefined;
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Stack accessors are trusted only after the object passes native error branding.
 function isTrustedNativeErrorStack(current: object, descriptor: PropertyDescriptor): boolean {
   if (!hasNativeErrorBrand(current)) {
     return false;
@@ -420,6 +449,7 @@ function isTrustedNativeErrorStack(current: object, descriptor: PropertyDescript
 
   let canonicalDescriptor = foreignErrorStackDescriptors.get(verified.prototype);
   if (!canonicalDescriptor) {
+    // SAFETY: Reflect.construct returns an untyped value; unknown preserves that uncertainty for the descriptor checks below.
     const canonical = Reflect.construct(verified.constructor, []) as unknown;
     if (
       typeof canonical !== 'object' ||
@@ -494,7 +524,9 @@ function createEventQueue<Value>(): EventQueue<Value> {
   };
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Retained storage branding walks arbitrary object prototypes without assuming their native type.
 function getRetainedStorageBrand(current: object): string | undefined {
+  // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
   let prototype = Object.getPrototypeOf(current) as object | null;
 
   for (let depth = 0; prototype !== null && depth < MAX_BUFFERED_EVENT_DEPTH; depth += 1) {
@@ -523,6 +555,7 @@ function getRetainedStorageBrand(current: object): string | undefined {
     ) {
       return descriptor.value;
     }
+    // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
     prototype = Object.getPrototypeOf(prototype) as object | null;
   }
 
@@ -530,6 +563,7 @@ function getRetainedStorageBrand(current: object): string | undefined {
 }
 
 function estimateRetainedBufferBytes(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Memory accounting inspects arbitrary retained objects and detects native backing storage at runtime.
   current: object,
   visit: (value: unknown, depth: number) => void,
   depth: number,
@@ -539,9 +573,11 @@ function estimateRetainedBufferBytes(
     let kind: RetainedStorage['kind'] = 'typed-array';
 
     try {
+      // SAFETY: The captured intrinsic getter performs its own receiver brand check; its result stays unknown until the ArrayBuffer validation below.
       buffer = typedArrayBufferGetter?.call(current) as unknown;
     } catch {
       kind = 'data-view';
+      // SAFETY: The DataView intrinsic getter performs its receiver brand check; its result stays unknown until the ArrayBuffer validation below.
       buffer = dataViewBufferGetter?.call(current) as unknown;
     }
 
@@ -559,6 +595,7 @@ function estimateRetainedBufferBytes(
     return undefined;
   }
 
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Captured native accessors are checked for a finite numeric result before retained-size accounting.
   let getter: (() => unknown) | undefined;
   const kind: RetainedStorage['kind'] = 'buffer';
   switch (brand) {
@@ -581,6 +618,7 @@ function estimateRetainedBufferBytes(
       return { bytes: 0, kind: 'map' };
     }
     case 'Date': {
+      // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the captured intrinsic without reading its mutable call property.
       Reflect.apply(dateTimestampGetter, current, []);
       return { bytes: 8, kind: 'date' };
     }
@@ -606,6 +644,7 @@ function estimateRetainedBufferBytes(
 }
 
 function visitHiddenEventValues(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Native collection contents are inspected only after storage branding, without trusting structural fields.
   current: object,
   kind: RetainedStorage['kind'] | undefined,
   visit: (value: unknown, overhead: number) => boolean,
@@ -630,6 +669,7 @@ function visitHiddenEventValues(
     if (!headersEntries) {
       return false;
     }
+    // SAFETY: The captured native Headers.entries method performs its receiver brand check inside the enclosing try/catch.
     for (const [name, value] of headersEntries.call(current as Headers)) {
       if (!visit(name, 8) || !visit(value, 8)) {
         return false;
@@ -641,6 +681,7 @@ function visitHiddenEventValues(
 }
 
 function getInspectableEventKeys(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Event key inspection must accept arbitrary retained objects, arrays, and native storage views.
   current: object,
   kind: RetainedStorage['kind'] | undefined,
   availableBytes: number,
@@ -683,6 +724,7 @@ function getInspectableEventKeys(
 }
 
 function visitInspectableEventProperties(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Retained event properties are inspected through descriptors on arbitrary object identities.
   current: object,
   kind: RetainedStorage['kind'] | undefined,
   depth: number,
@@ -720,6 +762,7 @@ function visitInspectableEventProperties(
 }
 
 function visitRetainedEventPrototypes(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Retention accounting follows arbitrary object prototypes without assuming their properties.
   current: object,
   depth: number,
   isBlobInternalHandle: boolean,
@@ -727,8 +770,10 @@ function visitRetainedEventPrototypes(
   availableBytes: () => number,
   charge: (bytes: number) => boolean,
   visit: (value: unknown, depth: number, isBlobInternalHandle?: boolean) => void,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- The retention callback records prototype identity before inspecting its descriptors.
   retainPrototype: (prototype: object, inspect: () => boolean) => boolean,
 ): boolean {
+  // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
   let prototype = Object.getPrototypeOf(current) as object | null;
 
   for (let prototypeDepth = depth + 1; prototype !== null; prototypeDepth += 1) {
@@ -794,6 +839,7 @@ function visitRetainedEventPrototypes(
       return false;
     }
 
+    // SAFETY: Object.getPrototypeOf returns an object or null; this native-prototype inspection does not assume an application-specific instance type.
     prototype = Object.getPrototypeOf(retainedPrototype) as object | null;
   }
 
@@ -860,6 +906,7 @@ function inspectBufferedEventGraph(
     }
     return bytes <= remainingBytes;
   };
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- The ledger records object and symbol identities, which have no shared structural contract.
   const addIdentity = (identity: BufferedRetainedIdentity): void => {
     if (activeNode) {
       activeNode.edges.add(identity);
@@ -867,6 +914,7 @@ function inspectBufferedEventGraph(
       roots.add(identity);
     }
   };
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Retained graph nodes are identified by object or symbol identity independently of their fields.
   const retainIdentity = (identity: BufferedRetainedIdentity, inspect: () => boolean): boolean => {
     addIdentity(identity);
     const node: BufferedInspectedNode = { bytes: 0, edges: new Set() };
@@ -893,6 +941,8 @@ function inspectBufferedEventGraph(
         if (!symbolDescriptionGetter) {
           return false;
         }
+        // SAFETY: The captured Symbol description getter is called after the symbol branch and returns a string or undefined by its native contract.
+        // oxlint-disable-next-line anti-slop/no-reflect-apply -- Invoke the captured intrinsic without reading its mutable call property.
         const description = Reflect.apply(symbolDescriptionGetter, current, []) as string | undefined;
         return charge(8 + (description?.length ?? 0) * 2);
       })
@@ -1064,6 +1114,7 @@ function collectBufferedLedgerIdentities(
 }
 
 function getBufferedLedgerChange(
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- Ledger changes are keyed by object or symbol identity, not a structural event type.
   identity: BufferedRetainedIdentity,
   graph: BufferedInspectedGraph,
   records: Map<BufferedRetainedIdentity, BufferedLedgerRecord>,
@@ -1312,6 +1363,7 @@ function createBufferedEventLedger(): {
     entry.identities.clear();
   };
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The ledger contract contextually types its callbacks and keeps retained-identity internals private.
   return {
     retain(graph) {
       const entry: BufferedLedgerEntry = { scalarBytes: 0, roots: new Set(), identities: new Set() };
@@ -1359,6 +1411,10 @@ export class EventStream<EventTypes extends BaseEvents> {
   #errored = false;
   #aborted = false;
   #catchingPromiseCreated = false;
+  // Terminal failure recorded during settlement, before `end` is emitted, so
+  // iterators can surface it even when a throwing user listener prevented
+  // their internal failure listeners from running.
+  #terminalFailure: { kind: 'error' | 'abort'; error: OpenAIError } | undefined;
 
   /** Creates an unstarted stream with independent connection and completion lifecycle promises. */
   constructor() {
@@ -1439,16 +1495,38 @@ export class EventStream<EventTypes extends BaseEvents> {
     this.controller.abort();
   }
 
+  /** Creates a user-abort error retaining this runner's cancellation reason. */
+  protected _userAbortError(): APIUserAbortError {
+    const error = new APIUserAbortError();
+    Object.defineProperty(error, 'cause', {
+      value: this.controller.signal.reason,
+      writable: true,
+      configurable: true,
+    });
+    return error;
+  }
+
+  #abortFromSignal(signal: AbortSignal) {
+    try {
+      this.controller.abort(signal.reason);
+    } catch {
+      this.controller.abort();
+    }
+  }
+
   protected _listenForAbort(signal: AbortSignal | null | undefined) {
     if (!signal || this.ended) {
       return;
     }
     if (signal.aborted) {
-      this.controller.abort();
+      this.#abortFromSignal(signal);
+      return;
+    }
+    if (this.#abortListeners.some((registration) => registration.signal === signal)) {
       return;
     }
 
-    const listener = () => this.controller.abort();
+    const listener = () => this.#abortFromSignal(signal);
     signal.addEventListener('abort', listener, { once: true });
     this.#abortListeners.push({ signal, listener });
   }
@@ -1485,12 +1563,14 @@ export class EventStream<EventTypes extends BaseEvents> {
       return this;
     }
 
+    // SAFETY: Listener functions are object identities used as WeakMap keys; registration and removal use the same function instance.
     const emittedRegistration = this.#emittedListenerRegistrations.get(listener as object);
     if (
       emittedRegistration?.event === event &&
       !emittedRegistration.registration.removed &&
       !emittedRegistration.registration.detached
     ) {
+      // SAFETY: The stored registration event was compared with this event above, preserving the event/listener type correlation.
       this.#removeEmittedListener(
         event,
         emittedRegistration.registration as EventListeners<EventTypes, Event>[number],
@@ -1531,6 +1611,7 @@ export class EventStream<EventTypes extends BaseEvents> {
       registration?.listener === listener &&
       registration.once
     ) {
+      // SAFETY: Listener functions are object identities used as WeakMap keys; registration and removal use the same function instance.
       this.#emittedListenerRegistrations.set(listener as object, { event, registration });
     }
   }
@@ -1544,6 +1625,7 @@ export class EventStream<EventTypes extends BaseEvents> {
     }
 
     registration.removed = true;
+    // SAFETY: Listener functions are object identities used as WeakMap keys; registration and removal use the same function instance.
     this.#emittedListenerRegistrations.delete(registration.listener as object);
     this.#pendingListenerCleanup.add(event);
     if (this.#listenerDispatchDepth === 0) {
@@ -1553,9 +1635,11 @@ export class EventStream<EventTypes extends BaseEvents> {
 
   #cleanupEmittedListeners(): void {
     for (const event of this.#pendingListenerCleanup) {
+      // SAFETY: Pending cleanup keys are added only from registered EventTypes events; the key retains its event-map membership.
       const eventType = event as keyof EventTypes;
       const listeners = this.#listeners[eventType];
       if (listeners) {
+        // SAFETY: Filtering only removes registrations from the same event bucket and preserves the listener signatures for that event.
         this.#listeners[eventType] = listeners.filter((listener) => !listener.removed) as any;
       }
     }
@@ -1577,16 +1661,11 @@ export class EventStream<EventTypes extends BaseEvents> {
    */
   emitted<Event extends keyof EventTypes>(
     event: Event,
-  ): Promise<
-    EventParameters<EventTypes, Event> extends [infer Param]
-      ? Param
-      : EventParameters<EventTypes, Event> extends []
-        ? void
-        : EventParameters<EventTypes, Event>
-  > {
+  ): Promise<EmittedEventResult<EventParameters<EventTypes, Event>>> {
     return new Promise((resolve, reject) => {
       this.#catchingPromiseCreated = true;
       const onError = (error: OpenAIError) => {
+        // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
         this.off(event, onEvent as EventListener<EventTypes, Event>);
         reject(error);
       };
@@ -1594,12 +1673,15 @@ export class EventStream<EventTypes extends BaseEvents> {
         if (event !== 'error') {
           this.off('error', onError);
         }
+        // SAFETY: The emitted API returns the sole argument or the full tuple according to its existing EventTypes-dependent result contract.
         resolve((values.length > 1 ? values : values[0]) as any);
       };
 
       if (event !== 'error') {
+        // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
         this.#onceForEmitted('error', onError as EventListener<EventTypes, 'error'>);
       }
+      // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
       this.#onceForEmitted(event, onEvent as EventListener<EventTypes, Event>);
     });
   }
@@ -1630,7 +1712,9 @@ export class EventStream<EventTypes extends BaseEvents> {
             sdkOwnedBufferedEventArguments.delete(args);
           }
         };
+        // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
         this.on(event, onEvent as EventListener<EventTypes, Event>);
+        // SAFETY: This callback is paired with the same event when registered and removed; its variadic body forwards the event tuple or captured error.
         return () => this.off(event, onEvent as EventListener<EventTypes, Event>);
       },
       {
@@ -1683,6 +1767,7 @@ export class EventStream<EventTypes extends BaseEvents> {
     let failureDelivered = false;
     let detach: () => void = () => undefined;
 
+    // SAFETY: A completed iterator result has no yielded value; never preserves the iterator public result type for done: true.
     const doneResult = (): Result => ({ value: undefined as never, done: true });
     const finishReaders = () => {
       while (readQueue.length) {
@@ -1764,10 +1849,12 @@ export class EventStream<EventTypes extends BaseEvents> {
         }
 
         if (typeof value === 'object' && value !== null && sdkOwnedBufferedEventArguments.has(value)) {
+          // SAFETY: Only SDK-created argument tuples are inserted into this private WeakSet, so membership establishes the array identity.
           const argumentsTuple = value as unknown[];
           for (let index = 0; index < argumentsTuple.length; index += 1) {
             const argument = argumentsTuple[index];
             if (typeof argument === 'string') {
+              // SAFETY: The branch checked argument is a string; JSON stringify/parse returns that same string value while detaching retained storage.
               argumentsTuple[index] = bufferedJSONParse(bufferedJSONStringify(argument)) as string;
             }
           }
@@ -1790,8 +1877,24 @@ export class EventStream<EventTypes extends BaseEvents> {
         rejectReader();
       }
     };
+    // A throwing user listener registered before this iterator stops dispatch
+    // before onFailure runs; adopt the failure the stream recorded during
+    // settlement so terminal errors are never converted into clean completion.
+    const adoptTerminalFailure = () => {
+      if (failure) {
+        return;
+      }
+      const terminal = this.#terminalFailure;
+      if (!terminal) {
+        return;
+      }
+      if (terminal.kind === 'error' ? rejectOnError : rejectOnAbort) {
+        failure = terminal.error;
+      }
+    };
     const onEnd = () => {
       ended = true;
+      adoptTerminalFailure();
       cleanup();
       if (!pushQueue.length) {
         rejectReader();
@@ -1826,6 +1929,9 @@ export class EventStream<EventTypes extends BaseEvents> {
           return Promise.resolve({ value, done: false });
         }
 
+        if (ended || this.ended) {
+          adoptTerminalFailure();
+        }
         if (failure && !failureDelivered) {
           failureDelivered = true;
           return Promise.reject(failure);
@@ -1841,6 +1947,9 @@ export class EventStream<EventTypes extends BaseEvents> {
       },
       return: () => {
         ended = true;
+        // The consumer walked away; terminal failures recorded later must not
+        // resurface through this iterator.
+        failureDelivered = true;
         while (bufferedEventSizes.length) {
           deactivateBufferedEvent(bufferedEventSizes.dequeue()!);
         }
@@ -1873,7 +1982,7 @@ export class EventStream<EventTypes extends BaseEvents> {
   #handleError(this: EventStream<EventTypes>, error: unknown) {
     this.#errored = true;
     if (error instanceof Error && error.name === 'AbortError') {
-      error = new APIUserAbortError();
+      error = this._userAbortError();
     }
     if (error instanceof APIUserAbortError) {
       this.#aborted = true;
@@ -1894,6 +2003,45 @@ export class EventStream<EventTypes extends BaseEvents> {
   /** Returns whether an event currently has one or more registered listeners. */
   protected _hasListeners<Event extends keyof EventTypes>(event: Event): boolean {
     return Boolean(this.#listeners[event]?.some((listener) => !listener.removed));
+  }
+
+  #settleTerminalEvent<Event extends keyof EventTypes>(
+    event: Event,
+    args: EventParameters<EventTypes, Event>,
+    hasListeners: boolean,
+  ): void {
+    if (event === 'abort') {
+      // SAFETY: The abort event key selects the APIUserAbortError argument tuple established by the typed emit contract.
+      const error = args[0] as APIUserAbortError;
+      this.#terminalFailure ??= { kind: 'abort', error };
+      if (!this.#catchingPromiseCreated && !hasListeners) {
+        Promise.reject(error);
+      }
+      this.#rejectConnectedPromise(error);
+      this.#rejectEndPromise(error);
+      this._emit('end');
+      return;
+    }
+
+    if (event === 'error') {
+      // NOTE: _emit('error', error) should only be called from #handleError().
+
+      // SAFETY: The error event is emitted by the error-normalization path, which supplies an OpenAIError as its first argument.
+      const error = args[0] as OpenAIError;
+      this.#terminalFailure ??= { kind: 'error', error };
+      if (!this.#catchingPromiseCreated && !hasListeners) {
+        // Trigger an unhandled rejection if the user hasn't registered any error handlers.
+        // If you are seeing stack traces here, make sure to handle errors via either:
+        // - runner.on('error', () => ...)
+        // - await runner.done()
+        // - await runner.finalChatCompletion()
+        // - etc.
+        Promise.reject(error);
+      }
+      this.#rejectConnectedPromise(error);
+      this.#rejectEndPromise(error);
+      this._emit('end');
+    }
   }
 
   /** Dispatches a connection, failure, cancellation, or completion lifecycle event. */
@@ -1918,61 +2066,56 @@ export class EventStream<EventTypes extends BaseEvents> {
     }
 
     const listeners: EventListeners<EventTypes, Event> | undefined = this.#listeners[event];
-    if (listeners) {
-      this.#listeners[event] = listeners.filter((listener) => {
-        if (listener.once) {
-          listener.detached = true;
-        }
-        return !listener.once && !listener.removed;
-      }) as any;
-      this.#listenerDispatchDepth += 1;
-      try {
-        for (const registration of listeners as any) {
-          if (!registration.removed) {
-            registration.listener(...(args as any));
+    let dispatchError: unknown;
+    let dispatchThrew = false;
+    try {
+      if (listeners) {
+        // SAFETY: Filtering only removes registrations from the same event bucket and preserves the listener signatures for that event.
+        this.#listeners[event] = listeners.filter((listener) => {
+          if (listener.once) {
+            listener.detached = true;
           }
-        }
-      } finally {
-        this.#listenerDispatchDepth -= 1;
-        if (this.#listenerDispatchDepth === 0) {
-          this.#cleanupEmittedListeners();
-          for (const check of this.#pendingBufferedEventChecks) {
-            this.#pendingBufferedEventChecks.delete(check);
-            if (!this.#ended) {
-              check();
+          return !listener.once && !listener.removed;
+        }) as any;
+        this.#listenerDispatchDepth += 1;
+        try {
+          // SAFETY: The listener bucket and argument tuple come from the same EventTypes key; this bridges TypeScript generic indexed-access correlation.
+          for (const registration of listeners as any) {
+            if (!registration.removed) {
+              const { listener } = registration;
+              // SAFETY: The listener bucket and argument tuple come from the same EventTypes key; this bridges TypeScript generic indexed-access correlation.
+              listener(...(args as any));
+            }
+          }
+        } finally {
+          this.#listenerDispatchDepth -= 1;
+          if (this.#listenerDispatchDepth === 0) {
+            this.#cleanupEmittedListeners();
+            for (const check of this.#pendingBufferedEventChecks) {
+              this.#pendingBufferedEventChecks.delete(check);
+              if (!this.#ended) {
+                check();
+              }
             }
           }
         }
       }
+    } catch (error) {
+      dispatchError = error;
+      dispatchThrew = true;
     }
 
-    if (event === 'abort') {
-      const error = args[0] as APIUserAbortError;
-      if (!this.#catchingPromiseCreated && !listeners?.length) {
-        Promise.reject(error);
+    try {
+      this.#settleTerminalEvent(event, args, Boolean(listeners?.length));
+    } catch (error) {
+      if (!dispatchThrew) {
+        dispatchError = error;
+        dispatchThrew = true;
       }
-      this.#rejectConnectedPromise(error);
-      this.#rejectEndPromise(error);
-      this._emit('end');
-      return;
     }
 
-    if (event === 'error') {
-      // NOTE: _emit('error', error) should only be called from #handleError().
-
-      const error = args[0] as OpenAIError;
-      if (!this.#catchingPromiseCreated && !listeners?.length) {
-        // Trigger an unhandled rejection if the user hasn't registered any error handlers.
-        // If you are seeing stack traces here, make sure to handle errors via either:
-        // - runner.on('error', () => ...)
-        // - await runner.done()
-        // - await runner.finalChatCompletion()
-        // - etc.
-        Promise.reject(error);
-      }
-      this.#rejectConnectedPromise(error);
-      this.#rejectEndPromise(error);
-      this._emit('end');
+    if (dispatchThrew) {
+      throw dispatchError;
     }
   }
 

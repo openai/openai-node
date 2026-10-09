@@ -19,19 +19,41 @@ const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchan
 // workload-identity path, so short-lived tokens keep a usable cache window.
 const MAX_REFRESH_BUFFER_FRACTION = 0.5;
 
+function calculateExpiresAt(expiresIn: unknown, exchangeStartedAt: number): number {
+  if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+    throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
+  }
+
+  const now = Date.now();
+  const fullLifetimeDeadline = now + expiresIn * 1000;
+  if (!Number.isSafeInteger(fullLifetimeDeadline) || fullLifetimeDeadline <= now) {
+    throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
+  }
+  const expiresAt = fullLifetimeDeadline - (performance.now() - exchangeStartedAt);
+  if (expiresAt <= now) {
+    throw new OpenAIError('Workload identity token expired before its exchange completed.');
+  }
+
+  return expiresAt;
+}
+
 function calculateRefreshAt(
   expiresAt: number,
-  now: number,
+  lifetimeSeconds: number,
   refreshBufferSeconds: number | undefined,
 ): number {
   const configuredBufferMs = (refreshBufferSeconds ?? 1200) * 1000;
-  const effectiveBufferMs = Math.min(configuredBufferMs, (expiresAt - now) * MAX_REFRESH_BUFFER_FRACTION);
+  const effectiveBufferMs = Math.min(
+    configuredBufferMs,
+    lifetimeSeconds * 1000 * MAX_REFRESH_BUFFER_FRACTION,
+  );
   return expiresAt - effectiveBufferMs;
 }
 
 const NATIVE_RESPONSE_PROTOTYPE = Response.prototype;
 const READ_NATIVE_RESPONSE_BODY = NATIVE_RESPONSE_PROTOTYPE.arrayBuffer;
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Custom fetch response prototypes are verified through descriptors before trusting their native contract.
 function isResponsePrototype(response: Response, prototype: object): boolean {
   const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
   if (
@@ -52,6 +74,7 @@ function isResponsePrototype(response: Response, prototype: object): boolean {
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- The prototype walk compares untrusted cross-realm objects by identity and descriptor metadata.
 function isResponseBodyPrototype(prototype: object, responsePrototype: object | null): boolean {
   if (prototype === responsePrototype) {
     return true;
@@ -68,10 +91,12 @@ function isResponseBodyPrototype(prototype: object, responsePrototype: object | 
 }
 
 function decodeNativeResponseBody(body: ArrayBuffer): string {
+  // SAFETY: Bun is an optional runtime global; its version is checked before selecting Bun-specific decoding behavior.
   const scope = globalThis as typeof globalThis & { Bun?: { version?: unknown } };
   return new TextDecoder('utf-8', { ignoreBOM: typeof scope.Bun?.version === 'string' }).decode(body);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Decoded token JSON remains untrusted until the caller validates its fields.
 async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
   let readText: ((this: Response) => Promise<string>) | undefined;
   let responsePrototype: object | null = null;
@@ -119,6 +144,7 @@ async function parseOAuthTokenResponse(response: Response): Promise<unknown> {
 }
 
 function isUnsafeAccessToken(accessToken: string): boolean {
+  // SAFETY: Bun is an optional runtime global; its version is checked before selecting Bun-specific decoding behavior.
   const scope = globalThis as typeof globalThis & { Bun?: { version?: unknown } };
   if (typeof scope.Bun?.version === 'string') {
     return /[^\t\u0020-\u007E]|^[\t ]|[\t ]$/u.test(accessToken);
@@ -152,7 +178,9 @@ export class WorkloadIdentityAuth {
     this.config = {
       identityProviderId,
       serviceAccountId,
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(clientId === undefined ? {} : { clientId }),
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(refreshBufferSeconds === undefined ? {} : { refreshBufferSeconds }),
       provider: {
         tokenType: provider.tokenType,
@@ -205,6 +233,7 @@ export class WorkloadIdentityAuth {
 
   private async refreshToken(generation: number): Promise<string> {
     const subjectToken = await this.config.provider.getToken();
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The token-exchange field dictionary gains an optional client_id after its required fields are initialized.
     const body: Record<string, string> = {
       grant_type: TOKEN_EXCHANGE_GRANT_TYPE,
       subject_token: subjectToken,
@@ -217,6 +246,8 @@ export class WorkloadIdentityAuth {
       body['client_id'] = this.config.clientId;
     }
 
+    // Exclude provider acquisition and measure delivery time independently of wall-clock changes.
+    const exchangeStartedAt = performance.now();
     const response = await this.fetch(this.tokenExchangeUrl, {
       method: 'POST',
       headers: {
@@ -237,7 +268,7 @@ export class WorkloadIdentityAuth {
       }
 
       if (response.status === 400 || response.status === 401 || response.status === 403) {
-        throw new OAuthError(response.status as 400 | 401 | 403, body, response.headers);
+        throw new OAuthError(response.status, body, response.headers);
       }
       throw APIError.generate(
         response.status,
@@ -260,22 +291,15 @@ export class WorkloadIdentityAuth {
       throw new OpenAIError("Token exchange response missing 'access_token' field");
     }
 
+    // SAFETY: The token response was checked as an object with a valid access token; expires_in is still validated by calculateExpiresAt.
     const expiresIn = (tokenResponse as Partial<TokenExchangeResponse>).expires_in ?? 3600;
-    if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
-      throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
-    }
-
-    const now = Date.now();
-    const expiresAt = now + expiresIn * 1000;
-    if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) {
-      throw new OpenAIError("Token exchange response has invalid 'expires_in' field");
-    }
+    const expiresAt = calculateExpiresAt(expiresIn, exchangeStartedAt);
 
     if (this.tokenGeneration === generation) {
       this.cachedToken = {
         token: accessToken,
         expiresAt,
-        refreshAt: calculateRefreshAt(expiresAt, now, this.config.refreshBufferSeconds),
+        refreshAt: calculateRefreshAt(expiresAt, expiresIn, this.config.refreshBufferSeconds),
       };
     }
 

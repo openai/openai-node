@@ -14,6 +14,7 @@ interface FakeSocket {
   dispatch: (event: string, value: unknown) => void;
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Deliver hostile error frames through the public Node adapter to test payload normalization without network I/O.
 vi.mock('ws', () => {
   function FakeNodeSocket() {
     const listeners = new Map<string, Listener>();
@@ -63,13 +64,22 @@ function serverError(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function dispatchFrame(socket: FakeSocket, transport: 'native' | 'node', frame: object): void {
+function dispatchFrame(
+  socket: FakeSocket,
+  transport: 'native' | 'node',
+  frame: ReturnType<typeof serverError>,
+): void {
   const data = JSON.stringify(frame);
   socket.dispatch('message', transport === 'native' ? { data } : data);
 }
 
-function onRealtimeEvent(realtime: unknown, event: string, listener: Listener): void {
-  (realtime as { on: (event: string, listener: Listener) => unknown }).on(event, listener);
+function onRealtimeEvent(
+  realtime: StableNativeRealtime | StableNodeRealtime | BetaNativeRealtime | BetaNodeRealtime,
+  event: string,
+  listener: Listener,
+): void {
+  // SAFETY: Each listed realtime wrapper implements on; this helper registers only the shared event listener contract and discards the return value.
+  (realtime as { on: (event: string, listener: Listener) => void }).on(event, listener);
 }
 
 beforeEach(() => {
@@ -122,6 +132,8 @@ describe.each([
       new OpenAI({ apiKey: 'test-key', baseURL: 'https://example.com/v1/' }),
     );
 
+    // SAFETY: The injected WebSocket constructor creates this FakeSocket; the cast exposes its test-only dispatch controls.
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The socket constructor is replaced by FakeSocket in this fixture; retain access to its error injection method.
     return { realtime, socket: realtime.socket as unknown as FakeSocket };
   }
 
@@ -211,6 +223,7 @@ describe.each([
 
   test('retains asynchronous rejection for an unhandled malformed server error', () => {
     const { socket } = connect();
+    // SAFETY: This rejection spy intentionally returns a resolved placeholder to avoid an unrelated unhandled rejection while inspecting the captured error.
     const reject = vi.spyOn(Promise, 'reject').mockReturnValue(Promise.resolve() as Promise<never>);
 
     expect(() =>

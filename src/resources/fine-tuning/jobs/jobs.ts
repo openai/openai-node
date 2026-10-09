@@ -15,6 +15,120 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 /**
  * Manage fine-tuning jobs to tailor a model to your specific training data.
  */
@@ -28,7 +142,7 @@ export class Jobs extends APIResource {
    * Response includes details of the enqueued job including job status and the name
    * of the fine-tuned models once complete.
    *
-   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/model-optimization)
+   * [Learn more about fine-tuning](https://developers.openai.com/api/docs/guides/model-optimization)
    *
    * @example
    * ```ts
@@ -39,13 +153,20 @@ export class Jobs extends APIResource {
    * ```
    */
   create(body: JobCreateParams, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post('/fine_tuning/jobs', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/fine_tuning/jobs',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Get info about a fine-tuning job.
    *
-   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/model-optimization)
+   * [Learn more about fine-tuning](https://developers.openai.com/api/docs/guides/model-optimization)
    *
    * @example
    * ```ts
@@ -55,10 +176,10 @@ export class Jobs extends APIResource {
    * ```
    */
   retrieve(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.get(path`/fine_tuning/jobs/${fineTuningJobID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/fine_tuning/jobs/${fineTuningJobID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -73,14 +194,110 @@ export class Jobs extends APIResource {
    * ```
    */
   list(
-    query: JobListParams | null | undefined = {},
+    query?:
+      | (JobListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<FineTuningJobsPage, FineTuningJob>;
+  list(
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<FineTuningJobsPage, FineTuningJob>;
+  list(
+    query:
+      | JobListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FineTuningJobsPage, FineTuningJob> {
-    return this._client.getAPIList('/fine_tuning/jobs', CursorPage<FineTuningJob>, {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+      ['after', 'limit', 'metadata'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as JobListParams | null | undefined;
+    return this._client.getAPIList(
+      '/fine_tuning/jobs',
+      CursorPage<FineTuningJob>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -94,10 +311,10 @@ export class Jobs extends APIResource {
    * ```
    */
   cancel(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/cancel`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/fine_tuning/jobs/${fineTuningJobID}/cancel`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -115,13 +332,111 @@ export class Jobs extends APIResource {
    */
   listEvents(
     fineTuningJobID: string,
-    query: JobListEventsParams | null | undefined = {},
+    query?:
+      | (JobListEventsParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent>;
+  listEvents(
+    fineTuningJobID: string,
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent>;
+  listEvents(
+    fineTuningJobID: string,
+    query:
+      | JobListEventsParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<FineTuningJobEventsPage, FineTuningJobEvent> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as JobListEventsParams | null | undefined;
     return this._client.getAPIList(
       path`/fine_tuning/jobs/${fineTuningJobID}/events`,
       CursorPage<FineTuningJobEvent>,
-      { query, ...options, __security: { bearerAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
     );
   }
 
@@ -136,10 +451,10 @@ export class Jobs extends APIResource {
    * ```
    */
   pause(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/pause`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/fine_tuning/jobs/${fineTuningJobID}/pause`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -153,10 +468,10 @@ export class Jobs extends APIResource {
    * ```
    */
   resume(fineTuningJobID: string, options?: RequestOptions): APIPromise<FineTuningJob> {
-    return this._client.post(path`/fine_tuning/jobs/${fineTuningJobID}/resume`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/fine_tuning/jobs/${fineTuningJobID}/resume`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 
@@ -221,7 +536,7 @@ export interface FineTuningJob {
   /**
    * The compiled results file ID(s) for the fine-tuning job. You can retrieve the
    * results with the
-   * [Files API](https://platform.openai.com/docs/api-reference/files/retrieve-contents).
+   * [Files API](https://developers.openai.com/api/reference/resources/files/methods/content).
    */
   result_files: Array<string>;
 
@@ -244,14 +559,14 @@ export interface FineTuningJob {
 
   /**
    * The file ID used for training. You can retrieve the training data with the
-   * [Files API](https://platform.openai.com/docs/api-reference/files/retrieve-contents).
+   * [Files API](https://developers.openai.com/api/reference/resources/files/methods/content).
    */
   training_file: string;
 
   /**
    * The file ID used for validation. You can retrieve the validation results with
    * the
-   * [Files API](https://platform.openai.com/docs/api-reference/files/retrieve-contents).
+   * [Files API](https://developers.openai.com/api/reference/resources/files/methods/content).
    */
   validation_file: string | null;
 
@@ -448,28 +763,29 @@ export type FineTuningJobIntegration = FineTuningJobWandbIntegrationObject;
 export interface JobCreateParams {
   /**
    * The name of the model to fine-tune. You can select one of the
-   * [supported models](https://platform.openai.com/docs/guides/fine-tuning#which-models-can-be-fine-tuned).
+   * [supported models](https://developers.openai.com/api/docs/guides/model-optimization#fine-tuning-methods).
    */
   model: (string & {}) | 'babbage-002' | 'davinci-002' | 'gpt-3.5-turbo' | 'gpt-4o-mini';
 
   /**
    * The ID of an uploaded file that contains training data.
    *
-   * See [upload file](https://platform.openai.com/docs/api-reference/files/create)
+   * See
+   * [upload file](https://developers.openai.com/api/reference/resources/files/methods/create)
    * for how to upload a file.
    *
    * Your dataset must be formatted as a JSONL file. Additionally, you must upload
    * your file with the purpose `fine-tune`.
    *
    * The contents of the file should differ depending on if the model uses the
-   * [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input),
-   * [completions](https://platform.openai.com/docs/api-reference/fine-tuning/completions-input)
+   * [chat](https://developers.openai.com/api/docs/guides/supervised-fine-tuning#formatting-your-data),
+   * [completions](https://developers.openai.com/api/docs/guides/supervised-fine-tuning#formatting-your-data)
    * format, or if the fine-tuning method uses the
-   * [preference](https://platform.openai.com/docs/api-reference/fine-tuning/preference-input)
+   * [preference](https://developers.openai.com/api/docs/guides/direct-preference-optimization)
    * format.
    *
    * See the
-   * [fine-tuning guide](https://platform.openai.com/docs/guides/model-optimization)
+   * [fine-tuning guide](https://developers.openai.com/api/docs/guides/model-optimization)
    * for more details.
    */
   training_file: string;
@@ -529,7 +845,7 @@ export interface JobCreateParams {
    * the purpose `fine-tune`.
    *
    * See the
-   * [fine-tuning guide](https://platform.openai.com/docs/guides/model-optimization)
+   * [fine-tuning guide](https://developers.openai.com/api/docs/guides/model-optimization)
    * for more details.
    */
   validation_file?: string | null;
@@ -640,8 +956,13 @@ export namespace JobCreateParams {
 
 export interface JobListParams extends CursorPageParams {
   /**
-   * Optional metadata filter. To filter, use the syntax `metadata[k]=v`.
-   * Alternatively, set `metadata=null` to indicate no metadata.
+   * Optional metadata filter. To filter, use the syntax `metadata[k]=v`. Omitting
+   * the parameter or passing an empty object applies no metadata filter. An empty
+   * value, such as `metadata[k]=`, filters for that key with an empty string value.
+   * To select jobs with null metadata, send the literal query string
+   * `metadata=null`. Nullable caller types do not specify how a client serializes
+   * null for a deep-object parameter. Use a raw query parameter if the client omits
+   * null. Do not combine the two query forms.
    */
   metadata?: { [key: string]: string } | null;
 }

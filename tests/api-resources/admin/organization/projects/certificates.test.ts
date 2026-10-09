@@ -49,7 +49,7 @@ describe('resource certificates', () => {
   });
 
   test('activate: required and optional params', async () => {
-    const response = await client.admin.organization.projects.certificates.activate('project_id', {
+    await client.admin.organization.projects.certificates.activate('project_id', {
       certificate_ids: ['cert_abc'],
     });
   });
@@ -68,7 +68,7 @@ describe('resource certificates', () => {
   });
 
   test('deactivate: required and optional params', async () => {
-    const response = await client.admin.organization.projects.certificates.deactivate('project_id', {
+    await client.admin.organization.projects.certificates.deactivate('project_id', {
       certificate_ids: ['cert_abc'],
     });
   });

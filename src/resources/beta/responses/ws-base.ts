@@ -6,6 +6,10 @@ import { sleep } from '../../../internal/utils/sleep';
 import { type WebSocketLike, ReadyState } from '../../../internal/ws-adapter';
 import {
   SendQueue,
+  getMaxBufferedEvents,
+  recordWebSocketError,
+  rawByteLength,
+  type WebSocketStreamOptions,
   flattenRawData,
   isRecoverableClose,
   type RawWebSocketData,
@@ -16,6 +20,19 @@ import {
 import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../../client';
 import { OpenAIError } from '../../../core/error';
+
+const webSocketEventPayloads = new WeakMap<object, string>();
+const webSocketEventBytes = new WeakMap<object, number>();
+
+/** Original wire size, available only during synchronous event notification. @internal */
+export function getWebSocketEventBytes(event: object): number | undefined {
+  return webSocketEventBytes.get(event);
+}
+
+/** Original JSON, available only during synchronous event notification. @internal */
+export function getWebSocketEventPayload(event: object): string | undefined {
+  return webSocketEventPayloads.get(event);
+}
 
 export interface ResponsesWSReconnectOptions {
   /**
@@ -51,11 +68,11 @@ export interface ResponsesWSBaseOptions {
   reconnect?: ResponsesWSReconnectOptions | null | undefined;
 
   /**
-   * Maximum size of the outgoing message queue in bytes.
-   * Messages queued while the socket is connecting or reconnecting are held
-   * in memory up to this limit. Once the limit is reached, new messages are
-   * discarded and an `error` event is emitted.
-   * Default: 1 MB
+   * Byte budget for outgoing messages queued while the socket is connecting
+   * or reconnecting. An empty queue accepts one message even if it exceeds
+   * this budget. Further messages are discarded and an `error` event is emitted
+   * if the total queued size would exceed the budget.
+   * Default: 1 MiB (1,048,576 bytes).
    */
   maxQueueSize?: number | undefined;
 }
@@ -101,8 +118,14 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     this.socket = this._connect();
   }
 
-  /** Creates a platform-specific WebSocket for the given URL and auth headers. */
+  /**
+   * Creates a platform-specific WebSocket for the given URL and captured client auth headers.
+   * The transport must supply or validate its final credentials before connecting;
+   * these headers may be empty when authentication is managed by the transport.
+   */
   protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
+
+  private _cancelRefresh: (() => void) | undefined;
 
   send(event: ResponsesAPI.BetaResponsesClientEvent) {
     if (!this.socket) {
@@ -156,6 +179,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     this._intentionallyClosed = true;
     this._closeCode = props?.code ?? 1000;
     this._closeReason = props?.reason ?? 'OK';
+    this._cancelRefresh?.();
     try {
       this.socket.close(this._closeCode, this._closeReason);
     } catch (err) {
@@ -168,6 +192,11 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
    * providing an alternative to the event-based `.on()` API.
    * The iterator will exit if the socket closes but exiting the iterator
    * does not close the socket.
+   *
+   * Pass `maxBufferedEvents` to limit queued records for this iterator, including
+   * lifecycle events. Overflow discards its backlog and rejects `next()` with a
+   * WebSocketError; the shared socket and other iterators remain active.
+   * Omitted means unlimited. This is an event-count limit, not a byte limit.
    *
    * @example
    * ```ts
@@ -186,26 +215,59 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
    * }
    * ```
    */
-  stream(): AsyncIterableIterator<ResponsesStreamMessage> {
-    return this[Symbol.asyncIterator]();
+  stream(options?: WebSocketStreamOptions): AsyncIterableIterator<ResponsesStreamMessage> {
+    return options === undefined ? this[Symbol.asyncIterator]() : this[Symbol.asyncIterator](options);
   }
 
-  [Symbol.asyncIterator](): AsyncIterableIterator<ResponsesStreamMessage> {
+  [Symbol.asyncIterator](options?: WebSocketStreamOptions): AsyncIterableIterator<ResponsesStreamMessage> {
     if (!this.socket) {
       throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
     }
 
+    const maxBufferedEvents = getMaxBufferedEvents(options);
+
     // Two-queue async iterator: `queue` buffers incoming messages,
     // `resolvers` buffers waiting next() calls. A push wakes the
     // oldest next(); a next() drains the oldest message.
-    const queue: ResponsesStreamMessage[] = [];
-    const resolvers: (() => void)[] = [];
+    const queue: (ResponsesStreamMessage | undefined)[] = [];
+    const resolvers: ((() => void) | undefined)[] = [];
+    let queueHead = 0;
+    let resolverHead = 0;
     let done = false;
+    let failure: WebSocketError | undefined;
     let currentSocket = this.socket;
 
+    const wakeResolver = () => {
+      if (resolverHead >= resolvers.length) return;
+
+      const resolver = resolvers[resolverHead];
+      resolvers[resolverHead] = undefined;
+      resolverHead += 1;
+      if (resolverHead >= 64 && resolverHead * 2 >= resolvers.length) {
+        resolvers.splice(0, resolverHead);
+        resolverHead = 0;
+      }
+      resolver?.();
+    };
+
     const push = (msg: ResponsesStreamMessage) => {
+      if (done) return;
+
+      if (maxBufferedEvents !== undefined && queue.length - queueHead >= maxBufferedEvents) {
+        failure = new WebSocketError(
+          `WebSocket stream exceeded maxBufferedEvents (${maxBufferedEvents})`,
+          null,
+        );
+        done = true;
+        queue.length = 0;
+        queueHead = 0;
+        cleanup();
+        flushResolvers();
+        return;
+      }
+
       queue.push(msg);
-      resolvers.shift()?.();
+      wakeResolver();
     };
 
     const onEvent = (event: ResponsesAPI.BetaResponsesServerEvent) => {
@@ -235,9 +297,14 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     };
 
     const flushResolvers = () => {
-      for (let resolver = resolvers.shift(); resolver; resolver = resolvers.shift()) {
-        resolver();
+      while (resolverHead < resolvers.length) {
+        const resolver = resolvers[resolverHead];
+        resolvers[resolverHead] = undefined;
+        resolverHead += 1;
+        resolver?.();
       }
+      resolvers.length = 0;
+      resolverHead = 0;
     };
 
     const onClose = (
@@ -251,8 +318,9 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
       cleanup();
     };
 
-    const onSocketSwap = (oldSocket: TSocket, newSocket: TSocket) => {
-      oldSocket.off('open', onOpen);
+    const onSocketSwap = (_oldSocket: TSocket, newSocket: TSocket) => {
+      if (currentSocket === newSocket) return;
+      currentSocket.off('open', onOpen);
       newSocket.on('open', onOpen);
       currentSocket = newSocket;
     };
@@ -309,9 +377,21 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
       }
     }
 
-    const resolve = (res: (value: IteratorResult<ResponsesStreamMessage>) => void) => {
-      if (queue.length > 0) {
-        res({ value: queue.shift()!, done: false });
+    const resolve = (
+      res: (value: IteratorResult<ResponsesStreamMessage>) => void,
+      reject: (error: WebSocketError) => void,
+    ) => {
+      if (failure) {
+        reject(failure);
+      } else if (queueHead < queue.length) {
+        const queued = queue[queueHead]!;
+        queue[queueHead] = undefined;
+        queueHead += 1;
+        if (queueHead >= 64 && queueHead * 2 >= queue.length) {
+          queue.splice(0, queueHead);
+          queueHead = 0;
+        }
+        res({ value: queued, done: false });
       } else if (done) {
         res({ value: undefined, done: true });
       } else {
@@ -321,10 +401,10 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     };
 
     const next = (): Promise<IteratorResult<ResponsesStreamMessage>> =>
-      new Promise((res) => {
-        if (resolve(res)) return;
+      new Promise((res, reject) => {
+        if (resolve(res, reject)) return;
         resolvers.push(() => {
-          resolve(res);
+          resolve(res, reject);
         });
       });
 
@@ -332,6 +412,8 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
       next,
       return: (): Promise<IteratorReturnResult<undefined>> => {
         done = true;
+        queue.length = 0;
+        queueHead = 0;
         cleanup();
         flushResolvers();
         return Promise.resolve({ value: undefined, done: true });
@@ -342,10 +424,13 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     };
   }
 
-  private _connect(): TSocket {
-    this.url = buildURL(this._client, this._parameters ?? {});
+  private _connect(
+    createSocket: (url: URL) => TSocket = (url) => this._createSocket(url, this._authHeaders()),
+    url: URL = buildURL(this._client, this._parameters ?? {}),
+  ): TSocket {
+    this.url = url;
 
-    const socket = this._createSocket(this.url, this._authHeaders());
+    const socket = createSocket(this.url);
 
     socket.on('message', (data: string | ArrayBuffer | ArrayBufferView, isBinary: boolean) => {
       if (isBinary) {
@@ -364,7 +449,43 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
         return;
       }
 
-      this._emit('event', event);
+      if (
+        event === null ||
+        typeof event !== 'object' ||
+        Array.isArray(event) ||
+        !Object.prototype.hasOwnProperty.call(event, 'type') ||
+        typeof event.type !== 'string'
+      ) {
+        this._onError(
+          null,
+          'received invalid WebSocket event: expected an object with an own string type',
+          undefined,
+        );
+        return;
+      }
+
+      const eventType: string = event.type;
+      const reservedEventType =
+        eventType === 'raw' ||
+        eventType === 'close' ||
+        eventType === 'event' ||
+        eventType === 'reconnecting' ||
+        eventType === 'reconnected' ||
+        eventType === 'open' ||
+        eventType === 'error';
+      if (reservedEventType && eventType !== 'error') {
+        this._onError(null, 'received reserved WebSocket event type', undefined);
+        return;
+      }
+
+      webSocketEventBytes.set(event, rawByteLength(data));
+      webSocketEventPayloads.set(event, text);
+      try {
+        this._emit('event', event);
+      } finally {
+        webSocketEventBytes.delete(event);
+        webSocketEventPayloads.delete(event);
+      }
 
       if (event.type === 'error') {
         this._onError(event);
@@ -375,6 +496,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     });
 
     socket.on('error', (err: Error) => {
+      recordWebSocketError(socket, err);
       // Suppress transient errors during reconnection — the retry loop
       // already handles them and will surface a close if retries exhaust.
       if (this._isReconnecting) return;
@@ -516,7 +638,22 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
       let closeCodePromise: Promise<number> | undefined;
       try {
         const oldSocket = this.socket;
-        this.socket = this._connect();
+        const url = buildURL(this._client, this._parameters ?? {});
+        const canceled = new Promise<undefined>((resolve) => {
+          this._cancelRefresh = () => resolve(undefined);
+        });
+        let createSocket: ((url: URL) => TSocket) | undefined;
+        try {
+          createSocket = await Promise.race([this._prepareReconnectSocket(), canceled]);
+        } finally {
+          this._cancelRefresh = undefined;
+        }
+        if (!this._canReconnect(closeCode)) {
+          this._isReconnecting = false;
+          this._emitPermanentClose(this._closeCode, this._closeReason);
+          return;
+        }
+        this.socket = this._connect(createSocket, url);
         // Registered synchronously after _connect() and before any
         // await so the code is captured even when ws emits 'close'
         // in the same tick as 'error' (e.g. abortHandshake).
@@ -533,6 +670,15 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
         this._internalEvents._emit('reconnected');
         return;
       } catch {
+        if (this._intentionallyClosed) {
+          // A public close observer may have thrown after lifecycle cleanup.
+          // Only emit here if the reconnect itself had not already closed.
+          if (this._isReconnecting) {
+            this._isReconnecting = false;
+            this._emitPermanentClose(this._closeCode, this._closeReason);
+          }
+          return;
+        }
         if (closeCodePromise) {
           // ws may emit 'error' before 'close', so await the code
           // rather than reading it synchronously.
@@ -606,10 +752,12 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     this._emit('close', code, reason, unsent);
   }
 
-  protected _authHeaders(): Record<string, string> {
-    if (this._client.apiKey) {
-      return { Authorization: `Bearer ${this._client.apiKey}` };
-    }
-    return {};
+  protected _prepareReconnectSocket(): Promise<(url: URL) => TSocket> {
+    const authHeaders = this._authHeaders();
+    return Promise.resolve((url) => this._createSocket(url, authHeaders));
+  }
+
+  protected _authHeaders(apiKey = this._client.apiKey): Record<string, string> {
+    return typeof apiKey === 'string' && apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
   }
 }

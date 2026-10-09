@@ -47,6 +47,7 @@ describe('bufferSteadyMultipartUploads', () => {
 
     const forwardedBody = await new Response(forwardedInit?.body, { headers: forwardedHeaders }).formData();
     expect(forwardedBody.get('default')).toBe('true');
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     const file = forwardedBody.get('files[]') as File;
     expect(file.name).toBe('README.md');
     expect(file.type).toBe('text/plain');

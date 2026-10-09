@@ -7,6 +7,13 @@ import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class Sessions extends APIResource {
   /**
    * Create a ChatKit session.
@@ -21,12 +28,15 @@ export class Sessions extends APIResource {
    * ```
    */
   create(body: SessionCreateParams, options?: RequestOptions): APIPromise<ThreadsAPI.ChatSession> {
-    return this._client.post('/chatkit/sessions', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      '/chatkit/sessions',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -41,11 +51,14 @@ export class Sessions extends APIResource {
    * ```
    */
   cancel(sessionID: string, options?: RequestOptions): APIPromise<ThreadsAPI.ChatSession> {
-    return this._client.post(path`/chatkit/sessions/${sessionID}/cancel`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/chatkit/sessions/${sessionID}/cancel`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'chatkit_beta=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 

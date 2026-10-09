@@ -99,6 +99,77 @@ describe('environment and request utilities', () => {
       vi.useRealTimers();
     }
   });
+
+  test('rejects even when structural signal cleanup throws', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const controller = new AbortController();
+      let listener: Parameters<AbortSignal['addEventListener']>[1] | undefined;
+      const signal = new Proxy(controller.signal, {
+        get(target, property) {
+          if (property === 'addEventListener') {
+            return (_type: string, next: Parameters<AbortSignal['addEventListener']>[1]) => {
+              listener = next;
+            };
+          }
+          if (property === 'removeEventListener') {
+            return () => {
+              throw new Error('listener cleanup failed');
+            };
+          }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- The compatibility proxy must preserve native AbortSignal accessors with the signal as receiver.
+          return Reflect.get(target, property, target);
+        },
+      });
+      let rejected = false;
+      void sleep(25, signal).catch(() => {
+        rejected = true;
+      });
+
+      controller.abort();
+      expect(() => {
+        if (typeof listener === 'function') {
+          listener.call(signal, new Event('abort'));
+        } else {
+          listener?.handleEvent(new Event('abort'));
+        }
+      }).not.toThrow();
+      await Promise.resolve();
+
+      expect(rejected).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('rejects when a structural signal aborts during listener registration', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const controller = new AbortController();
+      const signal = new Proxy(controller.signal, {
+        get(target, property) {
+          if (property === 'addEventListener') {
+            return () => controller.abort(new Error('aborted during registration'));
+          }
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- The compatibility proxy must preserve native AbortSignal accessors with the signal as receiver.
+          return Reflect.get(target, property, target);
+        },
+      });
+      let rejected = false;
+      void sleep(25, signal).catch(() => {
+        rejected = true;
+      });
+      await Promise.resolve();
+
+      expect(rejected).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('value utilities', () => {
@@ -138,6 +209,7 @@ describe('value utilities', () => {
   });
 
   test('checks own properties without trusting an overwritten hasOwnProperty method', () => {
+    // SAFETY: This local fixture intentionally controls its own keys and prototype; the dictionary view leaves values untrusted while testing prototype safety.
     const object = Object.create({ inherited: true }) as Record<string, unknown>;
     object['own'] = true;
     object['hasOwnProperty'] = undefined;

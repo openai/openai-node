@@ -65,6 +65,7 @@ export function uploadWebApiTestCases({
       // This works with the node types but to get this to work with web types
       // we would need to bump `typescript` to ~5.5 and add `DOM.AsyncIterable`
       // to `lib` but we want to test older ts versions
+      // SAFETY: The runtime response body supports async iteration; this ecosystem fixture also compiles against older TypeScript DOM declarations that omit it.
       const body = response.body! as any;
       for await (const chunk of body) {
         chunks.push(decoder.decode(chunk));

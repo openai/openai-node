@@ -8,31 +8,36 @@ import { type Uploadable } from '../core/uploads';
 import { RequestOptions } from '../internal/request-options';
 import { multipartFormRequestOptions } from '../internal/uploads';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Given a prompt and/or an input image, the model will generate a new image.
  */
 export class Images extends APIResource {
   /**
-   * Creates a variation of a given image. This endpoint only supports `dall-e-2`.
+   * This endpoint is retired and no longer available. Use the image edits endpoint
+   * with a GPT Image model and a prompt to create a variation of an image. The
+   * request and response schemas below describe the legacy contract.
    *
-   * @example
-   * ```ts
-   * const imagesResponse = await client.images.createVariation({
-   *   image: fs.createReadStream('otter.png'),
-   * });
-   * ```
+   * @deprecated
    */
   createVariation(body: ImageCreateVariationParams, options?: RequestOptions): APIPromise<ImagesResponse> {
     return this._client.post(
       '/images/variations',
-      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      ),
     );
   }
 
   /**
    * Creates an edited or extended image given one or more source images and a
-   * prompt. This endpoint supports GPT Image models (`gpt-image-1.5`, `gpt-image-1`,
-   * `gpt-image-1-mini`, and `chatgpt-image-latest`) and `dall-e-2`.
+   * prompt. This endpoint supports GPT Image models.
    *
    * @example
    * ```ts
@@ -54,22 +59,24 @@ export class Images extends APIResource {
   ): APIPromise<ImagesResponse> | APIPromise<Stream<ImageEditStreamEvent>> {
     return this._client.post(
       '/images/edits',
-      multipartFormRequestOptions(
-        {
-          body,
-          ...options,
-          stream: body.stream ?? false,
-          __metadata: { ...options?.__metadata, ...(body.model == null ? {} : { model: body.model }) },
-          __security: { bearerAuth: true },
-        },
-        this._client,
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions(
+          {
+            body,
+            ...options,
+            stream: body.stream ?? false,
+            __metadata: { ...options?.__metadata, ...(body.model == null ? {} : { model: body.model }) },
+            __security: { bearerAuth: true },
+          },
+          this._client,
+        ),
       ),
     ) as APIPromise<ImagesResponse> | APIPromise<Stream<ImageEditStreamEvent>>;
   }
 
   /**
-   * Creates an image given a prompt.
-   * [Learn more](https://platform.openai.com/docs/guides/images).
+   * Creates an image given a prompt using a GPT Image model.
+   * [Learn more](https://developers.openai.com/api/docs/guides/images-vision).
    *
    * @example
    * ```ts
@@ -91,12 +98,15 @@ export class Images extends APIResource {
     body: ImageGenerateParams,
     options?: RequestOptions,
   ): APIPromise<ImagesResponse> | APIPromise<Stream<ImageGenStreamEvent>> {
-    return this._client.post('/images/generations', {
-      body,
-      ...options,
-      stream: body.stream ?? false,
-      __security: { bearerAuth: true },
-    }) as APIPromise<ImagesResponse> | APIPromise<Stream<ImageGenStreamEvent>>;
+    return this._client.post(
+      '/images/generations',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        stream: body.stream ?? false,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<ImagesResponse> | APIPromise<Stream<ImageGenStreamEvent>>;
   }
 }
 
@@ -105,21 +115,21 @@ export class Images extends APIResource {
  */
 export interface Image {
   /**
-   * The base64-encoded JSON of the generated image. Returned by default for the GPT
-   * image models, and only present if `response_format` is set to `b64_json` for
-   * `dall-e-2` and `dall-e-3`.
+   * The base64-encoded JSON of the generated image. Returned by default for GPT
+   * image models, or when `response_format` is set to `b64_json` for models that
+   * support that parameter.
    */
   b64_json?: string;
 
   /**
-   * For `dall-e-3` only, the revised prompt that was used to generate the image.
+   * The revised prompt used to generate the image, for models that support prompt
+   * revision. Not returned by GPT image models.
    */
   revised_prompt?: string;
 
   /**
-   * When using `dall-e-2` or `dall-e-3`, the URL of the generated image if
-   * `response_format` is set to `url` (default value). Unsupported for the GPT image
-   * models.
+   * The URL of the generated image when `response_format` is set to `url` for models
+   * that support that parameter. Unsupported for GPT image models.
    */
   url?: string;
 }
@@ -151,12 +161,12 @@ export interface ImageEditCompletedEvent {
   /**
    * The quality setting for the edited image.
    */
-  quality: 'low' | 'medium' | 'high' | 'auto';
+  quality: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto';
 
   /**
-   * The size of the edited image.
+   * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
    */
-  size: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+  size: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
 
   /**
    * The type of the event. Always `image_edit.completed`.
@@ -247,12 +257,12 @@ export interface ImageEditPartialImageEvent {
   /**
    * The quality setting for the requested edited image.
    */
-  quality: 'low' | 'medium' | 'high' | 'auto';
+  quality: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto';
 
   /**
-   * The size of the requested edited image.
+   * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
    */
-  size: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+  size: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
 
   /**
    * The type of the event. Always `image_edit.partial_image`.
@@ -292,12 +302,12 @@ export interface ImageGenCompletedEvent {
   /**
    * The quality setting for the generated image.
    */
-  quality: 'low' | 'medium' | 'high' | 'auto';
+  quality: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto';
 
   /**
-   * The size of the generated image.
+   * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
    */
-  size: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+  size: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
 
   /**
    * The type of the event. Always `image_generation.completed`.
@@ -388,12 +398,12 @@ export interface ImageGenPartialImageEvent {
   /**
    * The quality setting for the requested image.
    */
-  quality: 'low' | 'medium' | 'high' | 'auto';
+  quality: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto';
 
   /**
-   * The size of the requested image.
+   * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
    */
-  size: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+  size: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
 
   /**
    * The type of the event. Always `image_generation.partial_image`.
@@ -406,12 +416,22 @@ export interface ImageGenPartialImageEvent {
  */
 export type ImageGenStreamEvent = ImageGenPartialImageEvent | ImageGenCompletedEvent;
 
+/**
+ * Deprecated values:
+ *
+ * - "dall-e-2", "dall-e-3": This model was retired on May 12, 2026. Use a GPT
+ *   image model instead.
+ */
 export type ImageModel =
-  | 'gpt-image-1'
-  | 'gpt-image-1-mini'
+  | 'gpt-image-1.5'
   | 'gpt-image-2'
   | 'gpt-image-2-2026-04-21'
-  | 'gpt-image-1.5'
+  | 'gpt-image-2.5-sunburst'
+  | 'gpt-image-2.5-sunburst-2026-09-08'
+  | 'gpt-image-2.5-flare'
+  | 'gpt-image-2.5-flare-2026-09-08'
+  | 'gpt-image-1'
+  | 'gpt-image-1-mini'
   | 'chatgpt-image-latest'
   | 'dall-e-2'
   | 'dall-e-3';
@@ -442,15 +462,15 @@ export interface ImagesResponse {
   output_format?: 'png' | 'webp' | 'jpeg';
 
   /**
-   * The quality of the image generated. Either `low`, `medium`, or `high`.
+   * The quality of the image generated. One of `low`, `medium`, `high`, `xhigh`, or
+   * `max`.
    */
-  quality?: 'low' | 'medium' | 'high';
+  quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
   /**
-   * The size of the image generated. Either `1024x1024`, `1024x1536`, or
-   * `1536x1024`.
+   * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
    */
-  size?: '1024x1024' | '1024x1536' | '1536x1024';
+  size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024';
 
   /**
    * For `gpt-image-1` only, the token usage information for the image generation.
@@ -530,8 +550,8 @@ export interface ImageCreateVariationParams {
   image: Uploadable;
 
   /**
-   * The model to use for image generation. Only `dall-e-2` is supported at this
-   * time.
+   * The legacy model used by the retired image variations endpoint. This endpoint no
+   * longer accepts requests.
    */
   model?: (string & {}) | ImageModel | null;
 
@@ -556,7 +576,7 @@ export interface ImageCreateVariationParams {
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
    * and detect abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 }
@@ -568,18 +588,17 @@ export interface ImageEditParamsBase {
    * The image(s) to edit. Must be a supported image file or an array of images.
    *
    * For the GPT image models (`gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`,
-   * `gpt-image-2`, `gpt-image-2-2026-04-21`, and `chatgpt-image-latest`), each image
-   * should be a `png`, `webp`, or `jpg` file less than 50MB. You can provide up to
-   * 16 images.
-   *
-   * For `dall-e-2`, you can only provide one image, and it should be a square `png`
-   * file less than 4MB.
+   * `gpt-image-2`, `gpt-image-2-2026-04-21`, `gpt-image-2.5-sunburst`,
+   * `gpt-image-2.5-sunburst-2026-09-08`, `gpt-image-2.5-flare`,
+   * `gpt-image-2.5-flare-2026-09-08`, and `chatgpt-image-latest`), each image should
+   * be a `png`, `webp`, or `jpg` file less than 50MB. You can provide up to 16
+   * images.
    */
   image: Uploadable | Array<Uploadable>;
 
   /**
-   * A text description of the desired image(s). The maximum length is 1000
-   * characters for `dall-e-2`, and 32000 characters for the GPT image models.
+   * A text description of the desired image(s). The maximum length is 32000
+   * characters for the GPT image models.
    */
   prompt: string;
 
@@ -588,17 +607,19 @@ export interface ImageEditParamsBase {
    * one of `transparent`, `opaque`, or `auto` (default value). When `auto` is used,
    * the model will automatically determine the best background for the image.
    *
-   * Transparent backgrounds are available for supported GPT Image models. For
-   * `gpt-image-2` and `gpt-image-2-2026-04-21`, this support is in preview. When
-   * using `transparent`, set the output format to `png` or `webp`.
+   * `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare`, including their `2026-09-08`
+   * snapshots, support `opaque` and `transparent` backgrounds. Transparent
+   * backgrounds are available for supported GPT Image models. For `gpt-image-2` and
+   * `gpt-image-2-2026-04-21`, this support is in preview. When using `transparent`,
+   * set the output format to `png` or `webp`.
    */
   background?: 'transparent' | 'opaque' | 'auto' | null;
 
   /**
    * Control how much effort the model will exert to match the style and features,
-   * especially facial features, of input images. This parameter is only supported
-   * for `gpt-image-1` and `gpt-image-1.5` and later models, unsupported for
-   * `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.
+   * especially facial features, of input images. Supports `high` and `low` on
+   * `gpt-image-1` and `gpt-image-1.5`; `gpt-image-1-mini` supports only `low`. For
+   * `gpt-image-2`, omit this parameter. Defaults to `low` on supported models.
    */
   input_fidelity?: 'high' | 'low' | null;
 
@@ -611,10 +632,11 @@ export interface ImageEditParamsBase {
   mask?: Uploadable;
 
   /**
-   * The model to use for image generation. One of `dall-e-2` or a GPT image model
-   * (`gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`, `gpt-image-2`,
-   * `gpt-image-2-2026-04-21`, or `chatgpt-image-latest`). Defaults to
-   * `gpt-image-1.5`.
+   * The GPT image model to use for image editing (`gpt-image-1`, `gpt-image-1-mini`,
+   * `gpt-image-1.5`, `gpt-image-2`, `gpt-image-2-2026-04-21`,
+   * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
+   * `gpt-image-2.5-flare`, `gpt-image-2.5-flare-2026-09-08`, or
+   * `chatgpt-image-latest`).
    */
   model?: (string & {}) | ImageModel | null;
 
@@ -648,37 +670,37 @@ export interface ImageEditParamsBase {
   partial_images?: number | null;
 
   /**
-   * The quality of the image that will be generated for GPT image models. Defaults
-   * to `auto`.
+   * The quality of the image that will be generated for GPT image models. The GPT
+   * image models support `low`, `medium`, and `high`. `gpt-image-2.5-sunburst` and
+   * `gpt-image-2.5-flare`, including their `2026-09-08` snapshots, also support
+   * `xhigh` and `max`. Defaults to `auto`.
    */
-  quality?: 'standard' | 'low' | 'medium' | 'high' | 'auto' | null;
+  quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto' | 'standard' | null;
 
   /**
-   * The format in which the generated images are returned. Must be one of `url` or
-   * `b64_json`. URLs are only valid for 60 minutes after the image has been
-   * generated. This parameter is only supported for `dall-e-2` (default is `url` for
-   * `dall-e-2`), as GPT image models always return base64-encoded images.
+   * @deprecated Legacy response format parameter for retired image models.
+   * Unsupported for GPT image models, which always return base64-encoded images.
    */
   response_format?: 'url' | 'b64_json' | null;
 
   /**
-   * The size of the generated images. For `gpt-image-2` and
-   * `gpt-image-2-2026-04-21`, arbitrary resolutions are supported as `WIDTHxHEIGHT`
-   * strings, for example `1536x864`. Width and height must both be divisible by 16
-   * and the requested aspect ratio must be between 1:3 and 3:1. Resolutions above
-   * `2560x1440` are experimental, and the maximum supported resolution is
-   * `3840x2160`. The requested size must also satisfy the model's current pixel and
-   * edge limits. The standard sizes `1024x1024`, `1536x1024`, and `1024x1536` are
-   * supported by the GPT image models; `auto` is supported for models that allow
-   * automatic sizing. For `dall-e-2`, use one of `256x256`, `512x512`, or
-   * `1024x1024`. For `dall-e-3`, use one of `1024x1024`, `1792x1024`, or
-   * `1024x1792`.
+   * The size of the generated images. Defaults to `auto`. For `gpt-image-2`,
+   * `gpt-image-2-2026-04-21`, `gpt-image-2.5-sunburst`,
+   * `gpt-image-2.5-sunburst-2026-09-08`, `gpt-image-2.5-flare`, and
+   * `gpt-image-2.5-flare-2026-09-08`, arbitrary resolutions are supported as
+   * `WIDTHxHEIGHT` strings, for example `1536x864`. Width and height must both be
+   * divisible by 16 and the requested aspect ratio must be between 1:3 and 3:1.
+   * Resolutions above `2560x1440` are experimental, and the maximum supported
+   * resolution is `3840x2160`. The requested size must also satisfy the model's
+   * current pixel and edge limits. The standard sizes `1024x1024`, `1536x1024`, and
+   * `1024x1536` are supported by the GPT image models; `auto` is supported for
+   * models that allow automatic sizing.
    */
-  size?: (string & {}) | '256x256' | '512x512' | '1024x1024' | '1536x1024' | '1024x1536' | 'auto' | null;
+  size?: (string & {}) | '1024x1024' | '1536x1024' | '1024x1536' | 'auto' | '256x256' | '512x512' | null;
 
   /**
    * Edit the image in streaming mode. Defaults to `false`. See the
-   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
    * for more information.
    */
   stream?: boolean | null;
@@ -686,7 +708,7 @@ export interface ImageEditParamsBase {
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
    * and detect abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 }
@@ -699,7 +721,7 @@ export namespace ImageEditParams {
 export interface ImageEditParamsNonStreaming extends ImageEditParamsBase {
   /**
    * Edit the image in streaming mode. Defaults to `false`. See the
-   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
    * for more information.
    */
   stream?: false | null;
@@ -708,7 +730,7 @@ export interface ImageEditParamsNonStreaming extends ImageEditParamsBase {
 export interface ImageEditParamsStreaming extends ImageEditParamsBase {
   /**
    * Edit the image in streaming mode. Defaults to `false`. See the
-   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
    * for more information.
    */
   stream: true;
@@ -719,8 +741,7 @@ export type ImageGenerateParams = ImageGenerateParamsNonStreaming | ImageGenerat
 export interface ImageGenerateParamsBase {
   /**
    * A text description of the desired image(s). The maximum length is 32000
-   * characters for the GPT image models, 1000 characters for `dall-e-2` and 4000
-   * characters for `dall-e-3`.
+   * characters.
    */
   prompt: string;
 
@@ -729,17 +750,20 @@ export interface ImageGenerateParamsBase {
    * one of `transparent`, `opaque`, or `auto` (default value). When `auto` is used,
    * the model will automatically determine the best background for the image.
    *
-   * Transparent backgrounds are available for supported GPT Image models. For
-   * `gpt-image-2` and `gpt-image-2-2026-04-21`, this support is in preview. When
-   * using `transparent`, set the output format to `png` or `webp`.
+   * `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare`, including their `2026-09-08`
+   * snapshots, support `opaque` and `transparent` backgrounds. Transparent
+   * backgrounds are available for supported GPT Image models. For `gpt-image-2` and
+   * `gpt-image-2-2026-04-21`, this support is in preview. When using `transparent`,
+   * set the output format to `png` or `webp`.
    */
   background?: 'transparent' | 'opaque' | 'auto' | null;
 
   /**
-   * The model to use for image generation. One of `dall-e-2`, `dall-e-3`, or a GPT
-   * image model (`gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`, `gpt-image-2`,
-   * or `gpt-image-2-2026-04-21`). Defaults to `dall-e-2` unless a parameter specific
-   * to the GPT image models is used.
+   * The GPT image model to use for image generation. Specify a model explicitly.
+   * Supported models include `gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`,
+   * `gpt-image-2`, `gpt-image-2-2026-04-21`, `gpt-image-2.5-sunburst`,
+   * `gpt-image-2.5-sunburst-2026-09-08`, `gpt-image-2.5-flare`,
+   * `gpt-image-2.5-flare-2026-09-08`, and `chatgpt-image-latest`.
    */
   model?: (string & {}) | ImageModel | null;
 
@@ -751,8 +775,7 @@ export interface ImageGenerateParamsBase {
   moderation?: 'low' | 'auto' | null;
 
   /**
-   * The number of images to generate. Must be between 1 and 10. For `dall-e-3`, only
-   * `n=1` is supported.
+   * The number of images to generate. Must be between 1 and 10.
    */
   n?: number | null;
 
@@ -785,31 +808,28 @@ export interface ImageGenerateParamsBase {
    * - `auto` (default value) will automatically select the best quality for the
    *   given model.
    * - `high`, `medium` and `low` are supported for the GPT image models.
-   * - `hd` and `standard` are supported for `dall-e-3`.
-   * - `standard` is the only option for `dall-e-2`.
+   * - `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare`, including their
+   *   `2026-09-08` snapshots, also support `xhigh` and `max`.
    */
-  quality?: 'standard' | 'hd' | 'low' | 'medium' | 'high' | 'auto' | null;
+  quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto' | 'standard' | 'hd' | null;
 
   /**
-   * The format in which generated images with `dall-e-2` and `dall-e-3` are
-   * returned. Must be one of `url` or `b64_json`. URLs are only valid for 60 minutes
-   * after the image has been generated. This parameter isn't supported for the GPT
-   * image models, which always return base64-encoded images.
+   * @deprecated Legacy response format parameter for retired image models.
+   * Unsupported for GPT image models, which always return base64-encoded images.
    */
   response_format?: 'url' | 'b64_json' | null;
 
   /**
-   * The size of the generated images. For `gpt-image-2` and
-   * `gpt-image-2-2026-04-21`, arbitrary resolutions are supported as `WIDTHxHEIGHT`
-   * strings, for example `1536x864`. Width and height must both be divisible by 16
-   * and the requested aspect ratio must be between 1:3 and 3:1. Resolutions above
-   * `2560x1440` are experimental, and the maximum supported resolution is
-   * `3840x2160`. The requested size must also satisfy the model's current pixel and
-   * edge limits. The standard sizes `1024x1024`, `1536x1024`, and `1024x1536` are
-   * supported by the GPT image models; `auto` is supported for models that allow
-   * automatic sizing. For `dall-e-2`, use one of `256x256`, `512x512`, or
-   * `1024x1024`. For `dall-e-3`, use one of `1024x1024`, `1792x1024`, or
-   * `1024x1792`.
+   * The size of the generated images. For `gpt-image-2`, `gpt-image-2-2026-04-21`,
+   * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
+   * `gpt-image-2.5-flare`, and `gpt-image-2.5-flare-2026-09-08`, arbitrary
+   * resolutions are supported as `WIDTHxHEIGHT` strings, for example `1536x864`.
+   * Width and height must both be divisible by 16 and the requested aspect ratio
+   * must be between 1:3 and 3:1. Resolutions above `2560x1440` are experimental, and
+   * the maximum supported resolution is `3840x2160`. The requested size must also
+   * satisfy the model's current pixel and edge limits. The standard sizes
+   * `1024x1024`, `1536x1024`, and `1024x1536` are supported by the GPT image models;
+   * `auto` is supported for models that allow automatic sizing.
    */
   size?:
     | (string & {})
@@ -825,23 +845,21 @@ export interface ImageGenerateParamsBase {
 
   /**
    * Generate the image in streaming mode. Defaults to `false`. See the
-   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
    * for more information. This parameter is only supported for the GPT image models.
    */
   stream?: boolean | null;
 
   /**
-   * The style of the generated images. This parameter is only supported for
-   * `dall-e-3`. Must be one of `vivid` or `natural`. Vivid causes the model to lean
-   * towards generating hyper-real and dramatic images. Natural causes the model to
-   * produce more natural, less hyper-real looking images.
+   * @deprecated Legacy style parameter for retired image models. Unsupported for GPT
+   * image models; describe the desired style in the prompt instead.
    */
   style?: 'vivid' | 'natural' | null;
 
   /**
    * A unique identifier representing your end-user, which can help OpenAI to monitor
    * and detect abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 }
@@ -854,7 +872,7 @@ export namespace ImageGenerateParams {
 export interface ImageGenerateParamsNonStreaming extends ImageGenerateParamsBase {
   /**
    * Generate the image in streaming mode. Defaults to `false`. See the
-   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
    * for more information. This parameter is only supported for the GPT image models.
    */
   stream?: false | null;
@@ -863,7 +881,7 @@ export interface ImageGenerateParamsNonStreaming extends ImageGenerateParamsBase
 export interface ImageGenerateParamsStreaming extends ImageGenerateParamsBase {
   /**
    * Generate the image in streaming mode. Defaults to `false`. See the
-   * [Image generation guide](https://platform.openai.com/docs/guides/image-generation)
+   * [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation)
    * for more information. This parameter is only supported for the GPT image models.
    */
   stream: true;

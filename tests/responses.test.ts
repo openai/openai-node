@@ -70,7 +70,9 @@ describe('request id', () => {
             headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
           },
         ),
+        // SAFETY: This response-parsing fixture never aborts or builds requests; the empty controller/options are inert constructor placeholders.
         controller: {} as any,
+        // SAFETY: This response-parsing fixture never aborts or builds requests; the empty controller/options are inert constructor placeholders.
         options: {} as any,
         requestLogID: 'log_...',
         retryOfRequestLogID: undefined,
@@ -97,6 +99,7 @@ describe('request id', () => {
 
     const page = await client.fineTuning.jobs.list();
     expect(page.data).toMatchObject([{ foo: 'bar' }]);
+    // SAFETY: The assertion intentionally probes for absent _request_id on a page, array, or primitive; it does not treat that property as present.
     expect((page as any)._request_id).toBeUndefined();
   });
 
@@ -107,7 +110,9 @@ describe('request id', () => {
         response: Response.json([{ foo: 'bar' }], {
           headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/json' },
         }),
+        // SAFETY: This response-parsing fixture never aborts or builds requests; the empty controller/options are inert constructor placeholders.
         controller: {} as any,
+        // SAFETY: This response-parsing fixture never aborts or builds requests; the empty controller/options are inert constructor placeholders.
         options: {} as any,
         requestLogID: 'log_...',
         retryOfRequestLogID: undefined,
@@ -118,6 +123,7 @@ describe('request id', () => {
     const rsp = await promise;
     expect(rsp.length).toBe(1);
     expect(rsp[0]).toMatchObject({ foo: 'bar' });
+    // SAFETY: The assertion intentionally probes for absent _request_id on a page, array, or primitive; it does not treat that property as present.
     expect((rsp as any)._request_id).toBeUndefined();
   });
 
@@ -128,7 +134,9 @@ describe('request id', () => {
         response: new Response('hello world', {
           headers: { 'x-request-id': 'req_id_xxx', 'content-type': 'application/text' },
         }),
+        // SAFETY: This response-parsing fixture never aborts or builds requests; the empty controller/options are inert constructor placeholders.
         controller: {} as any,
+        // SAFETY: This response-parsing fixture never aborts or builds requests; the empty controller/options are inert constructor placeholders.
         options: {} as any,
         requestLogID: 'log_...',
         retryOfRequestLogID: undefined,
@@ -138,6 +146,7 @@ describe('request id', () => {
 
     const result = await promise;
     expect(result).toBe('hello world');
+    // SAFETY: The assertion intentionally probes for absent _request_id on a page, array, or primitive; it does not treat that property as present.
     expect((result as any)._request_id).toBeUndefined();
   });
 });

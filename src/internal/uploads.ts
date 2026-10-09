@@ -105,6 +105,7 @@ type NamedBlob = Blob & {
  */
 export const checkFileSupport = () => {
   if (typeof File === 'undefined') {
+    // SAFETY: This optional Node global is inspected only to improve the missing-File diagnostic in runtimes without process.
     const { process } = globalThis as any;
     const isOldNode =
       typeof process?.versions?.node === 'string' &&
@@ -148,6 +149,7 @@ export function makeFile(
   options?: FilePropertyBag,
 ): File {
   checkFileSupport();
+  // SAFETY: The SDK BlobPart union supports Node and web binary inputs; the native File constructor handles those parts across their differing ambient types.
   return new File(fileBits as any, fileName ?? 'unknown_file', options);
 }
 
@@ -157,7 +159,9 @@ export function makeFile(
  * Directory components separated by either `/` or `\\` are discarded unless an
  * explicitly supplied `name` or `filename` opts into preserving its path. Preserved
  * paths must be safe and relative, and use forward slashes. Paths inferred from URLs and filesystem streams
- * discard their directories.
+ * discard their directories. URL filenames decode valid UTF-8 percent escapes,
+ * except that ASCII control characters stay escaped for multipart compatibility.
+ * A basename stays encoded if decoding would introduce literal multipart escape sequences.
  */
 export function getName(value: any, options?: { stripFilename?: boolean | undefined }): string | undefined {
   if (typeof value !== 'object' || value === null) {
@@ -174,7 +178,8 @@ export function getName(value: any, options?: { stripFilename?: boolean | undefi
   const url = 'url' in value && value.url && String(value.url);
   if (url) {
     try {
-      return basename(new URL(url).pathname);
+      const filename = basename(new URL(url).pathname);
+      return filename === undefined ? undefined : basename(decodeURLFilename(filename));
     } catch {
       return basename(url);
     }
@@ -188,12 +193,38 @@ function basename(value: string): string | undefined {
   return value.split(/[\\/]/).pop() || undefined;
 }
 
+function decodeURLFilename(filename: string): string {
+  try {
+    const decodedFilename = decodeURIComponent(filename);
+    // Fetch multipart receivers interpret these spellings as CR, LF, or a quote.
+    if (/%(?:0[AD]|22)/i.test(decodedFilename)) {
+      return filename;
+    }
+    // oxlint-disable-next-line no-control-regex -- Multipart parsers reject unescaped ASCII controls in filenames.
+    return decodedFilename.replace(/[\u0000-\u001F\u007F]/gu, encodeURIComponent);
+  } catch {
+    // A malformed escape leaves the original URL segment usable as a filename.
+    return filename;
+  }
+}
+
 function normalizeFilenamePath(value: string): string {
   const normalized = value.replace(/\\/g, '/');
   if (normalized.startsWith('/') || /^[A-Za-z]:/.test(normalized) || normalized.split('/').includes('..')) {
     throw new TypeError('Upload file name must be a safe relative path without parent directory segments');
   }
   return normalized;
+}
+
+const arrayBufferByteLengthGetter = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength')?.get;
+
+/** Recognizes native ArrayBuffers across realms without trusting their prototype or string tag. */
+export function isArrayBuffer(value: unknown): value is ArrayBuffer {
+  try {
+    return arrayBufferByteLengthGetter?.call(value) !== undefined;
+  } catch {
+    return false;
+  }
 }
 
 /** Identifies objects that expose a callable `Symbol.asyncIterator` method. */
@@ -257,6 +288,7 @@ const supportsFormDataMap = /* @__PURE__ */ new WeakMap<Fetch, Promise<boolean>>
  * confusing error messages later on.
  */
 function supportsFormData(fetchObject: OpenAI | Fetch): Promise<boolean> {
+  // SAFETY: The union has already excluded callable fetch values; the remaining OpenAI client owns the fetch implementation used by this probe.
   const fetch: Fetch = typeof fetchObject === 'function' ? fetchObject : (fetchObject as any).fetch;
   const cached = supportsFormDataMap.get(fetch);
   if (cached) {
@@ -266,10 +298,12 @@ function supportsFormData(fetchObject: OpenAI | Fetch): Promise<boolean> {
     try {
       let FetchResponse: typeof Response;
       if ('Response' in fetch) {
+        // SAFETY: Custom fetch implementations may expose their matching Response constructor; the enclosing probe catches incompatible constructors.
         FetchResponse = fetch.Response as typeof Response;
       } else {
         const response = await fetch('data:,');
         await response.arrayBuffer();
+        // SAFETY: The successful fetch response supplies the constructor used to test its own FormData support; failures remain inside the probe's catch.
         FetchResponse = response.constructor as typeof Response;
       }
       const data = new FormData();
@@ -340,6 +374,7 @@ const isUploadable = (value: unknown): value is Uploadable =>
     isStreamingFile(value) ||
     isBlob(value));
 
+// SAFETY: The enclosing object guard and own-key enumeration allow reading these property values without assigning them a trusted value type.
 const hasStreamingUploadableValue = (value: unknown): boolean => {
   if (isStreamingFile(value) || isAsyncIterable(value) || isReadableStream(value)) {
     return true;
@@ -358,6 +393,7 @@ const hasStreamingUploadableValue = (value: unknown): boolean => {
   return false;
 };
 
+// SAFETY: The enclosing object guard and own-key enumeration allow reading these property values without assigning them a trusted value type.
 const hasUploadableValue = (value: unknown): boolean => {
   if (isUploadable(value)) {
     return true;
@@ -485,6 +521,7 @@ function* iterateFormValue(key: string, value: unknown): Generator<FormEntry> {
 }
 
 function getStreamingFileName(value: Uploadable, options: CreateFormOptions): string {
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The runtime guard validates JavaScript and custom upload values before trusting the StreamingFile brand.
   if (isStreamingFile(value)) {
     const { name } = value;
     if (typeof name !== 'string' || !name) {
@@ -502,6 +539,7 @@ function getStreamingFileName(value: Uploadable, options: CreateFormOptions): st
 function getStreamingFileType(value: Uploadable): string {
   let type: string | undefined;
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- Runtime upload-brand checks intentionally accept unknown inputs despite the static Uploadable annotation.
   if (isStreamingFile(value) || isBlob(value)) {
     ({ type } = value);
   } else if (value instanceof Response) {
@@ -526,7 +564,8 @@ function validateStreamingFileType(type: string): string {
   return type;
 }
 
-function getStreamingFileData(value: Uploadable): unknown {
+function getStreamingFileData(value: Uploadable): Exclude<Uploadable, StreamingFile> {
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The runtime guard validates the streaming wrapper before accessing its potentially custom data.
   if (isStreamingFile(value)) {
     return value.data;
   }
@@ -538,7 +577,7 @@ async function* iterateBytes(value: unknown): AsyncGenerator<Uint8Array> {
     yield encodeUTF8(value);
   } else if (ArrayBuffer.isView(value)) {
     yield new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-  } else if (value instanceof ArrayBuffer) {
+  } else if (isArrayBuffer(value)) {
     yield new Uint8Array(value);
   } else if (value instanceof Response) {
     yield* iterateBytes(value.body || (await value.blob()));

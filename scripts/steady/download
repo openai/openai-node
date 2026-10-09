@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Retry failed or stalled transfers without limiting a progressing download's duration.
+exec curl --fail --location --proto '=https' --proto-redir '=https' --silent --show-error \
+  --retry 3 --retry-all-errors --retry-max-time 60 \
+  --connect-timeout 15 --speed-limit 1 --speed-time 15 \
+  --url "$1" --output "$2"

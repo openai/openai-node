@@ -1,12 +1,21 @@
 import type { Dirent } from 'node:fs';
+import type { promisify } from 'node:util';
+import type pAll from 'p-all';
 
+const packedPackageAcorn: {
+  parse: (source: string, options: { ecmaVersion: 2020; sourceType: 'module' }) => void;
+} = require(require.resolve('acorn', { paths: [require.resolve('ts-node/package.json')] }));
 const packedPackageAssert = require('node:assert/strict');
 const packedPackageChildProcess = require('node:child_process');
+const { promisify: packedPackagePromisify }: { promisify: typeof promisify } = require('node:util');
+
+const packedPackageExecFile = packedPackagePromisify(packedPackageChildProcess.execFile);
+const packedPackageAll: typeof pAll = require('p-all');
 const packedPackageFs = require('node:fs');
 const packedPackageOs = require('node:os');
 const packedPackagePath = require('node:path');
 
-(() => {
+(async () => {
   const assert = packedPackageAssert;
   const childProcess = packedPackageChildProcess;
   const fs = packedPackageFs;
@@ -41,6 +50,13 @@ const packedPackagePath = require('node:path');
     'OAuthError',
     'SubjectTokenProviderError',
   ];
+  const paginationExportNames = [
+    'ConversationCursorPage',
+    'CursorPage',
+    'NextCursorPage',
+    'Page',
+    'TokenPage',
+  ];
   const run = (command: string, args: string[], options: RunOptions = {}): string =>
     childProcess.execFileSync(command, args, {
       cwd: temporaryDirectory,
@@ -48,10 +64,20 @@ const packedPackagePath = require('node:path');
       stdio: 'pipe',
       ...options,
     });
+  const runAsync = async (command: string, args: string[], options: RunOptions = {}): Promise<string> => {
+    const { stdout } = await packedPackageExecFile(command, args, {
+      cwd: temporaryDirectory,
+      encoding: 'utf-8',
+      ...options,
+    });
+    return stdout;
+  };
   const readPackage = (file: string): PackageMetadata =>
+    // SAFETY: This reads the package manifest produced by the local pack step; the checks below validate its engine and peer metadata.
     JSON.parse(fs.readFileSync(file, 'utf-8')) as PackageMetadata;
   const findSourceMaps = (directory: string): string[] => {
     const maps: string[] = [];
+    // SAFETY: withFileTypes requests native Dirent entries; the dynamically required fs module does not retain that overload in its inferred type.
     const entries = fs.readdirSync(directory, { withFileTypes: true }) as Dirent[];
     for (const entry of entries) {
       const resolved = path.join(directory, entry.name);
@@ -73,6 +99,8 @@ const packedPackagePath = require('node:path');
   const requiresOptionalPeer = (source: string): boolean =>
     (source.startsWith('_vendor/zod-to-json-schema/') && !standaloneZodParsers.has(source)) ||
     source === 'helpers/zod.ts' ||
+    source === 'helpers/beta/agents/zod.ts' ||
+    source === 'helpers/beta/agents/filesystem.ts' ||
     source === 'helpers/audio.ts' ||
     source === 'providers/bedrock/aws.ts' ||
     source === 'auth/x509-transport.ts' ||
@@ -102,6 +130,7 @@ const packedPackagePath = require('node:path');
       path.join(temporaryDirectory, 'consumer.cjs'),
       [
         "const OpenAI = require('openai');",
+        "const pagination = require('openai/core/pagination');",
         "const { bedrock } = require('openai/providers/bedrock');",
         "const auth = require('openai/auth');",
         "if (typeof OpenAI !== 'function') throw new Error('CommonJS default export is not constructable');",
@@ -110,6 +139,10 @@ const packedPackagePath = require('node:path');
           (name) =>
             `if (typeof auth.${name} !== 'function') throw new Error('CommonJS auth export ${name} is unavailable');`,
         ),
+        ...paginationExportNames.map(
+          (name) =>
+            `if (typeof OpenAI.${name} !== 'function' || OpenAI.${name} !== pagination.${name}) throw new Error('CommonJS pagination static ${name} does not match its public export');`,
+        ),
         "new OpenAI({ apiKey: 'test' });",
       ].join('\n'),
     );
@@ -117,6 +150,7 @@ const packedPackagePath = require('node:path');
       path.join(temporaryDirectory, 'consumer.mjs'),
       [
         "import OpenAI from 'openai';",
+        "import * as pagination from 'openai/core/pagination';",
         "import { bedrock } from 'openai/providers/bedrock';",
         `import { ${authExportNames.join(', ')} } from 'openai/auth';`,
         "if (typeof OpenAI !== 'function') throw new Error('ESM default export is not constructable');",
@@ -124,6 +158,10 @@ const packedPackagePath = require('node:path');
         ...authExportNames.map(
           (name) =>
             `if (typeof ${name} !== 'function') throw new Error('ESM auth export ${name} is unavailable');`,
+        ),
+        ...paginationExportNames.map(
+          (name) =>
+            `if (typeof OpenAI.${name} !== 'function' || OpenAI.${name} !== pagination.${name}) throw new Error('ESM pagination static ${name} does not match its public export');`,
         ),
         "new OpenAI({ apiKey: 'test' });",
       ].join('\n'),
@@ -159,8 +197,21 @@ const packedPackagePath = require('node:path');
       websocketPeer,
       [
         "declare module 'ws' {",
+        '  interface TLSBuffer extends ArrayLike<number> {',
+        '    readonly buffer: ArrayBufferLike;',
+        '    readonly byteLength: number;',
+        '    readonly byteOffset: number;',
+        '  }',
         '  export interface ClientOptions {',
+        '    ca?: string | TLSBuffer | (string | TLSBuffer)[] | undefined;',
+        '    cert?: string | TLSBuffer | (string | TLSBuffer)[] | undefined;',
+        '    crl?: string | TLSBuffer | (string | TLSBuffer)[] | undefined;',
+        '    key?: string | TLSBuffer | (string | TLSBuffer | { pem: string | TLSBuffer; passphrase?: string | undefined })[] | undefined;',
+        '    pfx?: string | TLSBuffer | (string | TLSBuffer | { buf: string | TLSBuffer; passphrase?: string | undefined })[] | undefined;',
+        '    followRedirects?: boolean | undefined;',
         '    headers?: Record<string, string> | undefined;',
+        '    maxPayload?: number | undefined;',
+        '    perMessageDeflate?: boolean | object | undefined;',
         '  }',
         '  export class WebSocket {',
         '    constructor(address: string | URL, options?: ClientOptions);',
@@ -219,6 +270,92 @@ const packedPackagePath = require('node:path');
 
     const optionalUndici = path.join(temporaryDirectory, 'node_modules/undici');
     assert(!fs.existsSync(optionalUndici), 'Public authentication helpers must not require optional Undici');
+
+    const isolatedEnvironment = { ...process.env };
+    delete isolatedEnvironment['NODE_PATH'];
+    const browserConditionTest = path.join(temporaryDirectory, 'browser-condition.test.cjs');
+    fs.writeFileSync(
+      browserConditionTest,
+      [
+        "const OpenAI = require('openai');",
+        "test('loads the CommonJS entrypoint with browser export conditions', () => {",
+        "  expect(typeof OpenAI).toBe('function');",
+        "  expect(() => new OpenAI({ apiKey: 'test', dangerouslyAllowBrowser: true })).not.toThrow();",
+        '});',
+      ].join('\n'),
+    );
+    const browserConditionConfig = path.join(temporaryDirectory, 'jest-browser-condition.config.cjs');
+    fs.writeFileSync(
+      browserConditionConfig,
+      `module.exports = ${JSON.stringify({
+        testEnvironment: 'node',
+        testEnvironmentOptions: { customExportConditions: ['browser'] },
+        testMatch: ['<rootDir>/browser-condition.test.cjs'],
+        transform: {},
+      })};\n`,
+    );
+    const jestPackage = require.resolve('jest/package.json');
+    run(
+      process.execPath,
+      [
+        path.join(path.dirname(jestPackage), 'bin/jest.js'),
+        '--config',
+        browserConditionConfig,
+        '--runInBand',
+      ],
+      { env: isolatedEnvironment },
+    );
+    const browserConsumer = path.join(temporaryDirectory, 'browser-consumer.mjs');
+    fs.writeFileSync(browserConsumer, "import OpenAI from 'openai';\nexport default OpenAI;\n");
+    const browserConfig = path.join(temporaryDirectory, 'browser.vite.config.mjs');
+    fs.writeFileSync(
+      browserConfig,
+      [
+        "import { isBuiltin } from 'node:module';",
+        'export default {',
+        '  plugins: [{',
+        "    name: 'reject-node-builtins',",
+        "    enforce: 'pre',",
+        '    resolveId(source) {',
+        '      if (isBuiltin(source)) {',
+        '        this.error("Node-only dependency " + source + " reached the browser bundle");',
+        '      }',
+        '    },',
+        '  }],',
+        '  build: {',
+        "    target: 'es2020',",
+        '    minify: false,',
+        "    lib: { entry: './browser-consumer.mjs', formats: ['es'], fileName: () => 'browser-bundle.mjs' },",
+        '  },',
+        '};',
+      ].join('\n'),
+    );
+    const vitePackage = require.resolve('vite/package.json', {
+      paths: [require.resolve('vitest/package.json')],
+    });
+    run(
+      process.execPath,
+      [
+        path.join(path.dirname(vitePackage), 'bin/vite.js'),
+        'build',
+        '--config',
+        browserConfig,
+        '--logLevel',
+        'error',
+      ],
+      { env: isolatedEnvironment },
+    );
+    const browserBundle = path.join(temporaryDirectory, 'dist/browser-bundle.mjs');
+    assert(fs.existsSync(browserBundle), 'Packed browser consumer did not produce an ES2020 ESM bundle');
+    assert.doesNotThrow(
+      () =>
+        packedPackageAcorn.parse(fs.readFileSync(browserBundle, 'utf-8'), {
+          ecmaVersion: 2020,
+          sourceType: 'module',
+        }),
+      'Packed browser bundle contains syntax unsupported by ES2020, including top-level await',
+    );
+
     for (const [inputType, authenticationImport] of [
       ['commonjs', "const auth = require('openai/auth');"],
       ['module', "import * as auth from 'openai/auth';"],
@@ -231,7 +368,10 @@ const packedPackagePath = require('node:path');
     }
     assert(!fs.existsSync(optionalUndici), 'Importing public authentication helpers must not install Undici');
 
-    const privateX509Modules = [
+    const privateModules = [
+      'openai/internal/chat-completion-runner-state',
+      'openai/internal/chat-completion-runner-state.js',
+      'openai/internal/chat-completion-runner-state.mjs',
       'openai/internal/auth/x509-transport-capability',
       'openai/internal/auth/x509-transport-capability.js',
       'openai/internal/auth/x509-transport-capability.mjs',
@@ -250,7 +390,7 @@ const packedPackagePath = require('node:path');
       'openai/internal/auth/x509-transport-state-browser.js',
       'openai/internal/auth/x509-transport-state-browser.mjs',
     ];
-    const moduleNames = JSON.stringify(privateX509Modules);
+    const moduleNames = JSON.stringify(privateModules);
     run(process.execPath, [
       '--input-type=commonjs',
       '--eval',
@@ -262,12 +402,26 @@ const packedPackagePath = require('node:path');
       `for (const name of ${moduleNames}) { try { await import(name); throw new Error(name + ' is publicly accessible'); } catch (error) { if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error; } }`,
     ]);
 
+    assert(
+      ['.js', '.mjs'].every(
+        (extension) =>
+          !fs.existsSync(
+            path.join(
+              temporaryDirectory,
+              `node_modules/openai/internal/chat-completion-runner-state${extension}`,
+            ),
+          ),
+      ),
+      'Tool-runner mode must not be emitted as a shared mutable module',
+    );
+
     const unsupportedDispatcher =
       'assert.throws(direct, /Undici 5\\.2\\.0 or later/u); assert.throws(httpConnect, /Undici 5\\.2\\.0 or later/u); assert.throws(httpsConnect, /Undici 5\\.2\\.0 or later/u);';
     const unsupportedProxy =
       'assert.doesNotThrow(direct); assert.throws(httpConnect, /CONNECT.*Undici 5\\.5\\.1 or later/u); assert.throws(httpsConnect, /CONNECT.*Undici 5\\.5\\.1 or later/u);';
     const supportedTransports =
       'assert.doesNotThrow(direct); assert.doesNotThrow(httpConnect); assert.doesNotThrow(httpsConnect);';
+    // SAFETY: The controlled certificate-fixture subprocess serializes exactly certificateChain and privateKey for this local packing test.
     const certificateFixture = JSON.parse(
       run(
         process.execPath,
@@ -285,30 +439,38 @@ const packedPackagePath = require('node:path');
       ),
     ) as { certificateChain: string; privateKey: string };
 
-    for (const [undiciVersion, transportAssertions] of [
-      ['5.1.1', unsupportedDispatcher],
-      ['5.2.0', unsupportedProxy],
-      ['5.5.0', unsupportedProxy],
-      ['5.5.1', supportedTransports],
-      ['6.28.0', supportedTransports],
-      ['7.0.0', supportedTransports],
-    ] as const) {
+    const legacyConsumers = await packedPackageAll(
+      (
+        [
+          ['5.1.1', unsupportedDispatcher],
+          ['5.2.0', unsupportedProxy],
+          ['5.5.0', unsupportedProxy],
+          ['5.5.1', supportedTransports],
+          ['6.28.0', supportedTransports],
+          ['7.0.0', supportedTransports],
+        ] as const
+      ).map(([undiciVersion, transportAssertions]) => async () => {
+        const legacyPackOutput = await runAsync('npm', [
+          'pack',
+          '--silent',
+          '--ignore-scripts',
+          '--cache',
+          npmCache,
+          '--pack-destination',
+          temporaryDirectory,
+          `undici@${undiciVersion}`,
+        ]);
+        const packedUndici = legacyPackOutput.trim().split(/\r?\n/).pop();
+        assert(packedUndici, `npm pack did not report the genuine Undici ${undiciVersion} release`);
+        return { undiciVersion, transportAssertions, packedUndici };
+      }),
+      // Complete every child before the temporary directory is removed, including on failure.
+      { concurrency: 3, stopOnError: false },
+    );
+
+    for (const { undiciVersion, transportAssertions, packedUndici } of legacyConsumers) {
       const consumer = path.join(temporaryDirectory, `legacy-undici-${undiciVersion}`);
       fs.mkdirSync(consumer);
-      const packedUndici = run('npm', [
-        'pack',
-        '--silent',
-        '--ignore-scripts',
-        '--cache',
-        npmCache,
-        '--pack-destination',
-        temporaryDirectory,
-        `undici@${undiciVersion}`,
-      ])
-        .trim()
-        .split(/\r?\n/)
-        .pop();
-      assert(packedUndici, `npm pack did not report the genuine Undici ${undiciVersion} release`);
       fs.writeFileSync(
         path.join(consumer, 'package.json'),
         JSON.stringify({ name: `legacy-undici-${undiciVersion}-consumer`, private: true }),
@@ -380,8 +542,6 @@ const packedPackagePath = require('node:path');
     const installedSourceRoot = path.join(installedPackageRoot, 'src');
     const installedSourceConfig = path.join(installedSourceRoot, 'tsconfig.json');
     const installedSourceShim = path.join(installedSourceRoot, 'tsconfig.dist-src.d.ts');
-    const isolatedEnvironment = { ...process.env };
-    delete isolatedEnvironment['NODE_PATH'];
 
     assert(
       !fs.existsSync(path.join(temporaryDirectory, 'node_modules/@types/node')),
@@ -400,6 +560,7 @@ const packedPackagePath = require('node:path');
     const sourceMaps = findSourceMaps(installedPackageRoot);
     sourceMaps.sort();
     for (const mapPath of sourceMaps) {
+      // SAFETY: These files are emitted source maps discovered in the built package; the validator checks their source paths and contents.
       const sourceMap = JSON.parse(fs.readFileSync(mapPath, 'utf-8')) as SourceMap;
       for (const source of sourceMap.sources) {
         const resolvedSource: string = path.resolve(
@@ -464,23 +625,30 @@ const packedPackagePath = require('node:path');
       }),
     );
 
-    for (const compiler of [
-      path.join(root, 'node_modules/typescript-4-9/bin/tsc'),
-      path.join(root, 'node_modules/typescript/bin/tsc'),
-    ]) {
-      run(process.execPath, [compiler, '--project', path.join(temporaryDirectory, 'tsconfig.json')], {
-        env: isolatedEnvironment,
-      });
-      run(process.execPath, [compiler, '--project', installedSourceConfig, '--noEmit'], {
-        env: isolatedEnvironment,
-      });
-      run(process.execPath, [compiler, '--project', sourceNavigationConfig], {
-        env: isolatedEnvironment,
-      });
-    }
-    run(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'), '--project', bundlerConfig], {
-      env: isolatedEnvironment,
-    });
+    await packedPackageAll(
+      [
+        ...[
+          path.join(root, 'node_modules/typescript-4-9/bin/tsc'),
+          path.join(root, 'node_modules/typescript/bin/tsc'),
+        ].flatMap((compiler) =>
+          [path.join(temporaryDirectory, 'tsconfig.json'), installedSourceConfig, sourceNavigationConfig].map(
+            (config) => () =>
+              runAsync(process.execPath, [compiler, '--project', config, '--noEmit'], {
+                env: isolatedEnvironment,
+              }),
+          ),
+        ),
+        () =>
+          runAsync(
+            process.execPath,
+            [path.join(root, 'node_modules/typescript/bin/tsc'), '--project', bundlerConfig],
+            {
+              env: isolatedEnvironment,
+            },
+          ),
+      ],
+      { concurrency: 2, stopOnError: false },
+    );
 
     run(process.execPath, ['consumer.cjs']);
     run(process.execPath, ['consumer.mjs']);
@@ -492,8 +660,18 @@ const packedPackagePath = require('node:path');
       sourcePackage.engines,
       'Packed package engine metadata differs from package.json',
     );
+    assert.equal(
+      fs.readFileSync(
+        path.join(temporaryDirectory, 'node_modules/openai/src/_vendor/partial-json-parser/LICENSE'),
+        'utf-8',
+      ),
+      fs.readFileSync(path.join(root, 'src/_vendor/partial-json-parser/LICENSE'), 'utf-8'),
+      'Packed package must preserve the vendored partial-json license',
+    );
     assert.equal(installedPackage.peerDependencies?.['undici'], '>=5 <9');
     assert.equal(installedPackage.peerDependenciesMeta?.['undici']?.optional, true);
+    assert.equal(installedPackage.peerDependencies?.['ws'], '^8.21.0');
+    assert.equal(installedPackage.peerDependenciesMeta?.['ws']?.optional, true);
     assert(!fs.existsSync(optionalUndici), 'Undici must remain optional for ordinary SDK consumers');
     run(process.execPath, [
       '--conditions=browser',
@@ -501,6 +679,16 @@ const packedPackagePath = require('node:path');
       '--eval',
       "import OpenAI from 'openai'; new OpenAI({ apiKey: 'synthetic-browser-api-key', dangerouslyAllowBrowser: true });",
     ]);
+    fs.symlinkSync(
+      path.join(root, 'node_modules/ws'),
+      path.join(temporaryDirectory, 'node_modules/ws'),
+      'dir',
+    );
+    fs.copyFileSync(
+      path.join(root, 'scripts/fixtures/responses-ws-module-formats.cjs'),
+      path.join(temporaryDirectory, 'responses-ws-module-formats.cjs'),
+    );
+    run(process.execPath, ['--test', 'responses-ws-module-formats.cjs']);
     fs.symlinkSync(path.join(root, 'node_modules/undici'), optionalUndici, 'dir');
     for (const [inputType, consumer] of [
       [
@@ -528,8 +716,11 @@ const packedPackagePath = require('node:path');
     }
 
     console.log(
-      `Packed npm artifact passed CommonJS, ESM, and ${browserSafeSources.length}/${mappedSources.size} source checks across ${sourceMaps.length} source maps on ${process.version}.`,
+      `Packed npm artifact passed CommonJS, ESM, ES2020 browser bundling, and ${browserSafeSources.length}/${mappedSources.size} source checks across ${sourceMaps.length} source maps on ${process.version}.`,
     );
+  } catch (error) {
+    console.error(error);
+    process.exitCode = 1;
   } finally {
     fs.rmSync(temporaryDirectory, { recursive: true, force: true });
   }

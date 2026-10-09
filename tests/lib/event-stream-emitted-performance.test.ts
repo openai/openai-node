@@ -46,11 +46,7 @@ class EmittedTestStream extends EventStream<EmittedEvents> {
   }
 }
 
-function measureListenerMovement<T>(operation: () => T): {
-  result: T;
-  elementMoves: number;
-  spliceCalls: number;
-} {
+function measureListenerMovement<T>(operation: () => T) {
   const originalSplice = Array.prototype.splice;
   const originalFilter = Array.prototype.filter;
   let elementMoves = 0;
@@ -62,6 +58,7 @@ function measureListenerMovement<T>(operation: () => T): {
       spliceCalls += 1;
     }
     if (deleteCount === undefined) {
+      // oxlint-disable-next-line anti-slop/no-reflect-apply -- Preserve native splice's one-argument overload and omitted deleteCount in this instrumentation.
       return Reflect.apply(originalSplice, this, [start]);
     }
     return originalSplice.call(this, start, deleteCount, ...items);
@@ -69,6 +66,7 @@ function measureListenerMovement<T>(operation: () => T): {
 
   function trackedFilter(
     this: unknown[],
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- Array.filter accepts any truthy callback result; instrumentation must preserve that native signature. The Array.filter spy must preserve callbacks and receivers for arbitrary listener arrays.
     predicate: (value: unknown, index: number, values: unknown[]) => unknown,
     thisArg?: unknown,
   ) {
@@ -87,6 +85,7 @@ function measureListenerMovement<T>(operation: () => T): {
   }
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function captureRejection(promise: Promise<unknown>): Promise<unknown> {
   try {
     await promise;
@@ -191,6 +190,7 @@ describe('EventStream.emitted companion-listener performance', () => {
     const stream = new EmittedTestStream();
     const register = vi.spyOn(stream, 'once');
     stream.on('value', () => {
+      // SAFETY: The mock-call search selects the exact event name associated with this callback signature, and the presence guard runs before invoking or removing it.
       const callback = register.mock.calls.find(([event]) => event === 'value')?.[1] as
         | ((value: number) => void)
         | undefined;
@@ -215,6 +215,7 @@ describe('EventStream.emitted companion-listener performance', () => {
     const register = vi.spyOn(stream, 'once');
     const failure = new OpenAIError('snapshot failure');
     stream.on('error', () => {
+      // SAFETY: The mock-call search selects the exact event name associated with this callback signature, and the presence guard runs before invoking or removing it.
       const callback = register.mock.calls.find(([event]) => event === 'error')?.[1] as
         | ((error: OpenAIError) => void)
         | undefined;
@@ -241,6 +242,7 @@ describe('EventStream.emitted companion-listener performance', () => {
       stream.emitOther('nested');
     });
     stream.on('other', () => {
+      // SAFETY: The mock-call search selects the exact event name associated with this callback signature, and the presence guard runs before invoking or removing it.
       const callback = register.mock.calls.find(([event]) => event === 'value')?.[1] as
         | ((value: number) => void)
         | undefined;
@@ -278,6 +280,7 @@ describe('EventStream.emitted companion-listener performance', () => {
       });
 
       const pending = stream.emitted('value');
+      // SAFETY: The mock-call search selects the exact event name associated with this callback signature, and the presence guard runs before invoking or removing it.
       const callback = register.mock.calls.find(([event]) => event === 'value')?.[1] as
         | ((value: number) => void)
         | undefined;
@@ -440,6 +443,7 @@ describe('EventStream.emitted companion-listener performance', () => {
   test('continues reporting genuinely unhandled stream errors', () => {
     const stream = new EmittedTestStream();
     const failure = new OpenAIError('unhandled');
+    // SAFETY: The spy returns a resolved promise only to count reject calls without creating unhandled rejections; no resolved value is consumed.
     const reject = vi.spyOn(Promise, 'reject').mockImplementation(() => Promise.resolve() as Promise<never>);
 
     try {

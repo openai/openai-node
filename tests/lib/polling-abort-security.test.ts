@@ -8,6 +8,7 @@ import { pollWithResponse } from 'openai/lib/polling';
 
 type Options = RequestOptions & { pollIntervalMs?: number };
 type FetchMock = ReturnType<typeof vi.fn<Fetch>>;
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- This failure-only harness accepts different SDK result types and validates their rejection instead.
 type Method = [string, number, (client: OpenAI, options: Options) => Promise<unknown>];
 type AbortListener = Parameters<AbortSignal['addEventListener']>[1];
 type AbortListenerOptions = Parameters<AbortSignal['addEventListener']>[2];
@@ -41,7 +42,7 @@ const transitiveMethods: Method[] = [
   ['fileBatches.uploadAndPoll', 3, (c, o) => batches(c).uploadAndPoll('vs_123', uploads(), o)],
 ];
 
-function createClient(header?: string): { client: OpenAI; fetch: FetchMock } {
+function createClient(header?: string) {
   let polls = 0;
   const fetch = vi.fn<Fetch>(async (url, init) => {
     if (String(url).startsWith('data:')) {
@@ -87,6 +88,7 @@ async function waitForDelay(fetch: FetchMock, requests: number): Promise<void> {
   expect(vi.getTimerCount()).toBe(1);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function observe(promise: Promise<unknown>): Promise<unknown> {
   try {
     return { completed: await promise };
@@ -152,12 +154,7 @@ function hiddenSignal(signal: AbortSignal, inherited: boolean): Options {
     : Object.defineProperty(options, 'signal', { value: signal });
 }
 
-function throwingStructuralSignal(controller: AbortController): {
-  signal: AbortSignal;
-  removeEventListener: ReturnType<typeof vi.fn<AbortSignal['removeEventListener']>>;
-  callbackErrors: unknown[];
-  failNextRemovals: (count?: number) => void;
-} {
+function throwingStructuralSignal(controller: AbortController) {
   const callbackErrors: unknown[] = [];
   const listeners = new Map<NonNullable<AbortListener>, NonNullable<AbortListener>>();
   let failuresRemaining = 0;
@@ -226,6 +223,24 @@ afterEach(() => {
 });
 
 describe.each(directMethods)('%s public cancellation', (_name, requests, invoke) => {
+  test.each([
+    { name: 'default interval', header: undefined },
+    { name: 'server interval', header: '9000' },
+  ])('honors a zero interval over the $name and releases its abort listener', async ({ header }) => {
+    const controller = new AbortController();
+    const { client, fetch } = createClient(header);
+    const pending = observe(invoke(client, { signal: controller.signal, pollIntervalMs: 0 }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(requestCount(fetch)).toBe(requests + 1);
+    await expect(Promise.race([pending, Promise.resolve('still polling')])).resolves.toMatchObject({
+      completed: { status: 'completed' },
+    });
+    expect(getEventListeners(controller.signal, 'abort')).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   test('promptly cancels the documented caller signal without another request', async () => {
     const controller = new AbortController();
     const { client, fetch } = createClient();
@@ -286,10 +301,8 @@ describe.each([...directMethods, ...transitiveMethods])(
 
       await expect(pending).resolves.toMatchObject({ completed: { status: 'completed' } });
       expect(requestCount(fetch)).toBe(requests + 1);
-      expect(getEventListeners(controller.signal, 'abort')).toEqual([
-        ...retainedListeners,
-        expect.any(Function),
-      ]);
+      // The next HTTP request reuses the shared bridge; only the polling timer's listener is removed.
+      expect(getEventListeners(controller.signal, 'abort')).toEqual(retainedListeners);
       expect(vi.getTimerCount()).toBe(0);
       expect(removeEventListener).toHaveBeenCalledTimes(2);
       expect(callbackErrors).toEqual([]);
@@ -474,28 +487,26 @@ describe('caller-signal reentrancy and polling compatibility', () => {
         throwingStructuralSignal(controller);
       const original = signal.addEventListener.bind(signal);
 
-      vi.spyOn(signal, 'addEventListener').mockImplementation(((
-        type: string,
-        listener: AbortListener,
-        options?: AbortListenerOptions,
-      ) => {
-        if (removeEventListener.mock.calls.length === 0) {
-          original(type, listener, options);
-          return;
-        }
+      vi.spyOn(signal, 'addEventListener').mockImplementation(
+        (type: string, listener: AbortListener, options?: AbortListenerOptions) => {
+          if (removeEventListener.mock.calls.length === 0) {
+            original(type, listener, options);
+            return;
+          }
 
-        removeEventListener.mockClear();
-        failNextRemovals(2);
-        controller.abort(reason);
-        if (typeof listener === 'function') {
-          listener.call(signal, new Event('abort'));
-          listener.call(signal, new Event('abort'));
-        }
-        original(type, listener, options);
-        if (throwAfterInstall) {
-          throw new Error('structural registration threw after cancellation and installation');
-        }
-      }) as typeof signal.addEventListener);
+          removeEventListener.mockClear();
+          failNextRemovals(2);
+          controller.abort(reason);
+          if (typeof listener === 'function') {
+            listener.call(signal, new Event('abort'));
+            listener.call(signal, new Event('abort'));
+          }
+          original(type, listener, options);
+          if (throwAfterInstall) {
+            throw new Error('structural registration threw after cancellation and installation');
+          }
+        },
+      );
 
       const { client, fetch } = createClient();
       const pending = observe(files(client).poll('vs_123', 'file_123', { signal, pollIntervalMs: 4000 }));
@@ -514,22 +525,20 @@ describe('caller-signal reentrancy and polling compatibility', () => {
     const original = signal.addEventListener.bind(signal);
     let retainedListeners: unknown[] = [];
 
-    vi.spyOn(signal, 'addEventListener').mockImplementation(((
-      type: string,
-      listener: AbortListener,
-      options?: AbortListenerOptions,
-    ) => {
-      if (removeEventListener.mock.calls.length === 0) {
-        original(type, listener, options);
-        return;
-      }
+    vi.spyOn(signal, 'addEventListener').mockImplementation(
+      (type: string, listener: AbortListener, options?: AbortListenerOptions) => {
+        if (removeEventListener.mock.calls.length === 0) {
+          original(type, listener, options);
+          return;
+        }
 
-      retainedListeners = getEventListeners(controller.signal, 'abort');
-      removeEventListener.mockClear();
-      failNextRemovals();
-      original(type, listener, options);
-      throw failure;
-    }) as typeof signal.addEventListener);
+        retainedListeners = getEventListeners(controller.signal, 'abort');
+        removeEventListener.mockClear();
+        failNextRemovals();
+        original(type, listener, options);
+        throw failure;
+      },
+    );
 
     const { client, fetch } = createClient();
     const pending = observe(files(client).poll('vs_123', 'file_123', { signal, pollIntervalMs: 4000 }));
@@ -554,20 +563,18 @@ describe('caller-signal reentrancy and polling compatibility', () => {
       const reason = new Error('abort raced with listener installation');
       const original = controller.signal.addEventListener.bind(controller.signal);
 
-      vi.spyOn(controller.signal, 'addEventListener').mockImplementation(((
-        type: string,
-        listener: AbortListener,
-        options?: AbortListenerOptions,
-      ) => {
-        controller.abort(reason);
-        if (deliver && typeof listener === 'function') {
-          listener.call(controller.signal, new Event('abort'));
-        }
-        original(type, listener, options);
-        if (throwAfterInstall) {
-          throw new Error('registration threw after cancellation and installation');
-        }
-      }) as typeof controller.signal.addEventListener);
+      vi.spyOn(controller.signal, 'addEventListener').mockImplementation(
+        (type: string, listener: AbortListener, options?: AbortListenerOptions) => {
+          controller.abort(reason);
+          if (deliver && typeof listener === 'function') {
+            listener.call(controller.signal, new Event('abort'));
+          }
+          original(type, listener, options);
+          if (throwAfterInstall) {
+            throw new Error('registration threw after cancellation and installation');
+          }
+        },
+      );
 
       await expect(pollInternal({ signal: controller.signal, pollIntervalMs: 4000 })).rejects.toMatchObject({
         cause: reason,
@@ -583,14 +590,12 @@ describe('caller-signal reentrancy and polling compatibility', () => {
     const failure = new Error('registration failed after installation');
     const original = controller.signal.addEventListener.bind(controller.signal);
 
-    vi.spyOn(controller.signal, 'addEventListener').mockImplementation(((
-      type: string,
-      listener: AbortListener,
-      options?: AbortListenerOptions,
-    ) => {
-      original(type, listener, options);
-      throw failure;
-    }) as typeof controller.signal.addEventListener);
+    vi.spyOn(controller.signal, 'addEventListener').mockImplementation(
+      (type: string, listener: AbortListener, options?: AbortListenerOptions) => {
+        original(type, listener, options);
+        throw failure;
+      },
+    );
 
     await expect(pollInternal({ signal: controller.signal, pollIntervalMs: 4000 })).rejects.toBe(failure);
     expect(getEventListeners(controller.signal, 'abort')).toEqual([]);

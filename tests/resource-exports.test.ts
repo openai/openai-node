@@ -32,6 +32,7 @@ const resourceIndexes = [...findResourceIndexes(resourcesDirectory), ...realtime
 
 describe.each(resourceIndexes)('SDK exports: $path', ({ modulePath }) => {
   test('exposes every declared runtime export', async () => {
+    // SAFETY: Dynamic import returns a module namespace object; this test enumerates its runtime export names without assuming their value types.
     const exports = (await import(modulePath)) as Record<string, unknown>;
     const names = Object.keys(exports);
 

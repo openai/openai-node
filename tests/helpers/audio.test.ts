@@ -4,8 +4,10 @@ import { spawn } from 'node:child_process';
 import { Readable, Writable } from 'node:stream';
 import { playAudio } from 'openai/helpers/audio';
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Exercise native pipe and process failure contracts without requiring ffplay or audio hardware.
 vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
 
+// SAFETY: The module mock replaces this import with a Vitest spy before this binding is read.
 const spawnMock = spawn as MockedFunction<typeof spawn>;
 
 function mockFfplay() {
@@ -32,6 +34,7 @@ function mockFfplay() {
     }
     return ffplay;
   });
+  // SAFETY: The subprocess/audio fixture implements the stream and event methods this path uses; the test observes those operations without spawning a real player.
   spawnMock.mockReturnValue(ffplay as any);
 
   return { chunks, ffplay };
@@ -55,6 +58,7 @@ describe('playAudio', () => {
     const { chunks } = mockFfplay();
     const response = { body: Readable.from(['hello']) };
 
+    // SAFETY: The subprocess/audio fixture implements the stream and event methods this path uses; the test observes those operations without spawning a real player.
     await playAudio(response as any);
 
     expect(Buffer.concat(chunks).toString()).toBe('hello');

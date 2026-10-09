@@ -26,6 +26,7 @@ async function createProvider(region: string) {
     region,
     // Ignore a stale AWS_BEARER_TOKEN_BEDROCK when using AWS credentials.
     apiKey: null,
+    // Spread creates an own data property without invoking inherited setters or changing the object prototype.
     ...(profile ? { profile } : {}),
   });
 }

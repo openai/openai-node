@@ -81,6 +81,7 @@ async function collect(source: AsyncIterable<unknown>): Promise<unknown[]> {
   return items;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function rejection(source: AsyncIterable<unknown>): Promise<unknown> {
   return await collect(source).then(
     () => {},
@@ -90,6 +91,7 @@ async function rejection(source: AsyncIterable<unknown>): Promise<unknown> {
 
 function expectPrivateSyntaxError(value: unknown): asserts value is SyntaxError & { cause?: unknown } {
   expect(value).toBeInstanceOf(SyntaxError);
+  // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
   const error = value as SyntaxError & { cause?: unknown };
   expect(error.message).toBe(safeSyntaxMessage);
   expect(error.cause).toBeUndefined();
@@ -320,6 +322,7 @@ describe('SSE completion sentinel integrity', () => {
     const error = await rejection(stream);
 
     expect(error).toBeInstanceOf(SyntaxError);
+    // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
     const failure = error as SyntaxError & { cause?: unknown };
     expect(failure.message).toBe('Error reading response: malformed newline-delimited JSON.');
     expect(failure.cause).toBeUndefined();

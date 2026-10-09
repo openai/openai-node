@@ -46,6 +46,7 @@ export function parseUnionDef(
 
     const types: JsonSchema7Primitive[] = [];
     for (const x of options) {
+      // SAFETY: The preceding every check restricts each option to a primitive mapping key with no additional checks.
       const type = primitiveMappings[x._def.typeName as ZodPrimitive]; //Can be safely casted due to row 43
       if (type && !types.includes(type)) {
         types.push(type);
@@ -59,6 +60,7 @@ export function parseUnionDef(
     // all options literals
 
     const types: JsonSchema7Primitive[] = [];
+    // SAFETY: The preceding every check establishes that every union option is a Zod literal definition.
     for (const x of options as readonly { _def: ZodLiteralDef }[]) {
       const type = typeof x._def.value;
       switch (type) {
@@ -118,6 +120,7 @@ const asAnyOf = (
   def: ZodUnionDef | ZodDiscriminatedUnionDef<any, any>,
   refs: Refs,
 ): JsonSchema7PrimitiveUnionType | JsonSchema7AnyOfType | undefined => {
+  // SAFETY: Zod union options are either the discriminated-union map values or the ordinary option array; both contain schema definitions for parseDef.
   const anyOf = ((def.options instanceof Map ? [...def.options.values()] : def.options) as any[])
     .map((x, i) =>
       parseDef(x._def, {

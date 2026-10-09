@@ -5,6 +5,7 @@ export type JsonSchema7NullType = {
 };
 
 export function parseNullDef(refs: Refs): JsonSchema7NullType {
+  // SAFETY: The OpenAPI target uses nullable plus enum because its null representation differs from the JSON Schema return type.
   return refs.target === 'openApi3'
     ? ({
         enum: ['null'],

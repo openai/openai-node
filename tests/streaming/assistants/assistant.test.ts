@@ -1,12 +1,7 @@
-import OpenAI, { OpenAIError } from 'openai';
+import { OpenAIError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { AssistantStream } from 'openai/lib/AssistantStream';
 import { Stream } from 'openai/streaming';
-
-const openai = new OpenAI({
-  apiKey: 'My API Key',
-  baseURL: process.env['TEST_API_BASE_URL'] ?? 'http://127.0.0.1:4010',
-});
 
 describe('assistant tests', () => {
   test('delta accumulation', () => {
@@ -146,6 +141,7 @@ describe('assistant tests', () => {
       value: { event: 'thread.message.delta' },
     });
     expect(failure).toBeInstanceOf(OpenAIError);
+    // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
     expect((failure as OpenAIError).message).toBe('assistant boom');
     await expect(iterator.next()).rejects.toBe(failure);
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });

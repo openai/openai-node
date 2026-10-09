@@ -24,7 +24,7 @@ describe('resource completions', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.completions.create({
+    await client.completions.create({
       model: 'gpt-3.5-turbo-instruct',
       prompt: 'This is a test.',
       best_of: 0,

@@ -29,4 +29,13 @@ async function main() {
   console.log('answer:', rsp.output_parsed?.final_answer);
 }
 
-main().catch(console.error);
+async function run() {
+  try {
+    await main();
+  } catch (error) {
+    console.error(error);
+    process.exitCode = 1;
+  }
+}
+
+void run();

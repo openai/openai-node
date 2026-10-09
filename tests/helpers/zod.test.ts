@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import type OpenAI from 'openai';
 import { hasOwn } from 'openai/internal/utils/values';
 
 import {
@@ -18,6 +19,7 @@ function collectRefs(value: unknown, refs: string[] = []): string[] {
     return refs;
   }
 
+  // SAFETY: The traversal checks for a non-null object before reading schema keywords; keyword values remain subject to the following checks.
   const maybeRef = (value as { $ref?: unknown }).$ref;
   if (typeof maybeRef === 'string') {
     refs.push(maybeRef);
@@ -42,6 +44,7 @@ function countEnumValues(value: unknown): number {
     return total;
   }
 
+  // SAFETY: The traversal checks for a non-null object before reading schema keywords; keyword values remain subject to the following checks.
   const record = value as Record<string, unknown>;
   const enumValues = Array.isArray(record['enum']) ? record['enum'].length : 0;
   let nestedEnumValues = 0;
@@ -51,6 +54,7 @@ function countEnumValues(value: unknown): number {
   return enumValues + nestedEnumValues;
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JSON Pointer traversal may resolve any schema or literal value, which each fixture checks afterward. These assertions inspect converter output containing arbitrary schema keywords, definitions, and literal values.
 function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unknown {
   expect(pointer.startsWith('#/')).toBe(true);
 
@@ -62,7 +66,9 @@ function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unk
   for (const token of tokens) {
     expect(value).not.toBeNull();
     expect(typeof value).toBe('object');
+    // SAFETY: The traversal checks for a non-null object before reading schema keywords; keyword values remain subject to the following checks.
     expect(hasOwn(value as object, token)).toBe(true);
+    // SAFETY: The traversal checks for a non-null object before reading schema keywords; keyword values remain subject to the following checks.
     value = (value as Record<string, unknown>)[token];
   }
   return value;
@@ -74,6 +80,7 @@ function expectDefinitionRefsToResolve(schema: Record<string, unknown>) {
       return;
     }
 
+    // SAFETY: The traversal checks for a non-null object before reading schema keywords; keyword values remain subject to the following checks.
     const ref = (value as Record<string, unknown>)['$ref'];
     if (typeof ref === 'string') {
       const definition = resolveJsonPointer(schema, ref);
@@ -100,10 +107,44 @@ it('converts Zod v4 discriminated unions to anyOf for strict schemas', () => {
     ]),
   });
 
+  // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
   const schema = zodResponseFormat(ResponseSchema, 'choice').json_schema.schema as any;
 
   expect(JSON.stringify(schema)).not.toContain('"oneOf"');
   expect(schema.properties.data.anyOf).toHaveLength(2);
+});
+
+describe.each([
+  { version: 'v4', schema: zv4.object({ value: zv4.xor([zv4.string(), zv4.number()]) }) },
+  {
+    version: 'v4 mini',
+    schema: zv4Mini.object({ value: zv4Mini.xor([zv4Mini.string(), zv4Mini.number()]) }),
+  },
+])('Zod $version XOR schemas', ({ schema }) => {
+  it.each([
+    { name: 'response format', create: () => zodResponseFormat(schema, 'xor') },
+    { name: 'text format', create: () => zodTextFormat(schema, 'xor') },
+    { name: 'chat function', create: () => zodFunction({ name: 'xor', parameters: schema }) },
+    { name: 'Responses function', create: () => zodResponsesFunction({ name: 'xor', parameters: schema }) },
+  ])('rejects oneOf in $name without changing the input schema', ({ create }) => {
+    const original = zv4.toJSONSchema(schema, { target: 'draft-7' });
+
+    expect(create).toThrow(
+      'Schema at `properties/value` uses unsupported keyword `oneOf` and cannot be represented in strict Structured Outputs.',
+    );
+    expect(zv4.toJSONSchema(schema, { target: 'draft-7' })).toEqual(original);
+  });
+
+  it('preserves oneOf in a non-strict Realtime function', () => {
+    const tool = zodRealtimeFunction({ name: 'xor', parameters: schema });
+
+    expect(tool.parameters).toMatchObject({
+      type: 'object',
+      properties: { value: { oneOf: [{ type: 'string' }, { type: 'number' }] } },
+      required: ['value'],
+    });
+    expect(tool).not.toHaveProperty('strict');
+  });
 });
 
 describe('Zod v4 mini', () => {
@@ -164,6 +205,8 @@ describe('Zod v4 mini', () => {
 
 describe.each([
   { version: 'v3', z: zv3 },
+  // SAFETY: The version matrix uses only the listed shared Zod constructors; the test exercises each real v3/v4 implementation despite incompatible library declarations.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Run shared schema-factory cases across Zod versions whose nominal class types differ.
   { version: 'v4', z: zv4 as any as typeof zv3 },
 ])('zodRealtimeFunction (Zod $version)', ({ z }) => {
   it('builds a Realtime function tool without strict', () => {
@@ -242,6 +285,8 @@ it('preserves inferred output types', () => {
 
 describe.each([
   { version: 'v3', z: zv3 },
+  // SAFETY: The version matrix uses only the listed shared Zod constructors; the test exercises each real v3/v4 implementation despite incompatible library declarations.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Run shared schema-factory cases across Zod versions whose nominal class types differ.
   { version: 'v4', z: zv4 as any as typeof zv3 },
 ])('zodResponseFormat (Zod $version)', ({ version, z }) => {
   it('does the thing', () => {
@@ -299,7 +344,9 @@ describe.each([
       }),
     });
 
+    // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
     const schema = zodResponseFormat(Root, 'example-scope').json_schema.schema as Record<string, unknown>;
+    // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
     const definitions = (schema['definitions'] ?? schema['$defs'] ?? {}) as Record<string, unknown>;
     const refs = collectRefs(schema);
     const definitionNames = Object.keys(definitions);
@@ -307,7 +354,9 @@ describe.each([
     expect(refs).not.toContainEqual(expect.stringMatching(/\s/));
     expect(definitionNames).not.toContainEqual(expect.stringMatching(/\s/));
     if (version === 'v3') {
+      // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const rootProperties = schema['properties'] as Record<string, Record<string, unknown>>;
+      // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const groupProperties = rootProperties['group']?.['properties'] as Record<string, { $ref?: string }>;
       const spacedRef = groupProperties['anotherSpacedUsage']?.$ref;
       const underscoredRef = groupProperties['anotherUnderscoredUsage']?.$ref;
@@ -322,15 +371,19 @@ describe.each([
     for (const ref of refs) {
       const definitionName = ref.split('/').pop();
       expect(definitionName).toBeDefined();
+      // SAFETY: The preceding assertion checks that the selected definition name exists before it is used as a property name.
       expect(definitions).toHaveProperty(definitionName as string);
     }
   });
 
   it('uses supplied schema definitions', () => {
+    // SAFETY: Array.from constructs exactly 200 enum strings here, so the tuple has a first element and only string values.
     const fooValues = Array.from({ length: 200 }, (_, index) => 'foo_' + index) as [string, ...string[]];
+    // SAFETY: Array.from constructs exactly 200 enum strings here, so the tuple has a first element and only string values.
     const barValues = Array.from({ length: 200 }, (_, index) => 'bar_' + index) as [string, ...string[]];
     const Foo = z.enum(fooValues);
     const Bar = z.enum(barValues);
+    // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
     const schema = zodResponseFormat(
       z.object({
         foo: Foo,
@@ -349,6 +402,7 @@ describe.each([
 
   it('keeps the response name separate from supplied schema definitions', () => {
     const Shared = z.object({ value: z.string() });
+    // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
     const schema = zodResponseFormat(z.object({ first: Shared, second: Shared }), 'root', {
       schemaDefinitions: { root: Shared },
     }).json_schema.schema as Record<string, unknown>;
@@ -359,6 +413,7 @@ describe.each([
 
   it('escapes JSON Pointer tokens in supplied schema definition refs', () => {
     const Shared = z.object({ value: z.string() });
+    // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
     const schema = zodResponseFormat(z.object({ first: Shared, second: Shared }), 'response', {
       schemaDefinitions: { 'foo/bar~baz': Shared },
     }).json_schema.schema as Record<string, unknown>;
@@ -369,6 +424,7 @@ describe.each([
 
   it('URI-encodes supplied schema definition refs', () => {
     const Shared = z.object({ value: z.string() });
+    // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
     const schema = zodResponseFormat(z.object({ first: Shared, second: Shared }), 'response', {
       schemaDefinitions: { 'foo%2Fbar': Shared },
     }).json_schema.schema as Record<string, unknown>;
@@ -706,6 +762,7 @@ describe.each([
       const optionalNullable = z.string().nullable().optional();
       const lazy = z.lazy(() => z.string());
       const nullable = z.object({ value: z.string() }).nullable();
+      // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const schema = zodTextFormat(
         z.object({
           brandedFirst: branded,
@@ -726,10 +783,12 @@ describe.each([
 
       expectDefinitionRefsToResolve(schema);
 
+      // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const properties = schema['properties'] as Record<string, { $ref?: string }>;
       const brandedRef = properties['brandedSecond']?.$ref;
       expect(brandedRef).toBeDefined();
 
+      // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const definitions = schema['definitions'] as Record<string, unknown>;
       expect(definitions[brandedRef!.replace('#/definitions/', '')]).toMatchObject({ type: 'string' });
     });
@@ -740,6 +799,7 @@ describe.each([
       const defaulted = base.default('fallback');
       const late = z.object({ value: base });
 
+      // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const schema = zodTextFormat(
         z.object({
           earlyFirst: early,
@@ -751,10 +811,13 @@ describe.each([
         }),
         'wrapperState',
       ).schema as Record<string, any>;
+      // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const definitions = schema['definitions'] as Record<string, any>;
 
+      // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const lateRef = schema['properties']['lateSecond']['$ref'] as string;
       const lateDefinition = definitions[lateRef.replace('#/definitions/', '')];
+      // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const valueRef = lateDefinition['properties']['value']['$ref'] as string;
       const valueDefinition = definitions[valueRef.replace('#/definitions/', '')];
 
@@ -769,6 +832,7 @@ describe.each([
         }),
       );
 
+      // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const schema = zodTextFormat(
         z.object({
           first: recursive,
@@ -776,8 +840,10 @@ describe.each([
         }),
         'recursive',
       ).schema as Record<string, any>;
+      // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const definitions = schema['definitions'] as Record<string, any>;
 
+      // SAFETY: The explicit Zod object fixture creates these schema properties and definitions; this test verifies their emitted references and contents.
       const recursiveRef = schema['properties']['second']['$ref'] as string;
       const recursiveDefinition = definitions[recursiveRef.replace('#/definitions/', '')];
 
@@ -794,7 +860,8 @@ describe.each([
   }
 });
 
-function _typeTests() {
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- This compile-time regression preserves the public optional callback contract for arbitrary results.
+function _typeTests(client: OpenAI, maybeCallback?: (args: { hello: 'world' }) => unknown) {
   const MiniSchema = zv4Mini.object({ hello: zv4Mini.literal('world') });
   type ParsedArguments = { hello: 'world' };
 
@@ -817,4 +884,51 @@ function _typeTests() {
   compareType<Parameters<NonNullable<typeof responseTool.$callback>>[0], ParsedArguments>(true);
   compareType<ReturnType<typeof responseTool.$parseRaw>, ParsedArguments>(true);
   compareType<typeof responseTool.__arguments, ParsedArguments>(true);
+
+  const explicitGenericTool = zodFunction<typeof MiniSchema>({
+    name: 'explicit_generic',
+    parameters: MiniSchema,
+    function: (args) => {
+      expectType<ParsedArguments>(args);
+      return Promise.resolve(args);
+    },
+  });
+  expectType<true>(explicitGenericTool.__hasFunction);
+  expectType<false>(
+    zodFunction<typeof MiniSchema>({ name: 'explicit_parse_only', parameters: MiniSchema }).__hasFunction,
+  );
+
+  for (const parameters of [
+    zv3.object({ hello: zv3.literal('world') }),
+    zv4.object({ hello: zv4.literal('world') }),
+    MiniSchema,
+  ]) {
+    const options = { name: 'greet', parameters };
+    const runnable = zodFunction({
+      ...options,
+      function: (args) => expectType<ParsedArguments>(args),
+    });
+    const callbackless = zodFunction(options);
+    const undefinedCallback = zodFunction({ ...options, function: undefined });
+    const optionalCallback = zodFunction({ ...options, function: maybeCallback });
+
+    expectType<true>(runnable.__hasFunction);
+    expectType<false>(callbackless.__hasFunction);
+    expectType<false>(undefinedCallback.__hasFunction);
+    expectType<false>(optionalCallback.__hasFunction);
+    expectType<ParsedArguments>(callbackless.__arguments);
+
+    const request = { model: 'gpt-4o', messages: [] };
+    client.chat.completions.runTools({ ...request, tools: [runnable] });
+    client.chat.completions.runTools({ ...request, tools: [runnable], stream: true });
+
+    for (const tool of [callbackless, undefinedCallback, optionalCallback]) {
+      client.chat.completions.parse({ ...request, tools: [tool] });
+      client.chat.completions.stream({ ...request, tools: [tool] });
+      // @ts-expect-error a tool without a guaranteed callback cannot be executed
+      client.chat.completions.runTools({ ...request, tools: [tool] });
+      // @ts-expect-error streaming tool execution also requires a guaranteed callback
+      client.chat.completions.runTools({ ...request, tools: [tool], stream: true });
+    }
+  }
 }

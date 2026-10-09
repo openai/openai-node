@@ -24,7 +24,7 @@ describe('resource steps', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    const response = await client.beta.threads.runs.steps.retrieve('step_id', {
+    await client.beta.threads.runs.steps.retrieve('step_id', {
       thread_id: 'thread_id',
       run_id: 'run_id',
       include: ['step_details.tool_calls[*].file_search.results[*].content'],
@@ -43,7 +43,7 @@ describe('resource steps', () => {
   });
 
   test('list: required and optional params', async () => {
-    const response = await client.beta.threads.runs.steps.list('run_id', {
+    await client.beta.threads.runs.steps.list('run_id', {
       thread_id: 'thread_id',
       after: 'after',
       before: 'before',

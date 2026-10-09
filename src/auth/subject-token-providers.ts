@@ -3,6 +3,7 @@ import type { SubjectTokenProvider } from './types';
 import type { Fetch } from '../internal/builtin-types';
 import * as Shims from '../internal/shims';
 import { SubjectTokenProviderError } from '../core/error';
+import { hasOwn, isObj } from '../internal/utils/values';
 
 const DEFAULT_RESOURCE = 'https://management.azure.com/';
 const DEFAULT_AZURE_API_VERSION = '2018-02-01';
@@ -15,15 +16,18 @@ const errorFunctionToString = Function.prototype.toString;
 const nativeErrorSource = errorFunctionToString.call(Error);
 const nativeSyntaxErrorSource = errorFunctionToString.call(SyntaxError);
 const nativeErrorBrandDescriptor = getOwnErrorDescriptor(Error, 'isError');
+// SAFETY: The captured Error.isError data property was checked to be callable and follows the native error-brand predicate contract.
 const nativeErrorBrand =
   nativeErrorBrandDescriptor &&
   'value' in nativeErrorBrandDescriptor &&
   typeof nativeErrorBrandDescriptor.value === 'function'
-    ? (nativeErrorBrandDescriptor.value as (error: object) => boolean)
+    ? // oxlint-disable-next-line anti-slop/no-object-parameters -- The native error-brand predicate inspects arbitrary objects without trusting their properties.
+      (nativeErrorBrandDescriptor.value as (error: object) => boolean)
     : undefined;
 
 type AzureJSONErrorKind = 'error' | 'syntax' | 'tagged-wrapper' | 'unknown' | 'unsafe';
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Cross-realm prototypes are inspected through descriptors before any error contract is trusted.
 function hasNativeErrorPrototype(prototype: object, kind: 'Error' | 'SyntaxError'): boolean {
   const name = getOwnErrorDescriptor(prototype, 'name');
   const constructor = getOwnErrorDescriptor(prototype, 'constructor');
@@ -48,10 +52,12 @@ function hasNativeErrorPrototype(prototype: object, kind: 'Error' | 'SyntaxError
   );
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- Untrusted thrown objects, including proxies, must be classified before treating them as errors.
 function classifyCrossRealmAzureError(error: object): AzureJSONErrorKind {
   try {
     const prototypes: object[] = [];
     let tagged = false;
+    // SAFETY: Object.getPrototypeOf returns an object or null; the traversal never treats the prototype as a more specific instance.
     for (
       let prototype: object | null = error;
       prototype !== null;
@@ -147,6 +153,14 @@ function isMalformedAzureJSONError(error: unknown): boolean {
   } catch {
     return true;
   }
+}
+
+function readAzureAccessToken(data: unknown): string {
+  const token = isObj(data) && hasOwn(data, 'access_token') ? data['access_token'] : undefined;
+  if (typeof token !== 'string' || token.trim().length === 0) {
+    throw new SubjectTokenProviderError("IMDS response missing 'access_token' field", 'azure-imds');
+  }
+  return token;
 }
 
 /** Reads the UTF-8 contents of a Kubernetes service-account token file. */
@@ -316,9 +330,9 @@ export function azureManagedIdentityTokenProvider(
           );
         }
 
-        let data: { access_token?: string };
+        let data: unknown;
         try {
-          data = (await response.json()) as { access_token?: string };
+          data = await response.json();
         } catch (error) {
           if (isMalformedAzureJSONError(error)) {
             throw new SyntaxError('IMDS response contains invalid JSON');
@@ -326,11 +340,7 @@ export function azureManagedIdentityTokenProvider(
           throw error;
         }
 
-        if (!data.access_token) {
-          throw new SubjectTokenProviderError("IMDS response missing 'access_token' field", 'azure-imds');
-        }
-
-        return data.access_token;
+        return readAzureAccessToken(data);
       } catch (error) {
         if (error instanceof SubjectTokenProviderError) {
           throw error;

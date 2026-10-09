@@ -14,6 +14,7 @@
 // Remote HTTPS requests must include: Authorization: Bearer <OPENAI_EXAMPLE_AUTH_TOKEN>
 
 import { timingSafeEqual } from 'node:crypto';
+import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:https';
 import OpenAI from 'openai';
@@ -90,9 +91,8 @@ app.use(express.text());
 //     method: 'POST',
 //     body: 'Tell me why dogs are better than cats',
 //   }).then(async res => {
-//     const decoder = new TextDecoder();
-//     for await (const chunk of res.body) {
-//       console.log(`chunk: ${decoder.decode(chunk)}`);
+//     for await (const chunk of res.body.pipeThrough(new TextDecoderStream())) {
+//       console.log(`chunk: ${chunk}`);
 //     }
 //   })
 //
@@ -131,10 +131,37 @@ function rethrowUnlessClientAbort(
   error: unknown,
   disconnect: ReturnType<typeof watchClientDisconnect>,
 ): void {
+  // SAFETY: openai is constructed by this example from the OpenAI class; its constructor supplies the static stream helpers used below.
   const clientConstructor = openai.constructor as typeof OpenAI;
 
   if (!disconnect?.signal.aborted || !(error instanceof clientConstructor.APIUserAbortError)) {
     throw error;
+  }
+}
+
+async function writeResponseChunk(
+  res: Response,
+  chunk: string,
+  disconnect: ReturnType<typeof watchClientDisconnect>,
+): Promise<void> {
+  if (res.write(chunk) === false && disconnect) {
+    try {
+      await once(res, 'drain', { signal: disconnect.signal });
+    } catch (error) {
+      if (
+        !disconnect.signal.aborted ||
+        typeof error !== 'object' ||
+        error === null ||
+        !('name' in error) ||
+        error.name !== 'AbortError' ||
+        !('code' in error) ||
+        error.code !== 'ABORT_ERR' ||
+        !('cause' in error) ||
+        error.cause !== disconnect.signal.reason
+      ) {
+        throw error;
+      }
+    }
   }
 }
 
@@ -170,7 +197,7 @@ const handleRequest = async (req: Request, res: Response) => {
         break;
       }
 
-      res.write(chunk.choices[0]?.delta.content || '');
+      await writeResponseChunk(res, chunk.choices[0]?.delta.content || '', disconnect);
 
       if (disconnect?.signal.aborted || res.destroyed) {
         break;
@@ -187,7 +214,20 @@ const handleRequest = async (req: Request, res: Response) => {
   }
 };
 
-app.post('/', (req: Request, res: Response) => handleRequest(req, res).catch(console.error));
+app.post('/', (req: Request, res: Response) =>
+  // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Express 4 does not await async handlers; consume their arbitrary rejection values in this synchronous route.
+  handleRequest(req, res).catch((error: unknown) => {
+    console.error(error);
+    if (res.destroyed || res.writableEnded) {
+      return;
+    }
+    if (res.headersSent) {
+      res.destroy();
+    } else {
+      res.status(500).end('Internal Server Error');
+    }
+  }),
+);
 
 const onListening = () => {
   console.log(

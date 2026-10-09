@@ -40,6 +40,15 @@ export {
 } from './content-provenance-checks';
 export { Conversations } from './conversations/conversations';
 export {
+  Decisions,
+  type Decision,
+  type DecisionInputImage,
+  type DecisionInputMessage,
+  type DecisionInputPart,
+  type DecisionInputText,
+  type DecisionCreateParams,
+} from './decisions';
+export {
   Embeddings,
   type CreateEmbeddingResponse,
   type Embedding,
@@ -62,10 +71,10 @@ export {
 } from './evals/evals';
 export {
   Files,
-  type FileContent,
   type FileDeleted,
   type FileObject,
   type FilePurpose,
+  type FileContent,
   type FileCreateParams,
   type FileListParams,
   type FileObjectsPage,
@@ -91,6 +100,7 @@ export {
   type ImageGenerateParamsNonStreaming,
   type ImageGenerateParamsStreaming,
 } from './images';
+export { Live } from './live/live';
 export { Models, type Model, type ModelDeleted, type ModelsPage } from './models';
 export {
   Moderations,
@@ -104,6 +114,7 @@ export {
 } from './moderations';
 export { Realtime } from './realtime/realtime';
 export { Responses } from './responses/responses';
+export { Safety } from './safety/safety';
 export {
   Skills,
   type DeletedSkill,
@@ -154,4 +165,4 @@ export {
   type VideoRemixParams,
   type VideosPage,
 } from './videos';
-export { Webhooks } from './webhooks';
+export { Webhooks } from './webhooks/webhooks';

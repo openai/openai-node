@@ -8,6 +8,120 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../core/paginati
 import { RequestOptions } from '../internal/request-options';
 import { path } from '../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 /**
  * Create large batches of API requests to run asynchronously.
  */
@@ -16,28 +130,134 @@ export class Batches extends APIResource {
    * Creates and executes a batch from an uploaded file of requests
    */
   create(body: BatchCreateParams, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.post('/batches', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/batches',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Retrieves a batch.
    */
   retrieve(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.get(path`/batches/${batchID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.get(
+      path`/batches/${batchID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
    * List your organization's batches.
    */
   list(
-    query: BatchListParams | null | undefined = {},
+    query?:
+      | (BatchListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<BatchesPage, Batch>;
+  list(
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<BatchesPage, Batch>;
+  list(
+    query:
+      | BatchListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<BatchesPage, Batch> {
-    return this._client.getAPIList('/batches', CursorPage<Batch>, {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+      ['after', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as BatchListParams | null | undefined;
+    return this._client.getAPIList(
+      '/batches',
+      CursorPage<Batch>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -46,10 +266,10 @@ export class Batches extends APIResource {
    * (if any) available in the output file.
    */
   cancel(batchID: string, options?: RequestOptions): APIPromise<Batch> {
-    return this._client.post(path`/batches/${batchID}/cancel`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/batches/${batchID}/cancel`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 
@@ -154,11 +374,11 @@ export interface Batch {
   metadata?: Shared.Metadata | null;
 
   /**
-   * Model ID used to process the batch, like `gpt-5-2025-08-07`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * Model ID used to process the batch, like `gpt-6-astra`. OpenAI offers a wide
+   * range of models with different capabilities, performance characteristics, and
+   * price points. Refer to the
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model?: string;
 
@@ -272,7 +492,7 @@ export namespace BatchUsage {
   export interface InputTokensDetails {
     /**
      * The number of tokens that were retrieved from the cache.
-     * [More on prompt caching](https://platform.openai.com/docs/guides/prompt-caching).
+     * [More on prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching).
      */
     cached_tokens: number;
   }
@@ -316,11 +536,12 @@ export interface BatchCreateParams {
   /**
    * The ID of an uploaded file that contains requests for the new batch.
    *
-   * See [upload file](https://platform.openai.com/docs/api-reference/files/create)
+   * See
+   * [upload file](https://developers.openai.com/api/reference/resources/files/methods/create)
    * for how to upload a file.
    *
    * Your input file must be formatted as a
-   * [JSONL file](https://platform.openai.com/docs/api-reference/batch/request-input),
+   * [JSONL file](https://developers.openai.com/api/docs/guides/batch#1-prepare-your-batch-file),
    * and must be uploaded with the purpose `batch`. The file can contain up to 50,000
    * requests, and can be up to 200 MB in size.
    */

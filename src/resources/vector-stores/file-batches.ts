@@ -13,6 +13,13 @@ import { pollVectorStoreFileBatch } from '../../lib/vector-store-polling';
 import { uploadAndPollVectorStoreFileBatch } from '../../lib/vector-store-upload';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class FileBatches extends APIResource {
   /**
    * Create a vector store file batch.
@@ -22,12 +29,15 @@ export class FileBatches extends APIResource {
     body: FileBatchCreateParams,
     options?: RequestOptions,
   ): APIPromise<VectorStoreFileBatch> {
-    return this._client.post(path`/vector_stores/${vectorStoreID}/file_batches`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/vector_stores/${vectorStoreID}/file_batches`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -39,11 +49,14 @@ export class FileBatches extends APIResource {
     options?: RequestOptions,
   ): APIPromise<VectorStoreFileBatch> {
     const { vector_store_id } = params;
-    return this._client.get(path`/vector_stores/${vector_store_id}/file_batches/${batchID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/vector_stores/${vector_store_id}/file_batches/${batchID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -56,11 +69,14 @@ export class FileBatches extends APIResource {
     options?: RequestOptions,
   ): APIPromise<VectorStoreFileBatch> {
     const { vector_store_id } = params;
-    return this._client.post(path`/vector_stores/${vector_store_id}/file_batches/${batchID}/cancel`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/vector_stores/${vector_store_id}/file_batches/${batchID}/cancel`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -87,12 +103,12 @@ export class FileBatches extends APIResource {
     return this._client.getAPIList(
       path`/vector_stores/${vector_store_id}/file_batches/${batchID}/files`,
       CursorPage<FilesAPI.VectorStoreFile>,
-      {
+      resolveResourceRequestOptions(options, (options) => ({
         query,
         ...options,
         headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
         __security: { bearerAuth: true },
-      },
+      })),
     );
   }
 
@@ -161,8 +177,8 @@ export interface VectorStoreFileBatch {
 
   /**
    * The ID of the
-   * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
-   * that the [File](https://platform.openai.com/docs/api-reference/files) is
+   * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
+   * that the [File](https://developers.openai.com/api/reference/resources/files) is
    * attached to.
    */
   vector_store_id: string;
@@ -214,12 +230,12 @@ export interface FileBatchCreateParams {
   chunking_strategy?: VectorStoresAPI.FileChunkingStrategyParam;
 
   /**
-   * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-   * the vector store should use. Useful for tools like `file_search` that can access
-   * files. If `attributes` or `chunking_strategy` are provided, they will be applied
-   * to all files in the batch. The maximum batch size is 2000 files. This endpoint
-   * is recommended for multi-file ingestion and helps reduce per-vector-store write
-   * request pressure. Mutually exclusive with `files`.
+   * A list of [File](https://developers.openai.com/api/reference/resources/files)
+   * IDs that the vector store should use. Useful for tools like `file_search` that
+   * can access files. If `attributes` or `chunking_strategy` are provided, they will
+   * be applied to all files in the batch. The maximum batch size is 2000 files. This
+   * endpoint is recommended for multi-file ingestion and helps reduce
+   * per-vector-store write request pressure. Mutually exclusive with `files`.
    */
   file_ids?: Array<string>;
 
@@ -237,10 +253,10 @@ export interface FileBatchCreateParams {
 export namespace FileBatchCreateParams {
   export interface File {
     /**
-     * A [File](https://platform.openai.com/docs/api-reference/files) ID that the
-     * vector store should use. Useful for tools like `file_search` that can access
+     * A [File](https://developers.openai.com/api/reference/resources/files) ID that
+     * the vector store should use. Useful for tools like `file_search` that can access
      * files. For multi-file ingestion, we recommend
-     * [`file_batches`](https://platform.openai.com/docs/api-reference/vector-stores-file-batches/createBatch)
+     * [`file_batches`](https://developers.openai.com/api/reference/resources/vector_stores/subresources/file_batches/methods/create)
      * to minimize per-vector-store write requests.
      */
     file_id: string;

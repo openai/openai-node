@@ -2,11 +2,15 @@ import type { Response } from '../../resources/responses/responses';
 import { OutputTextIndex } from './output-text-index';
 
 type ResponseOutput = Response['output'][number];
+export type ResponseOutputSnapshot = Pick<Response, 'output' | 'output_text'>;
 
 export interface ResponseAccumulatorContext {
-  canonicalSnapshot: Response | undefined;
+  canonicalSnapshot: ResponseOutputSnapshot | undefined;
   outputTextLengths: WeakMap<ResponseOutput, number>;
   outputTextIndex: OutputTextIndex;
+  /** Only the caller-fed WebSocket helper can defer the aggregate until a snapshot is read. */
+  deferOutputText?: boolean;
+  outputTextDirty?: boolean;
 }
 
 export function createCanonicalResponseContext(): ResponseAccumulatorContext {
@@ -32,7 +36,14 @@ export function getOutputText(context: ResponseAccumulatorContext, output: Respo
   return text;
 }
 
-export function ensureCanonicalOutputText(context: ResponseAccumulatorContext, snapshot: Response): void {
+export function ensureCanonicalOutputText(
+  context: ResponseAccumulatorContext,
+  snapshot: ResponseOutputSnapshot,
+): void {
+  if (context.deferOutputText) {
+    context.canonicalSnapshot = undefined;
+    return;
+  }
   if (context.canonicalSnapshot === snapshot) {
     return;
   }
@@ -51,7 +62,10 @@ export function ensureCanonicalOutputText(context: ResponseAccumulatorContext, s
   context.canonicalSnapshot = snapshot;
 }
 
-export function cloneResponse(context: ResponseAccumulatorContext, response: Response): Response {
+export function cloneResponse<T extends ResponseOutputSnapshot>(
+  context: ResponseAccumulatorContext,
+  response: T,
+): T {
   context.canonicalSnapshot = undefined;
   context.outputTextLengths = new WeakMap();
   context.outputTextIndex = new OutputTextIndex();
@@ -75,6 +89,9 @@ export function updateCachedOutputTextLength(
   previousText: string,
   nextText: string,
 ): void {
+  if (context.deferOutputText) {
+    return;
+  }
   const length = context.outputTextLengths.get(output);
   if (length !== undefined) {
     const nextLength = length - previousText.length + nextText.length;
@@ -83,7 +100,11 @@ export function updateCachedOutputTextLength(
   }
 }
 
-function replaceOutputTextSuffix(snapshot: Response, previousText: string, nextText: string): void {
+function replaceOutputTextSuffix(
+  snapshot: ResponseOutputSnapshot,
+  previousText: string,
+  nextText: string,
+): void {
   if (previousText.length === 0) {
     snapshot.output_text += nextText;
     return;
@@ -127,13 +148,17 @@ function getPrecedingContentTextLength(
 
 export function updateOutputText(
   context: ResponseAccumulatorContext,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   outputIndex: number,
   previousText: string,
   nextText: string,
   contentIndex?: number,
 ): void {
   if (previousText === nextText) {
+    return;
+  }
+  if (context.deferOutputText) {
+    context.outputTextDirty = true;
     return;
   }
 

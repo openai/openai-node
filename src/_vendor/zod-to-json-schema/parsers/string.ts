@@ -222,6 +222,7 @@ export function parseStringDef(def: ZodStringDef, refs: Refs): JsonSchema7String
         case 'base64': {
           switch (refs.base64Strategy) {
             case 'format:binary': {
+              // SAFETY: The explicit OpenAPI binary strategy uses format: binary, an extension to the vendored JSON Schema string-format type.
               addFormat(res, 'binary' as any, check.message, refs);
               break;
             }
@@ -410,7 +411,7 @@ const processRegExp = (regexOrFunction: RegExp | (() => RegExp), refs: Refs): st
   }
 
   try {
-    const regexTest = new RegExp(pattern);
+    void new RegExp(pattern);
   } catch {
     console.warn(
       `Could not convert regex pattern at ${refs.currentPath.join(

@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { Stream } from 'openai/core/streaming';
 import type { OpenAIError } from 'openai/error';
-import { APIConnectionError } from 'openai/error';
+import { APIConnectionError, APIUserAbortError } from 'openai/error';
 import { PassThrough } from 'node:stream';
 import {
   ParsingToolFunction,
@@ -252,7 +252,7 @@ class RunnerListener {
 
     const expectedContents = this.messages
       .filter(isAssistantMessage)
-      .map((m) => m.content as string)
+      .map((m) => m.content)
       .filter(Boolean);
     expect(this.contents).toEqual(expectedContents);
     expect(this.finalMessage).toEqual(findLastAssistantMessage(this.messages));
@@ -387,13 +387,8 @@ class StreamingRunnerListener {
     expect(this.eventChatCompletions).toEqual(this.runner.allChatCompletions());
     const runnerMessages = this.runner.messages.filter((message) => !ignoredMessages.has(message));
     expect(this.eventMessages).toEqual(runnerMessages.slice(-this.eventMessages.length));
-    if (error) {
-      expect(this.error?.message).toEqual(error);
-      expect(this.runner.errored).toBe(true);
-    } else {
-      expect(this.error).toBeUndefined();
-      expect(this.runner.errored).toBe(false);
-    }
+    expect(this.error).toBeUndefined();
+    expect(this.runner.errored).toBe(false);
     expect(this.gotEnd).toBe(true);
   }
 }
@@ -454,6 +449,7 @@ function _typeTests() {
         type: 'function',
         function: {
           name: 'numProperties',
+          // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
           function: (obj: object) => String(Object.keys(obj).length),
           parameters: { type: 'object' },
           parse: (str: string): object => {
@@ -478,6 +474,7 @@ function _typeTests() {
         type: 'function',
         // @ts-expect-error function must accept string if parse is omitted
         function: {
+          // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
           function: (obj: object) => String(Object.keys(obj).length),
           parameters: { type: 'object' },
           description: 'gets the number of properties on an object',
@@ -514,6 +511,7 @@ function _typeTests() {
         name: 'numProperties',
         // @ts-expect-error parse and function don't match
         parse: (str: string) => str,
+        // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
         function: (obj: object) => String(Object.keys(obj).length),
         parameters: { type: 'object' },
         description: 'gets the number of properties on an object',
@@ -535,6 +533,7 @@ function _typeTests() {
           }
           return result;
         },
+        // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
         function: (obj: object) => String(Object.keys(obj).length),
         parameters: { type: 'object' },
         description: 'gets the number of properties on an object',
@@ -548,6 +547,7 @@ function _typeTests() {
           }
           return result;
         },
+        // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
         function: (obj: object) => Object.keys(obj).join(', '),
         parameters: { type: 'object' },
         description: 'gets the number of properties on an object',
@@ -556,6 +556,7 @@ function _typeTests() {
         name: 'len2',
         // @ts-expect-error parse and function don't match
         parse: (str: string) => str,
+        // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
         function: (obj: object) => String(Object.keys(obj).length),
         parameters: { type: 'object' },
         description: 'gets the number of properties on an object',
@@ -580,6 +581,7 @@ function _typeTests() {
             }
             return result;
           },
+          // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
           function: (obj: object) => String(Object.keys(obj).length),
           parameters: { type: 'object' },
           description: 'gets the number of properties on an object',
@@ -596,6 +598,7 @@ function _typeTests() {
             }
             return result;
           },
+          // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
           function: (obj: object) => Object.keys(obj).join(', '),
           parameters: { type: 'object' },
           description: 'gets the number of properties on an object',
@@ -608,6 +611,7 @@ function _typeTests() {
           parse: (str: string) => str,
           // @ts-ignore error occurs here in TS 5
           // function input doesn't match parse output
+          // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
           function: (obj: object) => String(Object.keys(obj).length),
           parameters: { type: 'object' },
           description: 'gets the number of properties on an object',
@@ -658,6 +662,57 @@ describe('resource completions', () => {
       });
 
       await runner.done();
+    });
+
+    test.each([
+      { name: 'text in default mode', content: 'Earlier reply', stream: undefined },
+      { name: 'text with stream: false', content: 'Earlier reply', stream: false as const },
+      {
+        name: 'content parts',
+        content: [{ type: 'text' as const, text: 'Earlier reply' }],
+        stream: false as const,
+      },
+    ])('does not emit assistant $name from input history', async ({ content, stream }) => {
+      const { fetch, handleRequest } = mockChatCompletionFetch();
+      const openai = new OpenAI({ apiKey: 'test-key', baseURL: 'https://example.com/v1/', fetch });
+      const messages: ChatCompletionMessageParam[] = [
+        { role: 'user', content: 'Earlier question' },
+        { role: 'assistant', content },
+        { role: 'user', content: 'Continue' },
+      ];
+      const runner = openai.chat.completions.runTools({
+        messages,
+        model: 'gpt-4o-mini',
+        tools: [],
+        ...(stream === undefined ? {} : { stream }),
+      });
+      const listener = new RunnerListener(runner);
+
+      await handleRequest(async (request) => {
+        expect(request.messages).toEqual(messages);
+        return {
+          id: 'chatcmpl_123',
+          object: 'chat.completion',
+          created: 0,
+          model: 'gpt-4o-mini',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'stop',
+              logprobs: null,
+              message: { role: 'assistant', content: 'New reply', refusal: null },
+            },
+          ],
+        };
+      });
+      await runner.done();
+
+      expect(listener.contents).toEqual(['New reply']);
+      expect(listener.messages).toMatchObject([{ role: 'assistant', content: 'New reply' }]);
+      expect(runner.messages).toHaveLength(messages.length + 1);
+      expect(runner.messages.slice(0, messages.length)).toEqual(messages);
+      expect(runner.messages[1]).toBe(messages[1]);
+      await listener.sanityCheck();
     });
 
     test('successful flow', async () => {
@@ -1202,6 +1257,7 @@ describe('resource completions', () => {
       const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
 
       const controller = new AbortController();
+      const abortReason = new Error('stop after assistant message');
       const runner = openai.chat.completions.runTools(
         {
           messages: [{ role: 'user', content: 'tell me what the weather is like' }],
@@ -1225,7 +1281,7 @@ describe('resource completions', () => {
 
       runner.on('message', (message) => {
         if (message.role === 'assistant') {
-          controller.abort();
+          controller.abort(abortReason);
         }
       });
       await handleRequest(async (request) => {
@@ -1261,7 +1317,8 @@ describe('resource completions', () => {
         };
       });
 
-      await runner.done().catch(() => {});
+      const abortError = await runner.done().catch((error) => error);
+      expect(abortError).toMatchObject({ cause: abortReason });
 
       expect(listener.messages).toEqual([
         {
@@ -1287,6 +1344,85 @@ describe('resource completions', () => {
       await listener.sanityCheck({ error: 'Request was aborted.' });
       expect(runner.aborted).toBe(true);
     });
+    test.each([
+      { parsed: false, named: false, reason: new Error('stop during tool callback') },
+      { parsed: true, named: false, reason: new Error('stop during parsed tool callback') },
+      { parsed: false, named: true, reason: new Error('stop during named tool callback') },
+      { parsed: true, named: true, reason: new Error('stop during named parsed tool callback') },
+      { parsed: false, named: false, reason: Number.NaN },
+      { parsed: true, named: false, reason: Number.NaN },
+    ])(
+      'classifies callback cancellation (parsed=$parsed, named=$named, reason=$reason)',
+      async ({ parsed, named, reason: abortReason }) => {
+        const { fetch, handleRequest } = mockChatCompletionFetch();
+        const openai = new OpenAI({ apiKey: 'something1234', baseURL: 'http://127.0.0.1:4010', fetch });
+        const controller = new AbortController();
+        const runner = openai.chat.completions.runTools(
+          {
+            messages: [{ role: 'user', content: 'run the tool' }],
+            model: 'gpt-3.5-turbo',
+            ...(named
+              ? { tool_choice: { type: 'function' as const, function: { name: 'abortable' } } }
+              : { parallel_tool_calls: false }),
+            tools: [
+              {
+                type: 'function',
+                function: {
+                  name: 'abortable',
+                  ...(parsed ? { parse: (args: string) => ({ args }) } : {}),
+                  function: (
+                    _args: string | { args: string },
+                    activeRunner: Pick<ChatCompletionRunner<unknown>, 'controller'>,
+                  ) => {
+                    controller.abort(abortReason);
+                    activeRunner.controller.signal.throwIfAborted();
+                    return 'unreachable';
+                  },
+                  parameters: {},
+                  description: 'aborts while running',
+                },
+              },
+            ],
+          },
+          { signal: controller.signal, maxChatCompletions: 1 },
+        );
+        const listener = new RunnerListener(runner);
+
+        await handleRequest(async () => ({
+          id: '1',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'tool_calls',
+              logprobs: null,
+              message: {
+                role: 'assistant',
+                content: null,
+                refusal: null,
+                parsed: null,
+                tool_calls: [
+                  {
+                    type: 'function',
+                    id: 'abort-call',
+                    function: { arguments: '', name: 'abortable' },
+                  },
+                ],
+              },
+            },
+          ],
+          created: Math.floor(Date.now() / 1000),
+          model: 'gpt-3.5-turbo',
+          object: 'chat.completion',
+        }));
+
+        const error = await runner.done().catch((error) => error);
+        expect(error).toBeInstanceOf(APIUserAbortError);
+        expect(error.cause).toBe(abortReason);
+        expect(runner.aborted).toBe(true);
+        expect(listener.gotAbort).toBe(true);
+      },
+    );
+
     test('successful flow with parse', async () => {
       const { fetch, handleRequest } = mockChatCompletionFetch();
 
@@ -1303,6 +1439,7 @@ describe('resource completions', () => {
         tools: [
           new ParsingToolFunction({
             name: 'numProperties',
+            // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
             function: (obj: object) => String(Object.keys(obj).length),
             parameters: { type: 'object' },
             parse: (str: string): object => {
@@ -1460,6 +1597,7 @@ describe('resource completions', () => {
         tools: [
           new ParsingToolFunction({
             name: 'numProperties',
+            // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
             function: (obj: object) => String(Object.keys(obj).length),
             parameters: { type: 'object' },
             parse: (str: string): object => {
@@ -2727,6 +2865,7 @@ describe('resource completions', () => {
         tools: [
           new ParsingToolFunction({
             name: 'numProperties',
+            // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
             function: (obj: object) => String(Object.keys(obj).length),
             parameters: { type: 'object' },
             parse: (str: string): object => {
@@ -2867,6 +3006,7 @@ describe('resource completions', () => {
         tools: [
           new ParsingToolFunction({
             name: 'numProperties',
+            // oxlint-disable-next-line anti-slop/no-object-parameters -- This generic key-counting tool deliberately accepts object results and tests parser/callback type compatibility.
             function: (obj: object) => String(Object.keys(obj).length),
             parameters: { type: 'object' },
             parse: (str: string): object => {

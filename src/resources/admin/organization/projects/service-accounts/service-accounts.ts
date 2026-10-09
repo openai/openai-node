@@ -12,6 +12,120 @@ import {
 import { RequestOptions } from '../../../../../internal/request-options';
 import { path } from '../../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 export class ServiceAccounts extends APIResource {
   apiKeys: APIKeysAPI.APIKeys = new APIKeysAPI.APIKeys(this._client);
 
@@ -33,11 +147,14 @@ export class ServiceAccounts extends APIResource {
     body: ServiceAccountCreateParams,
     options?: RequestOptions,
   ): APIPromise<ServiceAccountCreateResponse> {
-    return this._client.post(path`/organization/projects/${projectID}/service_accounts`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/projects/${projectID}/service_accounts`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -58,10 +175,13 @@ export class ServiceAccounts extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ProjectServiceAccount> {
     const { project_id } = params;
-    return this._client.get(path`/organization/projects/${project_id}/service_accounts/${serviceAccountID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/projects/${project_id}/service_accounts/${serviceAccountID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -84,7 +204,11 @@ export class ServiceAccounts extends APIResource {
     const { project_id, ...body } = params;
     return this._client.post(
       path`/organization/projects/${project_id}/service_accounts/${serviceAccountID}`,
-      { body, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -103,13 +227,111 @@ export class ServiceAccounts extends APIResource {
    */
   list(
     projectID: string,
-    query: ServiceAccountListParams | null | undefined = {},
+    query?:
+      | (ServiceAccountListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ProjectServiceAccountsPage, ProjectServiceAccount>;
+  list(
+    projectID: string,
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<ProjectServiceAccountsPage, ProjectServiceAccount>;
+  list(
+    projectID: string,
+    query:
+      | ServiceAccountListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ProjectServiceAccountsPage, ProjectServiceAccount> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ServiceAccountListParams | null | undefined;
     return this._client.getAPIList(
       path`/organization/projects/${projectID}/service_accounts`,
       ConversationCursorPage<ProjectServiceAccount>,
-      { query, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 
@@ -136,7 +358,10 @@ export class ServiceAccounts extends APIResource {
     const { project_id } = params;
     return this._client.delete(
       path`/organization/projects/${project_id}/service_accounts/${serviceAccountID}`,
-      { ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 }
@@ -205,6 +430,12 @@ export namespace ServiceAccountCreateResponse {
     object: 'organization.project.service_account.api_key';
 
     value: string;
+
+    /**
+     * The Unix timestamp (in seconds) when the API key expires, or null if it does not
+     * expire.
+     */
+    expires_at?: number | null;
   }
 }
 
@@ -226,6 +457,15 @@ export interface ServiceAccountCreateParams {
    * Create the service account without default roles or an API key.
    */
   create_service_account_only?: boolean | null;
+
+  /**
+   * Number of seconds until the initial API key expires. If omitted or null, the key
+   * does not expire unless the effective organization or project policy requires an
+   * expiration. When a policy sets a maximum lifetime, this value must be provided
+   * and must not exceed that limit. A non-null value cannot be used when
+   * `create_service_account_only` is true.
+   */
+  expires_in_seconds?: number | null;
 }
 
 export interface ServiceAccountRetrieveParams {

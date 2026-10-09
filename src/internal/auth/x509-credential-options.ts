@@ -13,6 +13,7 @@ export function normalizeX509CredentialOptions(options: ClientOptions): {
 } {
   const { credential } = options;
   if (credential === undefined) {
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Preserve the exported normalization contract when no X.509 credential is configured.
     return { credential, options };
   }
 
@@ -32,6 +33,7 @@ export function normalizeX509CredentialOptions(options: ClientOptions): {
     );
   }
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared ClientOptions return contract supports both normalized and unchanged client options.
   return {
     credential,
     options: {
@@ -142,5 +144,6 @@ export function prepareX509ClientClone(
     }
   }
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- Preserve the exported clone contract across inherited and replaced credentials and providers.
   return { credential: nextCredential, provider: prepareProviderClone(inherited, overrides) };
 }

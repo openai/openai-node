@@ -1,6 +1,11 @@
 import OpenAI from 'openai/index';
 import { toResponseInputItems } from 'openai/lib/responses/ResponseInputItems';
+import type {
+  BetaResponseInputItem,
+  BetaResponseOutputItem,
+} from 'openai/resources/beta/responses/responses';
 import type { ResponseInputItem, ResponseOutputItem } from 'openai/resources/responses/responses';
+import { expectType } from './utils/typing';
 
 const openai = new OpenAI({ apiKey: 'example-api-key' });
 
@@ -14,6 +19,20 @@ function isInputCompatibleOutputItem(
 }
 
 describe('responses item types', () => {
+  test('incomplete web search calls are valid stable and beta input and output items', () => {
+    const item = {
+      id: 'ws_123',
+      type: 'web_search_call',
+      status: 'incomplete',
+      action: { type: 'search', query: 'synthetic query' },
+    } as const;
+
+    expectType<ResponseOutputItem>(item);
+    expectType<ResponseInputItem>(item);
+    expectType<BetaResponseOutputItem>(item);
+    expectType<BetaResponseInputItem>(item);
+  });
+
   test('response output items are compatible with input items', async () => {
     expect(true).toBe(true);
   });

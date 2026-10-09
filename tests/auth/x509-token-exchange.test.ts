@@ -95,6 +95,7 @@ describe('isolated X.509 workload-identity token exchange', () => {
       await expect(
         exchangeX509Token({
           transport,
+          // SAFETY: This deliberately invalid identifier fixture crosses the typed API to verify runtime rejection without invoking caller serialization hooks.
           identityProviderId: identityProviderId as string,
           serviceAccountId: 'synthetic-service-account',
         }),
@@ -112,6 +113,7 @@ describe('isolated X.509 workload-identity token exchange', () => {
         exchangeX509Token({
           transport,
           identityProviderId: 'synthetic-identity-provider',
+          // SAFETY: This deliberately invalid identifier fixture crosses the typed API to verify runtime rejection without invoking caller serialization hooks.
           serviceAccountId: serviceAccountId as string,
         }),
       ).rejects.toThrow(/provider.*service-account/iu);
@@ -126,6 +128,8 @@ describe('isolated X.509 workload-identity token exchange', () => {
     await expect(
       exchangeX509Token({
         transport,
+        // SAFETY: This deliberately invalid identifier fixture crosses the typed API to verify runtime rejection without invoking caller serialization hooks.
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Inject an object with toJSON where a string is required to verify validation precedes serialization.
         identityProviderId: { toJSON } as unknown as string,
         serviceAccountId: 'synthetic-service-account',
       }),
@@ -145,9 +149,11 @@ describe('isolated X.509 workload-identity token exchange', () => {
     const options = {
       transport,
       get identityProviderId() {
+        // SAFETY: This deliberately invalid identifier fixture crosses the typed API to verify runtime rejection without invoking caller serialization hooks.
         return identityProviderId() as string;
       },
       get serviceAccountId() {
+        // SAFETY: This deliberately invalid identifier fixture crosses the typed API to verify runtime rejection without invoking caller serialization hooks.
         return serviceAccountId() as string;
       },
     };
@@ -260,6 +266,7 @@ describe('isolated X.509 workload-identity token exchange', () => {
       Reflect.deleteProperty(response, name);
 
       const prototype = Object.defineProperty({}, name, { get: getter });
+      // SAFETY: Object.create constructs the deliberate prototype fixture; only object identity or explicitly defined properties are used here.
       const parsed = Object.assign(Object.create(prototype) as object, response);
       mockResponse(response);
       vi.spyOn(JSON, 'parse').mockReturnValue(parsed);
@@ -290,9 +297,13 @@ describe('isolated X.509 workload-identity token exchange', () => {
       expect(caught).toBeInstanceOf(OAuthError);
       expect(caught).toMatchObject({ status: 403, error_code: code });
       expect(String(caught)).not.toContain(secret);
+      // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
       expect((caught as OAuthError).headers.get('location')).toBeNull();
+      // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
       expect((caught as OAuthError).headers.get('set-cookie')).toBeNull();
+      // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
       expect((caught as OAuthError).headers.get('x-should-retry')).toBeNull();
+      // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
       expect((caught as OAuthError).requestID).toBe('synthetic-request-id');
     },
   );
@@ -303,6 +314,7 @@ describe('isolated X.509 workload-identity token exchange', () => {
 
     const caught = await exchange().catch((error: unknown) => error);
     expect(caught).toBeInstanceOf(OAuthError);
+    // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
     expect((caught as OAuthError).error_code).toBeUndefined();
     expect(String(caught)).not.toContain(secret);
   });
@@ -331,8 +343,11 @@ describe('isolated X.509 workload-identity token exchange', () => {
 
     const caught = await exchange().catch((error: unknown) => error);
     expect(caught).toBeInstanceOf(APIError);
+    // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
     expect((caught as APIError).status).toBe(status);
+    // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
     expect((caught as APIError).headers?.get('location')).toBeNull();
+    // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
     expect((caught as APIError).headers?.get('x-should-retry')).toBeNull();
     expect(String(caught)).not.toContain(secret);
   });
@@ -358,6 +373,7 @@ describe('isolated X.509 workload-identity token exchange', () => {
 
       const caught = await exchange().catch((error: unknown) => error);
       expect(caught).toBeInstanceOf(APIError);
+      // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
       const error = caught as APIError;
       expect(error.status).toBe(status);
       expect(error.headers?.get('retry-after')).toBe('4');

@@ -149,9 +149,12 @@ describe('line decoder', () => {
     let scanned = 0;
 
     inspectBuffers((operations) => {
+      // SAFETY: The constructor spy forwards every argument to the captured native Uint8Array constructor and returns that real buffer through a tracking Proxy.
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The constructor instrumentation delegates allocation to the native Uint8Array while counting indexed reads.
       const constructorSpy = vi.spyOn(globalThis, 'Uint8Array').mockImplementation(function trackBuffer(
         ...args: unknown[]
       ) {
+        // SAFETY: The constructor spy forwards every argument to the captured native Uint8Array constructor and returns that real buffer through a tracking Proxy.
         const buffer = Reflect.construct(NativeUint8Array, args) as Uint8Array;
         return new Proxy(buffer, {
           get(target, property) {
@@ -161,6 +164,7 @@ describe('line decoder', () => {
                 throw new Error('LineDecoder rescanned buffered bytes');
               }
             }
+            // oxlint-disable-next-line anti-slop/no-reflect-get -- The instrumented typed-array proxy must forward arbitrary keys with the native target as receiver.
             const value = Reflect.get(target, property, target);
             return typeof value === 'function' ? value.bind(target) : value;
           },

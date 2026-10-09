@@ -18,6 +18,13 @@ import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Manage conversations and conversation items.
  */
@@ -31,17 +38,24 @@ export class Conversations extends APIResource {
     body: ConversationCreateParams | null | undefined = {},
     options?: RequestOptions,
   ): APIPromise<Conversation> {
-    return this._client.post('/conversations', { body, ...options, __security: { bearerAuth: true } });
+    return this._client.post(
+      '/conversations',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Get a conversation
    */
   retrieve(conversationID: string, options?: RequestOptions): APIPromise<Conversation> {
-    return this._client.get(path`/conversations/${conversationID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/conversations/${conversationID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -52,21 +66,24 @@ export class Conversations extends APIResource {
     body: ConversationUpdateParams,
     options?: RequestOptions,
   ): APIPromise<Conversation> {
-    return this._client.post(path`/conversations/${conversationID}`, {
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/conversations/${conversationID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Delete a conversation. Items in the conversation will not be deleted.
    */
   delete(conversationID: string, options?: RequestOptions): APIPromise<ConversationDeletedResource> {
-    return this._client.delete(path`/conversations/${conversationID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/conversations/${conversationID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 
@@ -284,10 +301,9 @@ export interface ConversationUpdateParams {
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
    * for storing additional information about the object in a structured format, and
-   * querying for objects via API or the dashboard.
-   *
-   * Keys are strings with a maximum length of 64 characters. Values are strings with
-   * a maximum length of 512 characters.
+   * querying for objects via API or the dashboard. Keys are strings with a maximum
+   * length of 64 characters. Values are strings with a maximum length of 512
+   * characters.
    */
   metadata: Shared.Metadata | null;
 }

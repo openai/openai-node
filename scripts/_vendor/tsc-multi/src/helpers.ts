@@ -4,6 +4,7 @@ export const helpers: Record<
     deps: string[];
     code: string;
   }
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- Preserve the vendored helper registry contract, which is indexed by emitted runtime helper names.
 > = {
   __addDisposableResource: {
     deps: [],

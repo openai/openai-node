@@ -1,7 +1,8 @@
 import type { Response, ResponseOutputText, ResponseStreamEvent } from '../../resources/responses/responses';
-import type { ResponseAccumulatorContext } from './canonical-output-text';
+import type { ResponseAccumulatorContext, ResponseOutputSnapshot } from './canonical-output-text';
 import { OpenAIError } from '../../error';
 import { hasOwn } from '../utils';
+import { isObj } from '../utils/values';
 import {
   cloneResponse,
   createCanonicalResponseContext,
@@ -128,6 +129,7 @@ type ResponseIgnoredEvent = Extract<
       | 'response.audio.done'
       | 'response.audio.transcript.delta'
       | 'response.audio.transcript.done'
+      | 'response.compaction.compacting'
       | 'response.image_generation_call.partial_image'
       | 'response.mcp_list_tools.in_progress'
       | 'response.mcp_list_tools.completed'
@@ -138,7 +140,7 @@ type ResponseIgnoredEvent = Extract<
 >;
 
 interface ResponseOutputIdentityIndex {
-  snapshot: Response;
+  snapshot: ResponseOutputSnapshot;
   output: Response['output'];
   length: number;
   identities: Set<string>;
@@ -153,6 +155,7 @@ function validateArrayIndex(
   allowAppend = false,
 ): void {
   if (
+    !Array.isArray(collection) ||
     !Number.isSafeInteger(index) ||
     index < 0 ||
     index > collection.length ||
@@ -173,7 +176,7 @@ function validateArrayAppend(
   validateArrayIndex(collection, index, kind, true);
 }
 
-function getOutput(snapshot: Response, outputIndex: number): Response['output'][number] {
+function getOutput(snapshot: ResponseOutputSnapshot, outputIndex: number): Response['output'][number] {
   validateArrayIndex(snapshot.output, outputIndex, 'output');
   const output = snapshot.output[outputIndex];
   if (!output) {
@@ -197,6 +200,7 @@ function hasRoutedOutputCallIdentity(
 }
 
 function getOutputItemIdentityKeys(output: Response['output'][number], eventType: string): string[] {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
   if (!hasOwn(output, 'type') || typeof output.type !== 'string') {
     throw new OpenAIError(`expected an own output item type for ${eventType}`);
   }
@@ -205,6 +209,7 @@ function getOutputItemIdentityKeys(output: Response['output'][number], eventType
   const identities: string[] = [];
 
   if (hasOwn(output, 'id')) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
     if (typeof output.id !== 'string' || output.id.length === 0) {
       throw new OpenAIError(`expected a non-empty output item id for ${eventType}`);
     }
@@ -214,6 +219,7 @@ function getOutputItemIdentityKeys(output: Response['output'][number], eventType
   }
 
   if (hasRoutedOutputCallIdentity(output)) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
     if (!hasOwn(output, 'call_id') || typeof output.call_id !== 'string' || output.call_id.length === 0) {
       throw new OpenAIError(`expected a non-empty output item call_id for ${eventType}`);
     }
@@ -238,7 +244,7 @@ function addOutputItemIdentities(identities: Set<string>, keys: readonly string[
   }
 }
 
-function createResponseOutputIdentityIndex(snapshot: Response): ResponseOutputIdentityIndex {
+function createResponseOutputIdentityIndex(snapshot: ResponseOutputSnapshot): ResponseOutputIdentityIndex {
   const identityIndex: ResponseOutputIdentityIndex = {
     snapshot,
     output: snapshot.output,
@@ -256,7 +262,7 @@ function createResponseOutputIdentityIndex(snapshot: Response): ResponseOutputId
 
 function getResponseOutputIdentityIndex(
   context: ResponseAccumulatorContext,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): ResponseOutputIdentityIndex {
   const cached = responseOutputIdentityIndexes.get(context);
   if (
@@ -273,7 +279,10 @@ function getResponseOutputIdentityIndex(
   return identityIndex;
 }
 
-function cloneValidatedResponse(context: ResponseAccumulatorContext, response: Response): Response {
+export function cloneValidatedResponse<T extends ResponseOutputSnapshot>(
+  context: ResponseAccumulatorContext,
+  response: T,
+): T {
   const nextContext = createCanonicalResponseContext();
   const snapshot = cloneResponse(nextContext, response);
   const identityIndex = createResponseOutputIdentityIndex(snapshot);
@@ -327,6 +336,7 @@ const expectedOutputItemTypes = {
   'response.mcp_list_tools.in_progress': 'mcp_list_tools',
   'response.mcp_list_tools.completed': 'mcp_list_tools',
   'response.mcp_list_tools.failed': 'mcp_list_tools',
+  'response.compaction.compacting': 'compaction',
 } satisfies Record<
   Exclude<ResponseItemScopedEvent['type'], 'response.content_part.added' | 'response.content_part.done'>,
   Response['output'][number]['type']
@@ -342,7 +352,7 @@ function getExpectedOutputItemType(event: ResponseItemScopedEvent): Response['ou
 
 function validateCompletedOutputItemIdentity(
   event: Extract<ResponseOutputItemEvent, { type: 'response.output_item.done' }>,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): void {
   const output = getOutput(snapshot, event.output_index);
   const replacement = event.item;
@@ -370,7 +380,7 @@ function validateCompletedOutputItemIdentity(
 
 function validateOutputItemIdentity(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   rejectInvalidShellTargets: boolean,
 ): void {
   if (event.type === 'response.output_item.done') {
@@ -399,7 +409,9 @@ function validateOutputItemIdentity(
     return;
   }
 
+  // SAFETY: The event type was classified as item-scoped; the following checks validate its own item_id before use.
   const itemEvent = event as ResponseItemScopedEvent;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
   if (!hasOwn(event, 'item_id') || typeof itemEvent.item_id !== 'string' || itemEvent.item_id.length === 0) {
     throw new OpenAIError(`expected a non-empty item_id for ${event.type}`);
   }
@@ -426,7 +438,7 @@ function getContent<T>(content: T[], contentIndex: number): T {
 }
 
 function getShellOutputContent(
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   output: Extract<Response['output'][number], { type: 'shell_call_output' }>,
   commandIndex: number,
 ): (typeof output.output)[number] {
@@ -513,6 +525,7 @@ const supportedResponseEventTypes = createSupportedResponseEventTypes([
   'response.audio.done',
   'response.audio.transcript.delta',
   'response.audio.transcript.done',
+  'response.compaction.compacting',
   'response.image_generation_call.partial_image',
   'response.mcp_list_tools.in_progress',
   'response.mcp_list_tools.completed',
@@ -534,19 +547,37 @@ const responseEventRoutingFields = [
   'summary_index',
 ] as const;
 
-function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumulatorEvent {
+// These fields are snapshotted before the event-specific validators inspect them.
+interface ResponseEventPayload {
+  item_id?: unknown;
+  output_index?: unknown;
+  content_index?: unknown;
+  annotation_index?: unknown;
+  command_index?: unknown;
+  summary_index?: unknown;
+  item?: unknown;
+  part?: unknown;
+}
+
+function sanitizeResponseEvent(
+  event: ResponseAccumulatorEvent & ResponseEventPayload,
+): ResponseAccumulatorEvent {
   let descriptor: PropertyDescriptor | undefined;
   try {
     descriptor = Object.getOwnPropertyDescriptor(event, 'type');
   } catch {
+    // SAFETY: assertNever always throws; the cast routes invalid runtime events through the existing unsupported-event error path.
     return assertNever(event as never);
   }
 
   const type: unknown = descriptor?.value;
+  // SAFETY: The string is used only as a Set lookup key; membership performs the supported-event check.
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
     typeof type !== 'string' ||
     !supportedResponseEventTypes.has(type as ResponseAccumulatorEvent['type'])
   ) {
+    // SAFETY: assertNever always throws; the cast routes invalid runtime events through the existing unsupported-event error path.
     return assertNever(event as never);
   }
 
@@ -565,21 +596,23 @@ function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumul
     try {
       for (const field of responseEventRoutingFields) {
         const routingDescriptor = Object.getOwnPropertyDescriptor(event, field);
-        stableValues.set(field, routingDescriptor ? Reflect.get(event, field, event) : undefined);
+        stableValues.set(field, routingDescriptor ? event[field] : undefined);
       }
 
       if (type === 'response.output_item.done') {
-        stableValues.set('item', structuredClone(Reflect.get(event, 'item', event)));
+        stableValues.set('item', structuredClone(event.item));
       } else if (type === 'response.content_part.added' || type === 'response.content_part.done') {
-        stableValues.set('part', structuredClone(Reflect.get(event, 'part', event)));
+        stableValues.set('part', structuredClone(event.part));
       }
     } catch {
+      // SAFETY: assertNever always throws; the cast routes invalid runtime events through the existing unsupported-event error path.
       return assertNever(event as never);
     }
   }
 
   return new Proxy(event, {
     get(target, property) {
+      // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys with the original target as accessor receiver.
       return stableValues.has(property) ? stableValues.get(property) : Reflect.get(target, property, target);
     },
   });
@@ -587,7 +620,7 @@ function sanitizeResponseEvent(event: ResponseAccumulatorEvent): ResponseAccumul
 
 function accumulateOutputItemEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   context: ResponseAccumulatorContext,
 ): event is ResponseOutputItemEvent {
   switch (event.type) {
@@ -608,7 +641,11 @@ function accumulateOutputItemEvent(
         context.outputTextIndex.append(text.length);
       }
       if (text) {
-        snapshot.output_text += text;
+        if (context.deferOutputText) {
+          context.outputTextDirty = true;
+        } else {
+          snapshot.output_text += text;
+        }
       }
       return true;
     }
@@ -635,7 +672,7 @@ function accumulateOutputItemEvent(
 
 function accumulateContentPartAddedEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   context: ResponseAccumulatorContext,
 ): event is ResponseContentPartAddedEvent {
   switch (event.type) {
@@ -672,7 +709,7 @@ function accumulateContentPartAddedEvent(
 
 function accumulateContentPartDoneEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   context: ResponseAccumulatorContext,
 ): event is ResponseContentPartDoneEvent {
   switch (event.type) {
@@ -706,9 +743,57 @@ function accumulateContentPartDoneEvent(
   }
 }
 
+// Streamed logprobs have a looser type than final output: bytes and even the
+// top token fields may be missing. Do not fabricate them in typed SSE snapshots.
+function isLogprobWithBytes(value: unknown): value is ResponseOutputText.Logprob.TopLogprob {
+  return (
+    isObj(value) &&
+    typeof value['token'] === 'string' &&
+    typeof value['logprob'] === 'number' &&
+    Array.isArray(value['bytes']) &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- This boundary checks each byte against the generated final-output contract before exposing a typed SSE snapshot.
+    value['bytes'].every((byte) => typeof byte === 'number')
+  );
+}
+
+function isOutputLogprobs(value: unknown): value is ResponseOutputText.Logprob[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry) =>
+        isLogprobWithBytes(entry) &&
+        'top_logprobs' in entry &&
+        Array.isArray(entry.top_logprobs) &&
+        entry.top_logprobs.every(isLogprobWithBytes),
+    )
+  );
+}
+
+function accumulateOutputLogprobs(
+  content: ResponseOutputText,
+  event: Extract<ResponseOutputTextEvent, { logprobs: unknown }>,
+): void {
+  const logprobs = structuredClone(event.logprobs);
+  if (!isOutputLogprobs(logprobs)) {
+    return;
+  }
+  if (event.type === 'response.output_text.done') {
+    if (logprobs.length > 0 || (Array.isArray(content.logprobs) && content.logprobs.length > 0)) {
+      content.logprobs = logprobs;
+    }
+  } else if (logprobs.length > 0) {
+    if (!Array.isArray(content.logprobs)) {
+      content.logprobs = [];
+    }
+    for (const logprob of logprobs) {
+      content.logprobs.push(logprob);
+    }
+  }
+}
+
 function accumulateOutputTextEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
   context: ResponseAccumulatorContext,
 ): event is ResponseOutputTextEvent {
   switch (event.type) {
@@ -719,6 +804,7 @@ function accumulateOutputTextEvent(
         if (content.type !== 'output_text') {
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
+        accumulateOutputLogprobs(content, event);
         const previousText = content.text;
         ensureCanonicalOutputText(context, snapshot);
         content.text = previousText + event.delta;
@@ -727,7 +813,13 @@ function accumulateOutputTextEvent(
           event.output_index === snapshot.output.length - 1 &&
           event.content_index === output.content.length - 1
         ) {
-          snapshot.output_text += event.delta;
+          if (context.deferOutputText) {
+            if (event.delta !== '') {
+              context.outputTextDirty = true;
+            }
+          } else {
+            snapshot.output_text += event.delta;
+          }
         } else {
           updateOutputText(
             context,
@@ -748,6 +840,7 @@ function accumulateOutputTextEvent(
         if (content.type !== 'output_text') {
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
+        accumulateOutputLogprobs(content, event);
         const previousText = content.text;
         ensureCanonicalOutputText(context, snapshot);
         content.text = event.text;
@@ -771,6 +864,7 @@ function accumulateOutputTextEvent(
           throw new OpenAIError(`expected content to be 'output_text', got ${content.type}`);
         }
         validateArrayIndex(content.annotations, event.annotation_index, 'annotation', true);
+        // SAFETY: The output_text discriminator and annotation index were checked; the annotation is cloned from the corresponding API event contract.
         content.annotations[event.annotation_index] = structuredClone(
           event.annotation,
         ) as ResponseOutputText['annotations'][number];
@@ -785,7 +879,7 @@ function accumulateOutputTextEvent(
 
 function accumulateRefusalAndArgumentsEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): event is ResponseRefusalAndArgumentsEvent {
   switch (event.type) {
     case 'response.refusal.delta': {
@@ -860,7 +954,7 @@ function accumulateRefusalAndArgumentsEvent(
 
 function accumulateShellEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): event is ResponseShellEvent {
   switch (event.type) {
     case 'response.shell_call_command.added':
@@ -907,7 +1001,7 @@ function accumulateShellEvent(
 
 function accumulateReasoningEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): event is ResponseReasoningEvent {
   switch (event.type) {
     case 'response.reasoning_text.delta': {
@@ -978,7 +1072,7 @@ function accumulateReasoningEvent(
 
 function accumulateCodeInterpreterEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): event is ResponseCodeInterpreterEvent {
   switch (event.type) {
     case 'response.code_interpreter_call_code.delta': {
@@ -1024,7 +1118,7 @@ function accumulateCodeInterpreterEvent(
 
 function accumulateSearchStatusEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): event is ResponseSearchStatusEvent {
   switch (event.type) {
     case 'response.file_search_call.in_progress': {
@@ -1077,7 +1171,7 @@ function accumulateSearchStatusEvent(
 
 function accumulateImageAndMcpStatusEvent(
   event: ResponseAccumulatorEvent,
-  snapshot: Response,
+  snapshot: ResponseOutputSnapshot,
 ): event is ResponseImageAndMcpStatusEvent {
   switch (event.type) {
     case 'response.image_generation_call.in_progress': {
@@ -1128,7 +1222,7 @@ function accumulateImageAndMcpStatusEvent(
   }
 }
 
-function isResponseLifecycleEvent(event: ResponseAccumulatorEvent): event is ResponseLifecycleEvent {
+function isResponseLifecycleEvent(event: { type: string }): event is ResponseLifecycleEvent {
   switch (event.type) {
     case 'response.created':
     case 'response.queued':
@@ -1144,12 +1238,13 @@ function isResponseLifecycleEvent(event: ResponseAccumulatorEvent): event is Res
   }
 }
 
-function isIgnoredResponseEvent(event: ResponseAccumulatorEvent): event is ResponseIgnoredEvent {
+function isIgnoredResponseEvent(event: { type: string }): event is ResponseIgnoredEvent {
   switch (event.type) {
     case 'response.audio.delta':
     case 'response.audio.done':
     case 'response.audio.transcript.delta':
     case 'response.audio.transcript.done':
+    case 'response.compaction.compacting':
     case 'response.image_generation_call.partial_image':
     case 'response.mcp_list_tools.in_progress':
     case 'response.mcp_list_tools.completed':
@@ -1166,6 +1261,74 @@ function isIgnoredResponseEvent(event: ResponseAccumulatorEvent): event is Respo
 
 export function createResponseContext(): ResponseAccumulatorContext {
   return createCanonicalResponseContext();
+}
+
+type ResponseOutputEvent = Exclude<ResponseAccumulatorEvent, ResponseLifecycleEvent>;
+
+function accumulateResponseOutput(
+  dispatchEvent: ResponseAccumulatorEvent,
+  snapshot: ResponseOutputSnapshot,
+  context: ResponseAccumulatorContext,
+  rejectInvalidShellTargets: boolean,
+): dispatchEvent is ResponseOutputEvent {
+  validateOutputItemIdentity(dispatchEvent, snapshot, rejectInvalidShellTargets);
+  if (accumulateOutputItemEvent(dispatchEvent, snapshot, context)) {
+    return true;
+  }
+  if (accumulateContentPartAddedEvent(dispatchEvent, snapshot, context)) {
+    return true;
+  }
+  if (accumulateContentPartDoneEvent(dispatchEvent, snapshot, context)) {
+    return true;
+  }
+  if (accumulateOutputTextEvent(dispatchEvent, snapshot, context)) {
+    return true;
+  }
+  if (accumulateRefusalAndArgumentsEvent(dispatchEvent, snapshot)) {
+    return true;
+  }
+  if (accumulateShellEvent(dispatchEvent, snapshot)) {
+    return true;
+  }
+  if (accumulateReasoningEvent(dispatchEvent, snapshot)) {
+    return true;
+  }
+  if (accumulateCodeInterpreterEvent(dispatchEvent, snapshot)) {
+    return true;
+  }
+  if (accumulateSearchStatusEvent(dispatchEvent, snapshot)) {
+    return true;
+  }
+  if (accumulateImageAndMcpStatusEvent(dispatchEvent, snapshot)) {
+    return true;
+  }
+
+  if (isIgnoredResponseEvent(dispatchEvent)) {
+    return true;
+  }
+  return false;
+}
+
+/** Matches shared events that can change output. Validation still occurs before mutation. */
+export function isResponseOutputEvent(event: { type: string }): event is ResponseOutputEvent {
+  // SAFETY: Membership of the existing SSE tag set is checked before using shared output validators.
+  return (
+    supportedResponseEventTypes.has(event.type as ResponseAccumulatorEvent['type']) &&
+    !isResponseLifecycleEvent(event) &&
+    !isIgnoredResponseEvent(event)
+  );
+}
+
+/** Applies the same strict output validation and mutations without requiring response metadata. */
+export function accumulateWebSocketOutput(
+  event: ResponseOutputEvent,
+  snapshot: ResponseOutputSnapshot,
+  context: ResponseAccumulatorContext,
+): void {
+  const dispatchEvent = sanitizeResponseEvent(event);
+  if (!accumulateResponseOutput(dispatchEvent, snapshot, context, true)) {
+    throw new OpenAIError('Unsupported WebSocket output event');
+  }
 }
 
 export function accumulateResponseWithContext(
@@ -1189,44 +1352,11 @@ export function accumulateResponseWithContext(
     return cloneValidatedResponse(context, dispatchEvent.response);
   }
 
-  validateOutputItemIdentity(dispatchEvent, snapshot, rejectInvalidShellTargets);
-
-  if (accumulateOutputItemEvent(dispatchEvent, snapshot, context)) {
+  if (accumulateResponseOutput(dispatchEvent, snapshot, context, rejectInvalidShellTargets)) {
     return snapshot;
   }
-  if (accumulateContentPartAddedEvent(dispatchEvent, snapshot, context)) {
-    return snapshot;
-  }
-  if (accumulateContentPartDoneEvent(dispatchEvent, snapshot, context)) {
-    return snapshot;
-  }
-  if (accumulateOutputTextEvent(dispatchEvent, snapshot, context)) {
-    return snapshot;
-  }
-  if (accumulateRefusalAndArgumentsEvent(dispatchEvent, snapshot)) {
-    return snapshot;
-  }
-  if (accumulateShellEvent(dispatchEvent, snapshot)) {
-    return snapshot;
-  }
-  if (accumulateReasoningEvent(dispatchEvent, snapshot)) {
-    return snapshot;
-  }
-  if (accumulateCodeInterpreterEvent(dispatchEvent, snapshot)) {
-    return snapshot;
-  }
-  if (accumulateSearchStatusEvent(dispatchEvent, snapshot)) {
-    return snapshot;
-  }
-  if (accumulateImageAndMcpStatusEvent(dispatchEvent, snapshot)) {
-    return snapshot;
-  }
-
   if (isResponseLifecycleEvent(dispatchEvent)) {
     return cloneValidatedResponse(context, dispatchEvent.response);
-  }
-  if (isIgnoredResponseEvent(dispatchEvent)) {
-    return snapshot;
   }
   return assertNever(dispatchEvent);
 }

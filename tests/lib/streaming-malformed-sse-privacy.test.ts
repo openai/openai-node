@@ -131,6 +131,7 @@ describe('malformed SSE diagnostic privacy', () => {
       );
 
       expect(thrown).toBeInstanceOf(SyntaxError);
+      // SAFETY: The preceding instance assertion establishes the error class; inspect its diagnostic fields and optional cause without changing the captured rejection.
       const syntaxError = thrown as SyntaxError & { cause?: unknown };
       expect(syntaxError.message).not.toContain(secret);
       expect(syntaxError.stack).not.toContain(secret);

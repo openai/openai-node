@@ -385,6 +385,7 @@ describe('Bedrock bearer redirect security', () => {
     await expect(
       provider.prepareRequest(request, {
         url: `${baseURL}/models`,
+        // SAFETY: This provider-origin rejection path uses the explicit URL and request headers before request options; the inert context must never reach a send.
         options: {} as never,
       }),
     ).rejects.toThrow();

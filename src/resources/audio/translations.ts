@@ -8,6 +8,13 @@ import { type Uploadable } from '../../core/uploads';
 import { RequestOptions } from '../../internal/request-options';
 import { multipartFormRequestOptions } from '../../internal/uploads';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Turn audio into text or text into audio.
  */
@@ -39,9 +46,11 @@ export class Translations extends APIResource {
   ): APIPromise<TranslationCreateResponse | string> {
     return this._client.post(
       '/audio/translations',
-      multipartFormRequestOptions(
-        { body, ...options, __metadata: { model: body.model }, __security: { bearerAuth: true } },
-        this._client,
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions(
+          { body, ...options, __metadata: { model: body.model }, __security: { bearerAuth: true } },
+          this._client,
+        ),
       ),
     );
   }
@@ -95,7 +104,7 @@ export interface TranslationCreateParams<
   /**
    * An optional text to guide the model's style or continue a previous audio
    * segment. The
-   * [prompt](https://platform.openai.com/docs/guides/speech-to-text#prompting)
+   * [prompt](https://developers.openai.com/api/docs/guides/speech-to-text#prompting)
    * should be in English.
    */
   prompt?: string;

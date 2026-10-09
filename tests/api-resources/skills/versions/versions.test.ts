@@ -43,7 +43,7 @@ describe('resource versions', () => {
   });
 
   test('retrieve: required and optional params', async () => {
-    const response = await client.skills.versions.retrieve('version', { skill_id: 'skill_123' });
+    await client.skills.versions.retrieve('version', { skill_id: 'skill_123' });
   });
 
   test('list', async () => {
@@ -84,6 +84,6 @@ describe('resource versions', () => {
   });
 
   test('delete: required and optional params', async () => {
-    const response = await client.skills.versions.delete('version', { skill_id: 'skill_123' });
+    await client.skills.versions.delete('version', { skill_id: 'skill_123' });
   });
 });

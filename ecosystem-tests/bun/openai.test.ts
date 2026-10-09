@@ -23,14 +23,6 @@ async function typeTests() {
 }
 
 function expectSimilar(received: any, comparedTo: string, expectedDistance: number) {
-  const message = () =>
-    [
-      `Received: ${JSON.stringify(received)}`,
-      `Expected: ${JSON.stringify(comparedTo)}`,
-      `Expected distance: ${expectedDistance}`,
-      `Received distance: ${actualDistance}`,
-    ].join('\n');
-
   const actualDistance = distance(received, comparedTo);
   expect(actualDistance).toBeLessThan(expectedDistance);
 }

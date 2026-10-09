@@ -3,7 +3,7 @@ import type { NullableHeaders } from './internal/headers';
 import { buildHeaders } from './internal/headers';
 import * as Errors from './error';
 import type { FinalRequestOptions } from './internal/request-options';
-import { isObj, readEnv } from './internal/utils';
+import { hasOwn, isObj, readEnv } from './internal/utils';
 import { path } from './internal/utils/path';
 import { OpenAI } from './client';
 import type { ClientOptions } from './client';
@@ -101,6 +101,7 @@ export class AzureOpenAI extends OpenAI {
       );
     }
 
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Azure accepts JavaScript credential configuration; distinguish static keys from callable token providers.
     if (typeof azureADTokenProvider === 'function') {
       dangerouslyAllowBrowser ??= true;
     }
@@ -143,6 +144,7 @@ export class AzureOpenAI extends OpenAI {
       apiKey: azureADTokenProvider ?? apiKey,
       baseURL,
       ...opts,
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(dangerouslyAllowBrowser === undefined ? {} : { dangerouslyAllowBrowser }),
     });
 
@@ -152,7 +154,23 @@ export class AzureOpenAI extends OpenAI {
 
   /** Clones this client with Azure options; OpenAI data residency remains unsupported. */
   override withOptions(options: Partial<AzureClientOptions>): this {
-    return super.withOptions(options);
+    // `OpenAI.withOptions` rebuilds the clone from `this._options`, which never holds the
+    // Azure-only construction options, so they are re-injected here the same way the Bedrock
+    // client re-injects its own subclass-only field.
+    const azureOptions: Partial<AzureClientOptions> = {
+      apiVersion: this.apiVersion,
+      deployment: this.deploymentName,
+      ...options,
+    };
+
+    // The inherited base URL is always carried into the clone, so an `endpoint` override would
+    // otherwise collide with it; let the endpoint rebuild the base URL instead. Both tests read
+    // own properties, so an option bag that passed neither field keeps the inherited base URL.
+    if (hasOwn(options, 'endpoint') && options.endpoint !== undefined && !hasOwn(options, 'baseURL')) {
+      azureOptions.baseURL = undefined;
+    }
+
+    return super.withOptions(azureOptions);
   }
 
   /** Builds an Azure request and inserts its deployment into model-scoped endpoint paths. */
@@ -178,7 +196,7 @@ export class AzureOpenAI extends OpenAI {
         throw new Error('Expected request body to be an object');
       }
       const model = this.deploymentName || options.body['model'] || options.__metadata?.['model'];
-      if (model !== undefined && !this.baseURL.includes('/deployments')) {
+      if (model !== undefined && !hasDeploymentPathSegment(this.baseURL)) {
         options.path = path`/deployments/${model}` + options.path;
       }
     }
@@ -208,10 +226,26 @@ export class AzureOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Azure accepts JavaScript credential configuration; distinguish static keys from callable token providers.
     if (security.bearerAuth && typeof this._options.apiKey === 'string') {
       return buildHeaders([{ 'api-key': this.apiKey }]);
     }
     return super.authHeaders(opts, security);
+  }
+}
+
+/**
+ * Reports whether the base URL already routes through a `/deployments` path segment, so the
+ * deployment must not be inserted again. A substring test would also match an unrelated segment
+ * such as `/deployments-proxy/`, or a host like `deployments.example.com`.
+ */
+function hasDeploymentPathSegment(baseURL: string): boolean {
+  try {
+    return new URL(baseURL).pathname.split('/').includes('deployments');
+  } catch {
+    // A base URL that is not an absolute URL has no path segments to read. Report none, the way
+    // the previous substring test did, and let joining the request path reject it as it did before.
+    return false;
   }
 }
 

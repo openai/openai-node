@@ -82,6 +82,7 @@ function createHandlerHarness(runtime: Runtime, failedClientIDs: number[] = []):
     }
   }
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The test module loader indexes this dependency registry using runtime import specifiers. The VM loader resolves heterogeneous mock module exports from runtime import specifiers.
   const dependencies: Record<string, unknown> = {
     '../../uploadWebApiTestCases': { uploadWebApiTestCases },
     'fastest-levenshtein': { distance: () => 0 },
@@ -105,7 +106,8 @@ function createHandlerHarness(runtime: Runtime, failedClientIDs: number[] = []):
   });
 
   const handlerExports: {
-    default?: (request: unknown, response?: MockNodeResponse) => Promise<unknown>;
+    default?: (request: unknown, response?: MockNodeResponse) => Promise<HandlerResult | undefined>;
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- Executing the CommonJS module populates this initially empty exports object.
   } = {};
 
   runInNewContext(
@@ -138,6 +140,7 @@ function createHandlerHarness(runtime: Runtime, failedClientIDs: number[] = []):
     callsPerRequest,
     async runRequest(): Promise<HandlerResult> {
       if (runtime === 'edge') {
+        // SAFETY: The VM executes the selected edge route whose response fixture supplies body and status; the harness verifies those fields per request.
         const response = (await handler({})) as HandlerResult;
         return { body: response.body, status: response.status };
       }

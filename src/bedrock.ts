@@ -1,5 +1,6 @@
 import * as Errors from './error';
 import { OpenAI } from './client';
+import { resolveRealtimeAPIKey } from './internal/realtime-credentials';
 import type { ApiKeySetter, ClientOptions } from './client';
 import { assertNoDataResidency } from './internal/data-residency';
 import {
@@ -111,6 +112,7 @@ function addBedrockOutputText<ResponseT extends ResponsesAPI.Response>(response:
 function restoreBedrockStreamOutputText(responses: API.Responses): API.Responses {
   const stream = responses.stream.bind(responses);
 
+  // SAFETY: The wrapper forwards the original stream parameters and preserves its generic result, only repairing the final response's output_text property.
   responses.stream = ((body: ResponseStreamParams, options?: RequestOptions) => {
     const responseStream = stream(body, options);
     const finalResponse = responseStream.finalResponse.bind(responseStream);
@@ -161,6 +163,8 @@ export class BedrockOpenAI extends OpenAI {
       apiKey = readEnv('AWS_BEARER_TOKEN_BEDROCK') ?? null;
     }
 
+    // SAFETY: The widening keeps a runtime guard for JavaScript callers that supply an API-key function despite the declared string contract.
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Reject a JavaScript function supplied as a static Bedrock API key before it can become a credential.
     if (typeof (apiKey as unknown) === 'function') {
       throw new Errors.OpenAIError(
         'Pass refreshable Bedrock credentials via `bedrockTokenProvider`, not `apiKey`.',
@@ -225,11 +229,6 @@ export class BedrockOpenAI extends OpenAI {
     const configuredBaseURL = this._options.baseURL ?? this.baseURL;
     assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
 
-    const security = options.__security ?? { bearerAuth: true };
-    if (security.adminAPIKeyAuth && !security.bearerAuth) {
-      await this._callApiKey();
-    }
-
     await super.prepareOptions(options);
     assertBedrockRequestOrigin(configuredBaseURL, this.buildURL(options.path, null, options.defaultBaseURL));
   }
@@ -240,6 +239,10 @@ export class BedrockOpenAI extends OpenAI {
   ): Promise<void> {
     assertBedrockRequestOrigin(this._options.baseURL ?? this.baseURL, context.url);
     await super.prepareRequest(request, context);
+    assertBedrockRequestOrigin(
+      this._options.baseURL ?? this.baseURL,
+      this.buildURL(context.options.path, null, context.options.defaultBaseURL),
+    );
     request.redirect = 'manual';
   }
 
@@ -248,8 +251,19 @@ export class BedrockOpenAI extends OpenAI {
     schemes?: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
   ): Promise<NullableHeaders | undefined> {
     const security = schemes ?? { bearerAuth: true, adminAPIKeyAuth: true };
-    const credential = this.apiKey;
-    if ((security.bearerAuth || security.adminAPIKeyAuth) && credential !== null) {
+    if (security.bearerAuth || security.adminAPIKeyAuth) {
+      assertBedrockRequestOrigin(
+        this._options.baseURL ?? this.baseURL,
+        this.buildURL(opts.path, null, opts.defaultBaseURL),
+      );
+      const { apiKey: credential } = await resolveRealtimeAPIKey(this);
+      assertBedrockRequestOrigin(
+        this._options.baseURL ?? this.baseURL,
+        this.buildURL(opts.path, null, opts.defaultBaseURL),
+      );
+      if (credential === null) {
+        return undefined;
+      }
       assertValidBedrockBearerCredential(credential);
       try {
         return buildHeaders([{ Authorization: `Bearer ${credential}` }]);
@@ -270,8 +284,10 @@ export class BedrockOpenAI extends OpenAI {
     const bedrockTokenProvider =
       options.apiKey === undefined ? (options.bedrockTokenProvider ?? this.bedrockTokenProvider) : undefined;
 
+    // SAFETY: Bedrock options extend the base client options; forwarding them preserves the subclass's existing withOptions construction behavior.
     return super.withOptions({
       ...options,
+      // Spread creates an own data property without invoking inherited setters or changing the object prototype.
       ...(bedrockTokenProvider ? { apiKey: undefined, bedrockTokenProvider } : {}),
     } as Partial<ClientOptions>);
   }

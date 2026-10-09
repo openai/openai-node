@@ -14,40 +14,57 @@ async function main() {
     headers: { 'OpenAI-Beta': 'responses_multi_agent=v1' },
   });
 
-  ws.send({
-    type: 'response.create',
-    model: 'gpt-5.6-sol',
-    input,
-    multi_agent: { enabled: true },
-  });
+  try {
+    ws.send({
+      type: 'response.create',
+      model: 'gpt-5.6-sol',
+      input,
+      multi_agent: { enabled: true },
+    });
 
-  const agents = new Map<string, string>();
-  let currentItemID: string | undefined;
-  for await (const message of ws) {
-    if (message.type === 'error') {
-      throw message.error;
-    }
-    if (message.type !== 'message') {
-      continue;
-    }
-
-    const event = message.message;
-    if (event.type === 'response.output_item.added' && event.item.type === 'message') {
-      agents.set(event.item.id, event.item.agent?.agent_name ?? '/root');
-    } else if (event.type === 'response.output_text.delta') {
-      if (currentItemID !== event.item_id) {
-        const separator = currentItemID === undefined ? '' : '\n\n';
-        currentItemID = event.item_id;
-        const name = agents.get(event.item_id) ?? '/root';
-        const role = name === '/root' ? 'Coordinator' : 'Agent';
-        process.stdout.write(`${separator}━━━ ${role}: ${name} ━━━\n\n`);
+    const agents = new Map<string, string>();
+    let currentItemID: string | undefined;
+    for await (const message of ws) {
+      if (message.type === 'error') {
+        throw message.error;
       }
-      process.stdout.write(event.delta);
-    } else if (event.type === 'response.completed') {
-      process.stdout.write('\n');
-      ws.close();
-      break;
+      if (message.type === 'close') {
+        throw new Error('WebSocket closed before the coordinator response completed.');
+      }
+      if (message.type !== 'message') {
+        continue;
+      }
+
+      const event = message.message;
+      if (event.type === 'response.output_item.added' && event.item.type === 'message') {
+        agents.set(event.item.id, event.item.agent?.agent_name ?? '/root');
+      } else if (event.type === 'response.output_text.delta') {
+        if (currentItemID !== event.item_id) {
+          const separator = currentItemID === undefined ? '' : '\n\n';
+          currentItemID = event.item_id;
+          const name = agents.get(event.item_id) ?? '/root';
+          const role = name === '/root' ? 'Coordinator' : 'Agent';
+          process.stdout.write(`${separator}━━━ ${role}: ${name} ━━━\n\n`);
+        }
+        process.stdout.write(event.delta);
+      } else if (
+        event.type === 'response.completed' ||
+        event.type === 'response.failed' ||
+        event.type === 'response.incomplete'
+      ) {
+        if (event.agent && event.agent.agent_name !== '/root') {
+          continue;
+        }
+        if (event.type !== 'response.completed') {
+          throw new Error(`Response ended with ${event.type}.`);
+        }
+        process.stdout.write('\n');
+        break;
+      }
     }
+  } finally {
+    // Exiting the iterator does not close the underlying WebSocket.
+    ws.close();
   }
 }
 

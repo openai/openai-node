@@ -1,6 +1,8 @@
 # Runs the repository's normal lint, build, test, benchmark, example, and ecosystem checks.
 # These checks catch generated-code, packaging, runtime, and integration
 # regressions; policy-document alignment lives in node-version-policy.yml.
+# SDK_GHA_RUNNER is trusted configuration for ephemeral GitHub-hosted capacity.
+# See docs/architecture/security-model.md#ci-runner-configuration.
 name: CI
 on:
   push:
@@ -18,7 +20,7 @@ jobs:
   lint:
     timeout-minutes: 10
     name: lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
@@ -48,7 +50,7 @@ jobs:
   build:
     timeout-minutes: 5
     name: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
@@ -86,9 +88,39 @@ jobs:
       - name: Check published package
         run: pnpm exec publint dist
 
+  build_windows:
+    timeout-minutes: 15
+    name: build (Windows)
+    runs-on: windows-latest
+    if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - name: Bootstrap
+        run: ./scripts/bootstrap
+
+      - name: Check build
+        run: pnpm build
+
   node_matrix:
     name: Read Node.js test matrix
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
@@ -106,13 +138,15 @@ jobs:
 
       - name: Read policy matrix
         id: policy
-        run: echo "matrix=$(node --experimental-strip-types scripts/check-node-version-policy.ts --matrix)" >> "$GITHUB_OUTPUT"
+        run: |
+          matrix="$(node --experimental-strip-types scripts/check-node-version-policy.ts --matrix)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   test:
     name: test (${{ matrix.node-version }})
     needs: node_matrix
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     continue-on-error: ${{ matrix.experimental }}
     permissions:
@@ -144,11 +178,22 @@ jobs:
         with:
           node-version: '${{ matrix.node-version }}'
 
+      - name: Check Steady downloads and cache lifecycle
+        run: |
+          node scripts/steady/download.test.cjs
+          node scripts/steady/publication.test.cjs
+          node scripts/steady/cache.test.cjs
+
       - name: Run tests
+        # Reuse V8 compilation within this job only; never restore it across runs.
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
         run: ./scripts/test
 
       - name: Test packed npm package
         if: matrix.experimental == false
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
         run: |
           ./scripts/build
           node --experimental-strip-types scripts/test-packed-package.ts
@@ -199,14 +244,16 @@ jobs:
   test_matrix:
     name: ${{ (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') && 'test matrix' || 'test matrix (not run)' }}
     if: ${{ always() && (github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review') }}
-    needs: [test, benchmarks]
-    runs-on: ubuntu-latest
+    needs: [test, benchmarks, ecosystem_tests, build_windows]
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     permissions: {}
     steps:
       - name: Tests (all)
         env:
           TEST_RESULT: ${{ needs.test.result }}
           BENCHMARKS_RESULT: ${{ needs.benchmarks.result }}
+          ECOSYSTEM_RESULT: ${{ needs.ecosystem_tests.result }}
+          WINDOWS_BUILD_RESULT: ${{ needs.build_windows.result }}
         run: |
           if [ "$TEST_RESULT" != "success" ]; then
             echo "::error::Node.js test matrix result: $TEST_RESULT"
@@ -216,11 +263,19 @@ jobs:
             echo "::error::Performance benchmarks result: $BENCHMARKS_RESULT"
             exit 1
           fi
+          if [ "$ECOSYSTEM_RESULT" != "success" ]; then
+            echo "::error::Ecosystem tests result: $ECOSYSTEM_RESULT"
+            exit 1
+          fi
+          if [ "$WINDOWS_BUILD_RESULT" != "success" ]; then
+            echo "::error::Windows build result: $WINDOWS_BUILD_RESULT"
+            exit 1
+          fi
 
   benchmarks:
     timeout-minutes: 20
     name: performance benchmarks
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.fork || github.event.action == 'ready_for_review'
     permissions:
       contents: read
@@ -255,6 +310,7 @@ jobs:
   examples:
     timeout-minutes: 30
     name: examples
+    # Keep live credentials independent of the configurable CI runner pool.
     runs-on: ubuntu-latest
     if: >-
       ${{
@@ -309,13 +365,8 @@ jobs:
 
   ecosystem_tests:
     name: ecosystem tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
-    if: >-
-      ${{
-        github.ref != 'refs/heads/release-please--branches--main--components--openai' &&
-        github.head_ref != 'release-please--branches--main--components--openai'
-      }}
     permissions:
       contents: read
 

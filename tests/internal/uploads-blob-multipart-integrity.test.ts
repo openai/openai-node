@@ -22,7 +22,7 @@ function captureImageRequests() {
   );
 
   return {
-    client: new OpenAI({ apiKey: 'test-api-key', fetch: transport as typeof fetch }),
+    client: new OpenAI({ apiKey: 'test-api-key', fetch: transport }),
     requests,
     transport,
   };
@@ -59,6 +59,7 @@ describe('multipart Blob upload integrity', () => {
     });
 
     const form = capturedForm(requests);
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     const images = form.getAll('image[]') as File[];
     expect(images.map((entry) => entry.name)).toEqual(['blob', 'overlay.png']);
     expect(images.map((entry) => entry.type)).toEqual(['image/png', 'image/png']);
@@ -69,8 +70,11 @@ describe('multipart Blob upload integrity', () => {
 
     const uploadedMask = form.get('mask');
     expect(uploadedMask).toBeInstanceOf(File);
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((uploadedMask as File).name).toBe('blob');
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((uploadedMask as File).type).toBe('image/png');
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     await expect((uploadedMask as File).text()).resolves.toBe('private intended edit mask');
   });
 
@@ -82,7 +86,9 @@ describe('multipart Blob upload integrity', () => {
     );
 
     expect(options.body).toBeInstanceOf(FormData);
+    // SAFETY: This fixture uses buffered uploads; multipart construction produces the FormData whose fields are checked here.
     const form = options.body as FormData;
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     const uploaded = form.get('nested[images][]') as File;
     expect(uploaded.name).toBe('blob');
     expect(uploaded.type).toBe('image/png');
@@ -146,6 +152,7 @@ describe('multipart Blob upload integrity', () => {
       image,
     });
 
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     const uploaded = capturedForm(requests).get('image') as File;
     expect(uploaded.name).toBe('response-image.png');
     expect(uploaded.type).toBe('image/png');
@@ -163,6 +170,7 @@ describe('multipart Blob upload integrity', () => {
 
     await client.audio.transcriptions.create({ model: 'whisper-1', file: audio });
 
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     const uploaded = capturedForm(requests).get('file') as File;
     expect(uploaded.name).toBe('recording.wav');
     expect(uploaded.type).toBe('audio/wav');
@@ -176,16 +184,23 @@ describe('multipart Blob upload integrity', () => {
     const anonymous = new Blob(['anonymous bytes'], { type: 'application/json' });
 
     const defaultOptions = await multipartFormRequestOptions({ body: { named, anonymous } }, fetch);
+    // SAFETY: This fixture uses buffered uploads; multipart construction produces the FormData whose fields are checked here.
     const defaultForm = defaultOptions.body as FormData;
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((defaultForm.get('named') as File).name).toBe('SKILL.md');
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((defaultForm.get('anonymous') as File).name).toBe('blob');
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((defaultForm.get('anonymous') as File).type).toBe('application/json');
 
     const preservedOptions = await multipartFormRequestOptions({ body: { named, anonymous } }, fetch, {
       stripFilenames: false,
     });
+    // SAFETY: This fixture uses buffered uploads; multipart construction produces the FormData whose fields are checked here.
     const preservedForm = preservedOptions.body as FormData;
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((preservedForm.get('named') as File).name).toBe('my-skill/SKILL.md');
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     expect((preservedForm.get('anonymous') as File).name).toBe('blob');
   });
 
@@ -209,9 +224,11 @@ describe('multipart Blob upload integrity', () => {
     await client.images.edit({
       model: 'gpt-image-1',
       prompt: 'Keep sparse and asynchronous upload order',
+      // SAFETY: This deliberately sparse upload array contains only the Blob/Response values assigned by the fixture; holes test serializer ordering.
       image: images as (Blob | Response)[],
     });
 
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     const uploaded = capturedForm(requests).getAll('image[]') as File[];
     expect(uploaded.map((entry) => entry.name)).toEqual(['first.png', 'blob']);
     expect(uploaded.map((entry) => entry.type)).toEqual(['image/png', 'image/png']);
@@ -232,6 +249,7 @@ describe('multipart Blob upload integrity', () => {
       image: [image, overlay],
     });
 
+    // SAFETY: The fixture places upload objects at this multipart key; the following assertions check the resulting file metadata or contents.
     const uploaded = capturedForm(requests).getAll('image[]') as File[];
     expect(uploaded.map((entry) => entry.type)).toEqual(['', '']);
     expect(uploaded.map((entry) => entry.name)).toEqual(['unknown_file', 'blob']);

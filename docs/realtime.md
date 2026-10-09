@@ -13,6 +13,7 @@ Basic text based example with `ws`:
 import { OpenAIRealtimeWS } from 'openai/realtime/ws';
 
 const rt = new OpenAIRealtimeWS({ model: 'gpt-realtime' });
+let responseDone = false;
 
 // access the underlying `ws.WebSocket` instance
 rt.socket.on('open', () => {
@@ -49,10 +50,26 @@ rt.on('session.created', (event) => {
 rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
 rt.on('response.output_text.done', () => console.log());
 
-rt.on('response.done', () => rt.close());
+// response.done also covers failed, cancelled, and incomplete responses.
+rt.on('response.done', (event) => {
+  responseDone = true;
+  if (event.response.status !== 'completed') {
+    console.error('Response did not complete successfully.');
+    process.exitCode = 1;
+  }
+  rt.close();
+});
 
-rt.socket.on('close', () => console.log('\nConnection closed!'));
+rt.socket.on('close', () => {
+  if (!responseDone) {
+    console.error('WebSocket closed before the response completed.');
+    process.exitCode = 1;
+  }
+  console.log('\nConnection closed!');
+});
 ```
+
+`response.done` indicates a terminal response, not necessarily a successful one. Check `event.response.status` for `completed`; a socket close before `response.done` also leaves the response unfinished.
 
 To use the web API `WebSocket` implementation, replace `OpenAIRealtimeWS` with `OpenAIRealtimeWebSocket` and adjust any `rt.socket` access:
 
@@ -138,3 +155,36 @@ rt.on('error', (err) => {
   console.error('Realtime error:', err);
 });
 ```
+
+### Disconnection and restoring a session
+
+Realtime does not automatically retry or reconnect. That retry bound is zero:
+an SDK `error` from a protocol rejection can leave the same socket usable,
+while a raw socket `close` (including a transport failure) ends that connection.
+Do not keep retrying permission or authentication failures. Check
+`response.done` to learn the response's outcome; a close alone cannot tell
+you whether a request completed.
+
+Only your application can decide whether to create a new session. Construct a
+new client socket, or use `OpenAIRealtimeWS.create(client, options)` (and
+`OpenAIRealtimeWebSocket.create` for native WebSockets) for a function-based
+credential. Each factory call resolves the current credential anew. For Azure,
+call the appropriate `.azure(client, options)` factory again. Register new
+listeners and wait for the new socket's `open` before sending new session
+configuration. Neither session settings nor conversation context are restored
+automatically. Remove unwanted listeners with `rt.off(event, originalListener)`;
+it detaches that listener only.
+
+`send()` returns `void` and writes to the current raw socket: it is not a
+durable pre-open queue. Wait for `open`; report send/serialization errors via
+an `error` listener. If your application queues commands, it owns that queue.
+It may choose what to do with commands it never attempted. A command already
+passed to `send()` is delivery-uncertain after a disconnect and must not be
+replayed automatically. The SDK does not retry or transfer it to the new
+socket. These rules apply to stable and beta Realtime; other WebSocket
+endpoints can have different contracts.
+
+## Realtime translation
+
+For Node.js translation sessions and draining final audio and transcripts, see
+[Realtime translation](realtime-translations.md).

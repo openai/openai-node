@@ -32,6 +32,120 @@ import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 export class VectorStores extends APIResource {
   files: FilesAPI.Files = new FilesAPI.Files(this._client);
   fileBatches: FileBatchesAPI.FileBatches = new FileBatchesAPI.FileBatches(this._client);
@@ -40,23 +154,29 @@ export class VectorStores extends APIResource {
    * Create a vector store.
    */
   create(body: VectorStoreCreateParams, options?: RequestOptions): APIPromise<VectorStore> {
-    return this._client.post('/vector_stores', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      '/vector_stores',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Retrieves a vector store.
    */
   retrieve(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStore> {
-    return this._client.get(path`/vector_stores/${vectorStoreID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/vector_stores/${vectorStoreID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -67,38 +187,140 @@ export class VectorStores extends APIResource {
     body: VectorStoreUpdateParams,
     options?: RequestOptions,
   ): APIPromise<VectorStore> {
-    return this._client.post(path`/vector_stores/${vectorStoreID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/vector_stores/${vectorStoreID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Returns a list of vector stores.
    */
   list(
-    query: VectorStoreListParams | null | undefined = {},
+    query?:
+      | (VectorStoreListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<VectorStoresPage, VectorStore>;
+  list(
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<VectorStoresPage, VectorStore>;
+  list(
+    query:
+      | VectorStoreListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<VectorStoresPage, VectorStore> {
-    return this._client.getAPIList('/vector_stores', CursorPage<VectorStore>, {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+      ['after', 'before', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as VectorStoreListParams | null | undefined;
+    return this._client.getAPIList(
+      '/vector_stores',
+      CursorPage<VectorStore>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Delete a vector store.
    */
   delete(vectorStoreID: string, options?: RequestOptions): APIPromise<VectorStoreDeleted> {
-    return this._client.delete(path`/vector_stores/${vectorStoreID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/vector_stores/${vectorStoreID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -113,13 +335,13 @@ export class VectorStores extends APIResource {
     return this._client.getAPIList(
       path`/vector_stores/${vectorStoreID}/search`,
       Page<VectorStoreSearchResponse>,
-      {
+      resolveResourceRequestOptions(options, (options) => ({
         body,
         method: 'post',
         ...options,
         headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
         __security: { bearerAuth: true },
-      },
+      })),
     );
   }
 }
@@ -381,9 +603,9 @@ export interface VectorStoreCreateParams {
   expires_after?: VectorStoreCreateParams.ExpiresAfter;
 
   /**
-   * A list of [File](https://platform.openai.com/docs/api-reference/files) IDs that
-   * the vector store should use. Useful for tools like `file_search` that can access
-   * files.
+   * A list of [File](https://developers.openai.com/api/reference/resources/files)
+   * IDs that the vector store should use. Useful for tools like `file_search` that
+   * can access files.
    */
   file_ids?: Array<string>;
 

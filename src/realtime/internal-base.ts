@@ -13,6 +13,7 @@ import { assertX509WebSocketSupported } from '../internal/auth/x509-workload-ide
 /** Parses frame data without exposing malformed payloads through JSON syntax errors. */
 export function parseRealtimeEvent(data: string): RealtimeServerEvent {
   try {
+    // SAFETY: RealtimeServerEvent is the API wire contract; JSON syntax is checked here while future event types remain accepted at runtime.
     return JSON.parse(data) as RealtimeServerEvent;
   } catch (error) {
     if (error instanceof SyntaxError) {
@@ -87,6 +88,7 @@ type RealtimeEvents = Simplify<
           type: EventType;
         }
       >,
+      // oxlint-disable-next-line anti-slop/no-unknown-returns -- Preserve the published event-callback contract, which accepts and ignores arbitrary return values.
     ) => unknown;
   }
 >;
@@ -281,19 +283,17 @@ export function buildRealtimeURL(
     return url;
   }
 
-  let url: URL;
+  const url = new URL(baseURL);
   if (azure) {
-    url = new URL(baseURL);
     const basePath = url.pathname.replace(/\/+/g, '/').replace(/\/+$/, '');
     const versionedPath = basePath.endsWith('/v1') ? basePath : `${basePath}/v1`;
     url.pathname = `${versionedPath}/realtime`;
     url.search = '';
-    url.hash = '';
   } else {
-    const path = '/realtime';
-    url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
+    url.pathname += url.pathname.endsWith('/') ? 'realtime' : '/realtime';
   }
 
+  url.hash = '';
   url.protocol = 'wss';
   // Sideband control connections attach to an existing call via `call_id`.
   if (hasCallID) {

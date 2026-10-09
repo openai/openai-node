@@ -9,6 +9,7 @@ it('does not expose stack traces from unexpected edge runtime errors', async () 
   delete process.env.OPENAI_ADMIN_KEY;
 
   try {
+    // SAFETY: The isolated route fixture supplies only the request or response methods this error/cleanup path touches; assertions verify the recorded effects.
     const response = await handler({} as NextRequest);
 
     expect(response.status).toBe(500);
@@ -35,6 +36,7 @@ it('does not expose stack traces from failed edge test handlers', async () => {
   process.env.OPENAI_API_KEY = 'test-key';
 
   try {
+    // SAFETY: The isolated route fixture supplies only the request or response methods this error/cleanup path touches; assertions verify the recorded effects.
     const response = await handler({} as NextRequest);
 
     expect(response.status).toBe(500);

@@ -4,10 +4,12 @@ import OpenAI from 'openai';
 import {
   APIConnectionError,
   APIConnectionTimeoutError,
+  APIUserAbortError,
   OAuthError,
   SubjectTokenProviderError,
 } from 'openai/core/error';
 import { CursorPage } from 'openai/core/pagination';
+import { createProvider } from 'openai/internal/provider';
 
 class IdempotentOpenAI extends OpenAI {
   protected override idempotencyHeader = 'Idempotency-Key';
@@ -24,7 +26,53 @@ function jsonResponse(value: unknown = {}, init: ResponseInit = {}): Response {
   });
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
+async function observe(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    return await promise;
+  } catch (error) {
+    return error;
+  }
+}
+
 describe('OpenAI client request behavior', () => {
+  test('keeps base, endpoint, default, and request queries in precedence order', async () => {
+    const fetch = vi.fn(async () => jsonResponse({ ok: true }));
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      baseURL:
+        'https://example.test/v1/customer/?tenant=sample&scope=read&scope=write&cursor=base&cursor=older&remove=base&remove=older',
+      defaultQuery: { cursor: 'default', remove: 'default' },
+      fetch,
+    });
+    await expect(
+      client.get('/models?cursor=endpoint&encoded=%2F%3F', {
+        query: { cursor: 'request', remove: undefined },
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledWith(
+      'https://example.test/v1/customer/models?tenant=sample&cursor=request&encoded=%2F%3F&scope=read&scope=write',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  test('never copies base URL parameters into an absolute request destination', async () => {
+    const fetch = vi.fn(async () => jsonResponse({ ok: true }));
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      baseURL: 'https://example.test/v1?tenant=base-only',
+      defaultQuery: { cursor: 'default' },
+      fetch,
+    });
+    await expect(client.get('https://other.example.test/models?source=endpoint')).resolves.toEqual({
+      ok: true,
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      'https://other.example.test/models?source=endpoint&cursor=default',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
   test('supports PUT requests through the public method helper', async () => {
     const fetch = vi.fn(async () => jsonResponse({ updated: true }));
     const client = new OpenAI({ apiKey: 'test-key', fetch });
@@ -195,6 +243,92 @@ describe('OpenAI client request behavior', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  test.each(['caller', 'prepared'] as const)(
+    'rejects promptly when the %s signal aborts during retry backoff',
+    async (abortedSignal) => {
+      vi.useFakeTimers();
+      const reason = new Error(`stop ${abortedSignal} request`);
+      const callerController = new AbortController();
+      const preparedController = new AbortController();
+      const fetch = vi.fn(async () =>
+        jsonResponse(
+          { error: { message: 'rate limited' } },
+          { status: 429, headers: { 'retry-after-ms': '60000' } },
+        ),
+      );
+      const client = new OpenAI({
+        provider: createProvider({
+          configure: () => ({
+            name: 'test-provider',
+            baseURL: 'https://api.openai.com/v1',
+            prepareRequest(request) {
+              request.signal = preparedController.signal;
+            },
+          }),
+        }),
+        maxRetries: 1,
+        fetch,
+      });
+      const request = client.get('/items', {
+        signal: callerController.signal,
+      });
+      const observed = observe(request);
+
+      try {
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+        const controller = abortedSignal === 'caller' ? callerController : preparedController;
+        controller.abort(reason);
+        await vi.advanceTimersByTimeAsync(0);
+
+        const waiting = Symbol('request still waiting for retry delay');
+        const result = await Promise.race([observed, Promise.resolve(waiting)]);
+        expect(result).not.toBe(waiting);
+        expect(result).toBeInstanceOf(APIUserAbortError);
+        expect(result).toMatchObject({ cause: reason });
+        expect(fetch).toHaveBeenCalledTimes(1);
+      } finally {
+        await vi.runAllTimersAsync();
+        await observed;
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  test('retries a response body timeout without treating it as a user abort', async () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const preparedController = new AbortController();
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(new ReadableStream(), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ recovered: true }));
+    const client = new OpenAI({
+      provider: createProvider({
+        configure: () => ({
+          name: 'test-provider',
+          baseURL: 'https://api.openai.com/v1',
+          prepareRequest(request) {
+            request.signal = preparedController.signal;
+          },
+        }),
+      }),
+      maxRetries: 1,
+      timeout: 10,
+      fetch,
+    });
+    const request = client.get('/items');
+
+    try {
+      await expect(request).resolves.toEqual({ recovered: true });
+      expect(fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
   test('encodes URL-encoded request objects with the configured content type', async () => {
     const client = new OpenAI({ apiKey: 'test-key' });
     const { req } = await client.buildRequest({
@@ -211,9 +345,58 @@ describe('OpenAI client request behavior', () => {
 
 describe('JSON response parsing', () => {
   test.each([
+    'application/json; charset=utf-8',
+    'Application/JSON',
+    'APPLICATION/JSON; Charset=UTF-8',
+    'application/vnd.openai+JSON',
+    'Application/Vnd.OpenAI+Json; profile="CaseSensitive"',
+  ])('parses %s without changing response accessors or headers', async (contentType) => {
+    const body = { id: 'model_123', object: 'model', created: 1, owned_by: 'synthetic' };
+    const response = Response.json(body, {
+      headers: { 'content-type': contentType, 'x-request-id': 'req_123' },
+    });
+    const fetch = vi.fn(async () => response);
+    const client = new OpenAI({ apiKey: 'test-key', fetch });
+    const promise = client.models.retrieve('model_123');
+    const rawResponse = await promise.asResponse();
+
+    expect(rawResponse).toBe(response);
+    expect(rawResponse.bodyUsed).toBe(false);
+    expect(rawResponse.headers.get('content-type')).toBe(contentType);
+    const parsed = await promise;
+    expect(parsed).toEqual(body);
+    expect(parsed._request_id).toBe('req_123');
+    expect(Object.keys(parsed)).not.toContain('_request_id');
+    const dataAndResponse = await promise.withResponse();
+    expect(dataAndResponse.data).toBe(parsed);
+    expect(dataAndResponse.response).toBe(response);
+    expect(dataAndResponse.request_id).toBe('req_123');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('preserves paginated items from a mixed-case JSON response', async () => {
+    const data = [{ id: 'model_123', object: 'model', created: 1, owned_by: 'synthetic' }];
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async () =>
+        Response.json(
+          { object: 'list', data },
+          {
+            headers: { 'content-type': 'Application/JSON' },
+          },
+        ),
+    });
+    const page = await client.models.list();
+
+    expect(page.data).toEqual(data);
+    expect(page.object).toBe('list');
+  });
+
+  test.each([
     ['application/json', undefined],
     ['application/json; charset=utf-8', undefined],
     ['application/vnd.openai+json', undefined],
+    ['Application/JSON', undefined],
     ['application/json', '0'],
   ])('accepts an empty %s response with content-length %s', async (contentType, contentLength) => {
     const response = new Response('', {
@@ -281,6 +464,15 @@ describe('JSON response parsing', () => {
     const client = new OpenAI({ apiKey: 'test-key', maxRetries: 0, fetch: vi.fn(async () => response) });
 
     await expect(client.get('/items')).rejects.toBeInstanceOf(SyntaxError);
+  });
+
+  test('rejects malformed JSON with a mixed-case media type', async () => {
+    const client = new OpenAI({
+      apiKey: 'test-key',
+      fetch: async () => new Response('{invalid', { headers: { 'content-type': 'Application/JSON' } }),
+    });
+
+    await expect(client.models.retrieve('model_123')).rejects.toBeInstanceOf(SyntaxError);
   });
 
   test('preserves the null result for genuine HTTP 204 responses', async () => {

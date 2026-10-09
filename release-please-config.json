@@ -9,7 +9,6 @@
   "prerelease": true,
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": false,
-  "draft-pull-request": true,
   "pull-request-header": "Automated Release PR",
   "pull-request-title-pattern": "release: ${version}",
   "changelog-sections": [

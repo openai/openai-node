@@ -74,14 +74,16 @@ function oauthResponse(accessToken: string, expiresIn = 3600): Response {
   });
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- The adversarial token accessor can return malformed values that the SDK must validate.
 function accessorResponse(readAccessToken: () => unknown, useProxy = false): Response {
-  const payload: { access_token: unknown; expires_in: number } = {
+  const payload = {
     access_token: undefined,
     expires_in: 3600,
   };
   const body = useProxy
     ? new Proxy(payload, {
         get(target, property, receiver) {
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys and the original accessor receiver.
           return property === 'access_token' ? readAccessToken() : Reflect.get(target, property, receiver);
         },
       })
@@ -129,7 +131,7 @@ function createLogger() {
   return { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 }
 
-function operationFor(surface: Surface, harness: Harness): () => Promise<unknown> {
+function operationFor(surface: Surface, harness: Harness) {
   if (surface === 'direct-auth') {
     const auth = new WorkloadIdentityAuth(harness.config, harness.fetch);
     return () => auth.getToken();
@@ -140,7 +142,7 @@ function operationFor(surface: Surface, harness: Harness): () => Promise<unknown
 }
 
 async function expectPrivateFailure(
-  run: () => Promise<unknown>,
+  run: ReturnType<typeof operationFor>,
   accessToken: string,
   surface: Surface,
 ): Promise<Error> {
@@ -157,6 +159,7 @@ async function expectPrivateFailure(
   }
 
   expect(failure.message).toBe(SAFE_ERROR);
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   expect((failure as Error & { cause?: unknown }).cause).toBeUndefined();
 
   let current: unknown = failure;
@@ -166,6 +169,7 @@ async function expectPrivateFailure(
       expect(diagnostic).not.toContain(ACCESS_SECRET);
       expect(diagnostic).not.toContain(PRIVATE_PATIENT);
     }
+    // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
     current = (current as Error & { cause?: unknown }).cause;
   }
 
@@ -522,6 +526,7 @@ describe('workload identity OAuth access-token confidentiality and integrity', (
     for (const attempt of attempts) {
       if (attempt.status === 'rejected') {
         expect(attempt.reason).toBeInstanceOf(OpenAIError);
+        // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
         expect((attempt.reason as Error).message).toBe(SAFE_ERROR);
       }
     }

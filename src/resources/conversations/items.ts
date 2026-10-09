@@ -12,6 +12,120 @@ import {
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 /**
  * Manage conversations and conversation items.
  */
@@ -25,12 +139,15 @@ export class Items extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ConversationItemList> {
     const { include, ...body } = params;
-    return this._client.post(path`/conversations/${conversationID}/items`, {
-      query: { include },
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/conversations/${conversationID}/items`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query: { include },
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -42,11 +159,14 @@ export class Items extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ConversationItem> {
     const { conversation_id, ...query } = params;
-    return this._client.get(path`/conversations/${conversation_id}/items/${itemID}`, {
-      query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/conversations/${conversation_id}/items/${itemID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -54,13 +174,111 @@ export class Items extends APIResource {
    */
   list(
     conversationID: string,
-    query: ItemListParams | null | undefined = {},
+    query?:
+      | (ItemListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ConversationItemsPage, ConversationItem>;
+  list(
+    conversationID: string,
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<ConversationItemsPage, ConversationItem>;
+  list(
+    conversationID: string,
+    query:
+      | ItemListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ConversationItemsPage, ConversationItem> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'include', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ItemListParams | null | undefined;
     return this._client.getAPIList(
       path`/conversations/${conversationID}/items`,
       ConversationCursorPage<ConversationItem>,
-      { query, ...options, __security: { bearerAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
     );
   }
 
@@ -73,10 +291,10 @@ export class Items extends APIResource {
     options?: RequestOptions,
   ): APIPromise<ConversationsAPI.Conversation> {
     const { conversation_id } = params;
-    return this._client.delete(path`/conversations/${conversation_id}/items/${itemID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/conversations/${conversation_id}/items/${itemID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 
@@ -85,7 +303,7 @@ export type ConversationItemsPage = ConversationCursorPage<ConversationItem>;
 /**
  * A single item within a conversation. The set of possible types are the same as
  * the `output` type of a
- * [Response object](https://platform.openai.com/docs/api-reference/responses/object#responses/object-output).
+ * [Response object](https://developers.openai.com/api/reference/resources/responses#%28resource%29%20responses%20%3E%20%28model%29%20response%20%3E%20%28schema%29%20%3E%20%28property%29%20output).
  */
 export type ConversationItem =
   | ConversationsAPI.Message
@@ -99,6 +317,7 @@ export type ConversationItem =
   | ResponsesAPI.ResponseToolSearchCall
   | ResponsesAPI.ResponseToolSearchOutputItem
   | ConversationItem.AdditionalTools
+  | ResponsesAPI.ResponseConfigurationUpdateItem
   | ResponsesAPI.ResponseReasoningItem
   | ConversationItem.Program
   | ConversationItem.ProgramOutput
@@ -141,6 +360,37 @@ export namespace ConversationItem {
      * The type of the image generation call. Always `image_generation_call`.
      */
     type: 'image_generation_call';
+
+    /**
+     * The action used for image generation.
+     */
+    action?: 'generate' | 'edit' | 'auto' | null;
+
+    /**
+     * The background setting used for generation.
+     */
+    background?: 'transparent' | 'opaque' | 'auto' | null;
+
+    /**
+     * The output format used for generation.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg' | null;
+
+    /**
+     * The quality of the image generated by the image generation tool call. One of
+     * `low`, `medium`, `high`, `xhigh`, `max`, or `auto`.
+     */
+    quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto' | null;
+
+    /**
+     * The prompt that was used after any model prompt rewriting.
+     */
+    revised_prompt?: string | null;
+
+    /**
+     * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
+     */
+    size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
   }
 
   export interface AdditionalTools {
@@ -522,7 +772,7 @@ export interface ItemCreateParams {
   /**
    * Query param: Additional fields to include in the response. See the `include`
    * parameter for
-   * [listing Conversation items above](https://platform.openai.com/docs/api-reference/conversations/list-items#conversations_list_items-include)
+   * [listing Conversation items above](https://developers.openai.com/api/reference/resources/conversations/subresources/items/methods/list#%28resource%29%20conversations.items%20%3E%20%28method%29%20list%20%3E%20%28params%29%20default%20%3E%20%28param%29%20include%20%3E%20%28schema%29)
    * for more information.
    */
   include?: Array<ResponsesAPI.ResponseIncludable>;
@@ -537,7 +787,7 @@ export interface ItemRetrieveParams {
   /**
    * Query param: Additional fields to include in the response. See the `include`
    * parameter for
-   * [listing Conversation items above](https://platform.openai.com/docs/api-reference/conversations/list-items#conversations_list_items-include)
+   * [listing Conversation items above](https://developers.openai.com/api/reference/resources/conversations/subresources/items/methods/list#%28resource%29%20conversations.items%20%3E%20%28method%29%20list%20%3E%20%28params%29%20default%20%3E%20%28param%29%20include%20%3E%20%28schema%29)
    * for more information.
    */
   include?: Array<ResponsesAPI.ResponseIncludable>;

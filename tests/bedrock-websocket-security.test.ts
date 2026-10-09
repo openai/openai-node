@@ -31,6 +31,7 @@ function CapturingWebSocket(url: URL, options: FakeNodeSocket['options']): FakeN
   };
 }
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Verify credential and origin rejection before public WebSocket adapters construct their transports.
 vi.mock('ws', () => ({ WebSocket: vi.fn(CapturingWebSocket) }));
 
 class FakeBrowserSocket {
@@ -54,12 +55,15 @@ class FakeBrowserSocket {
 }
 
 const originalWebSocket = globalThis.WebSocket;
-const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
+const nodeSocketConstructor = vi.mocked(WS.WebSocket);
 
 function expectPrivateBedrockCredentialFailure(failure: unknown, credential: string): void {
   expect(failure).toBeInstanceOf(TypeError);
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   expect((failure as Error).message).toBe('Bedrock bearer credential contains an invalid HTTP header value.');
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   expect((failure as Error).stack).not.toContain(credential);
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   expect((failure as Error & { cause?: unknown }).cause).toBeUndefined();
   expect(nodeSocketConstructor).not.toHaveBeenCalled();
   expect(FakeBrowserSocket.instances).toHaveLength(0);
@@ -75,11 +79,18 @@ function lastBrowserSocket(): FakeBrowserSocket {
 
 function lastNodeSocket(): FakeNodeSocket {
   const [result] = nodeSocketConstructor.mock.results.slice(-1);
+  // SAFETY: The injected ws constructor records only FakeNodeSocket results; the following check rejects a missing construction.
   const socket = result?.value as FakeNodeSocket | undefined;
   if (!socket) {
     throw new Error('Expected a Node WebSocket instance');
   }
   return socket;
+}
+
+function lastNodeHeader(name: string) {
+  return Object.entries(lastNodeSocket().options.headers ?? {}).find(
+    ([header]) => header.toLowerCase() === name.toLowerCase(),
+  )?.[1];
 }
 
 function createUnauthenticatedClient(): OpenAI {
@@ -299,9 +310,7 @@ describe('Bedrock WebSocket origin containment', () => {
 
     const websocket = new StableResponsesWS(client);
     expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
-    expect(lastNodeSocket().options.headers).toMatchObject({
-      Authorization: 'Bearer replacement-bedrock-secret',
-    });
+    expect(lastNodeHeader('authorization')).toBe('Bearer replacement-bedrock-secret');
   });
 
   test.each(realtimeSurfaces)(
@@ -343,9 +352,7 @@ describe('Bedrock WebSocket origin containment', () => {
         `wss://bedrock.example.com/custom/v2/${path}${path === 'realtime' ? '?model=gpt-realtime' : ''}`,
       );
       if (kind === 'node') {
-        expect(lastNodeSocket().options.headers).toMatchObject({
-          Authorization: 'Bearer static-bedrock-secret',
-        });
+        expect(lastNodeHeader('authorization')).toBe('Bearer static-bedrock-secret');
       } else {
         expect(lastBrowserSocket().protocols).toContain('openai-insecure-api-key.static-bedrock-secret');
       }
@@ -391,9 +398,7 @@ describe('Bedrock WebSocket origin containment', () => {
         expect(lastNodeSocket().url.toString()).toBe(
           'wss://bedrock.example.com/openai/v1/realtime?model=gpt-realtime',
         );
-        expect(lastNodeSocket().options.headers).toMatchObject({
-          Authorization: 'Bearer rotating-bedrock-secret',
-        });
+        expect(lastNodeHeader('authorization')).toBe('Bearer rotating-bedrock-secret');
       } else {
         expect(lastBrowserSocket().url).toBe(
           'wss://bedrock.example.com/openai/v1/realtime?model=gpt-realtime',
@@ -408,7 +413,7 @@ describe.each([
   { name: 'stable', Responses: StableResponsesWS },
   { name: 'beta', Responses: BetaResponsesWS },
 ])('$name Responses WebSocket redirect options', ({ Responses }) => {
-  test('preserves explicitly enabled redirects without sensitive headers', () => {
+  test('disables explicitly enabled redirects without sensitive headers', () => {
     const websocket = new Responses(createUnauthenticatedClient(), {
       followRedirects: true,
       headers: { 'X-Custom': 'value' },
@@ -416,9 +421,9 @@ describe.each([
 
     expect(websocket.socket.platformSocket).toBe(lastNodeSocket());
     expect(lastNodeSocket().options).toMatchObject({
-      followRedirects: true,
-      headers: { 'X-Custom': 'value' },
+      followRedirects: false,
     });
-    expect(lastNodeSocket().options.headers).not.toHaveProperty('Authorization');
+    expect(lastNodeHeader('x-custom')).toBe('value');
+    expect(lastNodeHeader('authorization')).toBeUndefined();
   });
 });

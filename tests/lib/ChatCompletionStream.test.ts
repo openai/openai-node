@@ -1,9 +1,13 @@
 import { vi } from 'vitest';
-import type OpenAI from 'openai';
-import { OpenAIError } from 'openai/error';
+import OpenAI, { AzureOpenAI } from 'openai';
+import { APIError, OpenAIError } from 'openai/error';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
-import type { ChatCompletionSnapshot } from 'openai/lib/ChatCompletionStream';
+import type {
+  ChatCompletionSnapshot,
+  ChatCompletionReadableStreamItem,
+  FunctionToolCallArgumentsDoneEvent,
+} from 'openai/lib/ChatCompletionStream';
 import { ChatCompletionStreamingRunner } from 'openai/lib/ChatCompletionStreamingRunner';
 import { makeParseableResponseFormat } from 'openai/lib/parser';
 import type { ChatCompletionTokenLogprob } from 'openai/resources';
@@ -13,6 +17,7 @@ import { makeStreamSnapshotRequest } from '../utils/mock-snapshots';
 import { expectType } from '../utils/typing';
 
 function mockStreamingClient(chunks: OpenAI.Chat.ChatCompletionChunk[]): OpenAI {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The stream fixture implements only completions.create and drives deterministic chunks.
   return {
     chat: {
       completions: {
@@ -90,7 +95,62 @@ function customToolChunks(): OpenAI.Chat.ChatCompletionChunk[] {
   ];
 }
 
+function responseWithAnnotations(chunks: OpenAI.Chat.ChatCompletionChunk[], annotationCount: number) {
+  const annotation = {
+    id: '',
+    object: '',
+    created: 0,
+    model: '',
+    choices: [...new Set(chunks.flatMap((chunk) => chunk.choices.map((choice) => choice.index)))].map(
+      (index) => ({ index, finish_reason: null, content_filter_results: {} }),
+    ),
+    usage: null,
+  };
+  const frames = [...chunks, ...Array.from({ length: annotationCount }, () => annotation)];
+  return new Response(
+    `${frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join('')}data: [DONE]\n\n`,
+    {
+      headers: { 'Content-Type': 'text/event-stream' },
+    },
+  );
+}
+
+function streamingClient(azure: boolean, fetch: OpenAI['fetch']) {
+  const options = { apiKey: 'test-key', fetch, maxRetries: 0 };
+  return azure
+    ? new AzureOpenAI({ ...options, endpoint: 'https://example.com', apiVersion: '2024-02-01' })
+    : new OpenAI({ ...options, baseURL: 'https://example.com/v1' });
+}
+
 describe('.stream()', () => {
+  it.each(['on', 'once'] as const)('preserves callback receivers for %s listeners', async (method) => {
+    const chunks = contentChunks('Hello', ' world');
+    const readable = new Stream(async function* streamChunks() {
+      yield* chunks;
+    }, new AbortController()).toReadableStream();
+    const stream = ChatCompletionStream.fromReadableStream(readable);
+    const unbound = vi.fn();
+    const bound = vi.fn();
+    const context = { name: 'caller-owned context' };
+
+    stream[method]('content', unbound);
+    stream[method]('content', bound.bind(context));
+    await stream.done();
+
+    const calls =
+      method === 'once'
+        ? [['Hello', 'Hello']]
+        : [
+            ['Hello', 'Hello'],
+            [' world', 'Hello world'],
+          ];
+    expect(bound.mock.calls).toEqual(calls);
+    expect(bound.mock.contexts).toEqual(calls.map(() => context));
+    expect(unbound.mock.calls).toEqual(calls);
+    expect(unbound.mock.contexts).toHaveLength(calls.length);
+    expect(unbound.mock.contexts.every((receiver) => receiver === undefined)).toBe(true);
+  });
+
   it.each([
     ['first-padding', 'last-padding'],
     [undefined, 'last-padding'],
@@ -138,6 +198,7 @@ describe('.stream()', () => {
       ],
     };
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The stream fixture implements only completions.create and drives deterministic chunks.
     const client = {
       chat: {
         completions: {
@@ -187,6 +248,7 @@ describe('.stream()', () => {
       ],
     };
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The stream fixture implements only completions.create and drives deterministic chunks.
     const client = {
       chat: {
         completions: {
@@ -247,6 +309,7 @@ describe('.stream()', () => {
           },
         ],
       },
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The Azure filter-only chunk intentionally lacks a delta to exercise provider compatibility.
       {
         id: '',
         object: '',
@@ -278,7 +341,7 @@ describe('.stream()', () => {
   });
 
   it('finalizes audio streams that end with an expires_at-only chunk', async () => {
-    const chunks = [
+    const chunks: ChatCompletionReadableStreamItem[] = [
       {
         id: 'chatcmpl-test',
         object: 'chat.completion.chunk',
@@ -288,7 +351,6 @@ describe('.stream()', () => {
           {
             index: 0,
             delta: { audio: { transcript: 'hel' } },
-            finish_reason: null,
           },
         ],
       },
@@ -335,7 +397,7 @@ describe('.stream()', () => {
           },
         ],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ];
     const readable = new Stream(async function* readable() {
       for (const chunk of chunks) {
         yield chunk;
@@ -343,6 +405,10 @@ describe('.stream()', () => {
     }, new AbortController()).toReadableStream();
 
     const stream = ChatCompletionStreamingRunner.fromReadableStream(readable);
+    const finishReasons: (string | null | undefined)[] = [];
+    stream.on('chunk', (_chunk, snapshot) => {
+      finishReasons.push(snapshot.choices[0]?.finish_reason);
+    });
 
     await expect(stream.finalChatCompletion()).resolves.toMatchObject({
       id: 'chatcmpl-test',
@@ -363,9 +429,11 @@ describe('.stream()', () => {
         },
       ],
     });
+    expect(finishReasons[0]).toBeNull();
   });
 
   it('does not infer a finish_reason if audio continues after expires_at', async () => {
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Audio delta fields are intentionally ahead of the generated chunk type and exercise supported runtime accumulation.
     const chunks = [
       {
         id: 'chatcmpl-test',
@@ -1028,7 +1096,7 @@ describe('.stream()', () => {
         model: 'gpt-4',
         choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ] satisfies OpenAI.Chat.ChatCompletionChunk[];
     // Yield valid chunks, then throw to error the stream after they have been
     // delivered (mimics a connection drop mid-response).
     const readable = new Stream(async function* failingChunks() {
@@ -1049,6 +1117,7 @@ describe('.stream()', () => {
     await stream.done().catch(() => {});
 
     const collected: OpenAI.Chat.ChatCompletionChunk[] = [];
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The null sentinel is replaced with any thrown iterator value, which must remain uncoerced.
     let caught: unknown = null;
     try {
       for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
@@ -1060,7 +1129,68 @@ describe('.stream()', () => {
 
     expect(collected).toHaveLength(chunks.length);
     expect(caught).toBeInstanceOf(OpenAIError);
-    expect((caught as OpenAIError).message).toBe('network boom');
+    expect(caught).toHaveProperty('message', 'network boom');
+  });
+
+  it('surfaces a server error frame from a readable stream as an APIError', async () => {
+    const errorBody = {
+      message: 'upstream exploded',
+      type: 'server_error',
+      code: 'server_error',
+      param: 'messages',
+    };
+    const readable = new Stream(async function* errorFrames() {
+      yield { error: errorBody };
+    }, new AbortController()).toReadableStream();
+
+    const stream = ChatCompletionStream.fromReadableStream(readable);
+    const failure = await stream.done().then(
+      () => null,
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(APIError);
+    expect(failure).toMatchObject({
+      message: 'upstream exploded',
+      code: 'server_error',
+      param: 'messages',
+      type: 'server_error',
+      error: errorBody,
+    });
+  });
+
+  it('ignores an inherited error property when reading stream items', async () => {
+    // eslint-disable-next-line no-extend-native -- deliberately simulates prototype pollution; removed in finally
+    Object.defineProperty(Object.prototype, 'error', {
+      value: { message: 'polluted', type: 'server_error' },
+      configurable: true,
+      enumerable: false,
+      writable: true,
+    });
+    try {
+      const readable = new Stream(async function* chunks() {
+        yield {
+          id: 'chatcmpl-own',
+          object: 'chat.completion.chunk',
+          created: 0,
+          model: 'gpt-test',
+          choices: [{ index: 0, delta: { role: 'assistant', content: 'ok' }, finish_reason: null }],
+        };
+        yield {
+          id: 'chatcmpl-own',
+          object: 'chat.completion.chunk',
+          created: 0,
+          model: 'gpt-test',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+        };
+      }, new AbortController()).toReadableStream();
+
+      const stream = ChatCompletionStream.fromReadableStream(readable);
+      await expect(stream.finalContent()).resolves.toBe('ok');
+    } finally {
+      // SAFETY: The test installed this configurable synthetic error property; the dictionary view is used only to remove it during cleanup.
+      delete (Object.prototype as Record<string, unknown>)['error'];
+    }
   });
 
   it('rejects a pending read exactly once when the stream errors while a reader is waiting', async () => {
@@ -1079,7 +1209,7 @@ describe('.stream()', () => {
         model: 'gpt-4',
         choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ] satisfies OpenAI.Chat.ChatCompletionChunk[];
     const readable = new Stream(async function* failingChunks() {
       for (const chunk of chunks) {
         yield chunk;
@@ -1100,7 +1230,7 @@ describe('.stream()', () => {
       (error) => error,
     );
     expect(caught).toBeInstanceOf(OpenAIError);
-    expect((caught as OpenAIError).message).toBe('network boom');
+    expect(caught).toHaveProperty('message', 'network boom');
     // The failure is delivered exactly once; iteration then ends cleanly.
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
@@ -1114,7 +1244,7 @@ describe('.stream()', () => {
           created: 1,
           model: 'gpt-4',
           choices: [{ index: 0, delta: { role: 'assistant', content: 'hel' }, finish_reason: null }],
-        } as unknown as OpenAI.Chat.ChatCompletionChunk;
+        } satisfies OpenAI.Chat.ChatCompletionChunk;
         // Hang so the only way the consumer stops is by breaking out.
         await Promise.race([]);
       },
@@ -1140,7 +1270,7 @@ describe('.stream()', () => {
         model: 'gpt-4',
         choices: [{ index: 0, delta: { role: 'assistant', content: 'hello' }, finish_reason: 'stop' }],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ] satisfies OpenAI.Chat.ChatCompletionChunk[];
     const readable = new Stream(async function* completeChunks() {
       for (const chunk of chunks) {
         yield chunk;
@@ -1170,7 +1300,7 @@ describe('.stream()', () => {
         model: 'gpt-4',
         choices: [{ index: 0, delta: { content: 'lo' }, finish_reason: null }],
       },
-    ] as unknown as OpenAI.Chat.ChatCompletionChunk[];
+    ] satisfies OpenAI.Chat.ChatCompletionChunk[];
     const readable = new Stream(async function* failingChunks() {
       for (const chunk of chunks) {
         yield chunk;
@@ -1190,6 +1320,7 @@ describe('.stream()', () => {
     await runner.done().catch(() => {});
 
     const collected: OpenAI.Chat.ChatCompletionChunk[] = [];
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The fixture records an arbitrary thrown value while separately preserving successfully delivered chunks.
     let caught: unknown = null;
     try {
       for await (const chunk of proxied) {
@@ -1201,7 +1332,7 @@ describe('.stream()', () => {
 
     expect(collected).toHaveLength(chunks.length);
     expect(caught).toBeInstanceOf(OpenAIError);
-    expect((caught as OpenAIError).message).toBe('network boom');
+    expect(caught).toHaveProperty('message', 'network boom');
   });
 
   it('preserves the existing streamed function-call detail type', () => {
@@ -1307,6 +1438,188 @@ describe('.stream()', () => {
       },
     ]);
   });
+
+  it.each([false, true].flatMap((azure) => [0, 2].map((annotationCount) => ({ azure, annotationCount }))))(
+    'emits function arguments done once per choice with $annotationCount trailing annotations (Azure: $azure)',
+    async ({ azure, annotationCount }) => {
+      const chunks = customToolChunks().map((chunk) => ({
+        ...chunk,
+        choices: chunk.choices.flatMap((choice) =>
+          [0, 1].map((index) => ({
+            ...choice,
+            index,
+            delta: {
+              ...choice.delta,
+              ...(choice.delta.tool_calls
+                ? {
+                    tool_calls: choice.delta.tool_calls.map((toolCall) => ({
+                      ...toolCall,
+                      ...(toolCall.id ? { id: `${toolCall.id}_${index}` } : {}),
+                    })),
+                  }
+                : {}),
+            },
+          })),
+        ),
+      }));
+      const fetch = vi.fn(async () => responseWithAnnotations(chunks, annotationCount));
+      const client = streamingClient(azure, fetch);
+      const stream = client.chat.completions.stream({
+        model: 'gpt-test',
+        messages: [{ role: 'user', content: 'Run code and check the weather' }],
+        n: 2,
+        tools: [
+          { type: 'custom', custom: { name: 'code_exec' } },
+          {
+            type: 'function',
+            function: {
+              name: 'get_weather',
+              strict: true,
+              parameters: {
+                type: 'object',
+                properties: { city: { type: 'string' } },
+                required: ['city'],
+                additionalProperties: false,
+              },
+            },
+          },
+        ],
+      });
+      const done: FunctionToolCallArgumentsDoneEvent[] = [];
+      stream.on('tool_calls.function.arguments.done', (event) => done.push(event));
+
+      const completion = await stream.finalChatCompletion();
+      const expected = {
+        name: 'get_weather',
+        index: 1,
+        arguments: '{"city":"SF"}',
+        parsed_arguments: { city: 'SF' },
+      };
+      expect(done).toEqual([expected, expected]);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(completion.choices).toHaveLength(2);
+      for (const choice of completion.choices) {
+        expect(choice.message.tool_calls).toEqual([
+          {
+            id: `call_custom_123_${choice.index}`,
+            type: 'custom',
+            custom: { name: 'code_exec', input: 'print("hello")\nreturn 42' },
+          },
+          {
+            id: `call_function_456_${choice.index}`,
+            type: 'function',
+            function: {
+              name: 'get_weather',
+              arguments: '{"city":"SF"}',
+              parsed_arguments: { city: 'SF' },
+            },
+          },
+        ]);
+      }
+    },
+  );
+
+  it('preserves interleaved non-strict tool completion notifications', async () => {
+    const fragments = [
+      { index: 0, arguments: '{"city":' },
+      { index: 1, arguments: '{"city":' },
+      { index: 0, arguments: '"SF"}' },
+      { index: 1, arguments: '"NY"}' },
+    ];
+    const chunks = fragments.map((fragment, position) =>
+      customToolChunk({
+        ...(position === 0 ? { role: 'assistant' } : {}),
+        tool_calls: [
+          {
+            index: fragment.index,
+            ...(position < 2 ? { id: `call_${fragment.index}`, type: 'function' as const } : {}),
+            function: {
+              ...(position < 2 ? { name: 'get_weather' } : {}),
+              arguments: fragment.arguments,
+            },
+          },
+        ],
+      }),
+    );
+    chunks.push(customToolChunk({}, 'tool_calls'));
+    const client = streamingClient(false, async () => responseWithAnnotations(chunks, 0));
+    const stream = client.chat.completions.stream({
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'Check two cities' }],
+      tools: [{ type: 'function', function: { name: 'get_weather', parameters: {} } }],
+    });
+    const done: FunctionToolCallArgumentsDoneEvent[] = [];
+    stream.on('tool_calls.function.arguments.done', (event) => done.push(event));
+
+    const completion = await stream.finalChatCompletion();
+    // Preserve existing switch notifications without suppressing the later complete arguments.
+    expect(done.map(({ index, arguments: args }) => ({ index, arguments: args }))).toEqual([
+      { index: 0, arguments: '{"city":' },
+      { index: 1, arguments: '{"city":' },
+      { index: 0, arguments: '{"city":"SF"}' },
+      { index: 1, arguments: '{"city":"NY"}' },
+    ]);
+    expect(completion.choices[0]?.message.tool_calls).toMatchObject([
+      { type: 'function', function: { arguments: '{"city":"SF"}' } },
+      { type: 'function', function: { arguments: '{"city":"NY"}' } },
+    ]);
+  });
+
+  it.each([false, true])(
+    'resets function arguments done for each tool-runner request (Azure: %s)',
+    async (azure) => {
+      let requests = 0;
+      const fetch = vi.fn(async () => {
+        requests += 1;
+        const chunks = [
+          customToolChunk({
+            role: 'assistant',
+            tool_calls: [
+              {
+                index: 0,
+                id: `call_${requests}`,
+                type: 'function',
+                function: { name: 'lookup', arguments: '{}' },
+              },
+            ],
+          }),
+          customToolChunk({}, 'tool_calls'),
+        ].map((chunk) => ({ ...chunk, id: `chatcmpl-${requests}` }));
+        return responseWithAnnotations(chunks, 2);
+      });
+      const client = streamingClient(azure, fetch);
+      const lookup = vi.fn((args: string) => args);
+      const runner = client.chat.completions.runTools(
+        {
+          model: 'gpt-test',
+          messages: [{ role: 'user', content: 'Look up two things' }],
+          stream: true,
+          tools: [
+            {
+              type: 'function',
+              function: {
+                name: 'lookup',
+                description: 'Look up a synthetic record',
+                parameters: {},
+                function: lookup,
+              },
+            },
+          ],
+        },
+        { maxChatCompletions: 2 },
+      );
+      const done: FunctionToolCallArgumentsDoneEvent[] = [];
+      runner.on('tool_calls.function.arguments.done', (event) => done.push(event));
+
+      const completion = await runner.finalChatCompletion();
+      const expected = { name: 'lookup', index: 0, arguments: '{}', parsed_arguments: null };
+      expect(done).toEqual([expected, expected]);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(lookup).toHaveBeenCalledTimes(2);
+      expect(runner.allChatCompletions().map((result) => result.id)).toEqual(['chatcmpl-1', 'chatcmpl-2']);
+      expect(completion.id).toBe('chatcmpl-2');
+    },
+  );
 
   it('preserves custom calls and unparsed function calls without auto-parseable tools', async () => {
     const stream = ChatCompletionStream.createChatCompletion(mockStreamingClient(customToolChunks()), {

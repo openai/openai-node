@@ -8,7 +8,7 @@ import type {
 } from '../../resources/responses/responses';
 import type { RequestOptions } from '../../internal/request-options';
 import type { ReadableStream } from '../../internal/shim-types';
-import { APIError, APIUserAbortError, OpenAIError } from '../../error';
+import { APIError, OpenAIError } from '../../error';
 import type OpenAI from '../../index';
 import { EventStream } from '../EventStream';
 import type { BaseEvents } from '../EventStream';
@@ -110,6 +110,7 @@ export class ResponseStream<ParsedT = null>
     params: ResponseStreamParams,
     options?: RequestOptions,
   ): ResponseStream<ParsedT> {
+    // SAFETY: The runner's request path forces stream: true; the constructor retains the same caller parameters for parsing metadata.
     const runner = new ResponseStream<ParsedT>(params as ResponseCreateParamsStreaming);
     runner._run(() =>
       runner._createOrRetrieveResponse(client, params, {
@@ -142,6 +143,7 @@ export class ResponseStream<ParsedT = null>
 
     const maybeEmit = (name: string, event: ResponseStreamEvent & { snapshot?: string }) => {
       if (starting_after == null || event.sequence_number > starting_after) {
+        // SAFETY: The caller derives the event name from the dispatched event discriminator; this bridge preserves the corresponding payload.
         this._emit(name as any, event);
       }
     };
@@ -150,6 +152,7 @@ export class ResponseStream<ParsedT = null>
       // First-party providers nest their error payload; retain flat compatibility for
       // serialized events matching the currently published event schema.
       const error =
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- An error event can contain malformed server data; validate its container before extracting error details.
         'error' in event && typeof event.error === 'object' && event.error !== null ? event.error : event;
       throw new APIError(undefined, error, event.message, undefined);
     }
@@ -263,7 +266,7 @@ export class ResponseStream<ParsedT = null>
       this.#addEvent(event, starting_after);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
     return this.#endRequest();
   }
@@ -280,7 +283,7 @@ export class ResponseStream<ParsedT = null>
       this.#addEvent(event, null);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
     return this.#endRequest();
   }

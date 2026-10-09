@@ -1,6 +1,7 @@
 import { isReadonlyArray } from './utils/values';
 
 type HeaderValue = string | undefined | null;
+type HeaderEntry = readonly (HeaderValue | readonly HeaderValue[])[];
 export type HeadersLike =
   | Headers
   | readonly HeaderValue[][]
@@ -39,11 +40,12 @@ function* iterateHeaders(headers: HeadersLike): IterableIterator<readonly [strin
   }
 
   let shouldClear = false;
-  let iter: Iterable<readonly (HeaderValue | readonly HeaderValue[])[]>;
-  if (headers instanceof Headers) {
-    iter = headers.entries();
-  } else if (isReadonlyArray(headers)) {
-    iter = headers;
+  let iter: Iterable<HeaderEntry>;
+  // Snapshot the iterable protocol across realms without rereading a caller-controlled getter.
+  const iterator: (() => Iterator<HeaderEntry>) | undefined =
+    Symbol.iterator in headers ? headers[Symbol.iterator] : undefined;
+  if (typeof iterator === 'function') {
+    iter = { [Symbol.iterator]: () => iterator.call(headers) };
   } else {
     shouldClear = true;
     iter = Object.entries(headers ?? {});

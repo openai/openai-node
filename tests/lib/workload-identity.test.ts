@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import OpenAI, { OAuthError, SubjectTokenProviderError } from 'openai';
-import type { Response, RequestInit } from 'openai/internal/builtin-types';
+import type { RequestInit } from 'openai/internal/builtin-types';
 
 const originalFetch = global.fetch;
 
@@ -61,6 +61,7 @@ describe('OpenAI with Workload Identity', () => {
   test('injects Authorization header with workload identity token', async () => {
     let apiRequestHeaders: Headers | undefined;
 
+    // SAFETY: The SDK calls this controlled fetch fake with URL strings and RequestInit; unused Request-object overloads are outside this fixture path.
     global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
@@ -92,8 +93,63 @@ describe('OpenAI with Workload Identity', () => {
     expect(apiRequestHeaders!.get('Authorization')).toBe('Bearer exchanged-access-token');
   });
 
+  test.each([
+    ['default null', { Authorization: null }, undefined, null],
+    ['default empty', { Authorization: '' }, undefined, ''],
+    ['request null', undefined, { Authorization: null }, null],
+    ['request empty', undefined, { Authorization: '' }, ''],
+    ['request null over default', { Authorization: 'Bearer default' }, { aUtHoRiZaTiOn: null }, null],
+    ['request empty over default', { Authorization: 'Bearer default' }, { authorization: '' }, ''],
+    ['default replacement', { Authorization: 'Bearer replacement' }, undefined, 'Bearer replacement'],
+    [
+      'request replacement',
+      { Authorization: null },
+      { Authorization: 'Bearer replacement' },
+      'Bearer replacement',
+    ],
+    ['default undefined', { Authorization: undefined }, undefined, 'Bearer exchanged-access-token'],
+    [
+      'request undefined',
+      { Authorization: 'Bearer default' },
+      { Authorization: undefined },
+      'Bearer default',
+    ],
+    ['native empty', undefined, new Headers({ Authorization: '' }), ''],
+    [
+      'workload placeholder',
+      undefined,
+      { Authorization: 'Bearer workload-identity-auth' },
+      'Bearer exchanged-access-token',
+    ],
+  ] as const)('preserves merged Authorization: %s', async (_name, defaultHeaders, headers, expected) => {
+    const authorizations: (string | null)[] = [];
+    // SAFETY: The SDK calls this controlled fetch fake with URL strings and RequestInit; unused Request-object overloads are outside this fixture path.
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.toString() === 'https://auth.openai.com/oauth/token') {
+        return Response.json({
+          access_token: 'exchanged-access-token',
+          issued_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+          token_type: 'Bearer',
+          expires_in: 3600,
+        });
+      }
+      if (url.toString() === 'https://api.openai.com/v1/models') {
+        authorizations.push(new Headers(init?.headers).get('Authorization'));
+        return Response.json({ data: [] });
+      }
+      throw new Error('Unexpected request');
+    }) as typeof fetch;
+
+    const client = new OpenAI({ ...createTestClientOptions(), defaultHeaders });
+    await client.get('/models', { headers });
+    // Repeat with the credential cache populated by the first request.
+    await client.get('/models', { headers });
+
+    expect(authorizations).toEqual([expected, expected]);
+  });
+
   test('does not satisfy admin-only auth with workload identity', async () => {
-    global.fetch = vi.fn(async () => new Response('Unexpected request', { status: 500 })) as typeof fetch;
+    global.fetch = vi.fn(async () => new Response('Unexpected request', { status: 500 }));
 
     const client = new OpenAI(createTestClientOptions());
 
@@ -113,6 +169,7 @@ describe('OpenAI with Workload Identity', () => {
   test('reuses cached token across multiple requests', async () => {
     let tokenExchangeCallCount = 0;
 
+    // SAFETY: The SDK calls this controlled fetch fake with URL strings and RequestInit; unused Request-object overloads are outside this fixture path.
     global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
@@ -149,6 +206,7 @@ describe('OpenAI with Workload Identity', () => {
     let apiCallCount = 0;
     let tokenExchangeCallCount = 0;
 
+    // SAFETY: The SDK calls this controlled fetch fake with URL strings and RequestInit; unused Request-object overloads are outside this fixture path.
     global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
@@ -189,6 +247,7 @@ describe('OpenAI with Workload Identity', () => {
     let apiCallCount = 0;
     let tokenExchangeCallCount = 0;
 
+    // SAFETY: The SDK calls this controlled fetch fake with URL strings and RequestInit; unused Request-object overloads are outside this fixture path.
     global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
@@ -225,6 +284,7 @@ describe('OpenAI with Workload Identity', () => {
     let apiCallCount = 0;
     let tokenExchangeCallCount = 0;
 
+    // SAFETY: The SDK calls this controlled fetch fake with URL strings and RequestInit; unused Request-object overloads are outside this fixture path.
     global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
@@ -286,6 +346,7 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test('propagates OAuthError on token exchange failure', async () => {
+    // SAFETY: The SDK calls this controlled fetch fake with URL strings and RequestInit; unused Request-object overloads are outside this fixture path.
     global.fetch = vi.fn(async (url: string) => {
       const urlStr = url.toString();
 
@@ -310,6 +371,7 @@ describe('OpenAI with Workload Identity', () => {
   test('refreshes expired tokens automatically', async () => {
     let tokenExchangeCallCount = 0;
 
+    // SAFETY: The SDK calls this controlled fetch fake with URL strings and RequestInit; unused Request-object overloads are outside this fixture path.
     global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       const urlStr = url.toString();
 
@@ -345,6 +407,7 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test('withOptions preserves workloadIdentity', async () => {
+    // SAFETY: The SDK calls this controlled fetch fake with URL strings and RequestInit; unused Request-object overloads are outside this fixture path.
     global.fetch = vi.fn(async (url: string) => {
       const urlStr = url.toString();
 
@@ -379,6 +442,7 @@ describe('OpenAI with Workload Identity', () => {
   test('works with custom subject token provider', async () => {
     let customProviderCallCount = 0;
 
+    // SAFETY: The SDK calls this controlled fetch fake with URL strings and RequestInit; unused Request-object overloads are outside this fixture path.
     global.fetch = vi.fn(async (url: string) => {
       const urlStr = url.toString();
 
@@ -423,9 +487,10 @@ describe('OpenAI with Workload Identity', () => {
   });
 
   test('uses client fetch for token exchange', async () => {
-    const globalFetchSpy = vi.fn(originalFetch as any);
-    global.fetch = globalFetchSpy as typeof fetch;
+    const globalFetchSpy = vi.fn(originalFetch);
+    global.fetch = globalFetchSpy;
 
+    // SAFETY: The SDK calls this controlled fetch fake with URL strings and RequestInit; unused Request-object overloads are outside this fixture path.
     const clientFetch = vi.fn(async (url: string) => {
       const urlStr = url.toString();
 

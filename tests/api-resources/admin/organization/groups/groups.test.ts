@@ -21,7 +21,7 @@ describe('resource groups', () => {
   });
 
   test('create: required and optional params', async () => {
-    const response = await client.admin.organization.groups.create({ name: 'x' });
+    await client.admin.organization.groups.create({ name: 'x' });
   });
 
   test('retrieve', async () => {
@@ -47,7 +47,7 @@ describe('resource groups', () => {
   });
 
   test('update: required and optional params', async () => {
-    const response = await client.admin.organization.groups.update('group_id', { name: 'x' });
+    await client.admin.organization.groups.update('group_id', { name: 'x' });
   });
 
   test('list', async () => {

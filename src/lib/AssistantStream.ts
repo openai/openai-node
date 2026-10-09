@@ -20,7 +20,7 @@ import type {
 } from '../resources/beta/threads/runs/runs';
 import type { ReadableStream } from '../internal/shim-types';
 import { Stream } from '../streaming';
-import { APIUserAbortError, OpenAIError } from '../error';
+import { APIError, OpenAIError } from '../error';
 import type {
   AssistantStreamEvent,
   MessageStreamEvent,
@@ -99,14 +99,13 @@ export type RunSubmitToolOutputsParamsStream = Omit<RunSubmitToolOutputsParamsBa
   stream?: true;
 };
 
-function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
-  event: AssistantStreamEvent;
-  exposedEvent: AssistantStreamEvent;
-} {
+function stabilizeAssistantStreamEvent(event: AssistantStreamEvent) {
   const eventDescriptor = Object.getOwnPropertyDescriptor(event, 'event');
   const dataDescriptor = Object.getOwnPropertyDescriptor(event, 'data');
-  const eventType = Reflect.get(event, 'event', event) as AssistantStreamEvent['event'];
-  const data = Reflect.get(event, 'data', event) as AssistantStreamEvent['data'];
+  // oxlint-disable-next-line anti-slop/no-reflect-get -- Reflective wire reads reject primitive frames and preserve the original event receiver.
+  const eventType: AssistantStreamEvent['event'] = Reflect.get(event, 'event', event);
+  // oxlint-disable-next-line anti-slop/no-reflect-get -- Keep the paired wire-data read on the original receiver after reading the event discriminator.
+  const data: AssistantStreamEvent['data'] = Reflect.get(event, 'data', event);
   let stableData = data;
   if (
     eventType === 'thread.message.created' ||
@@ -123,15 +122,24 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     eventType === 'thread.run.step.expired'
   ) {
     const messageID = Object.getOwnPropertyDescriptor(data, 'id');
-    if (messageID && 'value' in messageID && Reflect.get(data, 'id', data) !== messageID.value) {
+    if (
+      messageID &&
+      'value' in messageID &&
+      // SAFETY: The own id descriptor was found above; keep its live read unknown while comparing it with the captured descriptor value.
+      (data as { id: unknown }).id !== messageID.value
+    ) {
+      // SAFETY: Descriptor values are untyped; retaining this value as unknown avoids trusting a mutable message identifier.
       const canonicalID = messageID.value as unknown;
+      // SAFETY: The proxy retains the event data and substitutes only its captured own id; all other properties forward to the original receiver.
       stableData = new Proxy(data, {
         get(target, property) {
+          // oxlint-disable-next-line anti-slop/no-reflect-get -- Proxy forwarding must preserve arbitrary keys with the original target as accessor receiver.
           return property === 'id' ? canonicalID : Reflect.get(target, property, target);
         },
       }) as AssistantStreamEvent['data'];
     }
   }
+  // SAFETY: The captured event discriminator and data originate from the same event; TypeScript loses their correlation when constructing the stabilized copy.
   const stableEvent = Object.freeze({ event: eventType, data: stableData }) as AssistantStreamEvent;
   const ordinaryEvent =
     eventDescriptor !== undefined &&
@@ -142,6 +150,7 @@ function stabilizeAssistantStreamEvent(event: AssistantStreamEvent): {
     dataDescriptor.value === data &&
     stableData === data;
 
+  // SAFETY: The captured event discriminator and data originate from the same event; TypeScript loses their correlation when constructing the stabilized copy.
   return {
     event: stableEvent,
     exposedEvent: ordinaryEvent ? event : ({ event: eventType, data: stableData } as AssistantStreamEvent),
@@ -204,7 +213,7 @@ export class AssistantStream
       this.#addEvent(event);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
     return this._addRun(this.#endRequest());
   }
@@ -252,7 +261,7 @@ export class AssistantStream
       this.#addEvent(event);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
 
     return this._addRun(this.#endRequest());
@@ -322,7 +331,10 @@ export class AssistantStream
     return Object.values(this.#runStepSnapshots);
   }
 
-  /** Waits for successful completion and returns the final snapshot of every observed message. */
+  /**
+   * Waits for successful completion and returns the final snapshot of every observed message.
+   * Terminal message events replace accumulated snapshots without mutating earlier snapshots.
+   */
   async finalMessages(): Promise<Message[]> {
     await this.done();
 
@@ -355,7 +367,7 @@ export class AssistantStream
       this.#addEvent(event);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
 
     return this._addRun(this.#endRequest());
@@ -378,7 +390,7 @@ export class AssistantStream
       this.#addEvent(event);
     }
     if (stream.controller.signal?.aborted) {
-      throw new APIUserAbortError();
+      throw this._userAbortError();
     }
 
     return this._addRun(this.#endRequest());
@@ -479,6 +491,9 @@ export class AssistantStream
       case 'thread.message.delta':
       case 'thread.message.completed':
       case 'thread.message.incomplete': {
+        if (messageID !== undefined && this.#messageSnapshot) {
+          this.#reserveMessageAlias(this.#messageSnapshot, messageID);
+        }
         this.#handleMessage(stableEvent);
         if (messageID !== undefined) {
           this.#reserveMessageAlias(stableEvent.data, messageID);
@@ -491,10 +506,7 @@ export class AssistantStream
       }
 
       case 'error': {
-        //This is included for completeness, but errors are processed in the SSE event processing so this should not occur
-        throw new Error(
-          'Encountered an error event in event processing - errors should be processed earlier',
-        );
+        throw new APIError(undefined, stableEvent.data, undefined, undefined);
       }
       default: {
         assertNever(stableEvent);
@@ -520,6 +532,13 @@ export class AssistantStream
 
     if (typeof runStepID !== 'string' || runStepID.length === 0) {
       throw new OpenAIError('Received assistant run-step event with an invalid run-step ID');
+    }
+
+    if (event.event === 'thread.run.step.delta') {
+      const delta = event.data.delta;
+      if (delta && hasOwn(delta, 'id')) {
+        throw new OpenAIError('Run-step deltas must not contain an id field');
+      }
     }
 
     if (event.event === 'thread.run.step.created') {
@@ -767,6 +786,7 @@ export class AssistantStream
         ) {
           for (const toolCall of delta.step_details.tool_calls) {
             if (toolCall.index === this.#currentToolCallIndex) {
+              // SAFETY: The indexed tool call comes from this run-step snapshot after applying the delta for the same tool-call index.
               this.#emitExposed(
                 'toolCallDelta',
                 toolCall,
@@ -797,7 +817,7 @@ export class AssistantStream
         this.#activeRunStepID = undefined;
         const details = event.data.step_details;
         if (details.type === 'tool_calls' && this.#currentToolCall) {
-          this.#emitExposed('toolCallDone', this.#currentToolCall as ToolCall);
+          this.#emitExposed('toolCallDone', this.#currentToolCall);
         }
         this.#emitExposed('runStepDone', event.data, accumulatedRunStep);
         this.#currentToolCallIndex = undefined;
@@ -834,18 +854,24 @@ export class AssistantStream
       }
 
       case 'thread.run.step.delta': {
+        // SAFETY: Run-step snapshots are stored by their canonical run-step id; the delta path checks that the snapshot exists before updating it.
         const snapshot = this.#runStepSnapshots[runStepID] as Runs.RunStep;
         if (!snapshot) {
           throw new Error('Received a RunStepDelta before creation of a snapshot');
         }
 
-        const data = event.data;
+        const delta = event.data.delta;
 
-        if (data.delta) {
-          const accumulated = accumulateAssistantStreamDelta(snapshot, data.delta, true) as Runs.RunStep;
+        if (delta) {
+          // Raw-event listeners can replace or modify the delta after initial validation.
+          if (hasOwn(delta, 'id')) {
+            throw new OpenAIError('Run-step deltas must not contain an id field');
+          }
+          const accumulated = accumulateAssistantStreamDelta(snapshot, delta, true);
           this.#runStepSnapshots[runStepID] = accumulated;
         }
 
+        // SAFETY: Run-step snapshots are stored by their canonical run-step id; the delta path checks that the snapshot exists before updating it.
         return this.#runStepSnapshots[runStepID] as Runs.RunStep;
       }
 
@@ -860,7 +886,7 @@ export class AssistantStream
     }
 
     if (this.#runStepSnapshots[runStepID]) {
-      return this.#runStepSnapshots[runStepID] as Runs.RunStep;
+      return this.#runStepSnapshots[runStepID];
     }
     throw new Error('No snapshot available');
   }
@@ -921,9 +947,9 @@ export class AssistantStream
       case 'thread.message.in_progress':
       case 'thread.message.completed':
       case 'thread.message.incomplete': {
-        //No changes on other thread events
+        //Terminal events provide the authoritative message snapshot.
         if (snapshot) {
-          return [snapshot, newContent];
+          return [event.event === 'thread.message.in_progress' ? snapshot : event.data, newContent];
         }
         throw new Error('Received thread message event with no existing snapshot');
       }
@@ -937,11 +963,10 @@ export class AssistantStream
     currentContent: MessageContent | undefined,
     cacheArrays: boolean,
   ): TextContentBlock | ImageFileContentBlock {
-    return accumulateAssistantStreamDelta(
-      currentContent as unknown as Record<any, any>,
-      contentElement,
-      cacheArrays,
-    ) as TextContentBlock | ImageFileContentBlock;
+    // SAFETY: The accumulator merges the matching message-content delta into its existing block; the public return remains the text/image block union.
+    return accumulateAssistantStreamDelta(currentContent as Record<any, any>, contentElement, cacheArrays) as
+      | TextContentBlock
+      | ImageFileContentBlock;
   }
 
   /**

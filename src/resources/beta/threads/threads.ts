@@ -72,6 +72,13 @@ import { RequestOptions } from '../../../internal/request-options';
 import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Build Assistants that can call models and use tools.
  *
@@ -87,12 +94,15 @@ export class Threads extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   create(body: ThreadCreateParams | null | undefined = {}, options?: RequestOptions): APIPromise<Thread> {
-    return this._client.post('/threads', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      '/threads',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -101,11 +111,14 @@ export class Threads extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   retrieve(threadID: string, options?: RequestOptions): APIPromise<Thread> {
-    return this._client.get(path`/threads/${threadID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/threads/${threadID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -114,12 +127,15 @@ export class Threads extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   update(threadID: string, body: ThreadUpdateParams, options?: RequestOptions): APIPromise<Thread> {
-    return this._client.post(path`/threads/${threadID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/threads/${threadID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -128,11 +144,14 @@ export class Threads extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   delete(threadID: string, options?: RequestOptions): APIPromise<ThreadDeleted> {
-    return this._client.delete(path`/threads/${threadID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/threads/${threadID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -153,14 +172,17 @@ export class Threads extends APIResource {
     body: ThreadCreateAndRunParams,
     options?: RequestOptions,
   ): APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
-    return this._client.post('/threads/runs', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      stream: body.stream ?? false,
-      __synthesizeEventData: true,
-      __security: { bearerAuth: true },
-    }) as APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
+    return this._client.post(
+      '/threads/runs',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        stream: body.stream ?? false,
+        __synthesizeEventData: true,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
   /**
@@ -186,14 +208,14 @@ export class Threads extends APIResource {
 
 /**
  * Specifies the format that the model must output. Compatible with
- * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
- * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
- * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+ * [GPT-4o](https://developers.openai.com/api/docs/models/gpt-4o),
+ * [GPT-4 Turbo](https://developers.openai.com/api/docs/models/gpt-4-turbo), and
+ * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
  *
  * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
  * Outputs which ensures the model will match your supplied JSON schema. Learn more
  * in the
- * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+ * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
  *
  * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
  * message the model generates is valid JSON.
@@ -245,7 +267,7 @@ export type AssistantToolChoiceOption = 'none' | 'auto' | 'required' | Assistant
 
 /**
  * Represents a thread that contains
- * [messages](https://platform.openai.com/docs/api-reference/messages).
+ * [messages](https://developers.openai.com/api/docs/assistants/migration).
  */
 export interface Thread {
   /**
@@ -298,9 +320,9 @@ export namespace Thread {
   export namespace ToolResources {
     export interface CodeInterpreter {
       /**
-       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
-       * available to the `code_interpreter` tool. There can be a maximum of 20 files
-       * associated with the tool.
+       * A list of [file](https://developers.openai.com/api/reference/resources/files)
+       * IDs made available to the `code_interpreter` tool. There can be a maximum of 20
+       * files associated with the tool.
        */
       file_ids?: Array<string>;
     }
@@ -308,7 +330,7 @@ export namespace Thread {
     export interface FileSearch {
       /**
        * The
-       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
        * attached to this thread. There can be a maximum of 1 vector store attached to
        * the thread.
        */
@@ -327,8 +349,9 @@ export interface ThreadDeleted {
 
 export interface ThreadCreateParams {
   /**
-   * A list of [messages](https://platform.openai.com/docs/api-reference/messages) to
-   * start the thread with.
+   * A list of
+   * [messages](https://developers.openai.com/api/docs/assistants/migration) to start
+   * the thread with.
    */
   messages?: Array<ThreadCreateParams.Message>;
 
@@ -422,9 +445,9 @@ export namespace ThreadCreateParams {
   export namespace ToolResources {
     export interface CodeInterpreter {
       /**
-       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
-       * available to the `code_interpreter` tool. There can be a maximum of 20 files
-       * associated with the tool.
+       * A list of [file](https://developers.openai.com/api/reference/resources/files)
+       * IDs made available to the `code_interpreter` tool. There can be a maximum of 20
+       * files associated with the tool.
        */
       file_ids?: Array<string>;
     }
@@ -432,7 +455,7 @@ export namespace ThreadCreateParams {
     export interface FileSearch {
       /**
        * The
-       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
        * attached to this thread. There can be a maximum of 1 vector store attached to
        * the thread.
        */
@@ -440,7 +463,7 @@ export namespace ThreadCreateParams {
 
       /**
        * A helper to create a
-       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
        * with file_ids and attach it to this thread. There can be a maximum of 1 vector
        * store attached to the thread.
        */
@@ -456,10 +479,10 @@ export namespace ThreadCreateParams {
         chunking_strategy?: VectorStore.Auto | VectorStore.Static;
 
         /**
-         * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
-         * add to the vector store. For vector stores created before Nov 2025, there can be
-         * a maximum of 10,000 files in a vector store. For vector stores created starting
-         * in Nov 2025, the limit is 100,000,000 files.
+         * A list of [file](https://developers.openai.com/api/reference/resources/files)
+         * IDs to add to the vector store. For vector stores created before Nov 2025, there
+         * can be a maximum of 10,000 files in a vector store. For vector stores created
+         * starting in Nov 2025, the limit is 100,000,000 files.
          */
         file_ids?: Array<string>;
 
@@ -552,9 +575,9 @@ export namespace ThreadUpdateParams {
   export namespace ToolResources {
     export interface CodeInterpreter {
       /**
-       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
-       * available to the `code_interpreter` tool. There can be a maximum of 20 files
-       * associated with the tool.
+       * A list of [file](https://developers.openai.com/api/reference/resources/files)
+       * IDs made available to the `code_interpreter` tool. There can be a maximum of 20
+       * files associated with the tool.
        */
       file_ids?: Array<string>;
     }
@@ -562,7 +585,7 @@ export namespace ThreadUpdateParams {
     export interface FileSearch {
       /**
        * The
-       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
        * attached to this thread. There can be a maximum of 1 vector store attached to
        * the thread.
        */
@@ -578,8 +601,8 @@ export type ThreadCreateAndRunParams =
 export interface ThreadCreateAndRunParamsBase {
   /**
    * The ID of the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
-   * execute this run.
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) to use
+   * to execute this run.
    */
   assistant_id: string;
 
@@ -618,30 +641,31 @@ export interface ThreadCreateAndRunParamsBase {
   metadata?: Shared.Metadata | null;
 
   /**
-   * The ID of the [Model](https://platform.openai.com/docs/api-reference/models) to
-   * be used to execute this run. If a value is provided here, it will override the
-   * model associated with the assistant. If not, the model associated with the
-   * assistant will be used.
+   * The ID of the
+   * [Model](https://developers.openai.com/api/reference/resources/models) to be used
+   * to execute this run. If a value is provided here, it will override the model
+   * associated with the assistant. If not, the model associated with the assistant
+   * will be used.
    */
   model?: (string & {}) | Shared.ChatModel | null;
 
   /**
    * Whether to enable
-   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling#configuring-parallel-function-calling)
+   * [parallel function calling](https://developers.openai.com/api/docs/guides/function-calling#parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls?: boolean;
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
-   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://developers.openai.com/api/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://developers.openai.com/api/docs/models/gpt-4-turbo), and
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
    * Outputs which ensures the model will match your supplied JSON schema. Learn more
    * in the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
    * message the model generates is valid JSON.
@@ -724,8 +748,9 @@ export namespace ThreadCreateAndRunParams {
    */
   export interface Thread {
     /**
-     * A list of [messages](https://platform.openai.com/docs/api-reference/messages) to
-     * start the thread with.
+     * A list of
+     * [messages](https://developers.openai.com/api/docs/assistants/migration) to start
+     * the thread with.
      */
     messages?: Array<Thread.Message>;
 
@@ -819,9 +844,9 @@ export namespace ThreadCreateAndRunParams {
     export namespace ToolResources {
       export interface CodeInterpreter {
         /**
-         * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
-         * available to the `code_interpreter` tool. There can be a maximum of 20 files
-         * associated with the tool.
+         * A list of [file](https://developers.openai.com/api/reference/resources/files)
+         * IDs made available to the `code_interpreter` tool. There can be a maximum of 20
+         * files associated with the tool.
          */
         file_ids?: Array<string>;
       }
@@ -829,7 +854,7 @@ export namespace ThreadCreateAndRunParams {
       export interface FileSearch {
         /**
          * The
-         * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+         * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
          * attached to this thread. There can be a maximum of 1 vector store attached to
          * the thread.
          */
@@ -837,7 +862,7 @@ export namespace ThreadCreateAndRunParams {
 
         /**
          * A helper to create a
-         * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+         * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
          * with file_ids and attach it to this thread. There can be a maximum of 1 vector
          * store attached to the thread.
          */
@@ -853,10 +878,10 @@ export namespace ThreadCreateAndRunParams {
           chunking_strategy?: VectorStore.Auto | VectorStore.Static;
 
           /**
-           * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
-           * add to the vector store. For vector stores created before Nov 2025, there can be
-           * a maximum of 10,000 files in a vector store. For vector stores created starting
-           * in Nov 2025, the limit is 100,000,000 files.
+           * A list of [file](https://developers.openai.com/api/reference/resources/files)
+           * IDs to add to the vector store. For vector stores created before Nov 2025, there
+           * can be a maximum of 10,000 files in a vector store. For vector stores created
+           * starting in Nov 2025, the limit is 100,000,000 files.
            */
           file_ids?: Array<string>;
 
@@ -928,9 +953,9 @@ export namespace ThreadCreateAndRunParams {
   export namespace ToolResources {
     export interface CodeInterpreter {
       /**
-       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
-       * available to the `code_interpreter` tool. There can be a maximum of 20 files
-       * associated with the tool.
+       * A list of [file](https://developers.openai.com/api/reference/resources/files)
+       * IDs made available to the `code_interpreter` tool. There can be a maximum of 20
+       * files associated with the tool.
        */
       file_ids?: Array<string>;
     }
@@ -938,7 +963,7 @@ export namespace ThreadCreateAndRunParams {
     export interface FileSearch {
       /**
        * The ID of the
-       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
        * attached to this assistant. There can be a maximum of 1 vector store attached to
        * the assistant.
        */

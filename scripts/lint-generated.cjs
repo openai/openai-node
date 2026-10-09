@@ -54,7 +54,7 @@ function fixGeneratedFiles(files) {
     const before = fingerprint(files);
     const result = spawnSync(
       process.execPath,
-      [oxlint, '--config', generatedConfig, '--fix', '--quiet', ...files],
+      [oxlint, '--config', generatedConfig, '--fix', '--quiet', '--', ...files],
       { cwd: repositoryRoot, stdio: 'inherit' },
     );
 
@@ -77,7 +77,7 @@ function fixGeneratedFiles(files) {
 function checkGeneratedFiles(files) {
   const result = spawnSync(
     process.execPath,
-    [oxlint, '--config', generatedConfig, '--format', 'json', ...files],
+    [oxlint, '--config', generatedConfig, '--format', 'json', '--', ...files],
     { cwd: repositoryRoot, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 },
   );
 

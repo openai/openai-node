@@ -38,6 +38,7 @@ function createChunk(
           logprobs: null,
         };
 
+  // SAFETY: The fixture intentionally puts unvalidated indices into otherwise constructed chunks to exercise the stream index validator.
   return {
     id: 'chatcmpl-index-validation',
     object: 'chat.completion.chunk',
@@ -48,6 +49,7 @@ function createChunk(
 }
 
 function createStream(chunks: OpenAI.Chat.ChatCompletionChunk[], n?: number | null): ChatCompletionStream {
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The stream fixture implements only the completions.create transport used by this test.
   const client = {
     chat: {
       completions: {
@@ -104,12 +106,12 @@ describe('ChatCompletionStream index validation', () => {
   describe.each<StreamIndexKind>(['choice', 'tool call'])('%s indices', (kind) => {
     it('rejects an index that would pollute the global Array prototype', async () => {
       const pollutionKey = `sdk${kind.replace(' ', '')}PrototypePolluted`;
-      const prototype = Array.prototype as unknown as Record<string, unknown>;
+      const { prototype } = Array;
       const stream = createStream([createChunk('__proto__', kind, { [pollutionKey]: 'owned' })]);
 
       try {
         await expect(stream.done()).rejects.toThrow(`invalid ${kind} index: __proto__`);
-        expect(([] as unknown as Record<string, unknown>)[pollutionKey]).toBeUndefined();
+        expect([]).not.toHaveProperty(pollutionKey);
         expect(getSnapshotArray(stream, kind)).toEqual([]);
       } finally {
         Reflect.deleteProperty(prototype, pollutionKey);

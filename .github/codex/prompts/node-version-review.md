@@ -34,8 +34,11 @@ If it has drifted, prepare one focused change:
 
 Do not commit, push, open a pull request, call GitHub, or modify repository
 secrets. You may run the fast policy checker while editing, but do not spend
-this run repeating the full lint and test suites; the workflow owns validation
-and opens the draft pull request after you finish.
+this run repeating the full lint and test suites. This job has read-only
+repository access. The workflow exports the allowed edits as untrusted JSON;
+separate jobs verify the proposal against the original workflow commit, run
+repository validation, and publish the draft pull request. Only the publishing
+job has repository write access, and it does not execute proposed code.
 
 Your final response becomes the draft pull request body. Write concise Markdown
 with these sections:

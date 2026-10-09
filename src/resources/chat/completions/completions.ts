@@ -9,6 +9,10 @@ import { MessageListParams, Messages } from './messages';
 import { APIPromise } from '../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { Stream } from '../../../core/streaming';
+import {
+  normalizeChatCompletionStream,
+  type ChatCompletionWireChunk,
+} from '../../../lib/chat-completions/streaming';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
@@ -27,6 +31,120 @@ import { type RunnableToolFunctionWithContext } from '../../../lib/RunnableFunct
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 /**
  * Given a list of messages comprising a conversation, the model will return a response.
  */
@@ -35,22 +153,22 @@ export class Completions extends APIResource {
 
   /**
    * **Starting a new project?** We recommend trying
-   * [Responses](https://platform.openai.com/docs/api-reference/responses) to take
-   * advantage of the latest OpenAI platform features. Compare
-   * [Chat Completions with Responses](https://platform.openai.com/docs/guides/responses-vs-chat-completions?api-mode=responses).
+   * [Responses](https://developers.openai.com/api/reference/resources/responses) to
+   * take advantage of the latest OpenAI platform features. Compare
+   * [Chat Completions with Responses](https://developers.openai.com/api/docs/guides/migrate-to-responses?api-mode=responses).
    *
    * ---
    *
    * Creates a model response for the given chat conversation. Learn more in the
-   * [text generation](https://platform.openai.com/docs/guides/text-generation),
-   * [vision](https://platform.openai.com/docs/guides/vision), and
-   * [audio](https://platform.openai.com/docs/guides/audio) guides.
+   * [text generation](https://developers.openai.com/api/docs/guides/text),
+   * [vision](https://developers.openai.com/api/docs/guides/images-vision), and
+   * [audio](https://developers.openai.com/api/docs/guides/audio) guides.
    *
    * Parameter support can differ depending on the model used to generate the
    * response, particularly for newer reasoning models. Parameters that are only
    * supported for reasoning models are noted below. For the current state of
    * unsupported parameters in reasoning models,
-   * [refer to the reasoning guide](https://platform.openai.com/docs/guides/reasoning).
+   * [refer to the reasoning guide](https://developers.openai.com/api/docs/guides/reasoning).
    *
    * Returns a chat completion object, or a streamed sequence of chat completion
    * chunk objects if the request is streamed.
@@ -60,7 +178,7 @@ export class Completions extends APIResource {
    * const chatCompletion = await client.chat.completions.create(
    *   {
    *     messages: [{ content: 'string', role: 'developer' }],
-   *     model: 'gpt-5.4',
+   *     model: 'gpt-6-astra',
    *   },
    * );
    * ```
@@ -78,12 +196,19 @@ export class Completions extends APIResource {
     body: ChatCompletionCreateParams,
     options?: RequestOptions,
   ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
-    return this._client.post('/chat/completions', {
-      body,
-      ...options,
-      stream: body.stream ?? false,
-      __security: { bearerAuth: true },
-    }) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
+    return this._client
+      .post<ChatCompletion | Stream<ChatCompletionWireChunk>>(
+        '/chat/completions',
+        resolveResourceRequestOptions(options, (options) => ({
+          body,
+          ...options,
+          stream: body.stream ?? false,
+          __security: { bearerAuth: true },
+        })),
+      )
+      ._thenUnwrap((result) =>
+        body.stream ? normalizeChatCompletionStream(result as Stream<ChatCompletionWireChunk>) : result,
+      ) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
   }
 
   /**
@@ -97,10 +222,10 @@ export class Completions extends APIResource {
    * ```
    */
   retrieve(completionID: string, options?: RequestOptions): APIPromise<ChatCompletion> {
-    return this._client.get(path`/chat/completions/${completionID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/chat/completions/${completionID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -121,11 +246,14 @@ export class Completions extends APIResource {
     body: ChatCompletionUpdateParams,
     options?: RequestOptions,
   ): APIPromise<ChatCompletion> {
-    return this._client.post(path`/chat/completions/${completionID}`, {
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/chat/completions/${completionID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -141,14 +269,110 @@ export class Completions extends APIResource {
    * ```
    */
   list(
-    query: ChatCompletionListParams | null | undefined = {},
+    query?:
+      | (ChatCompletionListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ChatCompletionsPage, ChatCompletion>;
+  list(
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<ChatCompletionsPage, ChatCompletion>;
+  list(
+    query:
+      | ChatCompletionListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ChatCompletionsPage, ChatCompletion> {
-    return this._client.getAPIList('/chat/completions', CursorPage<ChatCompletion>, {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+      ['after', 'limit', 'metadata', 'model', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ChatCompletionListParams | null | undefined;
+    return this._client.getAPIList(
+      '/chat/completions',
+      CursorPage<ChatCompletion>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -162,10 +386,10 @@ export class Completions extends APIResource {
    * ```
    */
   delete(completionID: string, options?: RequestOptions): APIPromise<ChatCompletionDeleted> {
-    return this._client.delete(path`/chat/completions/${completionID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/chat/completions/${completionID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   parse<Params extends ChatCompletionParseParams, ParsedT = ExtractParsedContentFromParams<Params>>(
@@ -383,13 +607,15 @@ export interface ChatCompletion {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
-   *   then the request will be processed with the Flex Processing service tier.
-   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
-   *   include the `service_tier=fast` or `service_tier=priority` parameter for
-   *   Responses or Chat Completions. The response will show `service_tier=priority`
-   *   regardless of if you specify `service_tier=fast` or `priority` in your
-   *   request.
+   * - If set to
+   *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+   *   the request will be processed with the Flex Processing service tier.
+   * - To opt-in to
+   *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+   *   request level, include the `service_tier=fast` or `service_tier=priority`
+   *   parameter for Responses or Chat Completions. The response will show
+   *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+   *   `priority` in your request.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -663,7 +889,7 @@ export interface ChatCompletionAssistantMessageParam {
 
   /**
    * Data about a previous audio response from the model.
-   * [Learn more](https://platform.openai.com/docs/guides/audio).
+   * [Learn more](https://developers.openai.com/api/docs/guides/audio).
    */
   audio?: ChatCompletionAssistantMessageParam.Audio | null;
 
@@ -699,7 +925,7 @@ export interface ChatCompletionAssistantMessageParam {
 export namespace ChatCompletionAssistantMessageParam {
   /**
    * Data about a previous audio response from the model.
-   * [Learn more](https://platform.openai.com/docs/guides/audio).
+   * [Learn more](https://developers.openai.com/api/docs/guides/audio).
    */
   export interface Audio {
     /**
@@ -731,7 +957,7 @@ export namespace ChatCompletionAssistantMessageParam {
 /**
  * If the audio output modality is requested, this object contains data about the
  * audio response from the model.
- * [Learn more](https://platform.openai.com/docs/guides/audio).
+ * [Learn more](https://developers.openai.com/api/docs/guides/audio).
  */
 export interface ChatCompletionAudio {
   /**
@@ -760,7 +986,7 @@ export interface ChatCompletionAudio {
 /**
  * Parameters for audio output. Required when audio output is requested with
  * `modalities: ["audio"]`.
- * [Learn more](https://platform.openai.com/docs/guides/audio).
+ * [Learn more](https://developers.openai.com/api/docs/guides/audio).
  */
 export interface ChatCompletionAudioParam {
   /**
@@ -773,7 +999,8 @@ export interface ChatCompletionAudioParam {
    * The voice the model uses to respond. Supported built-in voices are `alloy`,
    * `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`,
    * `marin`, and `cedar`. You may also provide a custom voice object with an `id`,
-   * for example `{ "id": "voice_1234" }`.
+   * for example `{ "id": "voice_1234" }`. Custom voices must be created from audio
+   * samples.
    */
   voice:
     | string
@@ -805,7 +1032,7 @@ export namespace ChatCompletionAudioParam {
 /**
  * Represents a streamed chunk of a chat completion response returned by the model,
  * based on the provided input.
- * [Learn more](https://platform.openai.com/docs/guides/streaming-responses).
+ * [Learn more](https://developers.openai.com/api/docs/guides/streaming-responses).
  */
 export interface ChatCompletionChunk {
   /**
@@ -857,13 +1084,15 @@ export interface ChatCompletionChunk {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
-   *   then the request will be processed with the Flex Processing service tier.
-   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
-   *   include the `service_tier=fast` or `service_tier=priority` parameter for
-   *   Responses or Chat Completions. The response will show `service_tier=priority`
-   *   regardless of if you specify `service_tier=fast` or `priority` in your
-   *   request.
+   * - If set to
+   *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+   *   the request will be processed with the Flex Processing service tier.
+   * - To opt-in to
+   *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+   *   request level, include the `service_tier=fast` or `service_tier=priority`
+   *   parameter for Responses or Chat Completions. The response will show
+   *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+   *   `priority` in your request.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -895,9 +1124,16 @@ export interface ChatCompletionChunk {
 export namespace ChatCompletionChunk {
   export interface Choice {
     /**
-     * A chat completion delta generated by streamed model responses.
+     * A chat completion delta generated by streamed model responses. Streamed audio
+     * can arrive in partial updates with an ID, base64 data, or transcript text. The
+     * final audio update contains only its expiry timestamp.
      */
     delta: Choice.Delta;
+
+    /**
+     * The index of the choice in the list of choices.
+     */
+    index: number;
 
     /**
      * The reason the model stopped generating tokens. This will be `stop` if the model
@@ -905,14 +1141,10 @@ export namespace ChatCompletionChunk {
      * number of tokens specified in the request was reached, `content_filter` if
      * content was omitted due to a flag from our content filters, `tool_calls` if the
      * model called a tool, or `function_call` (deprecated) if the model called a
-     * function.
+     * function. Omitted from the final audio update containing only
+     * `delta.audio.expires_at`.
      */
     finish_reason: 'stop' | 'length' | 'tool_calls' | 'content_filter' | 'function_call' | null;
-
-    /**
-     * The index of the choice in the list of choices.
-     */
-    index: number;
 
     /**
      * Log probability information for the choice.
@@ -922,9 +1154,17 @@ export namespace ChatCompletionChunk {
 
   export namespace Choice {
     /**
-     * A chat completion delta generated by streamed model responses.
+     * A chat completion delta generated by streamed model responses. Streamed audio
+     * can arrive in partial updates with an ID, base64 data, or transcript text. The
+     * final audio update contains only its expiry timestamp.
      */
     export interface Delta {
+      /**
+       * A partial audio response. Audio chunks may carry an ID, base64 data, or
+       * transcript text; the final audio update contains only its expiry timestamp.
+       */
+      audio?: Delta.Audio;
+
       /**
        * The contents of the chunk message.
        */
@@ -950,6 +1190,34 @@ export namespace ChatCompletionChunk {
     }
 
     export namespace Delta {
+      /**
+       * A partial audio response. Audio chunks may carry an ID, base64 data, or
+       * transcript text; the final audio update contains only its expiry timestamp.
+       */
+      export interface Audio {
+        /**
+         * Unique identifier for this audio response.
+         */
+        id?: string;
+
+        /**
+         * Base64 encoded audio bytes generated by the model, in the format specified in
+         * the request.
+         */
+        data?: string;
+
+        /**
+         * The Unix timestamp (in seconds) for when this audio response will no longer be
+         * accessible on the server for use in multi-turn conversations.
+         */
+        expires_at?: number;
+
+        /**
+         * Transcript text from this audio chunk.
+         */
+        transcript?: string;
+      }
+
       /**
        * @deprecated Deprecated and replaced by `tool_calls`. The name and arguments of a
        * function that should be called, as generated by the model.
@@ -1211,8 +1479,7 @@ export namespace ChatCompletionChunk {
 }
 
 /**
- * Learn about
- * [text inputs](https://platform.openai.com/docs/guides/text-generation).
+ * Learn about [text inputs](https://developers.openai.com/api/docs/guides/text).
  */
 export type ChatCompletionContentPart =
   | ChatCompletionContentPartText
@@ -1222,8 +1489,8 @@ export type ChatCompletionContentPart =
 
 export namespace ChatCompletionContentPart {
   /**
-   * Learn about [file inputs](https://platform.openai.com/docs/guides/text) for text
-   * generation.
+   * Learn about [file inputs](https://developers.openai.com/api/docs/guides/text)
+   * for text generation.
    */
   export interface File {
     file: File.File;
@@ -1275,7 +1542,8 @@ export namespace ChatCompletionContentPart {
 }
 
 /**
- * Learn about [image inputs](https://platform.openai.com/docs/guides/vision).
+ * Learn about
+ * [image inputs](https://developers.openai.com/api/docs/guides/images-vision).
  */
 export interface ChatCompletionContentPartImage {
   image_url: ChatCompletionContentPartImage.ImageURL;
@@ -1302,9 +1570,9 @@ export namespace ChatCompletionContentPartImage {
 
     /**
      * Specifies the detail level of the image. Learn more in the
-     * [Vision guide](https://platform.openai.com/docs/guides/vision#low-or-high-fidelity-image-understanding).
+     * [Vision guide](https://developers.openai.com/api/docs/guides/images-vision#choose-an-image-detail-level).
      */
-    detail?: 'auto' | 'low' | 'high';
+    detail?: 'auto' | 'low' | 'high' | 'original';
   }
 
   /**
@@ -1321,7 +1589,7 @@ export namespace ChatCompletionContentPartImage {
 }
 
 /**
- * Learn about [audio inputs](https://platform.openai.com/docs/guides/audio).
+ * Learn about [audio inputs](https://developers.openai.com/api/docs/guides/audio).
  */
 export interface ChatCompletionContentPartInputAudio {
   input_audio: ChatCompletionContentPartInputAudio.InputAudio;
@@ -1378,8 +1646,7 @@ export interface ChatCompletionContentPartRefusal {
 }
 
 /**
- * Learn about
- * [text inputs](https://platform.openai.com/docs/guides/text-generation).
+ * Learn about [text inputs](https://developers.openai.com/api/docs/guides/text).
  */
 export interface ChatCompletionContentPartText {
   /**
@@ -1599,14 +1866,14 @@ export interface ChatCompletionMessage {
 
   /**
    * Annotations for the message, when applicable, as when using the
-   * [web search tool](https://platform.openai.com/docs/guides/tools-web-search?api-mode=chat).
+   * [web search tool](https://developers.openai.com/api/docs/guides/tools-web-search).
    */
   annotations?: Array<ChatCompletionMessage.Annotation>;
 
   /**
    * If the audio output modality is requested, this object contains data about the
    * audio response from the model.
-   * [Learn more](https://platform.openai.com/docs/guides/audio).
+   * [Learn more](https://developers.openai.com/api/docs/guides/audio).
    */
   audio?: ChatCompletionAudio | null;
 
@@ -2070,27 +2337,27 @@ export type ChatCompletionCreateParams =
 export interface ChatCompletionCreateParamsBase {
   /**
    * A list of messages comprising the conversation so far. Depending on the
-   * [model](https://platform.openai.com/docs/models) you use, different message
-   * types (modalities) are supported, like
-   * [text](https://platform.openai.com/docs/guides/text-generation),
-   * [images](https://platform.openai.com/docs/guides/vision), and
-   * [audio](https://platform.openai.com/docs/guides/audio).
+   * [model](https://developers.openai.com/api/docs/models) you use, different
+   * message types (modalities) are supported, like
+   * [text](https://developers.openai.com/api/docs/guides/text),
+   * [images](https://developers.openai.com/api/docs/guides/images-vision), and
+   * [audio](https://developers.openai.com/api/docs/guides/audio).
    */
   messages: Array<ChatCompletionMessageParam>;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * Model ID used to generate the response, like `gpt-6-astra` or `o3`. OpenAI
+   * offers a wide range of models with different capabilities, performance
+   * characteristics, and price points. Refer to the
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model: (string & {}) | Shared.ChatModel;
 
   /**
    * Parameters for audio output. Required when audio output is requested with
    * `modalities: ["audio"]`.
-   * [Learn more](https://platform.openai.com/docs/guides/audio).
+   * [Learn more](https://developers.openai.com/api/docs/guides/audio).
    */
   audio?: ChatCompletionAudioParam | null;
 
@@ -2148,18 +2415,19 @@ export interface ChatCompletionCreateParamsBase {
   /**
    * An upper bound for the number of tokens that can be generated for a completion,
    * including visible output tokens and
-   * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
    */
   max_completion_tokens?: number | null;
 
   /**
-   * @deprecated The maximum number of [tokens](/tokenizer) that can be generated in
-   * the chat completion. This value can be used to control
+   * @deprecated The maximum number of
+   * [tokens](https://platform.openai.com/tokenizer) that can be generated in the
+   * chat completion. This value can be used to control
    * [costs](https://openai.com/api/pricing/) for text generated via API.
    *
    * This value is now deprecated in favor of `max_completion_tokens`, and is not
    * compatible with
-   * [o-series models](https://platform.openai.com/docs/guides/reasoning).
+   * [o-series models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   max_tokens?: number | null;
 
@@ -2180,8 +2448,8 @@ export interface ChatCompletionCreateParamsBase {
    * `["text"]`
    *
    * The `gpt-4o-audio-preview` model can also be used to
-   * [generate audio](https://platform.openai.com/docs/guides/audio). To request that
-   * this model generate both text and audio responses, you can use:
+   * [generate audio](https://developers.openai.com/api/docs/guides/audio). To
+   * request that this model generate both text and audio responses, you can use:
    *
    * `["text", "audio"]`
    */
@@ -2201,14 +2469,17 @@ export interface ChatCompletionCreateParamsBase {
 
   /**
    * Whether to enable
-   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling#configuring-parallel-function-calling)
+   * [parallel function calling](https://developers.openai.com/api/docs/guides/function-calling#parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls?: boolean;
 
   /**
-   * Static predicted output content, such as the content of a text file that is
-   * being regenerated.
+   * Configuration for a
+   * [Predicted Output](https://developers.openai.com/api/docs/guides/predicted-outputs),
+   * which can greatly improve response times when large parts of the model response
+   * are known ahead of time. This is most common when you are regenerating a file
+   * with only minor changes to most of the content.
    */
   prediction?: ChatCompletionPredictionContent | null;
 
@@ -2222,7 +2493,7 @@ export interface ChatCompletionCreateParamsBase {
   /**
    * Used by OpenAI to cache responses for similar requests to optimize your cache
    * hit rates. Replaces the `user` field.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching).
    */
   prompt_cache_key?: string | null;
 
@@ -2234,7 +2505,7 @@ export interface ChatCompletionCreateParamsBase {
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
    * `ttl` defaults to `30m`, which is currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   prompt_cache_options?: ChatCompletionCreateParams.PromptCacheOptions;
@@ -2245,7 +2516,7 @@ export interface ChatCompletionCreateParamsBase {
    * The retention policy for the prompt cache. Set to `24h` to enable extended
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching#prompt-cache-retention).
    * This field expresses a maximum retention policy, while
    * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
    * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
@@ -2265,7 +2536,7 @@ export interface ChatCompletionCreateParamsBase {
    * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
    * reasoning effort can result in faster responses and fewer tokens used on
    * reasoning in a response. Not all reasoning models support every value. See the
-   * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+   * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
    * model-specific support.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
@@ -2276,7 +2547,7 @@ export interface ChatCompletionCreateParamsBase {
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
    * Outputs which ensures the model will match your supplied JSON schema. Learn more
    * in the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    *
    * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
    * ensures the message the model generates is valid JSON. Using `json_schema` is
@@ -2293,7 +2564,7 @@ export interface ChatCompletionCreateParamsBase {
    * identifies each user, with a maximum length of 64 characters. We recommend
    * hashing their username or email address, in order to avoid sending us any
    * identifying information.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   safety_identifier?: string | null;
 
@@ -2314,13 +2585,15 @@ export interface ChatCompletionCreateParamsBase {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
-   *   then the request will be processed with the Flex Processing service tier.
-   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
-   *   include the `service_tier=fast` or `service_tier=priority` parameter for
-   *   Responses or Chat Completions. The response will show `service_tier=priority`
-   *   regardless of if you specify `service_tier=fast` or `priority` in your
-   *   request.
+   * - If set to
+   *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+   *   the request will be processed with the Flex Processing service tier.
+   * - To opt-in to
+   *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+   *   request level, include the `service_tier=fast` or `service_tier=priority`
+   *   parameter for Responses or Chat Completions. The response will show
+   *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+   *   `priority` in your request.
    * - When not set, the default behavior is 'auto'.
    *
    * When the `service_tier` parameter is set, the response body will include the
@@ -2336,12 +2609,13 @@ export interface ChatCompletionCreateParamsBase {
    * Up to 4 sequences where the API will stop generating further tokens. The
    * returned text will not contain the stop sequence.
    */
-  stop?: string | null | Array<string>;
+  stop?: string | Array<string> | null;
 
   /**
    * Whether or not to store the output of this chat completion request for use in
-   * our [model distillation](https://platform.openai.com/docs/guides/distillation)
-   * or [evals](https://platform.openai.com/docs/guides/evals) products.
+   * our
+   * [model distillation](https://developers.openai.com/api/docs/guides/supervised-fine-tuning#distilling-from-a-larger-model)
+   * or [evals](https://developers.openai.com/api/docs/guides/evals) products.
    *
    * Supports text and image inputs. Note: image inputs over 8MB will be dropped.
    */
@@ -2352,9 +2626,9 @@ export interface ChatCompletionCreateParamsBase {
    * generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/chat/streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
    * for more information, along with the
-   * [streaming responses](https://platform.openai.com/docs/guides/streaming-responses)
+   * [streaming responses](https://developers.openai.com/api/docs/guides/streaming-responses)
    * guide for more information on how to handle the streaming events.
    */
   stream?: boolean | null;
@@ -2387,8 +2661,9 @@ export interface ChatCompletionCreateParamsBase {
 
   /**
    * A list of tools the model may call. You can provide either
-   * [custom tools](https://platform.openai.com/docs/guides/function-calling#custom-tools)
-   * or [function tools](https://platform.openai.com/docs/guides/function-calling).
+   * [custom tools](https://developers.openai.com/api/docs/guides/function-calling#custom-tools)
+   * or
+   * [function tools](https://developers.openai.com/api/docs/guides/function-calling).
    */
   tools?: Array<ChatCompletionTool>;
 
@@ -2415,7 +2690,7 @@ export interface ChatCompletionCreateParamsBase {
    * optimizations. A stable identifier for your end-users. Used to boost cache hit
    * rates by better bucketing similar requests and to help OpenAI detect and prevent
    * abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 
@@ -2430,7 +2705,7 @@ export interface ChatCompletionCreateParamsBase {
   /**
    * This tool searches the web for relevant results to use in a response. Learn more
    * about the
-   * [web search tool](https://platform.openai.com/docs/guides/tools-web-search?api-mode=chat).
+   * [web search tool](https://developers.openai.com/api/docs/guides/tools-web-search).
    */
   web_search_options?: ChatCompletionCreateParams.WebSearchOptions;
 }
@@ -2454,8 +2729,8 @@ export namespace ChatCompletionCreateParams {
 
     /**
      * The parameters the functions accepts, described as a JSON Schema object. See the
-     * [guide](https://platform.openai.com/docs/guides/function-calling) for examples,
-     * and the
+     * [guide](https://developers.openai.com/api/docs/guides/function-calling) for
+     * examples, and the
      * [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for
      * documentation about the format.
      *
@@ -2521,7 +2796,7 @@ export namespace ChatCompletionCreateParams {
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
    * `ttl` defaults to `30m`, which is currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   export interface PromptCacheOptions {
@@ -2546,7 +2821,7 @@ export namespace ChatCompletionCreateParams {
   /**
    * This tool searches the web for relevant results to use in a response. Learn more
    * about the
-   * [web search tool](https://platform.openai.com/docs/guides/tools-web-search?api-mode=chat).
+   * [web search tool](https://developers.openai.com/api/docs/guides/tools-web-search).
    */
   export interface WebSearchOptions {
     /**
@@ -2618,9 +2893,9 @@ export interface ChatCompletionCreateParamsNonStreaming extends ChatCompletionCr
    * generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/chat/streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
    * for more information, along with the
-   * [streaming responses](https://platform.openai.com/docs/guides/streaming-responses)
+   * [streaming responses](https://developers.openai.com/api/docs/guides/streaming-responses)
    * guide for more information on how to handle the streaming events.
    */
   stream?: false | null;
@@ -2632,9 +2907,9 @@ export interface ChatCompletionCreateParamsStreaming extends ChatCompletionCreat
    * generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/chat/streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
    * for more information, along with the
-   * [streaming responses](https://platform.openai.com/docs/guides/streaming-responses)
+   * [streaming responses](https://developers.openai.com/api/docs/guides/streaming-responses)
    * guide for more information on how to handle the streaming events.
    */
   stream: true;

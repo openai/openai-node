@@ -28,7 +28,7 @@ const tools: RunnableToolFunction<any>[] = [
       function: list,
       parse: JSON.parse,
     },
-  } as RunnableToolFunction<{ genre: string }>,
+  } satisfies RunnableToolFunction<{ genre: string }>,
   {
     type: 'function',
     function: {
@@ -43,7 +43,7 @@ const tools: RunnableToolFunction<any>[] = [
       function: search,
       parse: JSON.parse,
     },
-  } as RunnableToolFunction<{ name: string }>,
+  } satisfies RunnableToolFunction<{ name: string }>,
   {
     type: 'function',
     function: {
@@ -59,7 +59,7 @@ const tools: RunnableToolFunction<any>[] = [
       function: get,
       parse: JSON.parse,
     },
-  } as RunnableToolFunction<{ id: string }>,
+  } satisfies RunnableToolFunction<{ id: string }>,
 ];
 
 async function main() {

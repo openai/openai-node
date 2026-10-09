@@ -12,6 +12,7 @@ import { assertX509WebSocketSupported } from '../../internal/auth/x509-workload-
 /** Parses frame data without exposing malformed payloads through JSON syntax errors. */
 export function parseRealtimeEvent(data: string): RealtimeServerEvent {
   try {
+    // SAFETY: RealtimeServerEvent is the API wire contract; JSON syntax is checked here while future event types remain accepted at runtime.
     return JSON.parse(data) as RealtimeServerEvent;
   } catch (error) {
     if (error instanceof SyntaxError) {
@@ -86,6 +87,7 @@ type RealtimeEvents = Simplify<
           type: EventType;
         }
       >,
+      // oxlint-disable-next-line anti-slop/no-unknown-returns -- Preserve the published event-callback contract, which accepts and ignores arbitrary return values.
     ) => unknown;
   }
 >;
@@ -186,8 +188,9 @@ export function buildRealtimeURL(
   const hasModel = !!config.model;
   const hasCallID = !!config.callID;
 
-  const path = '/realtime';
-  const url = new URL(baseURL + (baseURL.endsWith('/') ? path.slice(1) : path));
+  const url = new URL(baseURL);
+  url.pathname += url.pathname.endsWith('/') ? 'realtime' : '/realtime';
+  url.hash = '';
 
   if (hasModel === hasCallID) {
     throw new Error('Pass exactly one of `model` or `callID` when opening a Realtime WebSocket.');

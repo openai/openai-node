@@ -214,7 +214,7 @@ describe('X.509 request ownership boundaries', () => {
       const original = client.buildRequest.bind(client);
       const builds = vi.fn(async (...args: Parameters<OpenAI['buildRequest']>) => {
         const built = await original(...args);
-        let body: unknown;
+        let body: ReadableStream<Uint8Array> | AsyncIterable<Uint8Array> | typeof chunks;
         if (kind === 'ReadableStream') {
           body = new ReadableStream({
             start(controller) {
@@ -671,17 +671,17 @@ describe('X.509 request ownership boundaries', () => {
             return Response.json(tokenResponse);
           }
           attempts += 1;
-          await delay(35, undefined, { signal: request.signal ?? undefined });
+          await delay(250, undefined, { signal: request.signal ?? undefined });
           return attempts === 1
             ? new Response(null, { status: 503, headers: { 'retry-after-ms': '1' } })
             : Response.json({ data: [] });
         });
-      const client = new OpenAI(options({ maxRetries: 1, timeout: 55 }));
+      const client = new OpenAI(options({ maxRetries: 1, timeout: 400 }));
       Object.defineProperty(client, hook, {
         value: async () => {
           preparations += 1;
           if (preparations === 2) {
-            await delay(90);
+            await delay(500);
           }
         },
       });

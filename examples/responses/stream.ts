@@ -19,6 +19,10 @@ async function main() {
 
   const result = await runner.finalResponse();
   console.log(result);
+  if (result.status !== 'completed') {
+    console.error(`Response ended with status ${result.status ?? 'unknown'}.`);
+    process.exitCode = 1;
+  }
 }
 
 main();

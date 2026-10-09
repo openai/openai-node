@@ -5,6 +5,13 @@ import { APIPromise } from '../../../../core/api-promise';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class SpendLimit extends APIResource {
   /**
    * Get a project's hard spend limit.
@@ -18,10 +25,13 @@ export class SpendLimit extends APIResource {
    * ```
    */
   retrieve(projectID: string, options?: RequestOptions): APIPromise<ProjectSpendLimit> {
-    return this._client.get(path`/organization/projects/${projectID}/spend_limit`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/projects/${projectID}/spend_limit`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -45,11 +55,14 @@ export class SpendLimit extends APIResource {
     body: SpendLimitUpdateParams,
     options?: RequestOptions,
   ): APIPromise<ProjectSpendLimit> {
-    return this._client.post(path`/organization/projects/${projectID}/spend_limit`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/projects/${projectID}/spend_limit`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -64,10 +77,13 @@ export class SpendLimit extends APIResource {
    * ```
    */
   delete(projectID: string, options?: RequestOptions): APIPromise<ProjectSpendLimitDeleted> {
-    return this._client.delete(path`/organization/projects/${projectID}/spend_limit`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      path`/organization/projects/${projectID}/spend_limit`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

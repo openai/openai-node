@@ -208,6 +208,7 @@ function captureStaticFailure(accumulator: Record<string, unknown>, delta: Recor
   }
 
   expect(failure).toBeInstanceOf(Error);
+  // SAFETY: The preceding class assertion verifies the captured Error; the optional cause remains unknown and is checked separately before use.
   return failure as Error;
 }
 
@@ -230,8 +231,10 @@ async function expectPrivateStreamFailure(
     throw new Error('Expected every public assistant-stream completion to reject.');
   }
 
+  // SAFETY: Promise rejection reasons are typed any; widening to unknown prevents assuming a shape before the class assertions.
   const failure = first.reason as unknown;
   expect(failure).toBeInstanceOf(OpenAIError);
+  // SAFETY: The preceding class assertion verifies the captured Error; the optional cause remains unknown and is checked separately before use.
   expect((failure as Error).constructor).toBe(OpenAIError);
 
   for (const result of results) {
@@ -241,11 +244,14 @@ async function expectPrivateStreamFailure(
     }
   }
 
+  // SAFETY: The preceding class assertion verifies the captured Error; the optional cause remains unknown and is checked separately before use.
   const sdkError = failure as OpenAIError & { cause?: unknown };
   expectPrivateError(sdkError, scenario.expectedMessage);
   if (scenario.cause) {
     expect(sdkError.cause).toBeInstanceOf(Error);
+    // SAFETY: The immediately preceding cause assertion verifies Error before the test reads its class or checks its private diagnostics.
     expect((sdkError.cause as Error).constructor.name).toBe(scenario.cause);
+    // SAFETY: The immediately preceding cause assertion verifies Error before the test reads its class or checks its private diagnostics.
     expectPrivateError(sdkError.cause as Error, scenario.expectedMessage);
   } else {
     expect(sdkError.cause).toBeUndefined();

@@ -41,6 +41,120 @@ import { pollAssistantRun } from '../../../../lib/assistant-run-polling';
 import { RunSubmitToolOutputsParamsStream } from '../../../../lib/AssistantStream';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 /**
  * Build Assistants that can call models and use tools.
  *
@@ -71,15 +185,18 @@ export class Runs extends APIResource {
     options?: RequestOptions,
   ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
     const { include, ...body } = params;
-    return this._client.post(path`/threads/${threadID}/runs`, {
-      query: { include },
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      stream: params.stream ?? false,
-      __synthesizeEventData: true,
-      __security: { bearerAuth: true },
-    }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
+    return this._client.post(
+      path`/threads/${threadID}/runs`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query: { include },
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        stream: params.stream ?? false,
+        __synthesizeEventData: true,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
   /**
@@ -89,11 +206,14 @@ export class Runs extends APIResource {
    */
   retrieve(runID: string, params: RunRetrieveParams, options?: RequestOptions): APIPromise<Run> {
     const { thread_id } = params;
-    return this._client.get(path`/threads/${thread_id}/runs/${runID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/threads/${thread_id}/runs/${runID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -103,12 +223,15 @@ export class Runs extends APIResource {
    */
   update(runID: string, params: RunUpdateParams, options?: RequestOptions): APIPromise<Run> {
     const { thread_id, ...body } = params;
-    return this._client.post(path`/threads/${thread_id}/runs/${runID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/threads/${thread_id}/runs/${runID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -118,15 +241,113 @@ export class Runs extends APIResource {
    */
   list(
     threadID: string,
-    query: RunListParams | null | undefined = {},
+    query?:
+      | (RunListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<RunsPage, Run>;
+  list(
+    threadID: string,
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<RunsPage, Run>;
+  list(
+    threadID: string,
+    query:
+      | RunListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<RunsPage, Run> {
-    return this._client.getAPIList(path`/threads/${threadID}/runs`, CursorPage<Run>, {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+      ['after', 'before', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as RunListParams | null | undefined;
+    return this._client.getAPIList(
+      path`/threads/${threadID}/runs`,
+      CursorPage<Run>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -136,11 +357,14 @@ export class Runs extends APIResource {
    */
   cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<Run> {
     const { thread_id } = params;
-    return this._client.post(path`/threads/${thread_id}/runs/${runID}/cancel`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/threads/${thread_id}/runs/${runID}/cancel`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -219,14 +443,17 @@ export class Runs extends APIResource {
     options?: RequestOptions,
   ): APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
     const { thread_id, ...body } = params;
-    return this._client.post(path`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      stream: params.stream ?? false,
-      __synthesizeEventData: true,
-      __security: { bearerAuth: true },
-    }) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
+    return this._client.post(
+      path`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        stream: params.stream ?? false,
+        __synthesizeEventData: true,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
   /**
@@ -266,7 +493,7 @@ export interface RequiredActionFunctionToolCall {
   /**
    * The ID of the tool call. This ID must be referenced when you submit the tool
    * outputs in using the
-   * [Submit tool outputs to run](https://platform.openai.com/docs/api-reference/runs/submitToolOutputs)
+   * [Submit tool outputs to run](https://developers.openai.com/api/docs/assistants/migration)
    * endpoint.
    */
   id: string;
@@ -302,7 +529,7 @@ export namespace RequiredActionFunctionToolCall {
 
 /**
  * Represents an execution run on a
- * [thread](https://platform.openai.com/docs/api-reference/threads).
+ * [thread](https://developers.openai.com/api/docs/assistants/migration).
  */
 export interface Run {
   /**
@@ -312,8 +539,8 @@ export interface Run {
 
   /**
    * The ID of the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * execution of this run.
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) used
+   * for execution of this run.
    */
   assistant_id: string;
 
@@ -350,8 +577,8 @@ export interface Run {
 
   /**
    * The instructions that the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * this run.
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) used
+   * for this run.
    */
   instructions: string;
 
@@ -384,8 +611,8 @@ export interface Run {
 
   /**
    * The model that the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * this run.
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) used
+   * for this run.
    */
   model: string;
 
@@ -396,7 +623,7 @@ export interface Run {
 
   /**
    * Whether to enable
-   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling#configuring-parallel-function-calling)
+   * [parallel function calling](https://developers.openai.com/api/docs/guides/function-calling#parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls: boolean;
@@ -409,14 +636,14 @@ export interface Run {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
-   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://developers.openai.com/api/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://developers.openai.com/api/docs/models/gpt-4-turbo), and
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
    * Outputs which ensures the model will match your supplied JSON schema. Learn more
    * in the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
    * message the model generates is valid JSON.
@@ -444,8 +671,9 @@ export interface Run {
   status: RunStatus;
 
   /**
-   * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
-   * that was executed on as a part of this run.
+   * The ID of the
+   * [thread](https://developers.openai.com/api/docs/assistants/migration) that was
+   * executed on as a part of this run.
    */
   thread_id: string;
 
@@ -462,8 +690,8 @@ export interface Run {
 
   /**
    * The list of tools that the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) used for
-   * this run.
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) used
+   * for this run.
    */
   tools: Array<AssistantsAPI.AssistantTool>;
 
@@ -609,8 +837,8 @@ export type RunCreateParams = RunCreateParamsNonStreaming | RunCreateParamsStrea
 export interface RunCreateParamsBase {
   /**
    * Body param: The ID of the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
-   * execute this run.
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) to use
+   * to execute this run.
    */
   assistant_id: string;
 
@@ -621,7 +849,7 @@ export interface RunCreateParamsBase {
    * search result content.
    *
    * See the
-   * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
+   * [file search tool documentation](https://developers.openai.com/api/docs/guides/tools-file-search#retrieval-customization)
    * for more information.
    */
   include?: Array<StepsAPI.RunStepInclude>;
@@ -640,8 +868,8 @@ export interface RunCreateParamsBase {
 
   /**
    * Body param: Overrides the
-   * [instructions](https://platform.openai.com/docs/api-reference/assistants/createAssistant)
-   * of the assistant. This is useful for modifying the behavior on a per-run basis.
+   * [instructions](https://developers.openai.com/api/docs/assistants/migration) of
+   * the assistant. This is useful for modifying the behavior on a per-run basis.
    */
   instructions?: string | null;
 
@@ -675,8 +903,8 @@ export interface RunCreateParamsBase {
 
   /**
    * Body param: The ID of the
-   * [Model](https://platform.openai.com/docs/api-reference/models) to be used to
-   * execute this run. If a value is provided here, it will override the model
+   * [Model](https://developers.openai.com/api/reference/resources/models) to be used
+   * to execute this run. If a value is provided here, it will override the model
    * associated with the assistant. If not, the model associated with the assistant
    * will be used.
    */
@@ -684,7 +912,7 @@ export interface RunCreateParamsBase {
 
   /**
    * Body param: Whether to enable
-   * [parallel function calling](https://platform.openai.com/docs/guides/function-calling#configuring-parallel-function-calling)
+   * [parallel function calling](https://developers.openai.com/api/docs/guides/function-calling#parallel-function-calling)
    * during tool use.
    */
   parallel_tool_calls?: boolean;
@@ -694,21 +922,22 @@ export interface RunCreateParamsBase {
    * supported values are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and
    * `max`. Reducing reasoning effort can result in faster responses and fewer tokens
    * used on reasoning in a response. Not all reasoning models support every value.
-   * See the [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+   * See the
+   * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
    * model-specific support.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 
   /**
    * Body param: Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
-   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://developers.openai.com/api/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://developers.openai.com/api/docs/models/gpt-4-turbo), and
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
    * Outputs which ensures the model will match your supplied JSON schema. Learn more
    * in the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
    * message the model generates is valid JSON.
@@ -872,8 +1101,9 @@ export interface RunCreateParamsStreaming extends RunCreateParamsBase {
 
 export interface RunRetrieveParams {
   /**
-   * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
-   * that was run.
+   * The ID of the
+   * [thread](https://developers.openai.com/api/docs/assistants/migration) that was
+   * run.
    */
   thread_id: string;
 }
@@ -881,7 +1111,8 @@ export interface RunRetrieveParams {
 export interface RunUpdateParams {
   /**
    * Path param: The ID of the
-   * [thread](https://platform.openai.com/docs/api-reference/threads) that was run.
+   * [thread](https://developers.openai.com/api/docs/assistants/migration) that was
+   * run.
    */
   thread_id: string;
 
@@ -932,8 +1163,8 @@ export type RunSubmitToolOutputsParams =
 export interface RunSubmitToolOutputsParamsBase {
   /**
    * Path param: The ID of the
-   * [thread](https://platform.openai.com/docs/api-reference/threads) to which this
-   * run belongs.
+   * [thread](https://developers.openai.com/api/docs/assistants/migration) to which
+   * this run belongs.
    */
   thread_id: string;
 

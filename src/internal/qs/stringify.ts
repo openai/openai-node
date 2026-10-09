@@ -22,6 +22,7 @@ const push_to_array = function push_to_array(arr: any[], value_or_array: any) {
 
 let toISOString;
 
+// SAFETY: The defaults object supplies the serializer's established non-null option values and RFC formatter; callers still merge their overrides separately.
 const defaults = {
   addQueryPrefix: false,
   allowDots: false,
@@ -172,6 +173,7 @@ function inner_stringify(
   }
 
   for (const key of obj_keys) {
+    // SAFETY: The serializer supports its existing encoded-key wrapper or property key; the branch selects the wrapper value before indexing the object.
     const value =
       // @ts-ignore
       typeof key === 'object' && key.value !== undefined ? key.value : obj[key as any];
@@ -180,6 +182,7 @@ function inner_stringify(
       continue;
     }
 
+    // SAFETY: Dot encoding applies the serializer's existing string-key protocol; this cast preserves its legacy mixed key representation.
     // @ts-ignore
     const encoded_key = allowDots && encodeDotInKeys ? (key as any).replace(/\./g, '%2E') : key;
     let key_prefix: string;

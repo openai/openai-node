@@ -12,6 +12,7 @@ class TestEmitter extends EventEmitter<TestEvents> {
     this._emit('foo', value);
   }
   emitNamed(event: string, value: string) {
+    // SAFETY: The fixture intentionally uses prototype-property event names outside the static event map to verify registration, lookup, and dispatch isolation.
     this._emit(event as 'foo', value);
   }
   emitError(err: Error) {
@@ -67,6 +68,7 @@ describe('EventEmitter listeners', () => {
     'safely emits unobserved Object.prototype event %s',
     (eventName) => {
       const emitter = new TestEmitter();
+      // SAFETY: The fixture intentionally uses prototype-property event names outside the static event map to verify registration, lookup, and dispatch isolation.
       const event = eventName as keyof TestEvents;
 
       expect(emitter.hasListener(event)).toBeFalsy();
@@ -79,6 +81,7 @@ describe('EventEmitter listeners', () => {
     'supports regular and one-time Object.prototype event listeners for %s',
     (eventName) => {
       const emitter = new TestEmitter();
+      // SAFETY: The fixture intentionally uses prototype-property event names outside the static event map to verify registration, lookup, and dispatch isolation.
       const event = eventName as 'foo';
       const repeated = vi.fn();
       const once = vi.fn();

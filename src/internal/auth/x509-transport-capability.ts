@@ -44,7 +44,7 @@ class NodeX509Transport implements X509Transport {
     Object.freeze(this);
   }
 
-  static dispatcher(value: object): Agent | ProxyAgent | undefined {
+  static dispatcher(value: X509Transport): Agent | ProxyAgent | undefined {
     return #dispatcher in value ? value.#dispatcher : undefined;
   }
 }
@@ -66,6 +66,7 @@ export function registerX509Transport(transport: X509Transport, registered: Regi
   rememberRegisteredX509Transport(transport, Object.freeze(registered));
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- Own data-property values must remain untrusted until their option-specific validators run.
 function dataOption(options: X509TransportOptions, name: keyof X509TransportOptions): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(options, name);
   if (!descriptor || !('value' in descriptor)) {

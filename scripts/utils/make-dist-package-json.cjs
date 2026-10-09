@@ -7,6 +7,7 @@ function processExportMap(m) {
     }
 
     const value = m[key];
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Package metadata permits string leaves and nested export conditions that require different rewriting.
     if (typeof value === 'string') {
       m[key] = value.replace(/^\.\/dist\//, './');
     } else {
@@ -22,14 +23,27 @@ if (pkgJson.imports?.['#x509-transport-state']) {
     if (condition === 'types') {
       continue;
     }
+    if (condition === 'browser') {
+      state[condition] = {
+        import: './internal/auth/x509-transport-state.mjs',
+        require: './internal/auth/x509-transport-state.js',
+        default: './internal/auth/x509-transport-state.mjs',
+      };
+      continue;
+    }
+    if (condition === 'default') {
+      state[condition] = './internal/auth/x509-transport-state.js';
+      continue;
+    }
     state[condition] = state[condition]
       .replace(/^\.\/src\//, './')
-      .replace(/\.cts$/, '.cjs')
+      .replace(/\.cts$/, condition === 'node' ? '.js' : '.cjs')
       .replace(/\.ts$/, '.mjs');
   }
 }
 
 for (const key of ['types', 'main', 'module']) {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Package metadata permits string leaves and nested export conditions that require different rewriting.
   if (typeof pkgJson[key] === 'string') {
     pkgJson[key] = pkgJson[key].replace(/^(\.\/)?dist\//, './');
   }

@@ -38,6 +38,62 @@ function mockResponse({ url, content }: { url: string; content?: Blob }): Respon
 }
 
 describe('toFile', () => {
+  describe.each([
+    {
+      kind: 'bytes',
+      make: () => new Uint8Array([1, 2]),
+      inferredName: 'unknown_file',
+    },
+    {
+      kind: 'named bytes',
+      make: () => Object.assign(new Uint8Array([1, 2]), { name: 'original.bin' }),
+      inferredName: 'original.bin',
+    },
+    {
+      kind: 'Blob',
+      make: () => new Blob([new Uint8Array([1, 2])]),
+      inferredName: 'unknown_file',
+    },
+    {
+      kind: 'Response',
+      make: () =>
+        mockResponse({
+          url: 'https://example.test/original.bin',
+          content: new Blob([new Uint8Array([1, 2])]),
+        }),
+      inferredName: 'original.bin',
+    },
+    {
+      kind: 'File',
+      make: () => new File([new Uint8Array([1, 2])], 'original.bin'),
+      inferredName: 'original.bin',
+    },
+    {
+      kind: 'compatible File',
+      make: foreignFileLike,
+      inferredName: 'foreign.jsonl',
+    },
+    {
+      kind: 'async iterable',
+      make: () => ({
+        name: 'original.bin',
+        async *[Symbol.asyncIterator]() {
+          yield new Uint8Array([1, 2]);
+        },
+      }),
+      inferredName: 'original.bin',
+    },
+  ])('$kind filename overrides', ({ make, inferredName }) => {
+    it.each(['', 'override.bin', undefined, null])('respects the %j filename', async (name) => {
+      const file = await toFile(make(), name, { type: 'application/octet-stream', lastModified: 7 });
+
+      expect(file.name).toBe(name ?? inferredName);
+      expect(file.type).toBe('application/octet-stream');
+      expect(file.lastModified).toBe(7);
+      expect([...new Uint8Array(await file.arrayBuffer())]).toEqual([1, 2]);
+    });
+  });
+
   it('throws a helpful error for mismatched types', async () => {
     await expect(
       // @ts-expect-error intentionally mismatched type

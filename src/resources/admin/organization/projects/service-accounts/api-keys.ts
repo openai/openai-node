@@ -5,6 +5,13 @@ import { APIPromise } from '../../../../../core/api-promise';
 import { RequestOptions } from '../../../../../internal/request-options';
 import { path } from '../../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class APIKeys extends APIResource {
   /**
    * Creates an API key for a service account in the project.
@@ -26,7 +33,11 @@ export class APIKeys extends APIResource {
     const { project_id, ...body } = params;
     return this._client.post(
       path`/organization/projects/${project_id}/service_accounts/${serviceAccountID}/api_keys`,
-      { body, ...options, __security: { adminAPIKeyAuth: true } },
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
     );
   }
 }
@@ -56,6 +67,12 @@ export interface APIKeyCreateResponse {
    * The unredacted API key value.
    */
   value: string;
+
+  /**
+   * The Unix timestamp (in seconds) when the API key expires, or null if it does not
+   * expire.
+   */
+  expires_at?: number | null;
 }
 
 export interface APIKeyCreateParams {
@@ -63,6 +80,11 @@ export interface APIKeyCreateParams {
    * Path param: The ID of the project.
    */
   project_id: string;
+
+  /**
+   * Body param: Number of seconds until the API key expires.
+   */
+  expires_in_seconds?: number | null;
 
   /**
    * Body param: API key name.

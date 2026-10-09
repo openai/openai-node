@@ -13,22 +13,139 @@ import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
+/**
+ * Create and manage model responses.
+ */
 export class Responses extends APIResource {
   inputItems: InputItemsAPI.InputItems = new InputItemsAPI.InputItems(this._client);
   inputTokens: InputTokensAPI.InputTokens = new InputTokensAPI.InputTokens(this._client);
 
   /**
    * Creates a model response. Provide
-   * [text](https://platform.openai.com/docs/guides/text) or
-   * [image](https://platform.openai.com/docs/guides/images) inputs to generate
-   * [text](https://platform.openai.com/docs/guides/text) or
-   * [JSON](https://platform.openai.com/docs/guides/structured-outputs) outputs. Have
-   * the model call your own
-   * [custom code](https://platform.openai.com/docs/guides/function-calling) or use
-   * built-in [tools](https://platform.openai.com/docs/guides/tools) like
-   * [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-   * [file search](https://platform.openai.com/docs/guides/tools-file-search) to use
-   * your own data as input for the model's response.
+   * [text](https://developers.openai.com/api/docs/guides/text) or
+   * [image](https://developers.openai.com/api/docs/guides/images-vision) inputs to
+   * generate [text](https://developers.openai.com/api/docs/guides/text) or
+   * [JSON](https://developers.openai.com/api/docs/guides/structured-outputs)
+   * outputs. Have the model call your own
+   * [custom code](https://developers.openai.com/api/docs/guides/function-calling) or
+   * use built-in [tools](https://developers.openai.com/api/docs/guides/tools) like
+   * [web search](https://developers.openai.com/api/docs/guides/tools-web-search) or
+   * [file search](https://developers.openai.com/api/docs/guides/tools-file-search)
+   * to use your own data as input for the model's response.
    *
    * @example
    * ```ts
@@ -49,16 +166,19 @@ export class Responses extends APIResource {
     options?: RequestOptions,
   ): APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>> {
     const { betas, ...body } = params;
-    return this._client.post('/responses?beta=true', {
-      body,
-      ...options,
-      headers: buildHeaders([
-        { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
-        options?.headers,
-      ]),
-      stream: params.stream ?? false,
-      __security: { bearerAuth: true },
-    }) as APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>>;
+    return this._client.post(
+      '/responses?beta=true',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([
+          { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
+          options?.headers,
+        ]),
+        stream: params.stream ?? false,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>>;
   }
 
   /**
@@ -73,35 +193,178 @@ export class Responses extends APIResource {
    */
   retrieve(
     responseID: string,
-    params?: ResponseRetrieveParamsNonStreaming,
+    params?: ResponseRetrieveParamsNonStreaming &
+      (
+        | {
+            [
+              K in
+                | 'method'
+                | 'path'
+                | 'query'
+                | 'body'
+                | 'headers'
+                | 'maxRetries'
+                | 'timeout'
+                | 'httpAgent'
+                | 'fetchOptions'
+                | 'signal'
+                | 'idempotencyKey'
+                | 'defaultBaseURL'
+                | '__metadata'
+                | '__binaryRequest'
+                | '__binaryResponse'
+                | '__streamClass'
+                | '__security'
+                | '__synthesizeEventData'
+            ]?: never;
+          }
+        | null
+        | undefined
+      ),
     options?: RequestOptions,
   ): APIPromise<BetaResponse>;
   retrieve(
     responseID: string,
-    params: ResponseRetrieveParamsStreaming,
+    params: ResponseRetrieveParamsStreaming &
+      (
+        | {
+            [
+              K in
+                | 'method'
+                | 'path'
+                | 'query'
+                | 'body'
+                | 'headers'
+                | 'maxRetries'
+                | 'timeout'
+                | 'httpAgent'
+                | 'fetchOptions'
+                | 'signal'
+                | 'idempotencyKey'
+                | 'defaultBaseURL'
+                | '__metadata'
+                | '__binaryRequest'
+                | '__binaryResponse'
+                | '__streamClass'
+                | '__security'
+                | '__synthesizeEventData'
+            ]?: never;
+          }
+        | null
+        | undefined
+      ),
     options?: RequestOptions,
   ): APIPromise<Stream<BetaResponseStreamEvent>>;
   retrieve(
     responseID: string,
-    params?: ResponseRetrieveParamsBase | undefined,
+    params?:
+      | (ResponseRetrieveParamsBase &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | undefined,
     options?: RequestOptions,
   ): APIPromise<Stream<BetaResponseStreamEvent> | BetaResponse>;
   retrieve(
     responseID: string,
-    params: ResponseRetrieveParams | undefined = {},
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): APIPromise<BetaResponse>;
+  retrieve(
+    responseID: string,
+    params:
+      | ResponseRetrieveParamsBase
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | undefined = {},
     options?: RequestOptions,
   ): APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      params,
+      ['betas', 'include', 'include_obfuscation', 'starting_after', 'stream'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      params = {};
+    }
+    params = params as ResponseRetrieveParams | undefined;
     const { betas, ...query } = params ?? {};
-    return this._client.get(path`/responses/${responseID}?beta=true`, {
-      query,
-      ...options,
-      headers: buildHeaders([
-        { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
-        options?.headers,
-      ]),
-      stream: params?.stream ?? false,
-      __security: { bearerAuth: true },
-    }) as APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>>;
+    return this._client.get(
+      path`/responses/${responseID}?beta=true`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([
+          { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
+          options?.headers,
+        ]),
+        stream: params?.stream ?? false,
+        __security: { bearerAuth: true },
+      })),
+    ) as APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>>;
   }
 
   /**
@@ -120,20 +383,26 @@ export class Responses extends APIResource {
     options?: RequestOptions,
   ): APIPromise<void> {
     const { betas } = params ?? {};
-    return this._client.delete(path`/responses/${responseID}?beta=true`, {
-      ...options,
-      headers: buildHeaders([
-        { Accept: '*/*', ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
-        options?.headers,
-      ]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/responses/${responseID}?beta=true`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([
+          {
+            Accept: '*/*',
+            ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined),
+          },
+          options?.headers,
+        ]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Cancels a model response with the given ID. Only responses created with the
    * `background` parameter set to `true` can be cancelled.
-   * [Learn more](https://platform.openai.com/docs/guides/background).
+   * [Learn more](https://developers.openai.com/api/docs/guides/background).
    *
    * @example
    * ```ts
@@ -148,43 +417,49 @@ export class Responses extends APIResource {
     options?: RequestOptions,
   ): APIPromise<BetaResponse> {
     const { betas } = params ?? {};
-    return this._client.post(path`/responses/${responseID}/cancel?beta=true`, {
-      ...options,
-      headers: buildHeaders([
-        { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
-        options?.headers,
-      ]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/responses/${responseID}/cancel?beta=true`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([
+          { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
+          options?.headers,
+        ]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
    * Compact a conversation. Returns a compacted response object.
    *
    * Learn when and how to compact long-running conversations in the
-   * [conversation state guide](https://platform.openai.com/docs/guides/conversation-state#managing-the-context-window).
+   * [conversation state guide](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window).
    * For ZDR-compatible compaction details, see
-   * [Compaction (advanced)](https://platform.openai.com/docs/guides/conversation-state#compaction-advanced).
+   * [Compaction (advanced)](https://developers.openai.com/api/docs/guides/conversation-state#compaction-advanced).
    *
    * @example
    * ```ts
    * const betaCompactedResponse =
    *   await client.beta.responses.compact({
-   *     model: 'gpt-5.6-sol',
+   *     model: 'gpt-6-astra',
    *   });
    * ```
    */
   compact(params: ResponseCompactParams, options?: RequestOptions): APIPromise<BetaCompactedResponse> {
     const { betas, ...body } = params;
-    return this._client.post('/responses/compact?beta=true', {
-      body,
-      ...options,
-      headers: buildHeaders([
-        { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
-        options?.headers,
-      ]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      '/responses/compact?beta=true',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([
+          { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
+          options?.headers,
+        ]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 
@@ -478,7 +753,7 @@ export type BetaComputerActionList = Array<BetaComputerAction>;
 
 /**
  * A tool that controls a virtual computer. Learn more about the
- * [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
+ * [computer tool](https://developers.openai.com/api/docs/guides/tools-computer-use).
  */
 export interface BetaComputerTool {
   /**
@@ -489,7 +764,7 @@ export interface BetaComputerTool {
 
 /**
  * A tool that controls a virtual computer. Learn more about the
- * [computer tool](https://platform.openai.com/docs/guides/tools-computer-use).
+ * [computer tool](https://developers.openai.com/api/docs/guides/tools-computer-use).
  */
 export interface BetaComputerUsePreviewTool {
   /**
@@ -595,7 +870,7 @@ export interface BetaContainerReference {
 
 /**
  * A custom tool that processes input using a specified format. Learn more about
- * [custom tools](https://platform.openai.com/docs/guides/function-calling#custom-tools)
+ * [custom tools](https://developers.openai.com/api/docs/guides/function-calling#custom-tools)
  */
 export interface BetaCustomTool {
   /**
@@ -612,6 +887,12 @@ export interface BetaCustomTool {
    * The tool invocation context(s).
    */
   allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+  /**
+   * Whether the tool response can be returned asynchronously versus immediately
+   * returned on next response creation.
+   */
+  async?: boolean;
 
   /**
    * Whether this tool should be deferred and discovered via tool search.
@@ -698,7 +979,7 @@ export interface BetaEasyInputMessage {
 /**
  * A tool that searches for relevant content from uploaded files. Learn more about
  * the
- * [file search tool](https://platform.openai.com/docs/guides/tools-file-search).
+ * [file search tool](https://developers.openai.com/api/docs/guides/tools-file-search).
  */
 export interface BetaFileSearchTool {
   /**
@@ -873,7 +1154,7 @@ export interface BetaFunctionShellTool {
 /**
  * Defines a function in your own code the model can choose to call. Learn more
  * about
- * [function calling](https://platform.openai.com/docs/guides/function-calling).
+ * [function calling](https://developers.openai.com/api/docs/guides/function-calling).
  */
 export interface BetaFunctionTool {
   /**
@@ -900,6 +1181,8 @@ export interface BetaFunctionTool {
    * The tool invocation context(s).
    */
   allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+  async?: boolean;
 
   /**
    * Whether this function is deferred and loaded via tool search.
@@ -1058,6 +1341,12 @@ export namespace BetaNamespaceTool {
     allowed_callers?: Array<'direct' | 'programmatic'> | null;
 
     /**
+     * Whether the tool response can be returned asynchronously versus immediately
+     * returned on next response creation.
+     */
+    async?: boolean;
+
+    /**
      * Whether this function should be deferred and discovered via tool search.
      */
     defer_loading?: boolean;
@@ -1086,6 +1375,8 @@ export interface BetaResponse {
    * Unique identifier for this Response.
    */
   id: string;
+
+  access_programs: BetaResponse.AccessPrograms | null;
 
   /**
    * Unix timestamp (in seconds) of when this Response was created.
@@ -1122,13 +1413,17 @@ export interface BetaResponse {
   metadata: { [key: string]: string } | null;
 
   /**
-   * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-   * wide range of models with different capabilities, performance characteristics,
-   * and price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * Model ID used to generate the response, like `gpt-6-astra`. OpenAI offers a wide
+   * range of models with different capabilities, performance characteristics, and
+   * price points. Refer to the
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model:
+    | 'gpt-6-astra'
+    | 'gpt-6.1-sol'
+    | 'gpt-6-sol'
+    | 'gpt-6-luna'
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
@@ -1179,6 +1474,8 @@ export interface BetaResponse {
     | 'gpt-4o-2024-11-20'
     | 'gpt-4o-2024-08-06'
     | 'gpt-4o-2024-05-13'
+    | 'gpt-audio-mini'
+    | 'gpt-audio-mini-2025-12-15'
     | 'gpt-4o-audio-preview'
     | 'gpt-4o-audio-preview-2024-10-01'
     | 'gpt-4o-audio-preview-2024-12-17'
@@ -1231,6 +1528,7 @@ export interface BetaResponse {
     | 'gpt-daybreak-blue-latest'
     | 'gpt-daybreak-red-latest'
     | 'gpt-5.6-cyber'
+    | 'gpt-rosalind-research'
     | (string & {});
 
   /**
@@ -1286,17 +1584,18 @@ export interface BetaResponse {
    *
    * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
    *   capabilities, like
-   *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-   *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+   *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+   *   or
+   *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
    *   Learn more about
-   *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+   *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
    * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
    *   predefined connectors such as Google Drive and SharePoint. Learn more about
-   *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
+   *   [MCP Tools](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
    * - **Function calls (custom tools)**: Functions that are defined by you, enabling
    *   the model to call your own code with strongly typed arguments and outputs.
    *   Learn more about
-   *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+   *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
    *   You can also use custom tools to call your own code.
    */
   tools: Array<BetaTool>;
@@ -1312,7 +1611,7 @@ export interface BetaResponse {
 
   /**
    * Whether to run the model response in the background.
-   * [Learn more](https://platform.openai.com/docs/guides/background).
+   * [Learn more](https://developers.openai.com/api/docs/guides/background).
    */
   background?: boolean | null;
 
@@ -1331,7 +1630,7 @@ export interface BetaResponse {
   /**
    * An upper bound for the number of tokens that can be generated for a response,
    * including visible output tokens and
-   * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
    */
   max_output_tokens?: number | null;
 
@@ -1352,21 +1651,30 @@ export interface BetaResponse {
   /**
    * The unique ID of the previous response to the model. Use this to create
    * multi-turn conversations. Learn more about
-   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
    * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
 
   /**
    * Reference to a prompt template and its variables.
-   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
    */
   prompt?: BetaResponsePrompt | null;
 
   /**
+   * Prompt cache diagnostics requested for this response.
+   */
+  prompt_cache_diagnostics?:
+    | BetaResponse.CacheMiss
+    | BetaResponse.CacheHit
+    | BetaResponse.ComparisonResponseNotFound
+    | BetaResponse.Unavailable;
+
+  /**
    * Used by OpenAI to cache responses for similar requests to optimize your cache
    * hit rates. Replaces the `user` field.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching).
    */
   prompt_cache_key?: string | null;
 
@@ -1382,7 +1690,7 @@ export interface BetaResponse {
    * The retention policy for the prompt cache. Set to `24h` to enable extended
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching#prompt-cache-retention).
    * This field expresses a maximum retention policy, while
    * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
    * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
@@ -1398,10 +1706,8 @@ export interface BetaResponse {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   reasoning?: BetaResponse.Reasoning | null;
 
@@ -1411,7 +1717,7 @@ export interface BetaResponse {
    * identifies each user, with a maximum length of 64 characters. We recommend
    * hashing their username or email address, in order to avoid sending us any
    * identifying information.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   safety_identifier?: string | null;
 
@@ -1423,13 +1729,15 @@ export interface BetaResponse {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
-   *   then the request will be processed with the Flex Processing service tier.
-   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
-   *   include the `service_tier=fast` or `service_tier=priority` parameter for
-   *   Responses or Chat Completions. The response will show `service_tier=priority`
-   *   regardless of if you specify `service_tier=fast` or `priority` in your
-   *   request.
+   * - If set to
+   *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+   *   the request will be processed with the Flex Processing service tier.
+   * - To opt-in to
+   *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+   *   request level, include the `service_tier=fast` or `service_tier=priority`
+   *   parameter for Responses or Chat Completions. The response will show
+   *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+   *   `priority` in your request.
    * - If set to 'ultrafast', then the request will be processed with the
    *   access-controlled Ultrafast Processing service tier. This tier is currently
    *   available for `gpt-5.6-sol`; a response served through it will show
@@ -1453,8 +1761,8 @@ export interface BetaResponse {
    * Configuration options for a text response from the model. Can be plain text or
    * structured JSON data. Learn more:
    *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+   * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+   * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
    */
   text?: BetaResponseTextConfig;
 
@@ -1488,20 +1796,29 @@ export interface BetaResponse {
    * optimizations. A stable identifier for your end-users. Used to boost cache hit
    * rates by better bucketing similar requests and to help OpenAI detect and prevent
    * abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 }
 
 export namespace BetaResponse {
+  export interface AccessPrograms {
+    /**
+     * The effective Cyber access program used for this response.
+     */
+    cyber: 'standard' | 'daybreak_blue' | 'daybreak_red';
+  }
+
   /**
    * Details about why the response is incomplete.
    */
   export interface IncompleteDetails {
     /**
-     * The reason why the response is incomplete.
+     * The reason why the response is incomplete. `steered` means the response stopped
+     * at a safe output boundary after a WebSocket `response.steer` event. The server
+     * can then create a successor response automatically with the queued input.
      */
-    reason?: 'max_output_tokens' | 'content_filter';
+    reason?: 'max_output_tokens' | 'max_messages' | 'content_filter' | 'steered';
   }
 
   export interface BetaSpecificProgrammaticToolCallingParam {
@@ -1654,6 +1971,47 @@ export namespace BetaResponse {
     }
   }
 
+  export interface CacheMiss {
+    /**
+     * The estimated number of input tokens affected after the first detected
+     * divergence.
+     */
+    cache_missed_tokens: number;
+
+    /**
+     * The reason prompt cache reuse did not occur.
+     */
+    reason:
+      | 'model_changed'
+      | 'prompt_cache_key_changed'
+      | 'tools_changed'
+      | 'text_format_changed'
+      | 'reasoning_effort_changed'
+      | 'verbosity_changed'
+      | 'context_compacted'
+      | 'input_changed'
+      | 'service_tier_changed';
+
+    type: 'cache_miss';
+
+    /**
+     * The raw token count of the reusable prefix in the compared response.
+     */
+    comparison_reusable_tokens?: number;
+  }
+
+  export interface CacheHit {
+    type: 'cache_hit';
+  }
+
+  export interface ComparisonResponseNotFound {
+    type: 'comparison_response_not_found';
+  }
+
+  export interface Unavailable {
+    type: 'unavailable';
+  }
+
   /**
    * The prompt-caching options that were applied to the response. Supported for
    * `gpt-5.6` and later models.
@@ -1668,13 +2026,16 @@ export namespace BetaResponse {
      * The minimum lifetime applied to each cache breakpoint.
      */
     ttl: '30m';
+
+    /**
+     * The response ID supplied as the prompt cache diagnostics comparison.
+     */
+    comparison_response_id?: string | null;
   }
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   export interface Reasoning {
     /**
@@ -1692,7 +2053,7 @@ export namespace BetaResponse {
      * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
      * reasoning effort can result in faster responses and fewer tokens used on
      * reasoning in a response. Not all reasoning models support every value. See the
-     * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+     * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
      * model-specific support.
      */
     effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
@@ -2373,8 +2734,51 @@ export namespace BetaResponseCodeInterpreterToolCall {
 }
 
 /**
+ * Emitted when new summary content is sampled for a compaction trigger. Contains
+ * no summary content.
+ */
+export interface BetaResponseCompactionCompactingEvent {
+  /**
+   * The ID of the compaction output item.
+   */
+  item_id: string;
+
+  /**
+   * The index of the compaction output item.
+   */
+  output_index: number;
+
+  /**
+   * The sequence number of the event that was emitted.
+   */
+  sequence_number: number;
+
+  /**
+   * The type of the event, always `response.compaction.compacting`.
+   */
+  type: 'response.compaction.compacting';
+
+  /**
+   * The agent that owns this multi-agent streaming event.
+   */
+  agent?: BetaResponseCompactionCompactingEvent.Agent;
+}
+
+export namespace BetaResponseCompactionCompactingEvent {
+  /**
+   * The agent that owns this multi-agent streaming event.
+   */
+  export interface Agent {
+    /**
+     * The canonical name of the agent that produced this item.
+     */
+    agent_name: string;
+  }
+}
+
+/**
  * A compaction item generated by the
- * [`v1/responses/compact` API](https://platform.openai.com/docs/api-reference/responses/compact).
+ * [`v1/responses/compact` API](https://developers.openai.com/api/reference/resources/responses/methods/compact).
  */
 export interface BetaResponseCompactionItem {
   /**
@@ -2417,7 +2821,7 @@ export namespace BetaResponseCompactionItem {
 
 /**
  * A compaction item generated by the
- * [`v1/responses/compact` API](https://platform.openai.com/docs/api-reference/responses/compact).
+ * [`v1/responses/compact` API](https://developers.openai.com/api/reference/resources/responses/methods/compact).
  */
 export interface BetaResponseCompactionItemParam {
   /**
@@ -2492,7 +2896,7 @@ export namespace BetaResponseCompletedEvent {
 
 /**
  * A tool call to a computer use tool. See the
- * [computer use guide](https://platform.openai.com/docs/guides/tools-computer-use)
+ * [computer use guide](https://developers.openai.com/api/docs/guides/tools-computer-use)
  * for more information.
  */
 export interface BetaResponseComputerToolCall {
@@ -2573,7 +2977,7 @@ export namespace BetaResponseComputerToolCall {
 
 export interface BetaResponseComputerToolCallOutputItem {
   /**
-   * The unique ID of the computer call tool output.
+   * The ID of the computer tool call output.
    */
   id: string;
 
@@ -2666,6 +3070,105 @@ export interface BetaResponseComputerToolCallOutputScreenshot {
    * The URL of the screenshot image.
    */
   image_url?: string;
+}
+
+/**
+ * A configuration update that applies to subsequent responses until it is replaced
+ * by another configuration update.
+ */
+export interface BetaResponseConfigurationUpdateItem {
+  /**
+   * The unique ID of the configuration update item.
+   */
+  id: string;
+
+  /**
+   * The item type. Always `configuration_update`.
+   */
+  type: 'configuration_update';
+
+  /**
+   * The agent that produced this item.
+   */
+  agent?: BetaResponseConfigurationUpdateItem.Agent;
+
+  /**
+   * The reasoning configuration applied by this update.
+   */
+  reasoning?: BetaResponseConfigurationUpdateItem.Reasoning;
+}
+
+export namespace BetaResponseConfigurationUpdateItem {
+  /**
+   * The agent that produced this item.
+   */
+  export interface Agent {
+    /**
+     * The canonical name of the agent that produced this item.
+     */
+    agent_name: string;
+  }
+
+  /**
+   * The reasoning configuration applied by this update.
+   */
+  export interface Reasoning {
+    /**
+     * The reasoning effort used for subsequent responses until another configuration
+     * update replaces it.
+     */
+    effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
+  }
+}
+
+/**
+ * An update to the conversation's response configuration. The configuration
+ * remains in effect for subsequent responses until it is replaced by another
+ * configuration update.
+ */
+export interface BetaResponseConfigurationUpdateItemParam {
+  /**
+   * The item type. Always `configuration_update`.
+   */
+  type: 'configuration_update';
+
+  /**
+   * The unique ID of the configuration update item.
+   */
+  id?: string | null;
+
+  /**
+   * The agent that produced this item.
+   */
+  agent?: BetaResponseConfigurationUpdateItemParam.Agent | null;
+
+  /**
+   * Updates to reasoning configuration. Only effort is supported.
+   */
+  reasoning?: BetaResponseConfigurationUpdateItemParam.Reasoning;
+}
+
+export namespace BetaResponseConfigurationUpdateItemParam {
+  /**
+   * The agent that produced this item.
+   */
+  export interface Agent {
+    /**
+     * The canonical name of the agent that produced this item.
+     */
+    agent_name: string;
+  }
+
+  /**
+   * Updates to reasoning configuration. Only effort is supported.
+   */
+  export interface Reasoning {
+    /**
+     * The reasoning effort to use for subsequent responses until another configuration
+     * update replaces it.
+     */
+    effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
+  }
 }
 
 /**
@@ -2924,6 +3427,11 @@ export interface BetaResponseCustomToolCall {
   agent?: BetaResponseCustomToolCall.Agent | null;
 
   /**
+   * Whether the custom tool call runs asynchronously.
+   */
+  async?: boolean;
+
+  /**
    * The execution context that produced this tool call.
    */
   caller?: BetaResponseCustomToolCall.Direct | BetaResponseCustomToolCall.Program | null;
@@ -3175,6 +3683,7 @@ export interface BetaResponseError {
     | 'invalid_prompt'
     | 'data_residency_mismatch'
     | 'bio_policy'
+    | 'misalignment_policy_violation'
     | 'vector_store_timeout'
     | 'invalid_image'
     | 'invalid_image_format'
@@ -3195,6 +3704,50 @@ export interface BetaResponseError {
    * A human-readable description of the error.
    */
   message: string;
+
+  misalignment?: BetaResponseError.Misalignment;
+}
+
+export namespace BetaResponseError {
+  export interface Misalignment {
+    /**
+     * The public explanation for this block.
+     */
+    detailed_explanation?: string;
+
+    /**
+     * An optional classification; clients must accept additional values.
+     */
+    error_type?:
+      | (string & {})
+      | 'potentially_unintended_data_transfer'
+      | 'potentially_unintended_data_access'
+      | 'potentially_unintended_destructive_activity'
+      | 'other';
+
+    /**
+     * An opaque target for explicitly continuing this review, or null when
+     * unavailable.
+     */
+    review_target?: string | null;
+
+    /**
+     * An optional public continuation instruction.
+     */
+    steer?: Misalignment.Steer;
+  }
+
+  export namespace Misalignment {
+    /**
+     * An optional public continuation instruction.
+     */
+    export interface Steer {
+      /**
+       * The public continuation instruction.
+       */
+      message: string;
+    }
+  }
 }
 
 /**
@@ -3409,7 +3962,7 @@ export namespace BetaResponseFileSearchCallSearchingEvent {
 
 /**
  * The results of a file search tool call. See the
- * [file search guide](https://platform.openai.com/docs/guides/tools-file-search)
+ * [file search guide](https://developers.openai.com/api/docs/guides/tools-file-search)
  * for more information.
  */
 export interface BetaResponseFileSearchToolCall {
@@ -3493,7 +4046,7 @@ export namespace BetaResponseFileSearchToolCall {
  *
  * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
  * ensures the model will match your supplied JSON schema. Learn more in the
- * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+ * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
  *
  * The default format is `{ "type": "text" }` with no additional options.
  *
@@ -3535,7 +4088,7 @@ export namespace BetaResponseFormatTextConfig {
 /**
  * JSON Schema response format. Used to generate structured JSON responses. Learn
  * more about
- * [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs).
+ * [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
  */
 export interface BetaResponseFormatTextJSONSchemaConfig {
   /**
@@ -3566,7 +4119,7 @@ export interface BetaResponseFormatTextJSONSchemaConfig {
    * true, the model will always follow the exact schema defined in the `schema`
    * field. Only a subset of JSON Schema is supported when `strict` is `true`. To
    * learn more, read the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    */
   strict?: boolean | null;
 }
@@ -3631,11 +4184,6 @@ export interface BetaResponseFunctionCallArgumentsDoneEvent {
    * The ID of the item.
    */
   item_id: string;
-
-  /**
-   * The name of the function that was called.
-   */
-  name: string;
 
   /**
    * The index of the output item.
@@ -3959,7 +4507,7 @@ export namespace BetaResponseFunctionShellToolCallOutput {
 
 /**
  * A tool call to run a function. See the
- * [function calling guide](https://platform.openai.com/docs/guides/function-calling)
+ * [function calling guide](https://developers.openai.com/api/docs/guides/function-calling)
  * for more information.
  */
 export interface BetaResponseFunctionToolCall {
@@ -3992,6 +4540,11 @@ export interface BetaResponseFunctionToolCall {
    * The agent that produced this item.
    */
   agent?: BetaResponseFunctionToolCall.Agent | null;
+
+  /**
+   * Whether the function tool call runs asynchronously.
+   */
+  async?: boolean;
 
   /**
    * The execution context that produced this tool call.
@@ -4037,7 +4590,7 @@ export namespace BetaResponseFunctionToolCall {
 
 /**
  * A tool call to run a function. See the
- * [function calling guide](https://platform.openai.com/docs/guides/function-calling)
+ * [function calling guide](https://developers.openai.com/api/docs/guides/function-calling)
  * for more information.
  */
 export interface BetaResponseFunctionToolCallItem extends BetaResponseFunctionToolCall {
@@ -4148,8 +4701,8 @@ export namespace BetaResponseFunctionToolCallOutputItem {
 
 /**
  * The results of a web search tool call. See the
- * [web search guide](https://platform.openai.com/docs/guides/tools-web-search) for
- * more information.
+ * [web search guide](https://developers.openai.com/api/docs/guides/tools-web-search)
+ * for more information.
  */
 export interface BetaResponseFunctionWebSearch {
   /**
@@ -4169,7 +4722,7 @@ export interface BetaResponseFunctionWebSearch {
   /**
    * The status of the web search tool call.
    */
-  status: 'in_progress' | 'searching' | 'completed' | 'failed';
+  status: 'in_progress' | 'searching' | 'completed' | 'failed' | 'incomplete';
 
   /**
    * The type of the web search tool call. Always `web_search_call`.
@@ -4543,6 +5096,10 @@ export type BetaResponseIncludable =
 
 /**
  * An event that is emitted when a response finishes as incomplete.
+ *
+ * Over WebSocket, steering can finish a response with
+ * `response.incomplete_details.reason` set to `steered`, followed automatically by
+ * a successor `response.created` that commits the queued steering input.
  */
 export interface BetaResponseIncompleteEvent {
   /**
@@ -4841,7 +5398,7 @@ export namespace BetaResponseInputFileContent {
 
 /**
  * An image input to the model. Learn about
- * [image inputs](https://platform.openai.com/docs/guides/vision).
+ * [image inputs](https://developers.openai.com/api/docs/guides/images-vision).
  */
 export interface BetaResponseInputImage {
   /**
@@ -4890,7 +5447,7 @@ export namespace BetaResponseInputImage {
 
 /**
  * An image input to the model. Learn about
- * [image inputs](https://platform.openai.com/docs/guides/vision)
+ * [image inputs](https://developers.openai.com/api/docs/guides/images-vision)
  */
 export interface BetaResponseInputImageContent {
   /**
@@ -4960,6 +5517,7 @@ export type BetaResponseInputItem =
   | BetaResponseInputItem.ToolSearchCall
   | BetaResponseToolSearchOutputItemParam
   | BetaResponseInputItem.AdditionalTools
+  | BetaResponseConfigurationUpdateItemParam
   | BetaResponseReasoningItem
   | BetaResponseCompactionItemParam
   | BetaResponseInputItem.ImageGenerationCall
@@ -5565,9 +6123,40 @@ export namespace BetaResponseInputItem {
     type: 'image_generation_call';
 
     /**
+     * The action used for image generation.
+     */
+    action?: 'generate' | 'edit' | 'auto' | null;
+
+    /**
      * The agent that produced this item.
      */
     agent?: ImageGenerationCall.Agent | null;
+
+    /**
+     * The background setting used for generation.
+     */
+    background?: 'transparent' | 'opaque' | 'auto' | null;
+
+    /**
+     * The output format used for generation.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg' | null;
+
+    /**
+     * The quality of the image generated by the image generation tool call. One of
+     * `low`, `medium`, `high`, `xhigh`, `max`, or `auto`.
+     */
+    quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto' | null;
+
+    /**
+     * The prompt that was used after any model prompt rewriting.
+     */
+    revised_prompt?: string | null;
+
+    /**
+     * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
+     */
+    size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
   }
 
   export namespace ImageGenerationCall {
@@ -6612,6 +7201,7 @@ export type BetaResponseItem =
   | BetaResponseToolSearchCall
   | BetaResponseToolSearchOutputItem
   | BetaResponseItem.AdditionalTools
+  | BetaResponseConfigurationUpdateItem
   | BetaResponseReasoningItem
   | BetaResponseItem.Program
   | BetaResponseItem.ProgramOutput
@@ -7042,9 +7632,40 @@ export namespace BetaResponseItem {
     type: 'image_generation_call';
 
     /**
+     * The action used for image generation.
+     */
+    action?: 'generate' | 'edit' | 'auto' | null;
+
+    /**
      * The agent that produced this item.
      */
     agent?: ImageGenerationCall.Agent | null;
+
+    /**
+     * The background setting used for generation.
+     */
+    background?: 'transparent' | 'opaque' | 'auto' | null;
+
+    /**
+     * The output format used for generation.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg' | null;
+
+    /**
+     * The quality of the image generated by the image generation tool call. One of
+     * `low`, `medium`, `high`, `xhigh`, `max`, or `auto`.
+     */
+    quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto' | null;
+
+    /**
+     * The prompt that was used after any model prompt rewriting.
+     */
+    revised_prompt?: string | null;
+
+    /**
+     * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
+     */
+    size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
   }
 
   export namespace ImageGenerationCall {
@@ -8246,9 +8867,40 @@ export namespace BetaResponseOutputItem {
     type: 'image_generation_call';
 
     /**
+     * The action used for image generation.
+     */
+    action?: 'generate' | 'edit' | 'auto' | null;
+
+    /**
      * The agent that produced this item.
      */
     agent?: ImageGenerationCall.Agent | null;
+
+    /**
+     * The background setting used for generation.
+     */
+    background?: 'transparent' | 'opaque' | 'auto' | null;
+
+    /**
+     * The output format used for generation.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg' | null;
+
+    /**
+     * The quality of the image generated by the image generation tool call. One of
+     * `low`, `medium`, `high`, `xhigh`, `max`, or `auto`.
+     */
+    quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto' | null;
+
+    /**
+     * The prompt that was used after any model prompt rewriting.
+     */
+    revised_prompt?: string | null;
+
+    /**
+     * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
+     */
+    size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
   }
 
   export namespace ImageGenerationCall {
@@ -8825,7 +9477,7 @@ export namespace BetaResponseOutputText {
     filename: string;
 
     /**
-     * The index of the file in the list of files.
+     * The index in the output text at which to insert the file citation.
      */
     index: number;
 
@@ -8952,7 +9604,7 @@ export namespace BetaResponseOutputText {
  */
 export interface BetaResponseOutputTextAnnotationAddedEvent {
   /**
-   * An annotation that applies to a span of output text.
+   * The annotation object being added. (See annotation schema for details.)
    */
   annotation:
     | BetaResponseOutputTextAnnotationAddedEvent.FileCitation
@@ -9013,7 +9665,7 @@ export namespace BetaResponseOutputTextAnnotationAddedEvent {
     filename: string;
 
     /**
-     * The index of the file in the list of files.
+     * The index in the output text at which to insert the file citation.
      */
     index: number;
 
@@ -9121,7 +9773,7 @@ export namespace BetaResponseOutputTextAnnotationAddedEvent {
 
 /**
  * Reference to a prompt template and its variables.
- * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+ * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
  */
 export interface BetaResponsePrompt {
   /**
@@ -9185,7 +9837,7 @@ export namespace BetaResponseQueuedEvent {
  * A description of the chain of thought used by a reasoning model while generating
  * a response. Be sure to include these items in your `input` to the Responses API
  * for subsequent turns of a conversation if you are manually
- * [managing context](https://platform.openai.com/docs/guides/conversation-state).
+ * [managing context](https://developers.openai.com/api/docs/guides/conversation-state).
  */
 export interface BetaResponseReasoningItem {
   /**
@@ -10057,6 +10709,566 @@ export type BetaResponseStatus =
   | 'incomplete';
 
 /**
+ * Emitted when steering input has been validated and queued. Acceptance means the
+ * server owns the input, not that it has been applied. The successor's
+ * `response.created` event is the commit point. If accepted input cannot be
+ * committed, `response.steer.failed` returns it with the same steering ID.
+ *
+ * When the response stops for client-owned tool output or approval, the input
+ * remains queued and `response.steer.pending` is emitted after
+ * `response.completed`. Fill the pending event's `required_input` stubs with saved
+ * results and send one matching explicit `response.create` per parent. Do not
+ * resend accepted input while it is still queued.
+ */
+export interface BetaResponseSteerAcceptedEvent {
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The accepted steering submission.
+   */
+  steer: BetaResponseSteerAcceptedEvent.Steer;
+
+  /**
+   * The event discriminator. Always `response.steer.accepted`.
+   */
+  type: 'response.steer.accepted';
+
+  /**
+   * The WebSocket lane that emitted this event. This field is present when the
+   * target response's `response.create` event supplied a `stream_id`.
+   */
+  stream_id?: string;
+}
+
+export namespace BetaResponseSteerAcceptedEvent {
+  /**
+   * The accepted steering submission.
+   */
+  export interface Steer {
+    /**
+     * The ID assigned to the steering submission.
+     */
+    id: string;
+
+    /**
+     * The ID of the response being steered.
+     */
+    previous_response_id: string;
+  }
+}
+
+/**
+ * A machine-readable steering error code. Clients should handle unknown values
+ * because additional codes may be introduced. Known values include:
+ *
+ * - `response_not_found`: The target response is not available on this connection.
+ * - `invalid_input`: The event or input failed validation.
+ * - `steering_not_supported`: The model or response execution mode does not
+ *   support steering.
+ * - `too_many_pending_steers`: Too much steering input is pending for the
+ *   response.
+ * - `response_already_completed`: The response completed and is no longer
+ *   accepting steering input.
+ * - `response_not_active`: The response is no longer accepting steering input.
+ * - `successor_creation_failed`: The successor response could not be created.
+ */
+export type BetaResponseSteerErrorCode =
+  | 'response_not_found'
+  | 'invalid_input'
+  | 'steering_not_supported'
+  | 'too_many_pending_steers'
+  | 'response_already_completed'
+  | 'response_not_active'
+  | 'successor_creation_failed'
+  | (string & {});
+
+/**
+ * Queues user input to steer a response on this WebSocket connection. Input can
+ * contain text, images, and files. Steering is supported only for single-agent
+ * responses on models and execution modes that support steering. Responses bound
+ * to a conversation or using automatic compaction do not support steering.
+ *
+ * A `response.steer.accepted` event acknowledges that the server owns the queued
+ * input, not that it has been applied. The successor's `response.created` event is
+ * the commit point. Input that cannot be committed is returned in
+ * `response.steer.failed`.
+ *
+ * Steering may cause the active response to finish at a safe output boundary with
+ * `response.incomplete` and `incomplete_details.reason` set to `steered`, followed
+ * automatically by a successor `response.created`. Normal completion can also be
+ * followed by an automatic successor. Automatic successors inherit the previous
+ * response's settings and continue from it with the queued input.
+ *
+ * If the response stops for client-owned tool output or approval, accepted
+ * steering input remains queued and `response.steer.pending` is emitted after
+ * `response.completed`. Fill the `required_input` stubs from that event with saved
+ * tool results or approval decisions, and send one explicit `response.create` per
+ * parent with the same `previous_response_id` and WebSocket lane. Do not rerun
+ * tools or resend accepted steering input. The queued input is prepended in
+ * submission order to that request's input, and the explicit request retains its
+ * own settings.
+ *
+ * This event accepts only `type`, `previous_response_id`, and `input`. Do not send
+ * `stream_id`; the target response determines the WebSocket lane.
+ */
+export interface BetaResponseSteerEvent {
+  /**
+   * Input to queue for a continuation of the response. Uses the same string or
+   * input-item shape as `response.create.input`, with a non-empty array when
+   * supplying input items.
+   *
+   * Steering accepts only messages with the `user` role. Each message may contain
+   * only `type`, `role`, and `content`, with `content` as a string or an array of
+   * `input_text`, `input_image`, and `input_file` parts. The optional `type` must be
+   * `message`. Other roles, tool outputs, and item types are not supported for
+   * steering.
+   */
+  input: BetaResponseSteerInput;
+
+  /**
+   * The ID of the response to steer on this WebSocket connection.
+   */
+  previous_response_id: string;
+
+  /**
+   * The event discriminator. Always `response.steer`.
+   */
+  type: 'response.steer';
+}
+
+/**
+ * Emitted when steering input is rejected or cannot be committed to a successor
+ * response. Returns the original, uncommitted input so the client can carry it
+ * into `response.create` when appropriate. Invalid input must be corrected before
+ * retrying.
+ *
+ * Failures after acceptance include the same steering ID. Failures before an ID is
+ * allocated omit `steer.id`. A lost connection or missing acknowledgement leaves
+ * the outcome unknown; it is not proof that the input was rejected.
+ */
+export interface BetaResponseSteerFailedEvent {
+  /**
+   * Information about why the input could not be committed.
+   */
+  error: BetaResponseSteerFailedEvent.Error;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The steering submission that could not be committed.
+   */
+  steer: BetaResponseSteerFailedEvent.Steer;
+
+  /**
+   * The event discriminator. Always `response.steer.failed`.
+   */
+  type: 'response.steer.failed';
+
+  /**
+   * The WebSocket lane that emitted this event, when the target response is
+   * available and its `response.create` event supplied a `stream_id`.
+   */
+  stream_id?: string;
+}
+
+export namespace BetaResponseSteerFailedEvent {
+  /**
+   * Information about why the input could not be committed.
+   */
+  export interface Error {
+    /**
+     * A machine-readable steering error code. Clients should handle unknown values
+     * because additional codes may be introduced. Known values include:
+     *
+     * - `response_not_found`: The target response is not available on this connection.
+     * - `invalid_input`: The event or input failed validation.
+     * - `steering_not_supported`: The model or response execution mode does not
+     *   support steering.
+     * - `too_many_pending_steers`: Too much steering input is pending for the
+     *   response.
+     * - `response_already_completed`: The response completed and is no longer
+     *   accepting steering input.
+     * - `response_not_active`: The response is no longer accepting steering input.
+     * - `successor_creation_failed`: The successor response could not be created.
+     */
+    code: ResponsesAPI.BetaResponseSteerErrorCode;
+
+    /**
+     * A human-readable description of the error.
+     */
+    message: string;
+
+    /**
+     * The error type. Always `invalid_request_error`.
+     */
+    type: 'invalid_request_error';
+  }
+
+  /**
+   * The steering submission that could not be committed.
+   */
+  export interface Steer {
+    /**
+     * Input to queue for a continuation of the response. Uses the same string or
+     * input-item shape as `response.create.input`, with a non-empty array when
+     * supplying input items.
+     *
+     * Steering accepts only messages with the `user` role. Each message may contain
+     * only `type`, `role`, and `content`, with `content` as a string or an array of
+     * `input_text`, `input_image`, and `input_file` parts. The optional `type` must be
+     * `message`. Other roles, tool outputs, and item types are not supported for
+     * steering.
+     */
+    input: ResponsesAPI.BetaResponseSteerInput;
+
+    /**
+     * The ID of the response that was targeted for steering.
+     */
+    previous_response_id: string;
+
+    /**
+     * The ID assigned to the steering submission, if one was allocated.
+     */
+    id?: string;
+  }
+}
+
+/**
+ * Input to queue for a continuation of the response. Uses the same string or
+ * input-item shape as `response.create.input`, with a non-empty array when
+ * supplying input items.
+ *
+ * Steering accepts only messages with the `user` role. Each message may contain
+ * only `type`, `role`, and `content`, with `content` as a string or an array of
+ * `input_text`, `input_image`, and `input_file` parts. The optional `type` must be
+ * `message`. Other roles, tool outputs, and item types are not supported for
+ * steering.
+ */
+export type BetaResponseSteerInput =
+  | string
+  | Array<ResponseSteerInputItemList.Message | ResponseSteerInputItemList.FunctionCallOutput>;
+
+export namespace ResponseSteerInputItemList {
+  export interface Message {
+    /**
+     * The message content, as an array of content parts.
+     */
+    content: Array<ResponsesAPI.BetaResponseSteerInputContent> | string;
+
+    /**
+     * The message role. Always `user`.
+     */
+    role: 'user';
+
+    /**
+     * The item type. Always `message`.
+     */
+    type: 'message';
+
+    /**
+     * The unique ID of this message item.
+     */
+    id?: string | null;
+
+    /**
+     * The agent that produced this item.
+     */
+    agent?: Message.Agent | null;
+
+    /**
+     * The status of the message item.
+     */
+    status?: string | null;
+  }
+
+  export namespace Message {
+    /**
+     * The agent that produced this item.
+     */
+    export interface Agent {
+      /**
+       * The canonical name of the agent that produced this item.
+       */
+      agent_name: string;
+    }
+  }
+
+  /**
+   * The output of a function tool call.
+   */
+  export interface FunctionCallOutput {
+    /**
+     * Text, image, or file output of the function tool call.
+     */
+    output: string | ResponsesAPI.BetaResponseFunctionCallOutputItemList;
+
+    /**
+     * The type of the function tool call output. Always `function_call_output`.
+     */
+    type: 'function_call_output';
+
+    /**
+     * The unique ID of the function tool call output. Populated when this item is
+     * returned via API.
+     */
+    id?: string | null;
+
+    /**
+     * The agent that produced this item.
+     */
+    agent?: FunctionCallOutput.Agent | null;
+
+    /**
+     * The unique ID of the function tool call generated by the model.
+     */
+    call_id?: string | null;
+
+    /**
+     * The execution context that produced this tool call.
+     */
+    caller?: FunctionCallOutput.Direct | FunctionCallOutput.Program | null;
+
+    /**
+     * The name of the tool that produced the output.
+     */
+    name?: string | null;
+
+    /**
+     * The namespace of the tool that produced the output.
+     */
+    namespace?: string | null;
+
+    /**
+     * The status of the item. One of `in_progress`, `completed`, or `incomplete`.
+     * Populated when items are returned via API.
+     */
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export namespace FunctionCallOutput {
+    /**
+     * The agent that produced this item.
+     */
+    export interface Agent {
+      /**
+       * The canonical name of the agent that produced this item.
+       */
+      agent_name: string;
+    }
+
+    export interface Direct {
+      /**
+       * The caller type. Always `direct`.
+       */
+      type: 'direct';
+    }
+
+    export interface Program {
+      /**
+       * The call ID of the program item that produced this tool call.
+       */
+      caller_id: string;
+
+      /**
+       * The caller type. Always `program`.
+       */
+      type: 'program';
+    }
+  }
+}
+
+/**
+ * A piece of message content, such as text, an image, or a file.
+ */
+export type BetaResponseSteerInputContent =
+  | BetaResponseInputTextContent
+  | BetaResponseInputImageContent
+  | BetaResponseInputFileContent;
+
+/**
+ * Emitted when accepted steering input remains queued after the target response
+ * completes. The server still owns the input. Do not resend it. The successor's
+ * `response.created` event is the commit point.
+ *
+ * When `reason` is `waiting_for_required_input`, this event follows
+ * `response.completed` while the response waits for the tool results or approval
+ * decisions identified by `required_input`. Copy those stubs, fill their result
+ * fields using the ordinary `response.create` input schemas, and submit one
+ * continuation per parent with the same `previous_response_id` and WebSocket lane.
+ * Use saved results without rerunning tools. The queued steering input is
+ * prepended in submission order to the continuation's input. That explicit request
+ * retains its own settings.
+ *
+ * This notification is emitted at most once per steering submission. Multiple
+ * submissions for the same parent can report the same required inputs; they do not
+ * each require a separate continuation.
+ */
+export interface BetaResponseSteerPendingEvent {
+  /**
+   * An extensible enum describing why accepted steering input is still queued.
+   * Clients should handle unknown values because additional reasons may be
+   * introduced. Known values include:
+   *
+   * - `waiting_for_required_input`: The response is waiting for the tool results or
+   *   approval decisions identified by `required_input`.
+   */
+  reason: BetaResponseSteerPendingReason;
+
+  /**
+   * Input stubs identifying outstanding client-owned tool results or approval
+   * decisions. Each stub contains identifying fields only; the client supplies the
+   * result before including it in `response.create`.
+   */
+  required_input: Array<BetaResponseSteerRequiredInput>;
+
+  /**
+   * The sequence number for this event.
+   */
+  sequence_number: number;
+
+  /**
+   * The steering submission that remains queued.
+   */
+  steer: BetaResponseSteerPendingEvent.Steer;
+
+  /**
+   * The event discriminator. Always `response.steer.pending`.
+   */
+  type: 'response.steer.pending';
+
+  /**
+   * The WebSocket lane that emitted this event. This field is present when the
+   * target response's `response.create` event supplied a `stream_id`.
+   */
+  stream_id?: string;
+}
+
+export namespace BetaResponseSteerPendingEvent {
+  /**
+   * The steering submission that remains queued.
+   */
+  export interface Steer {
+    /**
+     * The ID assigned to the steering submission.
+     */
+    id: string;
+
+    /**
+     * The ID of the response being steered.
+     */
+    previous_response_id: string;
+  }
+}
+
+/**
+ * An extensible enum describing why accepted steering input is still queued.
+ * Clients should handle unknown values because additional reasons may be
+ * introduced. Known values include:
+ *
+ * - `waiting_for_required_input`: The response is waiting for the tool results or
+ *   approval decisions identified by `required_input`.
+ */
+export type BetaResponseSteerPendingReason = 'waiting_for_required_input' | (string & {});
+
+/**
+ * An input stub identifying an outstanding client-owned tool result or approval
+ * decision. Copy the stub and fill the result fields using the corresponding
+ * `response.create` input schema. Use saved results without rerunning the tool.
+ * The server does not supply results, approval decisions, or safety
+ * acknowledgements in these stubs.
+ */
+export type BetaResponseSteerRequiredInput =
+  | BetaResponseSteerRequiredInput.FunctionCallOutput
+  | BetaResponseSteerRequiredInput.CustomToolCallOutput
+  | BetaResponseSteerRequiredInput.ComputerCallOutput
+  | BetaResponseSteerRequiredInput.ShellCallOutput
+  | BetaResponseSteerRequiredInput.ApplyPatchCallOutput
+  | BetaResponseSteerRequiredInput.ToolSearchOutput
+  | BetaResponseSteerRequiredInput.McpApprovalResponse;
+
+export namespace BetaResponseSteerRequiredInput {
+  /**
+   * Supply `output` using the function tool call output input schema.
+   */
+  export interface FunctionCallOutput {
+    call_id: string;
+
+    name: string;
+
+    type: 'function_call_output';
+  }
+
+  /**
+   * Supply `output` using the custom tool call output input schema. The original
+   * custom tool call supplies the tool's name.
+   */
+  export interface CustomToolCallOutput {
+    call_id: string;
+
+    type: 'custom_tool_call_output';
+  }
+
+  /**
+   * Supply `output` using the computer tool call output input schema, including any
+   * required `acknowledged_safety_checks`.
+   */
+  export interface ComputerCallOutput {
+    call_id: string;
+
+    type: 'computer_call_output';
+  }
+
+  /**
+   * Supply `output` using the shell tool call output input schema. Each output entry
+   * includes `stdout`, `stderr`, and `outcome`.
+   */
+  export interface ShellCallOutput {
+    call_id: string;
+
+    type: 'shell_call_output';
+  }
+
+  /**
+   * Supply `status` and optional `output` using the apply patch tool call output
+   * input schema.
+   */
+  export interface ApplyPatchCallOutput {
+    call_id: string;
+
+    type: 'apply_patch_call_output';
+  }
+
+  /**
+   * Supply `tools` using the tool search output input schema, retaining
+   * `execution: "client"`.
+   */
+  export interface ToolSearchOutput {
+    call_id: string;
+
+    execution: 'client';
+
+    type: 'tool_search_output';
+  }
+
+  /**
+   * Supply `approve` using the MCP approval response input schema. An optional
+   * `reason` can be supplied when denying the request. The original approval request
+   * identifies the tool and server.
+   */
+  export interface McpApprovalResponse {
+    approval_request_id: string;
+
+    type: 'mcp_approval_response';
+  }
+}
+
+/**
  * Event emitted while a response is streamed.
  */
 export type BetaResponseStreamEvent =
@@ -10069,6 +11281,7 @@ export type BetaResponseStreamEvent =
   | BetaResponseCodeInterpreterCallCompletedEvent
   | BetaResponseCodeInterpreterCallInProgressEvent
   | BetaResponseCodeInterpreterCallInterpretingEvent
+  | BetaResponseCompactionCompactingEvent
   | BetaResponseCompletedEvent
   | BetaResponseContentPartAddedEvent
   | BetaResponseContentPartDoneEvent
@@ -10123,8 +11336,8 @@ export type BetaResponseStreamEvent =
  * Configuration options for a text response from the model. Can be plain text or
  * structured JSON data. Learn more:
  *
- * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
- * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+ * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+ * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
  */
 export interface BetaResponseTextConfig {
   /**
@@ -10132,7 +11345,7 @@ export interface BetaResponseTextConfig {
    *
    * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
    * ensures the model will match your supplied JSON schema. Learn more in the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    *
    * The default format is `{ "type": "text" }` with no additional options.
    *
@@ -10451,7 +11664,24 @@ export interface BetaResponseToolSearchOutputItemParam {
   /**
    * The loaded tool definitions returned by the tool search output.
    */
-  tools: Array<BetaTool>;
+  tools: Array<
+    | BetaFunctionTool
+    | BetaFileSearchTool
+    | BetaComputerTool
+    | BetaComputerUsePreviewTool
+    | BetaWebSearchTool
+    | BetaResponseToolSearchOutputItemParam.Mcp
+    | BetaResponseToolSearchOutputItemParam.CodeInterpreter
+    | BetaResponseToolSearchOutputItemParam.ProgrammaticToolCalling
+    | BetaResponseToolSearchOutputItemParam.ImageGeneration
+    | BetaResponseToolSearchOutputItemParam.LocalShell
+    | BetaFunctionShellTool
+    | BetaCustomTool
+    | BetaToolSearchOutputNamespaceTool
+    | BetaToolSearchTool
+    | BetaWebSearchPreviewTool
+    | BetaApplyPatchTool
+  >;
 
   /**
    * The item type. Always `tool_search_output`.
@@ -10485,6 +11715,371 @@ export interface BetaResponseToolSearchOutputItemParam {
 }
 
 export namespace BetaResponseToolSearchOutputItemParam {
+  /**
+   * Give the model access to additional tools via remote Model Context Protocol
+   * (MCP) servers.
+   * [Learn more about MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
+   */
+  export interface Mcp {
+    /**
+     * A label for this MCP server, used to identify it in tool calls.
+     */
+    server_label: string;
+
+    /**
+     * The type of the MCP tool. Always `mcp`.
+     */
+    type: 'mcp';
+
+    /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+    /**
+     * List of allowed tool names or a filter object.
+     */
+    allowed_tools?: Array<string> | Mcp.McpToolFilter | null;
+
+    /**
+     * An OAuth access token that can be used with a remote MCP server, either with a
+     * custom MCP server URL or a service connector. Your application must handle the
+     * OAuth authorization flow and provide the token here.
+     */
+    authorization?: string;
+
+    /**
+     * @deprecated Identifier for service connectors, like those available in ChatGPT.
+     * One of `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more
+     * about service connectors
+     * [here](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#connectors).
+     *
+     * This field is deprecated for models released after September 1, 2026. Use
+     * `server_url` to connect to a remote MCP server, or `tunnel_id` to connect
+     * through a Secure MCP Tunnel.
+     *
+     * Currently supported `connector_id` values are:
+     *
+     * - Dropbox: `connector_dropbox`
+     * - Gmail: `connector_gmail`
+     * - Google Calendar: `connector_googlecalendar`
+     * - Google Drive: `connector_googledrive`
+     * - Microsoft Teams: `connector_microsoftteams`
+     * - Outlook Calendar: `connector_outlookcalendar`
+     * - Outlook Email: `connector_outlookemail`
+     * - SharePoint: `connector_sharepoint`
+     */
+    connector_id?:
+      | 'connector_dropbox'
+      | 'connector_gmail'
+      | 'connector_googlecalendar'
+      | 'connector_googledrive'
+      | 'connector_microsoftteams'
+      | 'connector_outlookcalendar'
+      | 'connector_outlookemail'
+      | 'connector_sharepoint';
+
+    /**
+     * Whether this MCP tool is deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
+
+    /**
+     * Optional HTTP headers to send to the MCP server. Use for authentication or other
+     * purposes.
+     */
+    headers?: { [key: string]: string } | null;
+
+    /**
+     * Specify which of the MCP server's tools require approval.
+     */
+    require_approval?: Mcp.McpToolApprovalFilter | 'always' | 'never' | null;
+
+    /**
+     * Optional description of the MCP server, used to provide more context.
+     */
+    server_description?: string;
+
+    /**
+     * The URL for the MCP server. One of `server_url`, `connector_id`, or `tunnel_id`
+     * must be provided.
+     */
+    server_url?: string;
+
+    /**
+     * The Secure MCP Tunnel ID to use instead of a direct server URL. One of
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided.
+     */
+    tunnel_id?: string;
+  }
+
+  export namespace Mcp {
+    /**
+     * A filter object to specify which tools are allowed.
+     */
+    export interface McpToolFilter {
+      /**
+       * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+       * is
+       * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+       * it will match this filter.
+       */
+      read_only?: boolean;
+
+      /**
+       * List of allowed tool names.
+       */
+      tool_names?: Array<string>;
+    }
+
+    /**
+     * Specify which of the MCP server's tools require approval. Can be `always`,
+     * `never`, or a filter object associated with tools that require approval.
+     */
+    export interface McpToolApprovalFilter {
+      /**
+       * A filter object to specify which tools are allowed.
+       */
+      always?: McpToolApprovalFilter.Always;
+
+      /**
+       * A filter object to specify which tools are allowed.
+       */
+      never?: McpToolApprovalFilter.Never;
+    }
+
+    export namespace McpToolApprovalFilter {
+      /**
+       * A filter object to specify which tools are allowed.
+       */
+      export interface Always {
+        /**
+         * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+         * is
+         * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+         * it will match this filter.
+         */
+        read_only?: boolean;
+
+        /**
+         * List of allowed tool names.
+         */
+        tool_names?: Array<string>;
+      }
+
+      /**
+       * A filter object to specify which tools are allowed.
+       */
+      export interface Never {
+        /**
+         * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+         * is
+         * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+         * it will match this filter.
+         */
+        read_only?: boolean;
+
+        /**
+         * List of allowed tool names.
+         */
+        tool_names?: Array<string>;
+      }
+    }
+  }
+
+  /**
+   * A tool that runs Python code to help generate a response to a prompt.
+   */
+  export interface CodeInterpreter {
+    /**
+     * The code interpreter container. Can be a container ID or an object that
+     * specifies uploaded file IDs to make available to your code, along with an
+     * optional `memory_limit` setting.
+     */
+    container: string | CodeInterpreter.CodeInterpreterToolAuto;
+
+    /**
+     * The type of the code interpreter tool. Always `code_interpreter`.
+     */
+    type: 'code_interpreter';
+
+    /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
+  }
+
+  export namespace CodeInterpreter {
+    /**
+     * Configuration for a code interpreter container. Optionally specify the IDs of
+     * the files to run the code on.
+     */
+    export interface CodeInterpreterToolAuto {
+      /**
+       * Always `auto`.
+       */
+      type: 'auto';
+
+      /**
+       * An optional list of uploaded files to make available to your code.
+       */
+      file_ids?: Array<string>;
+
+      /**
+       * The memory limit for the code interpreter container.
+       */
+      memory_limit?: '1g' | '4g' | '16g' | '64g' | null;
+
+      /**
+       * Network access policy for the container.
+       */
+      network_policy?:
+        | ResponsesAPI.BetaContainerNetworkPolicyDisabled
+        | ResponsesAPI.BetaContainerNetworkPolicyAllowlist;
+    }
+  }
+
+  export interface ProgrammaticToolCalling {
+    /**
+     * The type of the tool. Always `programmatic_tool_calling`.
+     */
+    type: 'programmatic_tool_calling';
+  }
+
+  /**
+   * A tool that generates images using the GPT image models.
+   */
+  export interface ImageGeneration {
+    /**
+     * The type of the image generation tool. Always `image_generation`.
+     */
+    type: 'image_generation';
+
+    /**
+     * Whether to generate a new image or edit an existing image. Default: `auto`.
+     */
+    action?: 'generate' | 'edit' | 'auto';
+
+    /**
+     * Allows to set transparency for the background of the generated image(s). Must be
+     * one of `transparent`, `opaque`, or `auto` (default value). When `auto` is used,
+     * the model will automatically determine the best background for the image.
+     *
+     * `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare`, including their `2026-09-08`
+     * snapshots, support `opaque` and `transparent` backgrounds. Transparent
+     * backgrounds are available for supported GPT Image models. For `gpt-image-2` and
+     * `gpt-image-2-2026-04-21`, this support is in preview. When using `transparent`,
+     * set the output format to `png` or `webp`.
+     */
+    background?: 'transparent' | 'opaque' | 'auto';
+
+    /**
+     * Control how much effort the model will exert to match the style and features,
+     * especially facial features, of input images. Supports `high` and `low` on
+     * `gpt-image-1` and `gpt-image-1.5`; `gpt-image-1-mini` supports only `low`. For
+     * `gpt-image-2`, omit this parameter. Defaults to `low` on supported models.
+     */
+    input_fidelity?: 'high' | 'low' | null;
+
+    /**
+     * Optional mask for inpainting. Contains `image_url` (string, optional) and
+     * `file_id` (string, optional).
+     */
+    input_image_mask?: ImageGeneration.InputImageMask;
+
+    /**
+     * The image generation model to use. One of `gpt-image-1`, `gpt-image-1-mini`,
+     * `gpt-image-1.5`, `gpt-image-2`, `gpt-image-2-2026-04-21`,
+     * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
+     * `gpt-image-2.5-flare`, `gpt-image-2.5-flare-2026-09-08`, or
+     * `chatgpt-image-latest`. Default: `gpt-image-1`.
+     */
+    model?:
+      | (string & {})
+      | 'gpt-image-1'
+      | 'gpt-image-1-mini'
+      | 'gpt-image-2'
+      | 'gpt-image-2-2026-04-21'
+      | 'gpt-image-2.5-sunburst'
+      | 'gpt-image-2.5-sunburst-2026-09-08'
+      | 'gpt-image-2.5-flare'
+      | 'gpt-image-2.5-flare-2026-09-08'
+      | 'gpt-image-1.5'
+      | 'chatgpt-image-latest';
+
+    /**
+     * Moderation level for the generated image. Default: `auto`.
+     */
+    moderation?: 'auto' | 'low';
+
+    /**
+     * Compression level for the output image. Default: 100.
+     */
+    output_compression?: number;
+
+    /**
+     * The output format of the generated image. One of `png`, `webp`, or `jpeg`.
+     * Default: `png`.
+     */
+    output_format?: 'png' | 'webp' | 'jpeg';
+
+    /**
+     * Number of partial images to generate in streaming mode, from 0 (default value)
+     * to 3.
+     */
+    partial_images?: number;
+
+    /**
+     * The quality of the generated image. The GPT image models support `low`,
+     * `medium`, and `high`. `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare`,
+     * including their `2026-09-08` snapshots, also support `xhigh` and `max`. Default:
+     * `auto`.
+     */
+    quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto';
+
+    /**
+     * The size of the generated images. For `gpt-image-2`, `gpt-image-2-2026-04-21`,
+     * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
+     * `gpt-image-2.5-flare`, and `gpt-image-2.5-flare-2026-09-08`, arbitrary
+     * resolutions are supported as `WIDTHxHEIGHT` strings, for example `1536x864`.
+     * Width and height must both be divisible by 16 and the requested aspect ratio
+     * must be between 1:3 and 3:1. Resolutions above `2560x1440` are experimental, and
+     * the maximum supported resolution is `3840x2160`. The requested size must also
+     * satisfy the model's current pixel and edge limits. The standard sizes
+     * `1024x1024`, `1536x1024`, and `1024x1536` are supported by the GPT image models;
+     * `auto` is supported for models that allow automatic sizing.
+     */
+    size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+  }
+
+  export namespace ImageGeneration {
+    /**
+     * Optional mask for inpainting. Contains `image_url` (string, optional) and
+     * `file_id` (string, optional).
+     */
+    export interface InputImageMask {
+      /**
+       * File ID for the mask image.
+       */
+      file_id?: string;
+
+      /**
+       * Base64-encoded mask image.
+       */
+      image_url?: string;
+    }
+  }
+
+  /**
+   * A tool that allows the model to execute shell commands in a local environment.
+   */
+  export interface LocalShell {
+    /**
+     * The type of the local shell tool. Always `local_shell`.
+     */
+    type: 'local_shell';
+  }
+
   /**
    * The agent that produced this item.
    */
@@ -10539,7 +12134,7 @@ export namespace BetaResponseUsage {
 
     /**
      * The number of tokens that were retrieved from the cache.
-     * [More on prompt caching](https://platform.openai.com/docs/guides/prompt-caching).
+     * [More on prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching).
      */
     cached_tokens: number;
   }
@@ -10684,7 +12279,10 @@ export namespace BetaResponseWebSearchCallSearchingEvent {
 /**
  * Client events accepted by the Responses WebSocket server.
  */
-export type BetaResponsesClientEvent = BetaResponsesClientEvent.ResponseCreate | BetaResponseInjectEvent;
+export type BetaResponsesClientEvent =
+  | BetaResponsesClientEvent.ResponseCreate
+  | BetaResponseSteerEvent
+  | BetaResponseInjectEvent;
 
 export namespace BetaResponsesClientEvent {
   /**
@@ -10705,8 +12303,13 @@ export namespace BetaResponsesClientEvent {
     type: 'response.create';
 
     /**
+     * Domain-specific access programs to use for this request.
+     */
+    access_programs?: ResponseCreate.AccessPrograms;
+
+    /**
      * Whether to run the model response in the background.
-     * [Learn more](https://platform.openai.com/docs/guides/background).
+     * [Learn more](https://developers.openai.com/api/docs/guides/background).
      */
     background?: boolean | null;
 
@@ -10750,11 +12353,11 @@ export namespace BetaResponsesClientEvent {
      *
      * Learn more:
      *
-     * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-     * - [Image inputs](https://platform.openai.com/docs/guides/images)
-     * - [File inputs](https://platform.openai.com/docs/guides/pdf-files)
-     * - [Conversation state](https://platform.openai.com/docs/guides/conversation-state)
-     * - [Function calling](https://platform.openai.com/docs/guides/function-calling)
+     * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+     * - [Image inputs](https://developers.openai.com/api/docs/guides/images-vision)
+     * - [File inputs](https://developers.openai.com/api/docs/guides/file-inputs)
+     * - [Conversation state](https://developers.openai.com/api/docs/guides/conversation-state)
+     * - [Function calling](https://developers.openai.com/api/docs/guides/function-calling)
      */
     input?: string | ResponsesAPI.BetaResponseInput;
 
@@ -10770,7 +12373,7 @@ export namespace BetaResponsesClientEvent {
     /**
      * An upper bound for the number of tokens that can be generated for a response,
      * including visible output tokens and
-     * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
+     * [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
      */
     max_output_tokens?: number | null;
 
@@ -10793,13 +12396,17 @@ export namespace BetaResponsesClientEvent {
     metadata?: { [key: string]: string } | null;
 
     /**
-     * Model ID used to generate the response, like `gpt-4o` or `o3`. OpenAI offers a
-     * wide range of models with different capabilities, performance characteristics,
-     * and price points. Refer to the
-     * [model guide](https://platform.openai.com/docs/models) to browse and compare
-     * available models.
+     * Model ID used to generate the response, like `gpt-6-astra`. OpenAI offers a wide
+     * range of models with different capabilities, performance characteristics, and
+     * price points. Refer to the
+     * [model guide](https://developers.openai.com/api/docs/models) to browse and
+     * compare available models.
      */
     model?:
+      | 'gpt-6-astra'
+      | 'gpt-6.1-sol'
+      | 'gpt-6-sol'
+      | 'gpt-6-luna'
       | 'gpt-5.6-sol'
       | 'gpt-5.6-terra'
       | 'gpt-5.6-luna'
@@ -10850,6 +12457,8 @@ export namespace BetaResponsesClientEvent {
       | 'gpt-4o-2024-11-20'
       | 'gpt-4o-2024-08-06'
       | 'gpt-4o-2024-05-13'
+      | 'gpt-audio-mini'
+      | 'gpt-audio-mini-2025-12-15'
       | 'gpt-4o-audio-preview'
       | 'gpt-4o-audio-preview-2024-10-01'
       | 'gpt-4o-audio-preview-2024-12-17'
@@ -10902,6 +12511,7 @@ export namespace BetaResponsesClientEvent {
       | 'gpt-daybreak-blue-latest'
       | 'gpt-daybreak-red-latest'
       | 'gpt-5.6-cyber'
+      | 'gpt-rosalind-research'
       | (string & {});
 
     /**
@@ -10922,21 +12532,21 @@ export namespace BetaResponsesClientEvent {
     /**
      * The unique ID of the previous response to the model. Use this to create
      * multi-turn conversations. Learn more about
-     * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+     * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
      * Cannot be used in conjunction with `conversation`.
      */
     previous_response_id?: string | null;
 
     /**
      * Reference to a prompt template and its variables.
-     * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+     * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
      */
     prompt?: ResponsesAPI.BetaResponsePrompt | null;
 
     /**
      * Used by OpenAI to cache responses for similar requests to optimize your cache
      * hit rates. Replaces the `user` field.
-     * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+     * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching).
      */
     prompt_cache_key?: string | null;
 
@@ -10948,7 +12558,7 @@ export namespace BetaResponsesClientEvent {
      * up to the latest 80 breakpoints in the conversation, without a content-block
      * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
      * `ttl` defaults to `30m`, which is currently the only supported value. See the
-     * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+     * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
      * for current details.
      */
     prompt_cache_options?: ResponseCreate.PromptCacheOptions;
@@ -10959,7 +12569,7 @@ export namespace BetaResponsesClientEvent {
      * The retention policy for the prompt cache. Set to `24h` to enable extended
      * prompt caching, which keeps cached prefixes active for longer, up to a maximum
      * of 24 hours.
-     * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+     * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching#prompt-cache-retention).
      * This field expresses a maximum retention policy, while
      * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
      * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
@@ -10975,10 +12585,8 @@ export namespace BetaResponsesClientEvent {
     prompt_cache_retention?: 'in_memory' | '24h' | null;
 
     /**
-     * **gpt-5 and o-series models only**
-     *
      * Configuration options for
-     * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+     * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
      */
     reasoning?: ResponseCreate.Reasoning | null;
 
@@ -10988,7 +12596,7 @@ export namespace BetaResponsesClientEvent {
      * identifies each user, with a maximum length of 64 characters. We recommend
      * hashing their username or email address, in order to avoid sending us any
      * identifying information.
-     * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+     * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
      */
     safety_identifier?: string | null;
 
@@ -11000,13 +12608,15 @@ export namespace BetaResponsesClientEvent {
      *   will use 'default'.
      * - If set to 'default', then the request will be processed with the standard
      *   pricing and performance for the selected model.
-     * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
-     *   then the request will be processed with the Flex Processing service tier.
-     * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
-     *   include the `service_tier=fast` or `service_tier=priority` parameter for
-     *   Responses or Chat Completions. The response will show `service_tier=priority`
-     *   regardless of if you specify `service_tier=fast` or `priority` in your
-     *   request.
+     * - If set to
+     *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+     *   the request will be processed with the Flex Processing service tier.
+     * - To opt-in to
+     *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+     *   request level, include the `service_tier=fast` or `service_tier=priority`
+     *   parameter for Responses or Chat Completions. The response will show
+     *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+     *   `priority` in your request.
      * - If set to 'ultrafast', then the request will be processed with the
      *   access-controlled Ultrafast Processing service tier. This tier is currently
      *   available for `gpt-5.6-sol`; a response served through it will show
@@ -11022,6 +12632,9 @@ export namespace BetaResponsesClientEvent {
 
     /**
      * Whether to store the generated model response for later retrieval via API.
+     * Defaults to true when omitted. If set to true, response data will be stored for
+     * at least 30 days, subject to the
+     * [data retention exceptions](https://developers.openai.com/api/docs/guides/your-data#v1responses).
      */
     store?: boolean | null;
 
@@ -11030,7 +12643,7 @@ export namespace BetaResponsesClientEvent {
      * generated using
      * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
      * See the
-     * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+     * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
      * for more information.
      */
     stream?: boolean | null;
@@ -11061,8 +12674,8 @@ export namespace BetaResponsesClientEvent {
      * Configuration options for a text response from the model. Can be plain text or
      * structured JSON data. Learn more:
      *
-     * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-     * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+     * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+     * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
      */
     text?: ResponsesAPI.BetaResponseTextConfig;
 
@@ -11090,17 +12703,18 @@ export namespace BetaResponsesClientEvent {
      *
      * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
      *   capabilities, like
-     *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-     *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+     *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+     *   or
+     *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
      *   Learn more about
-     *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+     *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
      * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
      *   predefined connectors such as Google Drive and SharePoint. Learn more about
-     *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
+     *   [MCP Tools](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
      * - **Function calls (custom tools)**: Functions that are defined by you, enabling
      *   the model to call your own code with strongly typed arguments and outputs.
      *   Learn more about
-     *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+     *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
      *   You can also use custom tools to call your own code.
      */
     tools?: Array<ResponsesAPI.BetaTool>;
@@ -11138,12 +12752,31 @@ export namespace BetaResponsesClientEvent {
      * optimizations. A stable identifier for your end-users. Used to boost cache hit
      * rates by better bucketing similar requests and to help OpenAI detect and prevent
      * abuse.
-     * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+     * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
      */
     user?: string;
   }
 
   export namespace ResponseCreate {
+    /**
+     * Domain-specific access programs to use for this request.
+     */
+    export interface AccessPrograms {
+      /**
+       * The Cyber access program to use for this request. Supported values are
+       * `standard`, `daybreak_blue`, and `daybreak_red`. If omitted, the API resolves
+       * the program from the model's Cyber tier and your organization and project
+       * access, subject to model-specific eligibility restrictions. By default, models
+       * without a Cyber tier use Standard. Blue-tier models use Daybreak Blue when
+       * authorized; otherwise they fall back to Standard unless the model requires
+       * Daybreak access. Red-tier models use Daybreak Red and require authorization.
+       * Requests that require unavailable Daybreak access return 403. An implicit
+       * Standard fallback is represented by null in the response's access_programs
+       * field, rather than an explicit Standard selection.
+       */
+      cyber?: 'standard' | 'daybreak_blue' | 'daybreak_red';
+    }
+
     export interface ContextManagement {
       /**
        * The context management entry type. Currently only 'compaction' is supported.
@@ -11233,10 +12866,16 @@ export namespace BetaResponsesClientEvent {
      * up to the latest 80 breakpoints in the conversation, without a content-block
      * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
      * `ttl` defaults to `30m`, which is currently the only supported value. See the
-     * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+     * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
      * for current details.
      */
     export interface PromptCacheOptions {
+      /**
+       * The ID of a response to compare when diagnosing prompt cache reuse. Supplying
+       * this field requests prompt cache diagnostics when the feature is enabled.
+       */
+      comparison_response_id?: string | null;
+
       /**
        * Controls whether OpenAI automatically creates an implicit cache breakpoint.
        * Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint
@@ -11248,6 +12887,12 @@ export namespace BetaResponsesClientEvent {
       mode?: 'implicit' | 'explicit';
 
       /**
+       * Prepares the prompt cache without generating output. Defaults to `false`. When
+       * set to `true`, overrides the `generate` field to `false`.
+       */
+      prewarm?: boolean;
+
+      /**
        * The minimum lifetime applied to every implicit and explicit cache breakpoint
        * written by the request. Defaults to `30m`, which is currently the only supported
        * value. The backend may retain cache entries for longer.
@@ -11256,10 +12901,8 @@ export namespace BetaResponsesClientEvent {
     }
 
     /**
-     * **gpt-5 and o-series models only**
-     *
      * Configuration options for
-     * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+     * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
      */
     export interface Reasoning {
       /**
@@ -11277,7 +12920,7 @@ export namespace BetaResponsesClientEvent {
        * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
        * reasoning effort can result in faster responses and fewer tokens used on
        * reasoning in a response. Not all reasoning models support every value. See the
-       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
        * model-specific support.
        */
       effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
@@ -11346,6 +12989,7 @@ export type BetaResponsesServerEvent =
   | BetaResponsesServerEvent.BetaResponseCodeInterpreterCallWsCompleted
   | BetaResponsesServerEvent.BetaResponseCodeInterpreterCallInWsProgress
   | BetaResponsesServerEvent.BetaResponseCodeInterpreterCallWsInterpreting
+  | BetaResponsesServerEvent.BetaResponseCompactionWsCompacting
   | BetaResponsesServerEvent.BetaResponseWsCompleted
   | BetaResponsesServerEvent.BetaResponseContentPartWsAdded
   | BetaResponsesServerEvent.BetaResponseContentPartWsDone
@@ -11396,6 +13040,9 @@ export type BetaResponsesServerEvent =
   | BetaResponsesServerEvent.BetaResponseCustomToolCallInputWsDone
   | BetaResponsesServerEvent.BetaResponseWsStreamingError
   | BetaResponsesServerEvent.BetaResponseWsError
+  | BetaResponseSteerAcceptedEvent
+  | BetaResponseSteerPendingEvent
+  | BetaResponseSteerFailedEvent
   | BetaResponseInjectCreatedEvent
   | BetaResponseInjectFailedEvent;
 
@@ -11492,6 +13139,18 @@ export namespace BetaResponsesServerEvent {
    * Emitted when the code interpreter is actively interpreting the code snippet.
    */
   export interface BetaResponseCodeInterpreterCallWsInterpreting extends BetaResponseCodeInterpreterCallInterpretingEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
+
+  /**
+   * Emitted when new summary content is sampled for a compaction trigger. Contains
+   * no summary content.
+   */
+  export interface BetaResponseCompactionWsCompacting extends BetaResponseCompactionCompactingEvent {
     /**
      * The WebSocket lane that emitted this event. This field is present when the
      * originating `response.create` event supplied a `stream_id`.
@@ -11677,6 +13336,10 @@ export namespace BetaResponsesServerEvent {
 
   /**
    * An event that is emitted when a response finishes as incomplete.
+   *
+   * Over WebSocket, steering can finish a response with
+   * `response.incomplete_details.reason` set to `steered`, followed automatically by
+   * a successor `response.created` that commits the queued steering input.
    */
   export interface BetaResponseWsIncomplete extends BetaResponseIncompleteEvent {
     /**
@@ -12107,6 +13770,50 @@ export namespace BetaResponsesServerEvent {
        * The response headers that were emitted with the error, if any.
        */
       headers?: { [key: string]: string };
+
+      misalignment?: Error.Misalignment;
+    }
+
+    export namespace Error {
+      export interface Misalignment {
+        /**
+         * The public explanation for this block.
+         */
+        detailed_explanation?: string;
+
+        /**
+         * An optional classification; clients must accept additional values.
+         */
+        error_type?:
+          | (string & {})
+          | 'potentially_unintended_data_transfer'
+          | 'potentially_unintended_data_access'
+          | 'potentially_unintended_destructive_activity'
+          | 'other';
+
+        /**
+         * An opaque target for explicitly continuing this review, or null when
+         * unavailable.
+         */
+        review_target?: string | null;
+
+        /**
+         * An optional public continuation instruction.
+         */
+        steer?: Misalignment.Steer;
+      }
+
+      export namespace Misalignment {
+        /**
+         * An optional public continuation instruction.
+         */
+        export interface Steer {
+          /**
+           * The public continuation instruction.
+           */
+          message: string;
+        }
+      }
     }
 
     /**
@@ -12129,13 +13836,15 @@ export namespace BetaResponsesServerEvent {
  *   will use 'default'.
  * - If set to 'default', then the request will be processed with the standard
  *   pricing and performance for the selected model.
- * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
- *   then the request will be processed with the Flex Processing service tier.
- * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
- *   include the `service_tier=fast` or `service_tier=priority` parameter for
- *   Responses or Chat Completions. The response will show `service_tier=priority`
- *   regardless of if you specify `service_tier=fast` or `priority` in your
- *   request.
+ * - If set to
+ *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+ *   the request will be processed with the Flex Processing service tier.
+ * - To opt-in to
+ *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+ *   request level, include the `service_tier=fast` or `service_tier=priority`
+ *   parameter for Responses or Chat Completions. The response will show
+ *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+ *   `priority` in your request.
  * - If set to 'ultrafast', then the request will be processed with the
  *   access-controlled Ultrafast Processing service tier. This tier is currently
  *   available for `gpt-5.6-sol`; a response served through it will show
@@ -12199,7 +13908,7 @@ export namespace BetaTool {
   /**
    * Give the model access to additional tools via remote Model Context Protocol
    * (MCP) servers.
-   * [Learn more about MCP](https://platform.openai.com/docs/guides/tools-remote-mcp).
+   * [Learn more about MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
    */
   export interface Mcp {
     /**
@@ -12230,10 +13939,14 @@ export namespace BetaTool {
     authorization?: string;
 
     /**
-     * Identifier for service connectors, like those available in ChatGPT. One of
-     * `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
-     * service connectors
-     * [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
+     * @deprecated Identifier for service connectors, like those available in ChatGPT.
+     * One of `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more
+     * about service connectors
+     * [here](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#connectors).
+     *
+     * This field is deprecated for models released after September 1, 2026. Use
+     * `server_url` to connect to a remote MCP server, or `tunnel_id` to connect
+     * through a Secure MCP Tunnel.
      *
      * Currently supported `connector_id` values are:
      *
@@ -12442,17 +14155,19 @@ export namespace BetaTool {
      * one of `transparent`, `opaque`, or `auto` (default value). When `auto` is used,
      * the model will automatically determine the best background for the image.
      *
-     * Transparent backgrounds are available for supported GPT Image models. For
-     * `gpt-image-2` and `gpt-image-2-2026-04-21`, this support is in preview. When
-     * using `transparent`, set the output format to `png` or `webp`.
+     * `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare`, including their `2026-09-08`
+     * snapshots, support `opaque` and `transparent` backgrounds. Transparent
+     * backgrounds are available for supported GPT Image models. For `gpt-image-2` and
+     * `gpt-image-2-2026-04-21`, this support is in preview. When using `transparent`,
+     * set the output format to `png` or `webp`.
      */
     background?: 'transparent' | 'opaque' | 'auto';
 
     /**
      * Control how much effort the model will exert to match the style and features,
-     * especially facial features, of input images. This parameter is only supported
-     * for `gpt-image-1` and `gpt-image-1.5` and later models, unsupported for
-     * `gpt-image-1-mini`. Supports `high` and `low`. Defaults to `low`.
+     * especially facial features, of input images. Supports `high` and `low` on
+     * `gpt-image-1` and `gpt-image-1.5`; `gpt-image-1-mini` supports only `low`. For
+     * `gpt-image-2`, omit this parameter. Defaults to `low` on supported models.
      */
     input_fidelity?: 'high' | 'low' | null;
 
@@ -12464,7 +14179,9 @@ export namespace BetaTool {
 
     /**
      * The image generation model to use. One of `gpt-image-1`, `gpt-image-1-mini`,
-     * `gpt-image-1.5`, `gpt-image-2`, `gpt-image-2-2026-04-21`, or
+     * `gpt-image-1.5`, `gpt-image-2`, `gpt-image-2-2026-04-21`,
+     * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
+     * `gpt-image-2.5-flare`, `gpt-image-2.5-flare-2026-09-08`, or
      * `chatgpt-image-latest`. Default: `gpt-image-1`.
      */
     model?:
@@ -12473,6 +14190,10 @@ export namespace BetaTool {
       | 'gpt-image-1-mini'
       | 'gpt-image-2'
       | 'gpt-image-2-2026-04-21'
+      | 'gpt-image-2.5-sunburst'
+      | 'gpt-image-2.5-sunburst-2026-09-08'
+      | 'gpt-image-2.5-flare'
+      | 'gpt-image-2.5-flare-2026-09-08'
       | 'gpt-image-1.5'
       | 'chatgpt-image-latest';
 
@@ -12499,23 +14220,24 @@ export namespace BetaTool {
     partial_images?: number;
 
     /**
-     * The quality of the generated image. One of `low`, `medium`, `high`, or `auto`.
-     * Default: `auto`.
+     * The quality of the generated image. The GPT image models support `low`,
+     * `medium`, and `high`. `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare`,
+     * including their `2026-09-08` snapshots, also support `xhigh` and `max`. Default:
+     * `auto`.
      */
-    quality?: 'low' | 'medium' | 'high' | 'auto';
+    quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto';
 
     /**
-     * The size of the generated images. For `gpt-image-2` and
-     * `gpt-image-2-2026-04-21`, arbitrary resolutions are supported as `WIDTHxHEIGHT`
-     * strings, for example `1536x864`. Width and height must both be divisible by 16
-     * and the requested aspect ratio must be between 1:3 and 3:1. Resolutions above
-     * `2560x1440` are experimental, and the maximum supported resolution is
-     * `3840x2160`. The requested size must also satisfy the model's current pixel and
-     * edge limits. The standard sizes `1024x1024`, `1536x1024`, and `1024x1536` are
-     * supported by the GPT image models; `auto` is supported for models that allow
-     * automatic sizing. For `dall-e-2`, use one of `256x256`, `512x512`, or
-     * `1024x1024`. For `dall-e-3`, use one of `1024x1024`, `1792x1024`, or
-     * `1024x1792`.
+     * The size of the generated images. For `gpt-image-2`, `gpt-image-2-2026-04-21`,
+     * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
+     * `gpt-image-2.5-flare`, and `gpt-image-2.5-flare-2026-09-08`, arbitrary
+     * resolutions are supported as `WIDTHxHEIGHT` strings, for example `1536x864`.
+     * Width and height must both be divisible by 16 and the requested aspect ratio
+     * must be between 1:3 and 3:1. Resolutions above `2560x1440` are experimental, and
+     * the maximum supported resolution is `3840x2160`. The requested size must also
+     * satisfy the model's current pixel and edge limits. The standard sizes
+     * `1024x1024`, `1536x1024`, and `1024x1536` are supported by the GPT image models;
+     * `auto` is supported for models that allow automatic sizing.
      */
     size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
   }
@@ -12669,12 +14391,12 @@ export interface BetaToolChoiceShell {
 
 /**
  * Indicates that the model should use a built-in tool to generate a response.
- * [Learn more about built-in tools](https://platform.openai.com/docs/guides/tools).
+ * [Learn more about built-in tools](https://developers.openai.com/api/docs/guides/tools).
  */
 export interface BetaToolChoiceTypes {
   /**
    * The type of hosted tool the model should to use. Learn more about
-   * [built-in tools](https://platform.openai.com/docs/guides/tools).
+   * [built-in tools](https://developers.openai.com/api/docs/guides/tools).
    *
    * Allowed values are:
    *
@@ -12695,6 +14417,75 @@ export interface BetaToolChoiceTypes {
     | 'web_search_preview_2025_03_11'
     | 'image_generation'
     | 'code_interpreter';
+}
+
+/**
+ * Groups function/custom tools under a shared namespace.
+ */
+export interface BetaToolSearchOutputNamespaceTool {
+  /**
+   * A description of the namespace shown to the model.
+   */
+  description: string;
+
+  /**
+   * The namespace name used in tool calls (for example, `crm`).
+   */
+  name: string;
+
+  /**
+   * The function/custom tools loaded inside this namespace.
+   */
+  tools: Array<BetaToolSearchOutputNamespaceTool.Function | BetaCustomTool>;
+
+  /**
+   * The type of the tool. Always `namespace`.
+   */
+  type: 'namespace';
+}
+
+export namespace BetaToolSearchOutputNamespaceTool {
+  export interface Function {
+    /**
+     * The name of the loaded function tool.
+     */
+    name: string;
+
+    type: 'function';
+
+    /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+    /**
+     * Whether the tool response can be returned asynchronously versus immediately
+     * returned on next response creation.
+     */
+    async?: boolean;
+
+    /**
+     * Whether this function should be deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
+
+    description?: string | null;
+
+    /**
+     * A JSON Schema describing the JSON value encoded in string outputs for this
+     * function tool. This does not describe content-array outputs.
+     */
+    output_schema?: { [key: string]: unknown } | null;
+
+    parameters?: unknown | null;
+
+    /**
+     * Whether to enforce strict parameter validation. If omitted, Responses attempts
+     * to use strict validation when the schema is compatible, and falls back to
+     * non-strict validation otherwise.
+     */
+    strict?: boolean | null;
+  }
 }
 
 /**
@@ -12725,7 +14516,7 @@ export interface BetaToolSearchTool {
 /**
  * This tool searches the web for relevant results to use in a response. Learn more
  * about the
- * [web search tool](https://platform.openai.com/docs/guides/tools-web-search).
+ * [web search tool](https://developers.openai.com/api/docs/guides/tools-web-search).
  */
 export interface BetaWebSearchPreviewTool {
   /**
@@ -12743,14 +14534,18 @@ export interface BetaWebSearchPreviewTool {
   search_context_size?: 'low' | 'medium' | 'high';
 
   /**
-   * The user's location.
+   * The approximate location of the user. If omitted or null, defaults to the United
+   * States. To avoid this fallback, pass `{"type": "approximate"}` without location
+   * fields. To localize results, provide the relevant location fields.
    */
   user_location?: BetaWebSearchPreviewTool.UserLocation | null;
 }
 
 export namespace BetaWebSearchPreviewTool {
   /**
-   * The user's location.
+   * The approximate location of the user. If omitted or null, defaults to the United
+   * States. To avoid this fallback, pass `{"type": "approximate"}` without location
+   * fields. To localize results, provide the relevant location fields.
    */
   export interface UserLocation {
     /**
@@ -12784,7 +14579,7 @@ export namespace BetaWebSearchPreviewTool {
 
 /**
  * Search the Internet for sources related to the prompt. Learn more about the
- * [web search tool](https://platform.openai.com/docs/guides/tools-web-search).
+ * [web search tool](https://developers.openai.com/api/docs/guides/tools-web-search).
  */
 export interface BetaWebSearchTool {
   /**
@@ -12811,7 +14606,9 @@ export interface BetaWebSearchTool {
   search_context_size?: 'low' | 'medium' | 'high';
 
   /**
-   * The approximate location of the user.
+   * The approximate location of the user. If omitted or null, defaults to the United
+   * States. To avoid this fallback, pass `{"type": "approximate"}` without location
+   * fields. To localize results, provide the relevant location fields.
    */
   user_location?: BetaWebSearchTool.UserLocation | null;
 }
@@ -12831,7 +14628,9 @@ export namespace BetaWebSearchTool {
   }
 
   /**
-   * The approximate location of the user.
+   * The approximate location of the user. If omitted or null, defaults to the United
+   * States. To avoid this fallback, pass `{"type": "approximate"}` without location
+   * fields. To localize results, provide the relevant location fields.
    */
   export interface UserLocation {
     /**
@@ -12867,8 +14666,13 @@ export type ResponseCreateParams = ResponseCreateParamsNonStreaming | ResponseCr
 
 export interface ResponseCreateParamsBase {
   /**
+   * Body param: Domain-specific access programs to use for this request.
+   */
+  access_programs?: ResponseCreateParams.AccessPrograms;
+
+  /**
    * Body param: Whether to run the model response in the background.
-   * [Learn more](https://platform.openai.com/docs/guides/background).
+   * [Learn more](https://developers.openai.com/api/docs/guides/background).
    */
   background?: boolean | null;
 
@@ -12913,11 +14717,11 @@ export interface ResponseCreateParamsBase {
    *
    * Learn more:
    *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Image inputs](https://platform.openai.com/docs/guides/images)
-   * - [File inputs](https://platform.openai.com/docs/guides/pdf-files)
-   * - [Conversation state](https://platform.openai.com/docs/guides/conversation-state)
-   * - [Function calling](https://platform.openai.com/docs/guides/function-calling)
+   * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+   * - [Image inputs](https://developers.openai.com/api/docs/guides/images-vision)
+   * - [File inputs](https://developers.openai.com/api/docs/guides/file-inputs)
+   * - [Conversation state](https://developers.openai.com/api/docs/guides/conversation-state)
+   * - [Function calling](https://developers.openai.com/api/docs/guides/function-calling)
    */
   input?: string | BetaResponseInput;
 
@@ -12933,7 +14737,7 @@ export interface ResponseCreateParamsBase {
   /**
    * Body param: An upper bound for the number of tokens that can be generated for a
    * response, including visible output tokens and
-   * [reasoning tokens](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
    */
   max_output_tokens?: number | null;
 
@@ -12956,13 +14760,17 @@ export interface ResponseCreateParamsBase {
   metadata?: { [key: string]: string } | null;
 
   /**
-   * Body param: Model ID used to generate the response, like `gpt-4o` or `o3`.
-   * OpenAI offers a wide range of models with different capabilities, performance
+   * Body param: Model ID used to generate the response, like `gpt-6-astra`. OpenAI
+   * offers a wide range of models with different capabilities, performance
    * characteristics, and price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model?:
+    | 'gpt-6-astra'
+    | 'gpt-6.1-sol'
+    | 'gpt-6-sol'
+    | 'gpt-6-luna'
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
@@ -13013,6 +14821,8 @@ export interface ResponseCreateParamsBase {
     | 'gpt-4o-2024-11-20'
     | 'gpt-4o-2024-08-06'
     | 'gpt-4o-2024-05-13'
+    | 'gpt-audio-mini'
+    | 'gpt-audio-mini-2025-12-15'
     | 'gpt-4o-audio-preview'
     | 'gpt-4o-audio-preview-2024-10-01'
     | 'gpt-4o-audio-preview-2024-12-17'
@@ -13065,6 +14875,7 @@ export interface ResponseCreateParamsBase {
     | 'gpt-daybreak-blue-latest'
     | 'gpt-daybreak-red-latest'
     | 'gpt-5.6-cyber'
+    | 'gpt-rosalind-research'
     | (string & {});
 
   /**
@@ -13086,21 +14897,21 @@ export interface ResponseCreateParamsBase {
   /**
    * Body param: The unique ID of the previous response to the model. Use this to
    * create multi-turn conversations. Learn more about
-   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
    * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
 
   /**
    * Body param: Reference to a prompt template and its variables.
-   * [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
+   * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
    */
   prompt?: BetaResponsePrompt | null;
 
   /**
    * Body param: Used by OpenAI to cache responses for similar requests to optimize
    * your cache hit rates. Replaces the `user` field.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching).
    */
   prompt_cache_key?: string | null;
 
@@ -13113,7 +14924,7 @@ export interface ResponseCreateParamsBase {
    * conversation, without a content-block lookback limit. Set `mode` to `explicit`
    * to disable the implicit breakpoint. The `ttl` defaults to `30m`, which is
    * currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   prompt_cache_options?: ResponseCreateParams.PromptCacheOptions;
@@ -13124,7 +14935,7 @@ export interface ResponseCreateParamsBase {
    * The retention policy for the prompt cache. Set to `24h` to enable extended
    * prompt caching, which keeps cached prefixes active for longer, up to a maximum
    * of 24 hours.
-   * [Learn more](https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention).
+   * [Learn more](https://developers.openai.com/api/docs/guides/prompt-caching#prompt-cache-retention).
    * This field expresses a maximum retention policy, while
    * `prompt_cache_options.ttl` expresses a minimum cache lifetime. The two fields
    * are independent and do not interact. For `gpt-5.5`, `gpt-5.5-pro`, and future
@@ -13140,10 +14951,8 @@ export interface ResponseCreateParamsBase {
   prompt_cache_retention?: 'in_memory' | '24h' | null;
 
   /**
-   * Body param: **gpt-5 and o-series models only**
-   *
-   * Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   * Body param: Configuration options for
+   * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   reasoning?: ResponseCreateParams.Reasoning | null;
 
@@ -13153,7 +14962,7 @@ export interface ResponseCreateParamsBase {
    * uniquely identifies each user, with a maximum length of 64 characters. We
    * recommend hashing their username or email address, in order to avoid sending us
    * any identifying information.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   safety_identifier?: string | null;
 
@@ -13165,13 +14974,15 @@ export interface ResponseCreateParamsBase {
    *   will use 'default'.
    * - If set to 'default', then the request will be processed with the standard
    *   pricing and performance for the selected model.
-   * - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)',
-   *   then the request will be processed with the Flex Processing service tier.
-   * - To opt-in to [Fast mode](/api/docs/guides/fast-mode) at the request level,
-   *   include the `service_tier=fast` or `service_tier=priority` parameter for
-   *   Responses or Chat Completions. The response will show `service_tier=priority`
-   *   regardless of if you specify `service_tier=fast` or `priority` in your
-   *   request.
+   * - If set to
+   *   '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+   *   the request will be processed with the Flex Processing service tier.
+   * - To opt-in to
+   *   [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+   *   request level, include the `service_tier=fast` or `service_tier=priority`
+   *   parameter for Responses or Chat Completions. The response will show
+   *   `service_tier=priority` regardless of if you specify `service_tier=fast` or
+   *   `priority` in your request.
    * - If set to 'ultrafast', then the request will be processed with the
    *   access-controlled Ultrafast Processing service tier. This tier is currently
    *   available for `gpt-5.6-sol`; a response served through it will show
@@ -13187,7 +14998,9 @@ export interface ResponseCreateParamsBase {
 
   /**
    * Body param: Whether to store the generated model response for later retrieval
-   * via API.
+   * via API. Defaults to true when omitted. If set to true, response data will be
+   * stored for at least 30 days, subject to the
+   * [data retention exceptions](https://developers.openai.com/api/docs/guides/your-data#v1responses).
    */
   store?: boolean | null;
 
@@ -13196,7 +15009,7 @@ export interface ResponseCreateParamsBase {
    * client as it is generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream?: boolean | null;
@@ -13219,8 +15032,8 @@ export interface ResponseCreateParamsBase {
    * Body param: Configuration options for a text response from the model. Can be
    * plain text or structured JSON data. Learn more:
    *
-   * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-   * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+   * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+   * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
    */
   text?: BetaResponseTextConfig;
 
@@ -13248,17 +15061,18 @@ export interface ResponseCreateParamsBase {
    *
    * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
    *   capabilities, like
-   *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-   *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+   *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+   *   or
+   *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
    *   Learn more about
-   *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+   *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
    * - **MCP Tools**: Integrations with third-party systems via custom MCP servers or
    *   predefined connectors such as Google Drive and SharePoint. Learn more about
-   *   [MCP Tools](https://platform.openai.com/docs/guides/tools-connectors-mcp).
+   *   [MCP Tools](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
    * - **Function calls (custom tools)**: Functions that are defined by you, enabling
    *   the model to call your own code with strongly typed arguments and outputs.
    *   Learn more about
-   *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+   *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
    *   You can also use custom tools to call your own code.
    */
   tools?: Array<BetaTool>;
@@ -13298,7 +15112,7 @@ export interface ResponseCreateParamsBase {
    * optimizations. A stable identifier for your end-users. Used to boost cache hit
    * rates by better bucketing similar requests and to help OpenAI detect and prevent
    * abuse.
-   * [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#safety-identifiers).
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
 
@@ -13309,6 +15123,25 @@ export interface ResponseCreateParamsBase {
 }
 
 export namespace ResponseCreateParams {
+  /**
+   * Domain-specific access programs to use for this request.
+   */
+  export interface AccessPrograms {
+    /**
+     * The Cyber access program to use for this request. Supported values are
+     * `standard`, `daybreak_blue`, and `daybreak_red`. If omitted, the API resolves
+     * the program from the model's Cyber tier and your organization and project
+     * access, subject to model-specific eligibility restrictions. By default, models
+     * without a Cyber tier use Standard. Blue-tier models use Daybreak Blue when
+     * authorized; otherwise they fall back to Standard unless the model requires
+     * Daybreak access. Red-tier models use Daybreak Red and require authorization.
+     * Requests that require unavailable Daybreak access return 403. An implicit
+     * Standard fallback is represented by null in the response's access_programs
+     * field, rather than an explicit Standard selection.
+     */
+    cyber?: 'standard' | 'daybreak_blue' | 'daybreak_red';
+  }
+
   export interface ContextManagement {
     /**
      * The context management entry type. Currently only 'compaction' is supported.
@@ -13398,10 +15231,16 @@ export namespace ResponseCreateParams {
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
    * `ttl` defaults to `30m`, which is currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   export interface PromptCacheOptions {
+    /**
+     * The ID of a response to compare when diagnosing prompt cache reuse. Supplying
+     * this field requests prompt cache diagnostics when the feature is enabled.
+     */
+    comparison_response_id?: string | null;
+
     /**
      * Controls whether OpenAI automatically creates an implicit cache breakpoint.
      * Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint
@@ -13413,6 +15252,12 @@ export namespace ResponseCreateParams {
     mode?: 'implicit' | 'explicit';
 
     /**
+     * Prepares the prompt cache without generating output. Defaults to `false`. When
+     * set to `true`, overrides the `generate` field to `false`.
+     */
+    prewarm?: boolean;
+
+    /**
      * The minimum lifetime applied to every implicit and explicit cache breakpoint
      * written by the request. Defaults to `30m`, which is currently the only supported
      * value. The backend may retain cache entries for longer.
@@ -13421,10 +15266,8 @@ export namespace ResponseCreateParams {
   }
 
   /**
-   * **gpt-5 and o-series models only**
-   *
    * Configuration options for
-   * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+   * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
    */
   export interface Reasoning {
     /**
@@ -13442,7 +15285,7 @@ export namespace ResponseCreateParams {
      * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
      * reasoning effort can result in faster responses and fewer tokens used on
      * reasoning in a response. Not all reasoning models support every value. See the
-     * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+     * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
      * model-specific support.
      */
     effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
@@ -13506,7 +15349,7 @@ export interface ResponseCreateParamsNonStreaming extends ResponseCreateParamsBa
    * client as it is generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream?: false | null;
@@ -13518,7 +15361,7 @@ export interface ResponseCreateParamsStreaming extends ResponseCreateParamsBase 
    * client as it is generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream: true;
@@ -13554,7 +15397,7 @@ export interface ResponseRetrieveParamsBase {
    * client as it is generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream?: boolean;
@@ -13576,7 +15419,7 @@ export interface ResponseRetrieveParamsNonStreaming extends ResponseRetrievePara
    * client as it is generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream?: false;
@@ -13588,7 +15431,7 @@ export interface ResponseRetrieveParamsStreaming extends ResponseRetrieveParamsB
    * client as it is generated using
    * [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format).
    * See the
-   * [Streaming section below](https://platform.openai.com/docs/api-reference/responses-streaming)
+   * [Streaming section below](https://developers.openai.com/api/reference/resources/responses/streaming-events)
    * for more information.
    */
   stream: true;
@@ -13610,13 +15453,17 @@ export interface ResponseCancelParams {
 
 export interface ResponseCompactParams {
   /**
-   * Body param: Model ID used to generate the response, like `gpt-5` or `o3`. OpenAI
+   * Body param: Model ID used to generate the response, like `gpt-6-astra`. OpenAI
    * offers a wide range of models with different capabilities, performance
    * characteristics, and price points. Refer to the
-   * [model guide](https://platform.openai.com/docs/models) to browse and compare
-   * available models.
+   * [model guide](https://developers.openai.com/api/docs/models) to browse and
+   * compare available models.
    */
   model:
+    | 'gpt-6-astra'
+    | 'gpt-6.1-sol'
+    | 'gpt-6-sol'
+    | 'gpt-6-luna'
     | 'gpt-5.6-sol'
     | 'gpt-5.6-terra'
     | 'gpt-5.6-luna'
@@ -13667,6 +15514,8 @@ export interface ResponseCompactParams {
     | 'gpt-4o-2024-11-20'
     | 'gpt-4o-2024-08-06'
     | 'gpt-4o-2024-05-13'
+    | 'gpt-audio-mini'
+    | 'gpt-audio-mini-2025-12-15'
     | 'gpt-4o-audio-preview'
     | 'gpt-4o-audio-preview-2024-10-01'
     | 'gpt-4o-audio-preview-2024-12-17'
@@ -13719,6 +15568,7 @@ export interface ResponseCompactParams {
     | 'gpt-daybreak-blue-latest'
     | 'gpt-daybreak-red-latest'
     | 'gpt-5.6-cyber'
+    | 'gpt-rosalind-research'
     | (string & {})
     | null;
 
@@ -13739,7 +15589,7 @@ export interface ResponseCompactParams {
   /**
    * Body param: The unique ID of the previous response to the model. Use this to
    * create multi-turn conversations. Learn more about
-   * [conversation state](https://platform.openai.com/docs/guides/conversation-state).
+   * [conversation state](https://developers.openai.com/api/docs/guides/conversation-state).
    * Cannot be used in conjunction with `conversation`.
    */
   previous_response_id?: string | null;
@@ -13758,7 +15608,7 @@ export interface ResponseCompactParams {
    * conversation, without a content-block lookback limit. Set `mode` to `explicit`
    * to disable the implicit breakpoint. The `ttl` defaults to `30m`, which is
    * currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   prompt_cache_options?: ResponseCompactParams.PromptCacheOptions | null;
@@ -13775,16 +15625,17 @@ export interface ResponseCompactParams {
    * in the Project settings. Unless otherwise configured, the Project will use
    * 'default'. - If set to 'default', then the request will be processed with the
    * standard pricing and performance for the selected model. - If set to
-   * '[flex](https://platform.openai.com/docs/guides/flex-processing)', then the
-   * request will be processed with the Flex Processing service tier. - To opt-in to
-   * [Fast mode](/api/docs/guides/fast-mode) at the request level, include the
-   * `service_tier=fast` or `service_tier=priority` parameter for Responses or Chat
-   * Completions. The response will show `service_tier=priority` regardless of if you
-   * specify `service_tier=fast` or `priority` in your request. - When not set, the
-   * default behavior is 'auto'. When the `service_tier` parameter is set, the
-   * response body will include the `service_tier` value based on the processing mode
-   * actually used to serve the request. This response value may be different from
-   * the value set in the parameter.
+   * '[flex](https://developers.openai.com/api/docs/guides/flex-processing)', then
+   * the request will be processed with the Flex Processing service tier. - To opt-in
+   * to [Fast mode](https://developers.openai.com/api/docs/guides/fast-mode) at the
+   * request level, include the `service_tier=fast` or `service_tier=priority`
+   * parameter for Responses or Chat Completions. For models with a dedicated Fast
+   * tier, either value resolves to `service_tier=fast`; for other models, either
+   * value resolves to `service_tier=priority`. - When not set, the default behavior
+   * is 'auto'. When the `service_tier` parameter is set, the response body will
+   * include the `service_tier` value based on the processing mode actually used to
+   * serve the request. This response value may be different from the value set in
+   * the parameter.
    */
   service_tier?: 'auto' | 'default' | 'fast' | 'flex' | 'priority' | null;
 
@@ -13803,7 +15654,7 @@ export namespace ResponseCompactParams {
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
    * `ttl` defaults to `30m`, which is currently the only supported value. See the
-   * [prompt caching guide](https://platform.openai.com/docs/guides/prompt-caching)
+   * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
   export interface PromptCacheOptions {
@@ -13867,12 +15718,15 @@ export declare namespace Responses {
     type BetaResponseCodeInterpreterCallInProgressEvent as BetaResponseCodeInterpreterCallInProgressEvent,
     type BetaResponseCodeInterpreterCallInterpretingEvent as BetaResponseCodeInterpreterCallInterpretingEvent,
     type BetaResponseCodeInterpreterToolCall as BetaResponseCodeInterpreterToolCall,
+    type BetaResponseCompactionCompactingEvent as BetaResponseCompactionCompactingEvent,
     type BetaResponseCompactionItem as BetaResponseCompactionItem,
     type BetaResponseCompactionItemParam as BetaResponseCompactionItemParam,
     type BetaResponseCompletedEvent as BetaResponseCompletedEvent,
     type BetaResponseComputerToolCall as BetaResponseComputerToolCall,
     type BetaResponseComputerToolCallOutputItem as BetaResponseComputerToolCallOutputItem,
     type BetaResponseComputerToolCallOutputScreenshot as BetaResponseComputerToolCallOutputScreenshot,
+    type BetaResponseConfigurationUpdateItem as BetaResponseConfigurationUpdateItem,
+    type BetaResponseConfigurationUpdateItemParam as BetaResponseConfigurationUpdateItemParam,
     type BetaResponseContainerReference as BetaResponseContainerReference,
     type BetaResponseContent as BetaResponseContent,
     type BetaResponseContentPartAddedEvent as BetaResponseContentPartAddedEvent,
@@ -13962,6 +15816,15 @@ export declare namespace Responses {
     type BetaResponseShellCallOutputContentDeltaEvent as BetaResponseShellCallOutputContentDeltaEvent,
     type BetaResponseShellCallOutputContentDoneEvent as BetaResponseShellCallOutputContentDoneEvent,
     type BetaResponseStatus as BetaResponseStatus,
+    type BetaResponseSteerAcceptedEvent as BetaResponseSteerAcceptedEvent,
+    type BetaResponseSteerErrorCode as BetaResponseSteerErrorCode,
+    type BetaResponseSteerEvent as BetaResponseSteerEvent,
+    type BetaResponseSteerFailedEvent as BetaResponseSteerFailedEvent,
+    type BetaResponseSteerInput as BetaResponseSteerInput,
+    type BetaResponseSteerInputContent as BetaResponseSteerInputContent,
+    type BetaResponseSteerPendingEvent as BetaResponseSteerPendingEvent,
+    type BetaResponseSteerPendingReason as BetaResponseSteerPendingReason,
+    type BetaResponseSteerRequiredInput as BetaResponseSteerRequiredInput,
     type BetaResponseStreamEvent as BetaResponseStreamEvent,
     type BetaResponseTextConfig as BetaResponseTextConfig,
     type BetaResponseTextDeltaEvent as BetaResponseTextDeltaEvent,
@@ -13986,6 +15849,7 @@ export declare namespace Responses {
     type BetaToolChoiceOptions as BetaToolChoiceOptions,
     type BetaToolChoiceShell as BetaToolChoiceShell,
     type BetaToolChoiceTypes as BetaToolChoiceTypes,
+    type BetaToolSearchOutputNamespaceTool as BetaToolSearchOutputNamespaceTool,
     type BetaToolSearchTool as BetaToolSearchTool,
     type BetaWebSearchPreviewTool as BetaWebSearchPreviewTool,
     type BetaWebSearchTool as BetaWebSearchTool,

@@ -5,6 +5,7 @@ import type { NullableHeaders } from 'openai/internal/headers';
 import type { RequestOptions } from 'openai/internal/request-options';
 import { sleep } from 'openai/internal/utils/sleep';
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Compatibility tests observe exact sleep arguments, including negative intervals, before native timer normalization.
 vi.mock('openai/internal/utils/sleep', () => ({
   sleep: vi.fn(async () => {}),
 }));
@@ -21,7 +22,8 @@ afterEach(() => {
 
 describe('assistant run polling compatibility', () => {
   test.each([
-    { label: 'zero explicit interval', interval: 0, header: '17', expected: 17 },
+    { label: 'zero explicit interval', interval: 0, header: '17', expected: 0 },
+    { label: 'zero interval without a server interval', interval: 0, header: '', expected: 0 },
     { label: 'negative explicit interval', interval: -2, header: '17', expected: -2 },
     { label: 'NaN explicit interval', interval: Number.NaN, header: '0x10', expected: 16 },
     { label: 'numeric header prefix', interval: undefined, header: '12ms', expected: 12 },
@@ -71,7 +73,9 @@ describe('assistant run polling compatibility', () => {
       expect(call[1]).toBe(params);
       expect(call[2]?.headers).toMatchObject({ 'X-Test': 'kept' });
     }
+    // SAFETY: Two successful retrieve calls and their headers are asserted above; the SDK merge supplies the internal values/nulls containers whose sharing is tested.
     const firstHeaders = retrieve.mock.calls[0]?.[2]?.headers as NullableHeaders;
+    // SAFETY: Two successful retrieve calls and their headers are asserted above; the SDK merge supplies the internal values/nulls containers whose sharing is tested.
     const secondHeaders = retrieve.mock.calls[1]?.[2]?.headers as NullableHeaders;
     expect(firstHeaders).not.toBe(secondHeaders);
     expect(firstHeaders.values).toBe(secondHeaders.values);

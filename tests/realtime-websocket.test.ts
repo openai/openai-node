@@ -6,6 +6,7 @@ import { OpenAIRealtimeWebSocket as StableBrowserRealtime } from 'openai/realtim
 import { OpenAIRealtimeWS as StableNodeRealtime } from 'openai/realtime/ws';
 import { OpenAIRealtimeWebSocket as BetaBrowserRealtime } from 'openai/beta/realtime/websocket';
 import { OpenAIRealtimeWS as BetaNodeRealtime } from 'openai/beta/realtime/ws';
+import { VERSION } from 'openai/version';
 import * as WS from 'ws';
 
 type Listener = (event: any) => void;
@@ -19,6 +20,7 @@ type FakeNodeSocket = {
   dispatch: (event: string, value: unknown) => void;
 };
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Capture public adapter handshakes and dispatch deterministic transport events without network I/O.
 vi.mock('ws', () => ({
   WebSocket: vi.fn().mockImplementation(function WebSocket(url: URL, options: FakeNodeSocket['options']) {
     const listeners = new Map<string, Listener>();
@@ -61,7 +63,7 @@ class FakeBrowserSocket {
 }
 
 const originalWebSocket = globalThis.WebSocket;
-const nodeSocketConstructor = WS.WebSocket as unknown as Mock;
+const nodeSocketConstructor = vi.mocked(WS.WebSocket);
 const azureCredentialCases = [
   {
     authentication: 'an Azure API key',
@@ -82,16 +84,25 @@ function lastBrowserSocket(): FakeBrowserSocket {
 }
 
 function lastNodeSocket(): FakeNodeSocket {
+  // SAFETY: The mocked ws constructor returns FakeNodeSocket; the preceding constructor call records that exact instance.
   return nodeSocketConstructor.mock.results[nodeSocketConstructor.mock.results.length - 1]!
     .value as FakeNodeSocket;
 }
 
-function onRealtimeEvent(realtime: unknown, event: string, listener: Listener): void {
-  (realtime as { on: (event: string, listener: Listener) => unknown }).on(event, listener);
+function onRealtimeEvent(
+  realtime: StableBrowserRealtime | StableNodeRealtime | BetaBrowserRealtime | BetaNodeRealtime,
+  event: string,
+  listener: Listener,
+): void {
+  // SAFETY: Each listed realtime wrapper implements on; this helper registers only the shared event listener contract and discards the return value.
+  (realtime as { on: (event: string, listener: Listener) => void }).on(event, listener);
 }
 
-function createClient(apiKey: string | (() => Promise<string>) = 'test-key'): OpenAI {
-  return new OpenAI({ apiKey, baseURL: 'https://example.com/v1/' });
+function createClient(
+  apiKey: string | (() => Promise<string>) = 'test-key',
+  baseURL = 'https://example.com/v1/',
+): OpenAI {
+  return new OpenAI({ apiKey, baseURL });
 }
 
 function createAzureClient(
@@ -138,6 +149,28 @@ describe.each([
   { name: 'stable', Realtime: StableBrowserRealtime, beta: false },
   { name: 'beta', Realtime: BetaBrowserRealtime, beta: true },
 ])('$name browser realtime websocket', ({ Realtime, beta }) => {
+  test('preserves base URL routing queries when opening a model session', () => {
+    const client = createClient('test-key', 'https://example.com/v1?route=tenant#configuration');
+
+    const realtime = new Realtime({ model: 'gpt-realtime' }, client);
+
+    expect(lastBrowserSocket().url).toBe('wss://example.com/v1/realtime?route=tenant&model=gpt-realtime');
+    expect(realtime.url.toString()).toBe(lastBrowserSocket().url);
+    expect(lastBrowserSocket().protocols).toContain('openai-insecure-api-key.test-key');
+  });
+
+  test('preserves base URL routing queries when resolving sideband credentials', async () => {
+    const client = createClient(
+      async () => 'rotating-key',
+      'https://example.com/v1/?route=tenant&call_id=previous#configuration',
+    );
+
+    await Realtime.create(client, { callID: 'rtc_123' });
+
+    expect(lastBrowserSocket().url).toBe('wss://example.com/v1/realtime?route=tenant&call_id=rtc_123');
+    expect(lastBrowserSocket().protocols).toContain('openai-insecure-api-key.rotating-key');
+  });
+
   test('opens model and sideband sessions with the expected authentication protocols', () => {
     const client = createClient();
     const model = new Realtime({ model: 'gpt-realtime' }, client);
@@ -148,6 +181,7 @@ describe.each([
       'openai-insecure-api-key.test-key',
       ...(beta ? ['openai-beta.realtime-v1'] : []),
     ]);
+    expect(lastBrowserSocket().headers).not.toHaveProperty('User-Agent');
 
     const sideband = new Realtime({ callID: 'call-123' }, client);
     expect(sideband.url.searchParams.get('call_id')).toBe('call-123');
@@ -221,6 +255,29 @@ describe.each([
     expect(errors).toHaveBeenCalledTimes(3);
   });
 
+  test('reports native socket failures with their message and cause', () => {
+    const realtime = new Realtime({ model: 'gpt-realtime' }, createClient());
+    const socket = lastBrowserSocket();
+    const errors = vi.fn();
+    const described = new Error('Received network error or non-101 status code.');
+    // oxlint-disable-next-line unicorn/error-message -- Node's native WebSocket reports connection failures this way.
+    const undescribed = new TypeError('');
+
+    onRealtimeEvent(realtime, 'error', errors);
+
+    socket.dispatch('error', { type: 'error', message: described.message, error: described });
+    socket.dispatch('error', { type: 'error', message: '', error: described });
+    socket.dispatch('error', { type: 'error', message: '', error: undescribed });
+    socket.dispatch('error', { type: 'error' });
+
+    expect(errors.mock.calls.map(([error]) => [error.message, error.cause])).toEqual([
+      [described.message, described],
+      [described.message, described],
+      ['unknown error', undescribed],
+      ['unknown error', null],
+    ]);
+  });
+
   test.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
     'dispatches Object.prototype event type %s without crashing',
     (eventType) => {
@@ -238,6 +295,7 @@ describe.each([
     const realtime = new Realtime({ model: 'gpt-realtime' }, createClient());
     const socket = lastBrowserSocket();
 
+    // SAFETY: This minimal outbound event fixture tests socket serialization; its omitted session fields are not interpreted by the wrapper.
     realtime.send({ type: 'session.update' } as any);
     expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: 'session.update' }));
 
@@ -260,6 +318,7 @@ describe.each([
       throw new Error('close failed');
     });
 
+    // SAFETY: This minimal outbound event fixture tests socket serialization; its omitted session fields are not interpreted by the wrapper.
     realtime.send({ type: 'session.update' } as any);
     realtime.close();
     expect(errors).toHaveBeenCalledTimes(2);
@@ -455,6 +514,7 @@ describe('stable browser realtime transcription', () => {
     { intent: 'unsupported' },
   ])('rejects conflicting Azure transcription targets before opening a socket %#', async (options) => {
     await expect(
+      // SAFETY: These table rows deliberately violate Azure connection option constraints to exercise runtime rejection.
       StableBrowserRealtime.azure(createAzureClient({ deployment: 'configured' }), options as any),
     ).rejects.toThrow(
       'Pass exactly one of `deploymentName`, `callID`, or transcription `intent` when opening an Azure Realtime WebSocket.',
@@ -467,6 +527,32 @@ describe.each([
   { name: 'stable', Realtime: StableNodeRealtime, beta: false },
   { name: 'beta', Realtime: BetaNodeRealtime, beta: true },
 ])('$name Node realtime websocket', ({ Realtime, beta }) => {
+  test('preserves base URL routing queries when opening a model session', () => {
+    const client = createClient('test-key', 'https://example.com/v1?route=tenant#configuration');
+
+    const realtime = new Realtime({ model: 'gpt-realtime' }, client);
+
+    expect(lastNodeSocket().url.toString()).toBe(
+      'wss://example.com/v1/realtime?route=tenant&model=gpt-realtime',
+    );
+    expect(realtime.url.toString()).toBe(lastNodeSocket().url.toString());
+    expect(lastNodeSocket().options.headers).toMatchObject({ Authorization: 'Bearer test-key' });
+  });
+
+  test('preserves base URL routing queries when resolving sideband credentials', async () => {
+    const client = createClient(
+      async () => 'rotating-key',
+      'https://example.com/v1/?route=tenant&call_id=previous#configuration',
+    );
+
+    await Realtime.create(client, { callID: 'rtc_123' });
+
+    expect(lastNodeSocket().url.toString()).toBe(
+      'wss://example.com/v1/realtime?route=tenant&call_id=rtc_123',
+    );
+    expect(lastNodeSocket().options.headers).toMatchObject({ Authorization: 'Bearer rotating-key' });
+  });
+
   test('opens authenticated model and sideband sessions and preserves custom headers', () => {
     const client = createClient();
     const model = new Realtime(
@@ -477,12 +563,25 @@ describe.each([
     expect(model.url.toString()).toBe('wss://example.com/v1/realtime?model=gpt-realtime');
     expect(lastNodeSocket().options.headers).toMatchObject({
       Authorization: 'Bearer test-key',
+      'User-Agent': `OpenAI/JS ${VERSION}`,
       'X-Custom': 'value',
       ...(beta ? { 'OpenAI-Beta': 'realtime=v1' } : {}),
     });
 
     const sideband = new Realtime({ callID: 'call-123' }, client);
     expect(sideband.url.searchParams.get('call_id')).toBe('call-123');
+  });
+
+  test('allows callers to override the SDK user agent', () => {
+    const realtime = new Realtime(
+      { model: 'gpt-realtime', options: { headers: { 'User-Agent': 'custom-client/1.0.0' } } },
+      createClient(),
+    );
+
+    expect(realtime.socket).toBe(lastNodeSocket());
+    expect(lastNodeSocket().options.headers).toMatchObject({
+      'User-Agent': 'custom-client/1.0.0',
+    });
   });
 
   test('requires function-based credentials to be resolved with create', async () => {
@@ -541,6 +640,7 @@ describe.each([
     const realtime = new Realtime({ model: 'gpt-realtime' }, createClient());
     const socket = lastNodeSocket();
 
+    // SAFETY: This minimal outbound event fixture tests socket serialization; its omitted session fields are not interpreted by the wrapper.
     realtime.send({ type: 'session.update' } as any);
     realtime.close();
     realtime.close({ code: 1001, reason: 'done' });
@@ -563,6 +663,7 @@ describe.each([
       throw new Error('close failed');
     });
 
+    // SAFETY: This minimal outbound event fixture tests socket serialization; its omitted session fields are not interpreted by the wrapper.
     realtime.send({ type: 'session.update' } as any);
     realtime.close();
     expect(errors).toHaveBeenCalledTimes(2);
@@ -678,6 +779,7 @@ describe('stable Node realtime transcription', () => {
     { intent: 'unsupported' },
   ])('rejects conflicting Azure transcription targets before opening a socket %#', async (options) => {
     await expect(
+      // SAFETY: These table rows deliberately violate Azure connection option constraints to exercise runtime rejection.
       StableNodeRealtime.azure(createAzureClient({ deployment: 'configured' }), options as any),
     ).rejects.toThrow(
       'Pass exactly one of `deploymentName`, `callID`, or transcription `intent` when opening an Azure Realtime WebSocket.',
@@ -855,6 +957,8 @@ describe('stable Node realtime custom URL builder', () => {
     expect(
       () =>
         new StableNodeRealtime(
+          // SAFETY: The invalid URL fixture deliberately bypasses the typed builder contract to test validation before transport creation.
+          // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Return a malformed URL from a custom URL builder to verify rejection before opening a socket.
           { model: 'gpt-realtime', buildRealtimeURL: () => 'not a valid URL' as unknown as URL },
           createClient(),
         ),

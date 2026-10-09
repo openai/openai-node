@@ -24,6 +24,7 @@ const openai = vi.hoisted(() => {
   return { constructor, createStream, toReadableStream };
 });
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- The regression asserts that rejected requests never construct the billed SDK client; the example exposes no constructor seam.
 vi.mock('openai', () => ({ default: openai.constructor }));
 
 const token = '0123456789abcdef0123456789abcdef';
@@ -71,7 +72,8 @@ function invoke(input: Request): Promise<Response> {
     response: { send: (stream: ReadableStream<Uint8Array>) => Response },
   ) => Promise<Response>;
 
-  return (handler as unknown as EdgeHandler)(input, {
+  // SAFETY: The imported edge example uses Request and response.send; this fixture provides those Web API values and returns a Response from send.
+  return (handler as EdgeHandler)(input, {
     send: (stream) => new Response(stream),
   });
 }
@@ -222,16 +224,20 @@ describe('Next Edge streaming example request boundaries', () => {
   });
 
   test('accepts an authenticated command-line request with no browser-origin headers', async () => {
-    const response = await invoke(request());
+    const input = request();
+    const response = await invoke(input);
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('{"content":"safe"}\n');
     expect(openai.constructor).toHaveBeenCalledOnce();
-    expect(openai.createStream).toHaveBeenCalledWith({
-      model: 'gpt-3.5-turbo',
-      stream: true,
-      messages: [{ role: 'user', content: 'Tell me why dogs are better than cats' }],
-    });
+    expect(openai.createStream).toHaveBeenCalledWith(
+      {
+        model: 'gpt-3.5-turbo',
+        stream: true,
+        messages: [{ role: 'user', content: 'Tell me why dogs are better than cats' }],
+      },
+      { signal: input.signal },
+    );
   });
 
   test('accepts an authenticated browser request from the configured trusted origin', async () => {
@@ -244,13 +250,15 @@ describe('Next Edge streaming example request boundaries', () => {
 
   test('preserves an authenticated body at exactly the 64 KiB UTF-8 boundary', async () => {
     const body = '🐕'.repeat(maximumPromptBytes / 4);
-    const response = await invoke(request({ body }));
+    const input = request({ body });
+    const response = await invoke(input);
 
     expect(response.status).toBe(200);
     expect(openai.createStream).toHaveBeenCalledWith(
       expect.objectContaining({
         messages: [{ role: 'user', content: body }],
       }),
+      { signal: input.signal },
     );
   });
 });

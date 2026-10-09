@@ -5,6 +5,13 @@ import { APIPromise } from '../../../../core/api-promise';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class HostedToolPermissions extends APIResource {
   /**
    * Returns hosted tool permissions for a project.
@@ -18,10 +25,13 @@ export class HostedToolPermissions extends APIResource {
    * ```
    */
   retrieve(projectID: string, options?: RequestOptions): APIPromise<ProjectHostedToolPermissions> {
-    return this._client.get(path`/organization/projects/${projectID}/hosted_tool_permissions`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/projects/${projectID}/hosted_tool_permissions`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -40,11 +50,14 @@ export class HostedToolPermissions extends APIResource {
     body: HostedToolPermissionUpdateParams,
     options?: RequestOptions,
   ): APIPromise<ProjectHostedToolPermissions> {
-    return this._client.post(path`/organization/projects/${projectID}/hosted_tool_permissions`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/projects/${projectID}/hosted_tool_permissions`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

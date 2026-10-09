@@ -7,6 +7,10 @@ import { distance } from './node_modules/fastest-levenshtein/esm/mod.js';
 /** @type {TestCase[]} */
 const tests = [];
 
+const live = /** @type {typeof globalThis & { __OPENAI_ECOSYSTEM_TEST_LIVE__?: boolean }} */ (
+  globalThis
+).__OPENAI_ECOSYSTEM_TEST_LIVE__ === true;
+
 /** @typedef {{ path: string[]; passed: boolean; error?: string }} TestResult */
 
 async function runTests() {
@@ -22,6 +26,15 @@ async function runTests() {
     pre.textContent = JSON.stringify(results, null, 2);
   }
   for (const { path, run, timeout } of tests) {
+    if (
+      !live &&
+      ![
+        'browser API-key protection remains enabled by default',
+        'toFile accepts ArrayBuffers from another realm',
+      ].includes(path[0])
+    ) {
+      continue;
+    }
     console.log('running', ...path);
     try {
       await Promise.race([
@@ -112,6 +125,44 @@ const apiKey = /** @type {typeof globalThis & { __OPENAI_ECOSYSTEM_TEST_API_KEY_
 ).__OPENAI_ECOSYSTEM_TEST_API_KEY__;
 
 const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+it('browser API-key protection remains enabled by default', () => {
+  let browserError;
+  try {
+    browserError = new OpenAI({ apiKey: 'synthetic-browser-api-key' });
+  } catch (error) {
+    browserError = error;
+  }
+
+  if (
+    !(browserError instanceof Error) ||
+    !browserError.message.includes('disabled by default') ||
+    !browserError.message.includes('dangerouslyAllowBrowser')
+  ) {
+    throw new Error('Expected API-key use to be disabled in browsers by default.');
+  }
+});
+
+it('toFile accepts ArrayBuffers from another realm', async () => {
+  const frame = document.createElement('iframe');
+  document.body.append(frame);
+  try {
+    const { contentWindow } = frame;
+    if (!contentWindow) {throw new Error('The iframe did not create a window');}
+    const foreign = /** @type {Window & typeof globalThis} */ (contentWindow);
+    const { buffer } = new foreign.Uint8Array([0, 1, 127, 255]);
+    expect(buffer instanceof ArrayBuffer).toEqual(false);
+
+    const file = await toFile(buffer, 'foreign.bin');
+    expect(file.name).toEqual('foreign.bin');
+    expect([...new Uint8Array(await file.arrayBuffer())].join(',')).toEqual('0,1,127,255');
+
+    const empty = await toFile(new foreign.ArrayBuffer(0), 'empty.bin');
+    expect(empty.size).toEqual(0);
+  } finally {
+    frame.remove();
+  }
+});
 
 async function typeTests() {
   // @ts-expect-error this should error if the `Uploadable` type was resolved correctly

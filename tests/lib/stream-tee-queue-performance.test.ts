@@ -18,12 +18,7 @@ function createNumberedStream(length: number, controller = new AbortController()
   return { stream: new Stream(() => ({ next }), controller), next, controller };
 }
 
-function measureArrayMovement<T>(operation: () => T): {
-  result: T;
-  elementMoves: number;
-  shiftCalls: number;
-  compactions: number;
-} {
+function measureArrayMovement<T>(operation: () => T) {
   const originalShift = Array.prototype.shift;
   const originalSlice = Array.prototype.slice;
   let elementMoves = 0;
@@ -55,7 +50,7 @@ function measureArrayMovement<T>(operation: () => T): {
   }
 }
 
-function capturePromiseQueues<T>(operation: () => T): { result: T; queues: Set<unknown[]> } {
+function capturePromiseQueues<T>(operation: () => T) {
   const originalPush = Array.prototype.push;
   const queues = new Set<unknown[]>();
 
@@ -136,6 +131,44 @@ describe('Stream.tee queue performance', () => {
     expect(next).toHaveBeenCalledTimes(QUEUE_SIZE);
   });
 
+  test.each([false, true])(
+    'releases canceled queues while a sibling keeps reading (nested: %s)',
+    async (nested) => {
+      const { stream, controller } = createNumberedStream(QUEUE_SIZE + 4);
+      const [left, right] = stream.tee();
+      const sibling = right[Symbol.asyncIterator]();
+      const { result: first, queues } = capturePromiseQueues(() => sibling.next());
+      await first;
+      const buffered = [...queues].find((queue) => queue[0] === first);
+      if (!buffered) {
+        throw new Error('Expected to capture the lagging reader queue');
+      }
+      await Promise.all(Array.from({ length: 3 }, () => sibling.next()));
+      expect(buffered).toHaveLength(4);
+      const branches = nested ? left.tee() : [left];
+      const readers = branches.map((branch) => branch.toReadableStream().getReader());
+
+      try {
+        await Promise.all(readers.map((reader) => reader.read()));
+        await Promise.all(readers.map((reader) => reader.cancel()));
+        expect(buffered).toHaveLength(0);
+
+        const results = await Promise.all(Array.from({ length: QUEUE_SIZE }, () => sibling.next()));
+        expect(results.map(({ value }) => value)).toEqual(
+          Array.from({ length: QUEUE_SIZE }, (_, index) => index + 4),
+        );
+        expect(buffered).toHaveLength(0);
+        expect(controller.signal.aborted).toBe(false);
+      } finally {
+        controller.abort();
+        await Promise.all(readers.map((reader) => reader.cancel()));
+        for (const reader of readers) {
+          reader.releaseLock();
+        }
+      }
+    },
+  );
+
   test('replays values independently for interleaved readers without extra source pulls', async () => {
     const { stream, next } = createNumberedStream(6);
     const [left, right] = stream.tee();
@@ -200,7 +233,7 @@ describe('Stream.tee queue performance', () => {
 
     expect(left.controller).toBe(controller);
     expect(right.controller).toBe(controller);
-    expect(left[Symbol.asyncIterator]().return).toBeUndefined();
+    expect(typeof left[Symbol.asyncIterator]().return).toBe('function');
 
     for await (const value of left) {
       if (value === 1) {

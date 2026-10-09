@@ -1,4 +1,14 @@
-import { fromBase64, toBase64 } from 'openai/internal/utils/base64';
+import { fromBase64, toBase64, toFloat32Array } from 'openai/internal/utils/base64';
+
+const incompleteVectors = [1, 2, 3, 5, 6, 7].map((byteLength) => ({
+  byteLength,
+  encoded: Buffer.alloc(byteLength).toString('base64'),
+}));
+const alignedVectors = [[], [1.25], [1.25, -2.5]].map((values) => ({
+  byteLength: values.length * Float32Array.BYTES_PER_ELEMENT,
+  encoded: Buffer.from(new Float32Array(values).buffer).toString('base64'),
+  values,
+}));
 
 describe.each(['Buffer', 'atob'])('with %s', (mode) => {
   let originalBuffer: BufferConstructor;
@@ -14,6 +24,14 @@ describe.each(['Buffer', 'atob'])('with %s', (mode) => {
       globalThis.Buffer = originalBuffer;
     }
   });
+  test.each(incompleteVectors)('toFloat32Array rejects $byteLength decoded bytes', ({ encoded }) => {
+    expect(() => toFloat32Array(encoded)).toThrow(RangeError);
+  });
+
+  test.each(alignedVectors)('toFloat32Array preserves $byteLength decoded bytes', ({ encoded, values }) => {
+    expect(toFloat32Array(encoded)).toEqual(values);
+  });
+
   test('toBase64', () => {
     const testCases = [
       {

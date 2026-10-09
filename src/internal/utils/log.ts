@@ -94,6 +94,7 @@ const sensitiveQueryNames = new Set([
   'token',
   'password',
   'clientsecret',
+  'signingsecret',
   'xamzsecuritytoken',
   'xamzsignature',
   'xamzcredential',

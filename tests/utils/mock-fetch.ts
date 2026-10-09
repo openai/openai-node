@@ -9,7 +9,7 @@ import type { Fetch, RequestInfo, RequestInit, Response } from 'openai/internal/
  * - calls the callback with the `fetch` arguments
  * - resolves `fetch` with the callback output
  */
-export function mockFetch(): { fetch: Fetch; handleRequest: (handle: Fetch) => Promise<void> } {
+export function mockFetch() {
   const fetchQueue: ((handler: typeof fetch) => void)[] = [];
   const handlerQueue: Promise<typeof fetch>[] = [];
 
@@ -59,6 +59,7 @@ export function mockFetch(): { fetch: Fetch; handleRequest: (handle: Fetch) => P
           return response;
         } catch (err) {
           reject(err);
+          // SAFETY: This path rejects the controlling handleRequest promise first; the returned error is only the mock transport placeholder for that failed handler.
           return err as any;
         }
       });

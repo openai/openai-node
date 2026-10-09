@@ -130,19 +130,25 @@ async function main() {
     // `lineRewriter()` allows us to rewrite the last output with new text, which is one
     // way of forwarding the streamed output to a visual interface.
     const writeLine = lineRewriter();
+    // SAFETY: This is a partial streaming accumulator; fields are inspected optionally while deltas arrive and it is submitted only after stream completion.
     let message = {} as ChatCompletionMessage;
     for await (const chunk of stream) {
       message = messageReducer(message, chunk);
-      writeLine(message);
+      if (process.stdout.isTTY) {
+        writeLine(message);
+      }
 
       // Add a small delay so that the chunks coming in are noticeable
       await new Promise((resolve) => setTimeout(resolve, CHUNK_DELAY_MS));
+    }
+    if (!process.stdout.isTTY) {
+      writeLine(message);
     }
     console.log();
     messages.push(message);
 
     // If there are no tool calls, we're done and can exit this loop
-    if (!message.tool_calls) {
+    if (!message.tool_calls?.length) {
       return;
     }
 
@@ -203,12 +209,18 @@ function messageReducer(previous: ChatCompletionMessage, item: ChatCompletionChu
     // chunk contains information about usage and token counts
     return previous;
   }
+  // SAFETY: The reducer retains prior message fields and merges the next delta; the caller waits for stream completion before submitting the accumulated message.
   return reduce(previous, choice.delta) as ChatCompletionMessage;
 }
 
 function lineRewriter() {
   let lastMessageLines = 0;
   return function write(value: any) {
+    if (!process.stdout.isTTY) {
+      console.log(formatWithOptions({ colors: false, breakLength: Infinity, depth: 4 }, value));
+      return;
+    }
+
     process.stdout.cursorTo(0);
     process.stdout.moveCursor(0, -lastMessageLines);
 
@@ -264,7 +276,7 @@ async function search(name: string) {
 }
 
 async function get(id: string) {
-  return db.find((item) => item.id === id)!;
+  return db.find((item) => item.id === id) ?? null;
 }
 
 main();

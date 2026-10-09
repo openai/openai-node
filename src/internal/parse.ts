@@ -9,6 +9,7 @@ export type APIResponseProps = {
   response: Response;
   options: FinalRequestOptions;
   controller: AbortController;
+  requestSignal?: AbortSignal | null | undefined;
   requestLogID: string;
   retryOfRequestLogID: string | undefined;
   startTime: number;
@@ -19,6 +20,7 @@ export async function defaultParseResponse<T>(
   props: APIResponseProps,
 ): Promise<WithRequestID<T>> {
   const { response, requestLogID, retryOfRequestLogID, startTime } = props;
+  let jsonBodyLength: number | undefined;
   const body = await (async () => {
     if (props.options.stream) {
       loggerFor(client).debug('response', response.status, response.url, response.headers, response.body);
@@ -53,7 +55,7 @@ export async function defaultParseResponse<T>(
     }
 
     const contentType = response.headers.get('content-type');
-    const mediaType = contentType?.split(';')[0]?.trim();
+    const mediaType = contentType?.split(';')[0]?.trim().toLowerCase();
     const isJSON = mediaType?.includes('application/json') || mediaType?.endsWith('+json');
     if (isJSON) {
       const contentLength = response.headers.get('content-length');
@@ -72,6 +74,7 @@ export async function defaultParseResponse<T>(
       }
 
       const json = JSON.parse(bodyText);
+      jsonBodyLength = bodyText.length;
       return addRequestID(json as T, response);
     }
 
@@ -80,16 +83,18 @@ export async function defaultParseResponse<T>(
   })().catch((error: unknown) => {
     throw asAbortError(error, props.controller.signal);
   });
-  loggerFor(client).debug(
-    `[${requestLogID}] response parsed`,
-    formatRequestDetails({
-      retryOfRequestLogID,
-      url: response.url,
-      status: response.status,
-      body,
-      durationMs: Date.now() - startTime,
-    }),
-  );
+  if (client.logLevel === 'debug') {
+    loggerFor(client).debug(
+      `[${requestLogID}] response parsed`,
+      formatRequestDetails({
+        retryOfRequestLogID,
+        url: response.url,
+        status: response.status,
+        body: jsonBodyLength === undefined ? body : { type: 'json', length: jsonBodyLength },
+        durationMs: Date.now() - startTime,
+      }),
+    );
+  }
   return body;
 }
 

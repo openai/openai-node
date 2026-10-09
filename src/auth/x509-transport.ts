@@ -82,6 +82,7 @@ function safeOptionRecord(
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`X.509 ${label} options must have only own plain data properties.`);
   }
+  // SAFETY: The snapshot starts empty with no prototype; only checked own data properties are copied into it below.
   const snapshot = Object.create(null) as Record<string, unknown>;
   for (const name of Reflect.ownKeys(value)) {
     if (typeof name !== 'string' || !allowed.has(name)) {
@@ -179,6 +180,7 @@ function validatedCredentialOptions(options: X509CredentialOptions): ValidatedX5
   const leaf = new X509Certificate(certificateChain);
   const privateKey = createPrivateKey({
     key: privateKeyPEM,
+    // Create an own data property so an inherited setter cannot intercept the private-key passphrase.
     ...(passphrase === undefined ? {} : { passphrase }),
   });
   if (!leaf.checkPrivateKey(privateKey)) {
@@ -239,6 +241,7 @@ function credentialDispatcher(
   requestTls: VerifiedX509TLSOptions,
 ): { dispatcher: Agent | ProxyAgent; proxy: X509ProxyMode } {
   if (proxyOptionsInput === undefined) {
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- The dispatcher owner returns one contract for direct Agents and both supported CONNECT proxy modes.
     return { dispatcher: new Agent({ connect: requestTls }), proxy: 'direct' };
   }
 
@@ -262,16 +265,20 @@ function credentialDispatcher(
   }
   const auth = proxyAuthentication(url);
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- The declared transport contract preserves the same dispatcher and proxy types across both construction paths.
   return {
     proxy,
     dispatcher: new ProxyAgent({
       uri: url.href,
+      // Define proxy credentials as own data without invoking inherited setters.
       ...(auth === undefined ? {} : { auth }),
       requestTls,
+      // Keep the optional proxy TLS configuration as an own data property.
       ...(proxy === 'https-connect'
         ? {
             proxyTls: {
               rejectUnauthorized: true,
+              // Define explicit proxy trust roots as own data without invoking inherited setters.
               ...(proxyCA === undefined ? {} : { ca: proxyCA }),
             },
           }
@@ -300,6 +307,7 @@ export function createX509Transport(options: X509TransportOptions): X509Transpor
         transport: capability,
         identityProviderId,
         serviceAccountId,
+        // Preserve the cancellation signal as own data without invoking inherited setters.
         ...(signal ? { signal } : {}),
       }),
     run: (operation) =>
@@ -315,11 +323,13 @@ export function createX509Transport(options: X509TransportOptions): X509Transpor
 export function fromX509(options: X509CredentialOptions): X509Credential {
   const configured = validatedCredentialOptions(options);
 
-  const requestTls = {
+  const requestTls: VerifiedX509TLSOptions = {
     cert: configured.certificateChain,
     key: configured.privateKey,
-    rejectUnauthorized: true as const,
+    rejectUnauthorized: true,
+    // Define the TLS passphrase as own data so inherited setters cannot intercept it.
     ...(configured.passphrase === undefined ? {} : { passphrase: configured.passphrase }),
+    // Define explicit workload trust roots as own data without invoking inherited setters.
     ...(configured.ca === undefined ? {} : { ca: configured.ca }),
   };
   const { dispatcher, proxy } = credentialDispatcher(configured.proxy, requestTls);
@@ -335,6 +345,7 @@ export function fromX509(options: X509CredentialOptions): X509Credential {
       type: 'x509',
       identityProviderId: configured.identityProviderId,
       serviceAccountId: configured.serviceAccountId,
+      // Preserve the optional refresh setting as own data without invoking inherited setters.
       ...(configured.refreshBufferSeconds === undefined
         ? {}
         : { refreshBufferSeconds: configured.refreshBufferSeconds }),

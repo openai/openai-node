@@ -58,6 +58,7 @@ async function main() {
 
   const toolCall = completion.choices[0]?.message.tool_calls?.[0];
   if (toolCall?.type === 'function') {
+    // SAFETY: The selected function tool was registered with zodFunction and Query, so its parsed arguments were validated by that schema.
     const args = toolCall.function.parsed_arguments as z.infer<typeof Query>;
     console.log(args);
     console.log(args.table_name);

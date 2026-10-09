@@ -24,6 +24,7 @@ const EMPTY = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.create(null))
  * `encodeURIComponent`. Nullish values, ordinary objects, and literal or
  * percent-encoded `.`/`..` path segments are rejected with an SDK error.
  */
+// SAFETY: This branch compares prototype methods to recognize cross-realm plain values; it does not call the optional hasOwnProperty member.
 export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
   function path(statics: readonly string[], ...params: readonly unknown[]): string {
     // If there are no params, no processing is needed.
@@ -45,6 +46,7 @@ export const createPathTagFunction = (pathEncoder = encodeURIPath) =>
         if (
           index !== params.length &&
           (value == null ||
+            // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Path parameters may arrive from JavaScript callers and require runtime validation before URL encoding.
             (typeof value === 'object' &&
               // handle values from other realms
               value.toString ===

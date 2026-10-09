@@ -121,6 +121,120 @@ import {
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 export class Projects extends APIResource {
   users: UsersAPI.Users = new UsersAPI.Users(this._client);
   serviceAccounts: ServiceAccountsAPI.ServiceAccounts = new ServiceAccountsAPI.ServiceAccounts(this._client);
@@ -151,11 +265,14 @@ export class Projects extends APIResource {
    * ```
    */
   create(body: ProjectCreateParams, options?: RequestOptions): APIPromise<Project> {
-    return this._client.post('/organization/projects', {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      '/organization/projects',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -170,10 +287,13 @@ export class Projects extends APIResource {
    * ```
    */
   retrieve(projectID: string, options?: RequestOptions): APIPromise<Project> {
-    return this._client.get(path`/organization/projects/${projectID}`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/projects/${projectID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -188,11 +308,14 @@ export class Projects extends APIResource {
    * ```
    */
   update(projectID: string, body: ProjectUpdateParams, options?: RequestOptions): APIPromise<Project> {
-    return this._client.post(path`/organization/projects/${projectID}`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/projects/${projectID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -207,14 +330,110 @@ export class Projects extends APIResource {
    * ```
    */
   list(
-    query: ProjectListParams | null | undefined = {},
+    query?:
+      | (ProjectListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<ProjectsPage, Project>;
+  list(
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<ProjectsPage, Project>;
+  list(
+    query:
+      | ProjectListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<ProjectsPage, Project> {
-    return this._client.getAPIList('/organization/projects', ConversationCursorPage<Project>, {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+      ['after', 'include_archived', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as ProjectListParams | null | undefined;
+    return this._client.getAPIList(
+      '/organization/projects',
+      ConversationCursorPage<Project>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -230,10 +449,13 @@ export class Projects extends APIResource {
    * ```
    */
   archive(projectID: string, options?: RequestOptions): APIPromise<Project> {
-    return this._client.post(path`/organization/projects/${projectID}/archive`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/projects/${projectID}/archive`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 
@@ -313,7 +535,7 @@ export interface ProjectCreateParams {
    * @deprecated Create the project with the specified data residency region. Your
    * organization must have access to Data residency functionality in order to use.
    * See
-   * [data residency controls](https://platform.openai.com/docs/guides/your-data#data-residency-controls)
+   * [data residency controls](https://developers.openai.com/api/docs/guides/your-data#data-residency-controls)
    * to review the functionality and limitations of setting this field. Deprecated:
    * use `residency` instead. Do not provide both `geography` and `residency`.
    */
@@ -323,7 +545,7 @@ export interface ProjectCreateParams {
    * Create the project with the specified residency configuration. Your organization
    * must have access to the requested residency configuration in order to use it.
    * See
-   * [data residency controls](https://platform.openai.com/docs/guides/your-data#data-residency-controls)
+   * [data residency controls](https://developers.openai.com/api/docs/guides/your-data#data-residency-controls)
    * to review the functionality and limitations of setting this field.
    */
   residency?: ProjectResidency | null;

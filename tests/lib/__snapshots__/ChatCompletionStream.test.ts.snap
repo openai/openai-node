@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`.stream() emits content logprobs events 1`] = `
 "data: {"id":"chatcmpl-9tZXFsqeQOozn5YU8I6SbjkmDnN76","object":"chat.completion.chunk","created":1723031665,"model":"gpt-4o-2024-08-06","system_fingerprint":"fp_845eaabc1f","choices":[{"index":0,"delta":{"role":"assistant","content":"","refusal":null},"logprobs":{"content":[],"refusal":null},"finish_reason":null}]}
@@ -68,8 +68,10 @@ data: [DONE]
 "
 `;
 
-exports[`.stream() works 1`] = `
+exports[`.stream() is robust against leading newline chunks 1`] = `
 "data: {"id":"chatcmpl-9tZXEmwtoDf6vqCqEWSvDP8jx9OXe","object":"chat.completion.chunk","created":1723031664,"model":"gpt-4o-2024-08-06","system_fingerprint":"fp_845eaabc1f","choices":[{"index":0,"delta":{"role":"assistant","content":"","refusal":null},"logprobs":null,"finish_reason":null}]}
+
+data: {"id":"chatcmpl-9tZXEmwtoDf6vqCqEWSvDP8jx9OXe","object":"chat.completion.chunk","created":1723031664,"model":"gpt-4o-2024-08-06","system_fingerprint":"fp_845eaabc1f","choices":[{"index":0,"delta":{"content":"\\n\\n"},"logprobs":null,"finish_reason":null}]}
 
 data: {"id":"chatcmpl-9tZXEmwtoDf6vqCqEWSvDP8jx9OXe","object":"chat.completion.chunk","created":1723031664,"model":"gpt-4o-2024-08-06","system_fingerprint":"fp_845eaabc1f","choices":[{"index":0,"delta":{"content":"{\\""},"logprobs":null,"finish_reason":null}]}
 
@@ -100,10 +102,8 @@ data: [DONE]
 "
 `;
 
-exports[`.stream() is robust against leading newline chunks 1`] = `
+exports[`.stream() works 1`] = `
 "data: {"id":"chatcmpl-9tZXEmwtoDf6vqCqEWSvDP8jx9OXe","object":"chat.completion.chunk","created":1723031664,"model":"gpt-4o-2024-08-06","system_fingerprint":"fp_845eaabc1f","choices":[{"index":0,"delta":{"role":"assistant","content":"","refusal":null},"logprobs":null,"finish_reason":null}]}
-
-data: {"id":"chatcmpl-9tZXEmwtoDf6vqCqEWSvDP8jx9OXe","object":"chat.completion.chunk","created":1723031664,"model":"gpt-4o-2024-08-06","system_fingerprint":"fp_845eaabc1f","choices":[{"index":0,"delta":{"content":"\\n\\n"},"logprobs":null,"finish_reason":null}]}
 
 data: {"id":"chatcmpl-9tZXEmwtoDf6vqCqEWSvDP8jx9OXe","object":"chat.completion.chunk","created":1723031664,"model":"gpt-4o-2024-08-06","system_fingerprint":"fp_845eaabc1f","choices":[{"index":0,"delta":{"content":"{\\""},"logprobs":null,"finish_reason":null}]}
 

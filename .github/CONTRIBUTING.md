@@ -1,3 +1,22 @@
+# Contributing
+
+## Contribution policy
+
+We welcome bug reports, feature requests, minimal reproductions, and root-cause
+analysis through [GitHub issues](https://github.com/openai/openai-node/issues).
+
+**Pull requests are limited to repository collaborators. We do not accept pull
+requests from non-collaborators**, including documentation or example changes.
+If you are not a collaborator, please open an issue instead of preparing a pull
+request. Include the affected version, expected and actual behavior, and a small,
+sanitized reproduction when applicable.
+
+Report suspected security vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md), rather than in issues or pull requests.
+
+The development and pull request instructions below are for maintainers and
+repository collaborators.
+
 ## Setting up the environment
 
 This repository uses the [`pnpm`](https://pnpm.io/installation) version pinned by `package.json`.
@@ -27,10 +46,29 @@ The repository's pnpm scripts use Bash. On Windows, install [Git for Windows](ht
 and run the development commands from Git Bash, where `bash` is available on `PATH`. If you run pnpm from
 PowerShell instead, add the Git for Windows `bin` directory that contains `bash.exe` to `PATH` first.
 
+The `build (Windows)` CI job runs `./scripts/bootstrap` and `pnpm build` on a Windows runner with
+Git Bash, using the repository's pinned Node.js and pnpm versions. The build also checks that the
+compiled CommonJS and ESM entrypoints can be loaded.
+
+The repository keeps formatter inputs on LF through `.gitattributes`. Git does not rewrite unchanged files
+when an existing `core.autocrlf=true` checkout first pulls that rule. If `git ls-files --eol AGENTS.md`
+still reports `w/crlf` and `pnpm lint` reports widespread formatting failures, first make sure
+`git status --short` is empty, then run:
+
+```sh
+$ pnpm format
+$ git add -u
+$ git status --short
+```
+
+The format command rewrites the existing checkout to LF. Because the checkout was clean, `git add -u`
+only refreshes equivalent tracked content after line-ending normalization. The final status command should
+remain empty; inspect any reported changes instead of discarding them.
+
 To set up the repository, run:
 
 ```sh
-$ pnpm install
+$ ./scripts/bootstrap
 $ pnpm build
 ```
 
@@ -142,6 +180,37 @@ $ pnpm link --global openai
 
 ## Running tests
 
+The mock server uses [the OpenAI Steady fork](https://github.com/openai-oss-forks/steady).
+`scripts/steady/manifest.json` is the single source of dependency pins: the
+Steady Git commit and source digest, plus the Deno version and runtime checksums. `./scripts/steady/install` fetches that source, verifies the runtime,
+and caches dependencies using the fork's frozen Deno lockfile. It requires
+Git, Node.js, curl 7.71.0 or newer, unzip, and sha256sum or shasum. The installation supports
+macOS and Linux on x64/ARM64, and Windows x64 through Git Bash.
+
+The runtime download retries failures up to three times, with a 60-second retry
+window, a 15-second connection timeout, and a 15-second stall timeout. Progressing
+downloads have no fixed duration limit; the retry window does not terminate an
+active transfer.
+
+`./scripts/run-steady` verifies the local source and runtime, then runs without
+downloading dependencies. Pass a local OpenAPI specification path. To update
+Steady, review the fork commit and run
+`node scripts/steady/update.cjs <full-commit-sha>`. This updates the manifest
+with the commit and its source digest; no launcher or test edits are needed.
+Then run `./scripts/steady/install`. Review the release checksums when changing Deno.
+Run `node scripts/steady/test.cjs` to check the download retries,
+installation, integrity checks, and mock-server lifecycle. These tests require
+OpenSSL to create temporary certificates for their local HTTPS download fixtures.
+Run just the download regressions with `node scripts/steady/download.test.cjs`.
+
+This checkout owns `scripts/steady/.cache`. Source and dependency entries are
+keyed by the Steady revision; the runtime and dependencies also include the Deno
+version, and runtimes include the platform. Install and launch commands remove
+unselected entries after 30 idle days. A process lease protects entries until
+the command exits, including running Windows executables. The current pins are
+retained; changing the manifest makes the previous entries eligible for expiry.
+Cleanup runs on the next install or launch, without background work.
+
 The test suite is split between handwritten unit tests, which run with Vitest,
 and generated API-resource tests, which remain on Jest. Generated tests have a
 generator comment at the top of the file and primarily
@@ -162,7 +231,7 @@ its corresponding runner, for example `./scripts/test tests/lib/parser.test.ts`
 or `./scripts/test tests/api-resources/models.test.ts`.
 
 The generated portion of the full and generated suites automatically
-starts a [Steady mock server](https://github.com/dgellow/steady) against the
+starts a [Steady mock server](https://github.com/openai-oss-forks/steady) against the
 OpenAPI spec when one is not already running. To manage that server yourself,
 run `./scripts/mock` in a separate terminal.
 
@@ -184,8 +253,10 @@ To save the machine-readable Vitest benchmark report:
 $ pnpm bench:json
 ```
 
-This writes `benchmark-results.json` in the repository root. The report is ignored
-by Git and uploaded as an artifact by the performance-benchmark job in normal CI.
+This writes `benchmark-results.json` in the repository root using the Vitest JSON
+reporter. Benchmark measurements are in each test case's `benchmarks` field; reports
+from Vitest 4 use a different schema. The report is ignored by Git and uploaded as
+an artifact by the performance-benchmark job in normal CI.
 The separate, manually triggered or scheduled benchmark workflow also uploads a
 runtime, runner, revision, and fixture-hash metadata file. Pass a benchmark name
 or file filter directly to run only part of the suite, for example:
@@ -242,6 +313,42 @@ format-on-save and lint-autofix editor settings.
 
 Changes made to this repository via the automated release PR pipeline publish to npm automatically. Publishing
 requires GitHub Actions OIDC trusted publishing; local token-based publishing is not supported.
+
+### CI coverage and release policy
+
+The table describes workflow execution and npm publication dependencies for changes targeting `main`
+in `openai/openai-node`.
+Required merge checks are configured in repository rules. The `test matrix` check requires the Node.js
+tests, benchmarks, credential-free ecosystem job, and Windows build to succeed.
+
+| Checks                                                              | PR             | Merge queue   | Push to `main`    | Release PR     | npm publication                             |
+| ------------------------------------------------------------------- | -------------- | ------------- | ----------------- | -------------- | ------------------------------------------- |
+| CI lint, build, Node.js tests, packed-package tests, benchmarks     | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
+| Windows contributor bootstrap and SDK build                         | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
+| Credential-free ecosystem startup/import and compatibility checks   | Runs           | Runs          | Runs              | Runs           | CI gate                                     |
+| Live examples and live ecosystem tests                              | Skipped        | Skipped       | Runs²             | Skipped        | CI gate²                                    |
+| CodeQL merge protection, breaking-change detection, Castiron checks | Runs           | Runs          | Not triggered     | Runs           | Merge protection; no separate release gate  |
+| Standalone Node.js support policy workflow                          | Not triggered  | Not triggered | Runs              | Not triggered  | No separate gate; assertions also run in CI |
+| Release PR title/version validation                                 | Not applicable | Not triggered | Not applicable    | Runs           | Checked before release creation             |
+| Release state, native-browser compatibility, release-package build  | Not applicable | Not triggered | Release workflow³ | Not applicable | Required                                    |
+
+¹ Same-repository PRs run these checks through branch pushes; duplicate PR-event jobs may be skipped.
+Fork PRs and `ready_for_review` events run them directly. Release PRs receive the same CI coverage.
+² Live checks require credentials and skip main pushes triggered by `dependabot[bot]`.
+³ Release state is checked on main pushes; browser compatibility and package build run when publication is due.
+
+The **CI gate** in [`create-releases.yml`](workflows/create-releases.yml) requires a successful
+[`ci.yml`](workflows/ci.yml) push run on `main` for the immutable release SHA, including live checks when
+they run. Missing CI, a mismatched SHA, failure, cancellation, or timeout prevents publication; a green
+run for another commit cannot satisfy the gate. The gate checks the overall workflow conclusion, so it
+does not independently reject skipped jobs. Experimental Node.js results remain advisory as defined by
+[the Node.js support policy](../NODE_VERSION_POLICY.md).
+
+When adding or changing checks, especially main-only checks, explicitly choose whether they block
+publication or are advisory. Update this table and the focused workflow regressions in
+[`tests/release-publish-workflow.test.ts`](../tests/release-publish-workflow.test.ts) to preserve the
+release SHA, failure handling, and publication dependencies. Keep merge-only workflows distinct from
+the publication gate.
 
 ### Override an automated release version
 

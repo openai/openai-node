@@ -13,6 +13,120 @@ import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 import { AssistantStream } from '../../lib/AssistantStream';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 /**
  * Build Assistants that can call models and use tools.
  */
@@ -23,12 +137,15 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   create(body: AssistantCreateParams, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.post('/assistants', {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      '/assistants',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -37,11 +154,14 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   retrieve(assistantID: string, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.get(path`/assistants/${assistantID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/assistants/${assistantID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -50,12 +170,15 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   update(assistantID: string, body: AssistantUpdateParams, options?: RequestOptions): APIPromise<Assistant> {
-    return this._client.post(path`/assistants/${assistantID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/assistants/${assistantID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -64,15 +187,111 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   list(
-    query: AssistantListParams | null | undefined = {},
+    query?:
+      | (AssistantListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<AssistantsPage, Assistant>;
+  list(
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<AssistantsPage, Assistant>;
+  list(
+    query:
+      | AssistantListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<AssistantsPage, Assistant> {
-    return this._client.getAPIList('/assistants', CursorPage<Assistant>, {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+      ['after', 'before', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as AssistantListParams | null | undefined;
+    return this._client.getAPIList(
+      '/assistants',
+      CursorPage<Assistant>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -81,11 +300,14 @@ export class Assistants extends APIResource {
    * @deprecated
    */
   delete(assistantID: string, options?: RequestOptions): APIPromise<AssistantDeleted> {
-    return this._client.delete(path`/assistants/${assistantID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/assistants/${assistantID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 
@@ -128,10 +350,10 @@ export interface Assistant {
 
   /**
    * ID of the model to use. You can use the
-   * [List models](https://platform.openai.com/docs/api-reference/models/list) API to
-   * see all of your available models, or see our
-   * [Model overview](https://platform.openai.com/docs/models) for descriptions of
-   * them.
+   * [List models](https://developers.openai.com/api/reference/resources/models/methods/list)
+   * API to see all of your available models, or see our
+   * [Model overview](https://developers.openai.com/api/docs/models) for descriptions
+   * of them.
    */
   model: string;
 
@@ -154,14 +376,14 @@ export interface Assistant {
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
-   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://developers.openai.com/api/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://developers.openai.com/api/docs/models/gpt-4-turbo), and
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
    * Outputs which ensures the model will match your supplied JSON schema. Learn more
    * in the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
    * message the model generates is valid JSON.
@@ -217,9 +439,9 @@ export namespace Assistant {
   export namespace ToolResources {
     export interface CodeInterpreter {
       /**
-       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
-       * available to the `code_interpreter`` tool. There can be a maximum of 20 files
-       * associated with the tool.
+       * A list of [file](https://developers.openai.com/api/reference/resources/files)
+       * IDs made available to the `code_interpreter`` tool. There can be a maximum of 20
+       * files associated with the tool.
        */
       file_ids?: Array<string>;
     }
@@ -227,7 +449,7 @@ export namespace Assistant {
     export interface FileSearch {
       /**
        * The ID of the
-       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
        * attached to this assistant. There can be a maximum of 1 vector store attached to
        * the assistant.
        */
@@ -263,7 +485,7 @@ export interface AssistantDeleted {
  *
  * We may add additional events over time, so we recommend handling unknown events
  * gracefully in your code. See the
- * [Assistants API quickstart](https://platform.openai.com/docs/assistants/overview)
+ * [Assistants API quickstart](https://developers.openai.com/api/docs/assistants/migration)
  * to learn how to integrate the Assistants API with streaming.
  */
 export type AssistantStreamEvent =
@@ -295,13 +517,13 @@ export type AssistantStreamEvent =
 export namespace AssistantStreamEvent {
   /**
    * Occurs when a new
-   * [thread](https://platform.openai.com/docs/api-reference/threads/object) is
+   * [thread](https://developers.openai.com/api/docs/assistants/migration) is
    * created.
    */
   export interface ThreadCreated {
     /**
      * Represents a thread that contains
-     * [messages](https://platform.openai.com/docs/api-reference/messages).
+     * [messages](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: ThreadsAPI.Thread;
 
@@ -315,12 +537,12 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a new
-   * [run](https://platform.openai.com/docs/api-reference/runs/object) is created.
+   * [run](https://developers.openai.com/api/docs/assistants/migration) is created.
    */
   export interface ThreadRunCreated {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -328,13 +550,13 @@ export namespace AssistantStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * moves to a `queued` status.
    */
   export interface ThreadRunQueued {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -342,13 +564,13 @@ export namespace AssistantStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * moves to an `in_progress` status.
    */
   export interface ThreadRunInProgress {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -356,13 +578,13 @@ export namespace AssistantStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * moves to a `requires_action` status.
    */
   export interface ThreadRunRequiresAction {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -370,13 +592,13 @@ export namespace AssistantStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * is completed.
    */
   export interface ThreadRunCompleted {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -384,13 +606,13 @@ export namespace AssistantStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * ends with status `incomplete`.
    */
   export interface ThreadRunIncomplete {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -398,13 +620,13 @@ export namespace AssistantStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * fails.
    */
   export interface ThreadRunFailed {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -412,13 +634,13 @@ export namespace AssistantStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * moves to a `cancelling` status.
    */
   export interface ThreadRunCancelling {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -426,13 +648,13 @@ export namespace AssistantStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * is cancelled.
    */
   export interface ThreadRunCancelled {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -440,13 +662,13 @@ export namespace AssistantStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * expires.
    */
   export interface ThreadRunExpired {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -455,8 +677,8 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * is created.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) is
+   * created.
    */
   export interface ThreadRunStepCreated {
     /**
@@ -469,8 +691,8 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * moves to an `in_progress` state.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) moves to
+   * an `in_progress` state.
    */
   export interface ThreadRunStepInProgress {
     /**
@@ -483,8 +705,8 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when parts of a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * are being streamed.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) are
+   * being streamed.
    */
   export interface ThreadRunStepDelta {
     /**
@@ -498,8 +720,8 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * is completed.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) is
+   * completed.
    */
   export interface ThreadRunStepCompleted {
     /**
@@ -512,8 +734,7 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * fails.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) fails.
    */
   export interface ThreadRunStepFailed {
     /**
@@ -526,8 +747,8 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * is cancelled.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) is
+   * cancelled.
    */
   export interface ThreadRunStepCancelled {
     /**
@@ -540,8 +761,7 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * expires.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) expires.
    */
   export interface ThreadRunStepExpired {
     /**
@@ -554,13 +774,13 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [message](https://platform.openai.com/docs/api-reference/messages/object) is
+   * [message](https://developers.openai.com/api/docs/assistants/migration) is
    * created.
    */
   export interface ThreadMessageCreated {
     /**
      * Represents a message within a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: MessagesAPI.Message;
 
@@ -569,13 +789,13 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [message](https://platform.openai.com/docs/api-reference/messages/object) moves
-   * to an `in_progress` state.
+   * [message](https://developers.openai.com/api/docs/assistants/migration) moves to
+   * an `in_progress` state.
    */
   export interface ThreadMessageInProgress {
     /**
      * Represents a message within a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: MessagesAPI.Message;
 
@@ -584,8 +804,8 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when parts of a
-   * [Message](https://platform.openai.com/docs/api-reference/messages/object) are
-   * being streamed.
+   * [Message](https://developers.openai.com/api/docs/assistants/migration) are being
+   * streamed.
    */
   export interface ThreadMessageDelta {
     /**
@@ -599,13 +819,13 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [message](https://platform.openai.com/docs/api-reference/messages/object) is
+   * [message](https://developers.openai.com/api/docs/assistants/migration) is
    * completed.
    */
   export interface ThreadMessageCompleted {
     /**
      * Represents a message within a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: MessagesAPI.Message;
 
@@ -614,13 +834,13 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when a
-   * [message](https://platform.openai.com/docs/api-reference/messages/object) ends
+   * [message](https://developers.openai.com/api/docs/assistants/migration) ends
    * before it is completed.
    */
   export interface ThreadMessageIncomplete {
     /**
      * Represents a message within a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: MessagesAPI.Message;
 
@@ -629,8 +849,8 @@ export namespace AssistantStreamEvent {
 
   /**
    * Occurs when an
-   * [error](https://platform.openai.com/docs/guides/error-codes#api-errors) occurs.
-   * This can happen due to an internal server error or a timeout.
+   * [error](https://developers.openai.com/api/docs/guides/error-codes#api-errors)
+   * occurs. This can happen due to an internal server error or a timeout.
    */
   export interface ErrorEvent {
     data: Shared.ErrorObject;
@@ -672,7 +892,7 @@ export namespace FileSearchTool {
      *
      * Note that the file search tool may output fewer than `max_num_results` results.
      * See the
-     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
+     * [file search tool documentation](https://developers.openai.com/api/docs/guides/tools-file-search#retrieval-customization)
      * for more information.
      */
     max_num_results?: number;
@@ -682,7 +902,7 @@ export namespace FileSearchTool {
      * will use the `auto` ranker and a score_threshold of 0.
      *
      * See the
-     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
+     * [file search tool documentation](https://developers.openai.com/api/docs/guides/tools-file-search#retrieval-customization)
      * for more information.
      */
     ranking_options?: FileSearch.RankingOptions;
@@ -694,7 +914,7 @@ export namespace FileSearchTool {
      * will use the `auto` ranker and a score_threshold of 0.
      *
      * See the
-     * [file search tool documentation](https://platform.openai.com/docs/assistants/tools/file-search#customizing-file-search-settings)
+     * [file search tool documentation](https://developers.openai.com/api/docs/guides/tools-file-search#retrieval-customization)
      * for more information.
      */
     export interface RankingOptions {
@@ -724,7 +944,7 @@ export interface FunctionTool {
 
 /**
  * Occurs when a
- * [message](https://platform.openai.com/docs/api-reference/messages/object) is
+ * [message](https://developers.openai.com/api/docs/assistants/migration) is
  * created.
  */
 export type MessageStreamEvent =
@@ -737,13 +957,13 @@ export type MessageStreamEvent =
 export namespace MessageStreamEvent {
   /**
    * Occurs when a
-   * [message](https://platform.openai.com/docs/api-reference/messages/object) is
+   * [message](https://developers.openai.com/api/docs/assistants/migration) is
    * created.
    */
   export interface ThreadMessageCreated {
     /**
      * Represents a message within a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: MessagesAPI.Message;
 
@@ -752,13 +972,13 @@ export namespace MessageStreamEvent {
 
   /**
    * Occurs when a
-   * [message](https://platform.openai.com/docs/api-reference/messages/object) moves
-   * to an `in_progress` state.
+   * [message](https://developers.openai.com/api/docs/assistants/migration) moves to
+   * an `in_progress` state.
    */
   export interface ThreadMessageInProgress {
     /**
      * Represents a message within a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: MessagesAPI.Message;
 
@@ -767,8 +987,8 @@ export namespace MessageStreamEvent {
 
   /**
    * Occurs when parts of a
-   * [Message](https://platform.openai.com/docs/api-reference/messages/object) are
-   * being streamed.
+   * [Message](https://developers.openai.com/api/docs/assistants/migration) are being
+   * streamed.
    */
   export interface ThreadMessageDelta {
     /**
@@ -782,13 +1002,13 @@ export namespace MessageStreamEvent {
 
   /**
    * Occurs when a
-   * [message](https://platform.openai.com/docs/api-reference/messages/object) is
+   * [message](https://developers.openai.com/api/docs/assistants/migration) is
    * completed.
    */
   export interface ThreadMessageCompleted {
     /**
      * Represents a message within a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: MessagesAPI.Message;
 
@@ -797,13 +1017,13 @@ export namespace MessageStreamEvent {
 
   /**
    * Occurs when a
-   * [message](https://platform.openai.com/docs/api-reference/messages/object) ends
+   * [message](https://developers.openai.com/api/docs/assistants/migration) ends
    * before it is completed.
    */
   export interface ThreadMessageIncomplete {
     /**
      * Represents a message within a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: MessagesAPI.Message;
 
@@ -813,8 +1033,8 @@ export namespace MessageStreamEvent {
 
 /**
  * Occurs when a
- * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
- * is created.
+ * [run step](https://developers.openai.com/api/docs/assistants/migration) is
+ * created.
  */
 export type RunStepStreamEvent =
   | RunStepStreamEvent.ThreadRunStepCreated
@@ -828,8 +1048,8 @@ export type RunStepStreamEvent =
 export namespace RunStepStreamEvent {
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * is created.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) is
+   * created.
    */
   export interface ThreadRunStepCreated {
     /**
@@ -842,8 +1062,8 @@ export namespace RunStepStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * moves to an `in_progress` state.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) moves to
+   * an `in_progress` state.
    */
   export interface ThreadRunStepInProgress {
     /**
@@ -856,8 +1076,8 @@ export namespace RunStepStreamEvent {
 
   /**
    * Occurs when parts of a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * are being streamed.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) are
+   * being streamed.
    */
   export interface ThreadRunStepDelta {
     /**
@@ -871,8 +1091,8 @@ export namespace RunStepStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * is completed.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) is
+   * completed.
    */
   export interface ThreadRunStepCompleted {
     /**
@@ -885,8 +1105,7 @@ export namespace RunStepStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * fails.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) fails.
    */
   export interface ThreadRunStepFailed {
     /**
@@ -899,8 +1118,8 @@ export namespace RunStepStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * is cancelled.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) is
+   * cancelled.
    */
   export interface ThreadRunStepCancelled {
     /**
@@ -913,8 +1132,7 @@ export namespace RunStepStreamEvent {
 
   /**
    * Occurs when a
-   * [run step](https://platform.openai.com/docs/api-reference/run-steps/step-object)
-   * expires.
+   * [run step](https://developers.openai.com/api/docs/assistants/migration) expires.
    */
   export interface ThreadRunStepExpired {
     /**
@@ -928,7 +1146,7 @@ export namespace RunStepStreamEvent {
 
 /**
  * Occurs when a new
- * [run](https://platform.openai.com/docs/api-reference/runs/object) is created.
+ * [run](https://developers.openai.com/api/docs/assistants/migration) is created.
  */
 export type RunStreamEvent =
   | RunStreamEvent.ThreadRunCreated
@@ -945,12 +1163,12 @@ export type RunStreamEvent =
 export namespace RunStreamEvent {
   /**
    * Occurs when a new
-   * [run](https://platform.openai.com/docs/api-reference/runs/object) is created.
+   * [run](https://developers.openai.com/api/docs/assistants/migration) is created.
    */
   export interface ThreadRunCreated {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -958,13 +1176,13 @@ export namespace RunStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * moves to a `queued` status.
    */
   export interface ThreadRunQueued {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -972,13 +1190,13 @@ export namespace RunStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * moves to an `in_progress` status.
    */
   export interface ThreadRunInProgress {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -986,13 +1204,13 @@ export namespace RunStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * moves to a `requires_action` status.
    */
   export interface ThreadRunRequiresAction {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -1000,13 +1218,13 @@ export namespace RunStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * is completed.
    */
   export interface ThreadRunCompleted {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -1014,13 +1232,13 @@ export namespace RunStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * ends with status `incomplete`.
    */
   export interface ThreadRunIncomplete {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -1028,13 +1246,13 @@ export namespace RunStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * fails.
    */
   export interface ThreadRunFailed {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -1042,13 +1260,13 @@ export namespace RunStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * moves to a `cancelling` status.
    */
   export interface ThreadRunCancelling {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -1056,13 +1274,13 @@ export namespace RunStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * is cancelled.
    */
   export interface ThreadRunCancelled {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -1070,13 +1288,13 @@ export namespace RunStreamEvent {
   }
 
   /**
-   * Occurs when a [run](https://platform.openai.com/docs/api-reference/runs/object)
+   * Occurs when a [run](https://developers.openai.com/api/docs/assistants/migration)
    * expires.
    */
   export interface ThreadRunExpired {
     /**
      * Represents an execution run on a
-     * [thread](https://platform.openai.com/docs/api-reference/threads).
+     * [thread](https://developers.openai.com/api/docs/assistants/migration).
      */
     data: RunsAPI.Run;
 
@@ -1086,13 +1304,13 @@ export namespace RunStreamEvent {
 
 /**
  * Occurs when a new
- * [thread](https://platform.openai.com/docs/api-reference/threads/object) is
+ * [thread](https://developers.openai.com/api/docs/assistants/migration) is
  * created.
  */
 export interface ThreadStreamEvent {
   /**
    * Represents a thread that contains
-   * [messages](https://platform.openai.com/docs/api-reference/messages).
+   * [messages](https://developers.openai.com/api/docs/assistants/migration).
    */
   data: ThreadsAPI.Thread;
 
@@ -1107,10 +1325,10 @@ export interface ThreadStreamEvent {
 export interface AssistantCreateParams {
   /**
    * ID of the model to use. You can use the
-   * [List models](https://platform.openai.com/docs/api-reference/models/list) API to
-   * see all of your available models, or see our
-   * [Model overview](https://platform.openai.com/docs/models) for descriptions of
-   * them.
+   * [List models](https://developers.openai.com/api/reference/resources/models/methods/list)
+   * API to see all of your available models, or see our
+   * [Model overview](https://developers.openai.com/api/docs/models) for descriptions
+   * of them.
    */
   model: (string & {}) | Shared.ChatModel;
 
@@ -1145,21 +1363,21 @@ export interface AssistantCreateParams {
    * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
    * reasoning effort can result in faster responses and fewer tokens used on
    * reasoning in a response. Not all reasoning models support every value. See the
-   * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+   * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
    * model-specific support.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
-   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://developers.openai.com/api/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://developers.openai.com/api/docs/models/gpt-4-turbo), and
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
    * Outputs which ensures the model will match your supplied JSON schema. Learn more
    * in the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
    * message the model generates is valid JSON.
@@ -1222,9 +1440,9 @@ export namespace AssistantCreateParams {
   export namespace ToolResources {
     export interface CodeInterpreter {
       /**
-       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
-       * available to the `code_interpreter` tool. There can be a maximum of 20 files
-       * associated with the tool.
+       * A list of [file](https://developers.openai.com/api/reference/resources/files)
+       * IDs made available to the `code_interpreter` tool. There can be a maximum of 20
+       * files associated with the tool.
        */
       file_ids?: Array<string>;
     }
@@ -1232,7 +1450,7 @@ export namespace AssistantCreateParams {
     export interface FileSearch {
       /**
        * The
-       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
        * attached to this assistant. There can be a maximum of 1 vector store attached to
        * the assistant.
        */
@@ -1240,7 +1458,7 @@ export namespace AssistantCreateParams {
 
       /**
        * A helper to create a
-       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
        * with file_ids and attach it to this assistant. There can be a maximum of 1
        * vector store attached to the assistant.
        */
@@ -1256,10 +1474,10 @@ export namespace AssistantCreateParams {
         chunking_strategy?: VectorStore.Auto | VectorStore.Static;
 
         /**
-         * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
-         * add to the vector store. For vector stores created before Nov 2025, there can be
-         * a maximum of 10,000 files in a vector store. For vector stores created starting
-         * in Nov 2025, the limit is 100,000,000 files.
+         * A list of [file](https://developers.openai.com/api/reference/resources/files)
+         * IDs to add to the vector store. For vector stores created before Nov 2025, there
+         * can be a maximum of 10,000 files in a vector store. For vector stores created
+         * starting in Nov 2025, the limit is 100,000,000 files.
          */
         file_ids?: Array<string>;
 
@@ -1340,10 +1558,10 @@ export interface AssistantUpdateParams {
 
   /**
    * ID of the model to use. You can use the
-   * [List models](https://platform.openai.com/docs/api-reference/models/list) API to
-   * see all of your available models, or see our
-   * [Model overview](https://platform.openai.com/docs/models) for descriptions of
-   * them.
+   * [List models](https://developers.openai.com/api/reference/resources/models/methods/list)
+   * API to see all of your available models, or see our
+   * [Model overview](https://developers.openai.com/api/docs/models) for descriptions
+   * of them.
    */
   model?:
     | (string & {})
@@ -1400,21 +1618,21 @@ export interface AssistantUpdateParams {
    * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
    * reasoning effort can result in faster responses and fewer tokens used on
    * reasoning in a response. Not all reasoning models support every value. See the
-   * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+   * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
    * model-specific support.
    */
   reasoning_effort?: Shared.ReasoningEffort | null;
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
-   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://developers.openai.com/api/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://developers.openai.com/api/docs/models/gpt-4-turbo), and
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
    * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
    * Outputs which ensures the model will match your supplied JSON schema. Learn more
    * in the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
    *
    * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
    * message the model generates is valid JSON.
@@ -1478,9 +1696,9 @@ export namespace AssistantUpdateParams {
     export interface CodeInterpreter {
       /**
        * Overrides the list of
-       * [file](https://platform.openai.com/docs/api-reference/files) IDs made available
-       * to the `code_interpreter` tool. There can be a maximum of 20 files associated
-       * with the tool.
+       * [file](https://developers.openai.com/api/reference/resources/files) IDs made
+       * available to the `code_interpreter` tool. There can be a maximum of 20 files
+       * associated with the tool.
        */
       file_ids?: Array<string>;
     }
@@ -1488,7 +1706,7 @@ export namespace AssistantUpdateParams {
     export interface FileSearch {
       /**
        * Overrides the
-       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
        * attached to this assistant. There can be a maximum of 1 vector store attached to
        * the assistant.
        */

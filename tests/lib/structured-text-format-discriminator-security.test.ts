@@ -53,38 +53,23 @@ const formatFactories: FormatFactory[] = [
   {
     name: 'Zod v3',
     expectedParsed: { city: 'Paris' },
-    create: (metadata) =>
-      zodTextFormat(
-        zodV3.object({ city: zodV3.string() }),
-        trustedName,
-        metadata as Parameters<typeof zodTextFormat>[2],
-      ),
+    create: (metadata) => zodTextFormat(zodV3.object({ city: zodV3.string() }), trustedName, metadata),
   },
   {
     name: 'Zod v4',
     expectedParsed: { city: 'Paris' },
-    create: (metadata) =>
-      zodTextFormat(
-        zodV4.object({ city: zodV4.string() }),
-        trustedName,
-        metadata as Parameters<typeof zodTextFormat>[2],
-      ),
+    create: (metadata) => zodTextFormat(zodV4.object({ city: zodV4.string() }), trustedName, metadata),
   },
   {
     name: 'Zod v4 mini',
     expectedParsed: { city: 'Paris' },
     create: (metadata) =>
-      zodTextFormat(
-        zodV4Mini.object({ city: zodV4Mini.string() }),
-        trustedName,
-        metadata as Parameters<typeof zodTextFormat>[2],
-      ),
+      zodTextFormat(zodV4Mini.object({ city: zodV4Mini.string() }), trustedName, metadata),
   },
   {
     name: 'Standard Schema',
     expectedParsed: { city: 'Paris', normalized: true },
-    create: (metadata) =>
-      standardTextFormat(standardSchema, trustedName, metadata as Parameters<typeof standardTextFormat>[2]),
+    create: (metadata) => standardTextFormat(standardSchema, trustedName, metadata),
   },
 ];
 
@@ -173,7 +158,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
 
   test('evaluates an enumerable discriminator getter exactly once', () => {
     let getterCalls = 0;
-    const metadata: UnsafeFormatMetadata = { description: trustedDescription };
+    const metadata = { description: trustedDescription };
     Object.defineProperty(metadata, 'type', {
       configurable: true,
       enumerable: true,
@@ -192,10 +177,11 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
   });
 
   test('ignores inherited and non-enumerable metadata discriminators', () => {
+    // SAFETY: This locally constructed hostile metadata fixture deliberately retains inherited, symbol, or prototype-named fields for the security regression.
     const inherited = Object.assign(Object.create({ type: 'text' }), {
       description: trustedDescription,
     }) as UnsafeFormatMetadata;
-    const hidden: UnsafeFormatMetadata = { description: trustedDescription };
+    const hidden = { description: trustedDescription };
     Object.defineProperty(hidden, 'type', { value: 'json_object', enumerable: false });
 
     expectTrustedFormat(create(inherited));
@@ -204,19 +190,21 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
 
   test('preserves enumerable symbols and prototype-safe metadata entries', () => {
     const metadataSymbol = Symbol('synthetic-format-metadata');
+    // SAFETY: This locally constructed hostile metadata fixture deliberately retains inherited, symbol, or prototype-named fields for the security regression.
     const metadata = JSON.parse(
       '{"type":"text","description":"Return validated weather details","__proto__":{"polluted":"no"}}',
     ) as UnsafeFormatMetadata;
     metadata[metadataSymbol] = 'preserved';
 
     const format = create(metadata);
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Deliberately mutate format metadata beyond its declared discriminator to test captured parser invariants.
     const record = format as unknown as UnsafeFormatMetadata;
 
     expectTrustedFormat(format);
     expect(record[metadataSymbol]).toBe('preserved');
     expect(Object.getPrototypeOf(format)).toBe(Object.prototype);
     expect(Object.getOwnPropertyDescriptor(format, '__proto__')?.value).toEqual({ polluted: 'no' });
-    expect((Object.prototype as Record<string, unknown>)['polluted']).toBeUndefined();
+    expect(Object.prototype).not.toHaveProperty('polluted');
   });
 
   test('keeps parsing metadata non-enumerable and replaces caller-supplied parser markers', () => {
@@ -277,6 +265,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
       }));
       const getter = vi.fn(() => serializer);
       const metadataSymbol = Symbol('preserved-serializer-metadata');
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- The fixture adds toJSON dynamically to compare hostile callable and accessor metadata.
       const metadata: UnsafeFormatMetadata = {
         description: trustedDescription,
         [metadataSymbol]: 'preserved',
@@ -294,7 +283,8 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
       Object.freeze(metadata);
 
       let requestBody: { text?: { format?: Record<string, unknown> } } | undefined;
-      const fetch = vi.fn(async (_request: unknown, init?: RequestInit) => {
+      const fetch = vi.fn(async (_request: string | URL | Request, init?: RequestInit) => {
+        // SAFETY: Decode the synthetic request or serialized format produced in this test to inspect the protected discriminator and schema fields.
         requestBody = JSON.parse(init?.body as string) as typeof requestBody;
         return Response.json(makeResponsePayload(), { status: 200 });
       });
@@ -327,6 +317,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
       expect(serializer).not.toHaveBeenCalled();
       expect(getter).toHaveBeenCalledTimes(useAccessor ? 1 : 0);
       expect(Object.getOwnPropertyDescriptor(format, 'toJSON')).toBeUndefined();
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Inspect the synthetic symbol property preserved outside the published text format type.
       expect((format as unknown as UnsafeFormatMetadata)[metadataSymbol]).toBe('preserved');
       expect(Object.isFrozen(metadata)).toBe(true);
       expect(response.output_parsed).toEqual(expectedParsed);
@@ -336,16 +327,17 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
   test('ignores inherited and non-enumerable metadata serialization hooks', () => {
     const inheritedSerializer = vi.fn(() => ({ type: 'text' }));
     const hiddenSerializer = vi.fn(() => ({ type: 'json_object' }));
+    // SAFETY: This locally constructed hostile metadata fixture deliberately retains inherited, symbol, or prototype-named fields for the security regression.
     const inherited = Object.assign(Object.create({ toJSON: inheritedSerializer }), {
       description: trustedDescription,
     }) as UnsafeFormatMetadata;
-    const hidden: UnsafeFormatMetadata = { description: trustedDescription };
+    const hidden = { description: trustedDescription };
     Object.defineProperty(hidden, 'toJSON', { enumerable: false, value: hiddenSerializer });
 
     for (const metadata of [inherited, hidden]) {
       const format = create(metadata);
       const wire = JSON.stringify(format);
-      const serialized = JSON.parse(wire) as Record<string, unknown>;
+      const serialized: unknown = JSON.parse(wire);
 
       expectTrustedFormat(format);
       expect(serialized).toMatchObject({ type: 'json_schema', name: trustedName, strict: true });
@@ -360,7 +352,8 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
     'sends a strict schema and validates the public Responses parse result despite %s metadata',
     async (override) => {
       let requestBody: { text?: { format?: Record<string, unknown> } } | undefined;
-      const fetch = vi.fn(async (_request: unknown, init?: RequestInit) => {
+      const fetch = vi.fn(async (_request: string | URL | Request, init?: RequestInit) => {
+        // SAFETY: Decode the synthetic request or serialized format produced in this test to inspect the protected discriminator and schema fields.
         requestBody = JSON.parse(init?.body as string) as typeof requestBody;
         return Response.json(makeResponsePayload(), { status: 200 });
       });
@@ -408,6 +401,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
     expect(format.$parseRaw(responseText)).toEqual(expectedParsed);
     expect(() => format.$parseRaw('{"city":42}')).toThrow();
 
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Deliberately mutate format metadata beyond its declared discriminator to test captured parser invariants.
     const mutableFormat = format as unknown as UnsafeFormatMetadata;
     mutableFormat['type'] = 'text';
     mutableFormat['strict'] = false;
@@ -416,7 +410,7 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
 
   test('preserves exceptions from hostile metadata getters', () => {
     const failure = new Error('synthetic metadata getter failure');
-    const metadata: UnsafeFormatMetadata = { description: trustedDescription };
+    const metadata = { description: trustedDescription };
     Object.defineProperty(metadata, 'type', {
       enumerable: true,
       get: () => {
@@ -430,9 +424,11 @@ describe.each(formatFactories)('$name structured text-format integrity', ({ crea
 
 describe('shared structured text-format factory', () => {
   test('normalizes a direct malformed factory input without mutating its frozen configuration', () => {
+    // SAFETY: The custom parser consumes the literal responseText fixture containing the declared city string.
     const parser = vi.fn((content: string) => JSON.parse(content) as ParsedWeather);
     const original = Object.freeze({
-      type: 'text' as unknown as 'json_schema',
+      // SAFETY: Deliberately supply the wrong discriminator while keeping a parser attached to test runtime discriminator validation.
+      type: 'text' as 'json_schema',
       name: trustedName,
       strict: true,
       description: trustedDescription,
@@ -459,6 +455,7 @@ describe('shared structured text-format factory', () => {
       strict: false,
       schema: { type: 'string' },
     }));
+    // SAFETY: The custom parser consumes the literal responseText fixture containing the declared city string.
     const parser = vi.fn((content: string) => JSON.parse(content) as ParsedWeather);
     const original = Object.freeze({
       type: 'json_schema' as const,
@@ -476,6 +473,7 @@ describe('shared structured text-format factory', () => {
 
     const format = makeParseableTextFormat(original, parser);
     const wire = JSON.stringify({ text: { format } });
+    // SAFETY: Decode the synthetic request or serialized format produced in this test to inspect the protected discriminator and schema fields.
     const serialized = JSON.parse(wire) as {
       text: { format: Record<string, unknown> };
     };
@@ -501,6 +499,7 @@ describe('shared structured text-format factory', () => {
       properties: { city: { type: 'string', minLength: 2 } },
       required: ['city'],
     };
+    // SAFETY: Deliberately include caller-controlled format/schema metadata to verify protected structured-format fields cannot be replaced.
     const format = standardTextFormat(standardSchema, trustedName, {
       schema: customSchema,
       description: trustedDescription,

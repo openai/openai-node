@@ -32,6 +32,7 @@ async function collect<T>(stream: AsyncIterable<T>): Promise<T[]> {
   return values;
 }
 
+// oxlint-disable-next-line anti-slop/no-object-parameters -- These fixtures send minimal wire fragments from several streaming APIs without assuming one event schema.
 function clientFor(event: object): OpenAI {
   const bytes = encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
   return new OpenAI({

@@ -7,9 +7,9 @@ import type { BodyInit } from '../../internal/builtin-types';
 import {
   assertBedrockRequestOrigin,
   assertProviderOwnsAuthorization,
-  errorWithCause,
   normalizeOptionalString,
   parseBedrockEndpointHostname,
+  prepareBedrockAuth,
   resolveBedrockBearerAuth,
   resolveBedrockEndpoint,
 } from '../../internal/bedrock';
@@ -96,11 +96,12 @@ function validateStaticCredentials(options: BedrockProviderOptions): AwsCredenti
   return {
     accessKeyId: options.accessKeyId,
     secretAccessKey: options.secretAccessKey,
+    // Spread creates an own data property without invoking inherited setters or changing the object prototype.
     ...(options.sessionToken ? { sessionToken: options.sessionToken } : {}),
   };
 }
 
-function requestTarget(parsedURL: URL): { path: string; query: Record<string, string | string[]> } {
+function requestTarget(parsedURL: URL) {
   const query: Record<string, string | string[]> = Object.create(null);
   for (const [name, value] of parsedURL.searchParams) {
     if (name === '__proto__') {
@@ -115,7 +116,7 @@ function requestTarget(parsedURL: URL): { path: string; query: Record<string, st
     } else if (typeof existing === 'string') {
       query[name] = [existing, value];
     } else {
-      query[name] = [...existing, value];
+      existing.push(value);
     }
   }
   return { path: parsedURL.pathname, query };
@@ -194,14 +195,15 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
     }));
   }
 
-  async prepareRequest(request: FinalizedRequestInit, { url }: ProviderRequestContext): Promise<void> {
+  async prepareRequest(request: FinalizedRequestInit, context: ProviderRequestContext): Promise<void> {
+    // SAFETY: process is optional outside Node; the native process tag is checked before using Node-specific signing and credential behavior.
     if (Object.prototype.toString.call((globalThis as any).process) !== '[object process]') {
       throw new Errors.OpenAIError(
         'Bedrock AWS credential authentication is only supported in Node.js and compatible server runtimes. Use bearer authentication in this runtime.',
       );
     }
 
-    const parsedURL = new URL(url);
+    const parsedURL = new URL(context.url);
     const canonicalEndpoint = parseBedrockEndpointHostname(parsedURL.hostname);
     if (canonicalEndpoint && canonicalEndpoint.endpoint !== this.options.endpoint) {
       throw new Errors.OpenAIError(
@@ -225,27 +227,28 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
     const body = signableBody(request.body);
     const target = requestTarget(parsedURL);
 
-    let signed: { headers: Record<string, string> };
-    try {
-      signed = await this.signatureV4().sign({
-        protocol: parsedURL.protocol,
-        hostname: parsedURL.hostname,
-        ...(parsedURL.port ? { port: Number(parsedURL.port) } : {}),
-        method,
-        ...target,
-        headers: Object.fromEntries(headers.entries()),
-        ...(body === undefined ? {} : { body }),
-      });
-    } catch (cause) {
-      const message = this.options.usesDefaultChain
+    await prepareBedrockAuth(request, context, {
+      resolve: () =>
+        this.signatureV4().sign({
+          protocol: parsedURL.protocol,
+          hostname: parsedURL.hostname,
+          // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+          ...(parsedURL.port ? { port: Number(parsedURL.port) } : {}),
+          method,
+          ...target,
+          headers: Object.fromEntries(headers.entries()),
+          // Spread creates an own data property without invoking inherited setters or changing the object prototype.
+          ...(body === undefined ? {} : { body }),
+        }),
+      failureMessage: this.options.usesDefaultChain
         ? 'Could not find credentials for Bedrock. Pass AWS credentials to `bedrock(...)` or configure the default AWS credential chain.'
-        : 'Failed to resolve AWS credentials for Bedrock. Verify your AWS profile, environment variables, or runtime identity configuration and try again.';
-      throw errorWithCause(message, cause);
-    }
-
-    request.method = method;
-    request.redirect = 'manual';
-    request.headers = new Headers(signed.headers);
+        : 'Failed to resolve AWS credentials for Bedrock. Verify your AWS profile, environment variables, or runtime identity configuration and try again.',
+      apply: (signed) => {
+        request.method = method;
+        request.redirect = 'manual';
+        request.headers = new Headers(signed.headers);
+      },
+    });
   }
 }
 

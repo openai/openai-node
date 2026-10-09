@@ -1,5 +1,574 @@
 # Changelog
 
+## [7.31.0](https://github.com/openai/openai-node/compare/v7.30.1...v7.31.0) (2026-10-09)
+
+
+### Features
+
+* **api:** add prewarmed hosted environments ([#2898](https://github.com/openai/openai-node/issues/2898)) ([7a0be86](https://github.com/openai/openai-node/commit/7a0be8677196fbd29e565f583a694fedc63524df))
+
+## [7.30.1](https://github.com/openai/openai-node/compare/v7.30.0...v7.30.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* **api:** correct custom voice creation parameters ([#2895](https://github.com/openai/openai-node/issues/2895)) ([3edaf0f](https://github.com/openai/openai-node/commit/3edaf0f3c3f9a366b6993773d231002fa59c3b4d))
+* **deps-dev:** bump @aws-sdk/credential-provider-node from 3.972.83 to 3.972.84 ([#2877](https://github.com/openai/openai-node/issues/2877)) ([0878349](https://github.com/openai/openai-node/commit/08783493ba6d633abfcd31fdc80d85ae0c44cb56))
+* **deps-dev:** bump @smithy/signature-v4 from 5.7.3 to 5.7.4 ([#2870](https://github.com/openai/openai-node/issues/2870)) ([12ce5f2](https://github.com/openai/openai-node/commit/12ce5f2608dfd16b39d2534f523d059a40c2f6d5))
+* **deps-dev:** bump jest from 30.5.1 to 30.5.2 ([#2867](https://github.com/openai/openai-node/issues/2867)) ([48b5c2a](https://github.com/openai/openai-node/commit/48b5c2a643d9e3a19789e584b4d90d6afd9ddf8f))
+* **deps-dev:** bump oxfmt from 0.67.0 to 0.70.0 ([#2864](https://github.com/openai/openai-node/issues/2864)) ([91a226d](https://github.com/openai/openai-node/commit/91a226d4b1054748e169b6fb9d032dc503b9022b))
+* **deps-dev:** bump puppeteer from 25.11.0 to 25.12.0 in /ecosystem-tests/browser-direct-import ([#2863](https://github.com/openai/openai-node/issues/2863)) ([89ded6b](https://github.com/openai/openai-node/commit/89ded6bd221c2f814a9453408549bc3ed31f36e8))
+* **deps-dev:** bump puppeteer from 25.11.0 to 25.12.0 in /ecosystem-tests/ts-browser-webpack ([#2876](https://github.com/openai/openai-node/issues/2876)) ([6ef1b6e](https://github.com/openai/openai-node/commit/6ef1b6e0ac3787a43d436b7c880a0d8e26b2f8ae))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/cloudflare-worker ([#2865](https://github.com/openai/openai-node/issues/2865)) ([ef61ce0](https://github.com/openai/openai-node/commit/ef61ce088e74df00db6b8758d384f64e9b8b92a5))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/node-ts-cjs ([#2869](https://github.com/openai/openai-node/issues/2869)) ([5aab61c](https://github.com/openai/openai-node/commit/5aab61c9c0d23f3239b3d6401af6543ce423be65))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/node-ts-cjs-web ([#2871](https://github.com/openai/openai-node/issues/2871)) ([285f879](https://github.com/openai/openai-node/commit/285f8798c7bf394f4ebf7837db4551919d0f19a5))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/node-ts-esm ([#2872](https://github.com/openai/openai-node/issues/2872)) ([3ea3374](https://github.com/openai/openai-node/commit/3ea337432a637d79d58251fd888b7a47089f3d90))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/node-ts-esm-auto ([#2873](https://github.com/openai/openai-node/issues/2873)) ([34e0877](https://github.com/openai/openai-node/commit/34e0877933821827f2af32f660d18b1030be1c32))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/node-ts-esm-web ([#2875](https://github.com/openai/openai-node/issues/2875)) ([03342c5](https://github.com/openai/openai-node/commit/03342c5b7887c4760529d4d18712101b19fa8803))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.14 in /ecosystem-tests/vercel-edge ([#2878](https://github.com/openai/openai-node/issues/2878)) ([1149531](https://github.com/openai/openai-node/commit/11495311c57e00b262d6d37995d8e222b9631f3a))
+* **deps-dev:** bump yargs from 18.1.0 to 18.2.0 ([#2874](https://github.com/openai/openai-node/issues/2874)) ([b1916d4](https://github.com/openai/openai-node/commit/b1916d4851e1c3ab551ef3ad157b031566511cb7))
+* **deps:** refresh development and ecosystem dependencies ([#2889](https://github.com/openai/openai-node/issues/2889)) ([68d22b9](https://github.com/openai/openai-node/commit/68d22b9d770f46f332270582c302b0618d7318f3))
+* **responses:** parse structured text only in final message phases ([#2893](https://github.com/openai/openai-node/issues/2893)) ([534e691](https://github.com/openai/openai-node/commit/534e691da6979e75c17a14bc04f1daff81fdbeef))
+* **uploads:** decode inferred URL filenames safely ([#2892](https://github.com/openai/openai-node/issues/2892)) ([30d50ab](https://github.com/openai/openai-node/commit/30d50ab301f4c348726d1fcb9c51a84cb8feb71a))
+
+## [7.30.0](https://github.com/openai/openai-node/compare/v7.29.0...v7.30.0) (2026-10-06)
+
+
+### Features
+
+* **api:** add standalone Decisions support ([#2886](https://github.com/openai/openai-node/issues/2886)) ([7195644](https://github.com/openai/openai-node/commit/7195644a4fa98d4d379903a00e6ba6350136ab02))
+
+## [7.29.0](https://github.com/openai/openai-node/compare/v7.28.0...v7.29.0) (2026-10-05)
+
+
+### Features
+
+* **agents:** observe local tool failures ([#2861](https://github.com/openai/openai-node/issues/2861)) ([3808241](https://github.com/openai/openai-node/commit/3808241ef383864689df7fd3a7fda35000df0bc1))
+* **agents:** run local tools during session creation streams ([#2862](https://github.com/openai/openai-node/issues/2862)) ([7423ac3](https://github.com/openai/openai-node/commit/7423ac3e9351c46300cd094479cded5551a72eb4))
+* **tools:** support tool search (defer_loading=true) in typed function helpers ([#2880](https://github.com/openai/openai-node/issues/2880)) ([3fb01eb](https://github.com/openai/openai-node/commit/3fb01eb05fbc16d9953670264ea3b63c16e4af87))
+
+## [7.28.0](https://github.com/openai/openai-node/compare/v7.27.0...v7.28.0) (2026-10-02)
+
+
+### Features
+
+* **api:** add custom voice creation and agent session events ([#2858](https://github.com/openai/openai-node/issues/2858)) ([11b9283](https://github.com/openai/openai-node/commit/11b9283f2a22737e273ccc1593d01af5cf584a0b))
+
+## [7.27.0](https://github.com/openai/openai-node/compare/v7.26.0...v7.27.0) (2026-10-01)
+
+
+### Features
+
+* **agents:** prepare hosted files and download result artifacts ([#2855](https://github.com/openai/openai-node/issues/2855)) ([7b5a9e0](https://github.com/openai/openai-node/commit/7b5a9e0113ead1b35d43cbd86a2869481fce7e22))
+
+## [7.26.0](https://github.com/openai/openai-node/compare/v7.25.0...v7.26.0) (2026-10-01)
+
+
+### Features
+
+* collect final output from beta Agents streams ([#2850](https://github.com/openai/openai-node/issues/2850)) ([71d2412](https://github.com/openai/openai-node/commit/71d24120c4cc4e5897a767f16d25f2804fa4ad7c))
+* **agents:** [1/n] parse typed output from agent streams ([#2853](https://github.com/openai/openai-node/issues/2853)) ([95b197b](https://github.com/openai/openai-node/commit/95b197b6b35c84bb7da322c3e5eb9adf1d1f79e7))
+* **api:** Add agent session trace listing ([#2845](https://github.com/openai/openai-node/issues/2845)) ([c6dd4c7](https://github.com/openai/openai-node/commit/c6dd4c75d0c864ad2f7e7c9df9a10310fd34fe44))
+* **beta:** bind typed application functions to Agents tools ([#2852](https://github.com/openai/openai-node/issues/2852)) ([6198ba0](https://github.com/openai/openai-node/commit/6198ba0d659084e34f540e9e8fa6c9ef86306ba1))
+
+
+### Bug Fixes
+
+* **api:** allow original image detail in Chat Completions ([#2851](https://github.com/openai/openai-node/issues/2851)) ([a3c1af5](https://github.com/openai/openai-node/commit/a3c1af5506ccf1349ababf813a5b23ae49a19486))
+* **api:** correct the eval run cancellation endpoint ([#2847](https://github.com/openai/openai-node/issues/2847)) ([2f77415](https://github.com/openai/openai-node/commit/2f7741598593ac3f9d162807426e43a3f7de9557))
+* **deps-dev:** bump @swc/core from 1.16.1 to 1.16.2 ([#2827](https://github.com/openai/openai-node/issues/2827)) ([ff26e64](https://github.com/openai/openai-node/commit/ff26e64c9e509e3b744f6f11df98667d95389fac))
+* **deps-dev:** bump puppeteer from 25.10.0 to 25.11.0 in /ecosystem-tests/browser-direct-import ([#2823](https://github.com/openai/openai-node/issues/2823)) ([53f8877](https://github.com/openai/openai-node/commit/53f88770dd43ce8747014c45ee894df6671f15b2))
+* **deps-dev:** bump puppeteer from 25.10.0 to 25.11.0 in /ecosystem-tests/ts-browser-webpack ([#2830](https://github.com/openai/openai-node/issues/2830)) ([2ac0cf2](https://github.com/openai/openai-node/commit/2ac0cf227fc7bcae31173392378939c2b3e7c4a8))
+* **deps-dev:** bump webpack from 5.110.3 to 5.111.1 in /ecosystem-tests/ts-browser-webpack ([#2828](https://github.com/openai/openai-node/issues/2828)) ([89de47a](https://github.com/openai/openai-node/commit/89de47a46ca562cc2ede953c81e55790ffd6f0ee))
+* **deps-dev:** bump wrangler from 4.131.1 to 4.135.0 in /ecosystem-tests/cloudflare-worker ([#2824](https://github.com/openai/openai-node/issues/2824)) ([8c2e159](https://github.com/openai/openai-node/commit/8c2e1593dea895b4a18819446239b8a1f8912ef2))
+* **deps-dev:** update Vercel CLI to remove legacy proxy dependencies ([#2835](https://github.com/openai/openai-node/issues/2835)) ([94395e8](https://github.com/openai/openai-node/commit/94395e8babb191c712a8bc6741e2ffbb017d3e09))
+* **deps-dev:** upgrade Vitest and migrate performance benchmarks ([#2831](https://github.com/openai/openai-node/issues/2831)) ([a1421b1](https://github.com/openai/openai-node/commit/a1421b1025e4815f0c535d44423338d3449d81d9))
+* **deps:** bump @azure/identity from 4.13.2 to 4.13.3 ([#2825](https://github.com/openai/openai-node/issues/2825)) ([bfa2dec](https://github.com/openai/openai-node/commit/bfa2decd67042babe165c68d4bee8be248e447e8))
+* **deps:** bump dotenv from 17.4.2 to 18.0.1 ([#2822](https://github.com/openai/openai-node/issues/2822)) ([6d0a62c](https://github.com/openai/openai-node/commit/6d0a62c39c0a51963b90a20e257f733813d9fbf3))
+* **deps:** bump zod from 4.5.4 to 4.6.5 ([#2829](https://github.com/openai/openai-node/issues/2829)) ([d2e9a06](https://github.com/openai/openai-node/commit/d2e9a0614e2dc3975f44d20d814146466d243ae4))
+* **responses:** refresh credentials on WebSocket reconnects ([#2856](https://github.com/openai/openai-node/issues/2856)) ([0afb3da](https://github.com/openai/openai-node/commit/0afb3da338c3737e82f5404d046de3ea074cce5d))
+* **responses:** reserve lane IDs across WebSocket session replacements ([#2842](https://github.com/openai/openai-node/issues/2842)) ([8b5e176](https://github.com/openai/openai-node/commit/8b5e1767203cf1fda1e2fa35fdc86a3b734c5a2a))
+
+
+### Chores
+
+* **api:** retain WebRTC Live session transport types ([#2846](https://github.com/openai/openai-node/issues/2846)) ([9798c93](https://github.com/openai/openai-node/commit/9798c931c519f980970882255e806dac22ff4e74))
+
+## [7.25.0](https://github.com/openai/openai-node/compare/v7.24.0...v7.25.0) (2026-09-29)
+
+
+### Features
+
+* **api:** add computer use to beta agents ([#2837](https://github.com/openai/openai-node/issues/2837)) ([f982249](https://github.com/openai/openai-node/commit/f98224927efcc518461846372cedaec2636fd9d4))
+
+## [7.24.0](https://github.com/openai/openai-node/compare/v7.23.0...v7.24.0) (2026-09-29)
+
+
+### Features
+
+* **api:** add Agents credential and session options ([#2812](https://github.com/openai/openai-node/issues/2812)) ([c0edae4](https://github.com/openai/openai-node/commit/c0edae4949952a015308e2ac67e98dc39ee5425a))
+* **api:** add Cyber access programs to Responses ([#2804](https://github.com/openai/openai-node/issues/2804)) ([51dbefe](https://github.com/openai/openai-node/commit/51dbefe2112753507e0de530215ff3e0063b0867))
+* **api:** add GPT-6.1 Sol model identifier ([#2836](https://github.com/openai/openai-node/issues/2836)) ([6492a63](https://github.com/openai/openai-node/commit/6492a63515b3d5573c2e3b1ebb740dec07a8a929))
+* **api:** add Realtime Translation client secret creation ([#2819](https://github.com/openai/openai-node/issues/2819)) ([441f33b](https://github.com/openai/openai-node/commit/441f33bcc37b46bc6911bacf9d68ef9232bbe265))
+* **realtime:** add dedicated Node translation WebSocket ([#2818](https://github.com/openai/openai-node/issues/2818)) ([d0616b8](https://github.com/openai/openai-node/commit/d0616b81c9a0d9cdf924903e5f1e364957e3c7e9))
+* **responses:** add opt-in WebSocket incremental output snapshots ([#2817](https://github.com/openai/openai-node/issues/2817)) ([4e4ea69](https://github.com/openai/openai-node/commit/4e4ea69ba4a4087b3ce46d7981bc96aedf8e06c8))
+
+
+### Bug Fixes
+
+* **client:** preserve base URL queries when joining relative endpoints ([#2816](https://github.com/openai/openai-node/issues/2816)) ([7ffba2d](https://github.com/openai/openai-node/commit/7ffba2de9feb8d62879a3029012fcba69fae826f))
+* **deps-dev:** bump @arethetypeswrong/cli from 0.18.3 to 0.18.5 ([#2783](https://github.com/openai/openai-node/issues/2783)) ([64ba34f](https://github.com/openai/openai-node/commit/64ba34f598a1ee477de117eae22ca013cb60acdf))
+* **deps-dev:** bump @aws-sdk/credential-provider-node from 3.972.81 to 3.972.83 ([#2784](https://github.com/openai/openai-node/issues/2784)) ([8e02310](https://github.com/openai/openai-node/commit/8e0231061b7f92992ee8d82cbeb8c421234a0f36))
+* **deps-dev:** bump @cloudflare/workers-types from 5.20260906.1 to 5.20260911.1 in /ecosystem-tests/cloudflare-worker ([#2780](https://github.com/openai/openai-node/issues/2780)) ([648324d](https://github.com/openai/openai-node/commit/648324dadbf18b49f8e3fa21dd3f1ebcf461de30))
+* **deps-dev:** bump publint from 0.3.23 to 0.3.24 ([#2781](https://github.com/openai/openai-node/issues/2781)) ([b99cab7](https://github.com/openai/openai-node/commit/b99cab7ab8e09e693c4ce71f4f3b35d790239439))
+* **deps-dev:** bump ultracite from 7.11.0 to 7.11.1 ([#2785](https://github.com/openai/openai-node/issues/2785)) ([1743718](https://github.com/openai/openai-node/commit/17437186cf9ad5c1fdb1acb72d2562a7d9c211af))
+* **deps-dev:** bump wrangler from 4.129.0 to 4.131.1 in /ecosystem-tests/cloudflare-worker ([#2782](https://github.com/openai/openai-node/issues/2782)) ([361124c](https://github.com/openai/openai-node/commit/361124c96c0cc5111b735e5e6e0beee92c921fef))
+* **live:** prevent hangs on fractional transcript grouping deadlines ([#2814](https://github.com/openai/openai-node/issues/2814)) ([82829b6](https://github.com/openai/openai-node/commit/82829b699d1e000c5c5ce90a7f701cb0b441ccf4))
+* **live:** prevent replay of delivery-uncertain queued writes ([#2833](https://github.com/openai/openai-node/issues/2833)) ([53060b2](https://github.com/openai/openai-node/commit/53060b219b27634ae0090185e0bc8467b040ab87))
+* **responses:** preserve supported streamed logprobs and provisional metadata ([#2821](https://github.com/openai/openai-node/issues/2821)) ([4eabd6d](https://github.com/openai/openai-node/commit/4eabd6d6ede32b04e30e9cf1adfbde04e6f45069))
+
+
+### Chores
+
+* **api:** clarify approximate web search location defaults ([#2802](https://github.com/openai/openai-node/issues/2802)) ([87a98d4](https://github.com/openai/openai-node/commit/87a98d4f3519dd6aa04974d27536f32a350f39f6))
+* **api:** clarify documented API error responses ([#2810](https://github.com/openai/openai-node/issues/2810)) ([1a17c2c](https://github.com/openai/openai-node/commit/1a17c2c42a09504c8aeaf29767e85ad8cebf62cd))
+* **api:** clarify Realtime modality array definitions ([#2803](https://github.com/openai/openai-node/issues/2803)) ([d454fe1](https://github.com/openai/openai-node/commit/d454fe1163eb9509e0cb6338e63b426ff165484a))
+* **api:** correct fine-tuning bounds and Realtime response reference ([#2799](https://github.com/openai/openai-node/issues/2799)) ([3ebc06e](https://github.com/openai/openai-node/commit/3ebc06e44d73426ba74ef859f943e9cfdcd0eec6))
+* **api:** document batch error responses ([#2807](https://github.com/openai/openai-node/issues/2807)) ([622f459](https://github.com/openai/openai-node/commit/622f4590c312d79abadc4693a61dab362afa8254))
+* **api:** document files and uploads error responses ([#2806](https://github.com/openai/openai-node/issues/2806)) ([3e1dfb1](https://github.com/openai/openai-node/commit/3e1dfb18e6b2b2678a417c2ac70171a1fe4f0007))
+* **api:** document fine-tuning and model errors ([#2809](https://github.com/openai/openai-node/issues/2809)) ([8e8f581](https://github.com/openai/openai-node/commit/8e8f5815a39f38033851ac1e17cc1622405aa0f3))
+* **api:** document Responses not-found errors ([#2805](https://github.com/openai/openai-node/issues/2805)) ([e92a268](https://github.com/openai/openai-node/commit/e92a26849f840cfecfb15f849cd49ac4201e11f8))
+* **api:** document stored chat completion errors ([#2808](https://github.com/openai/openai-node/issues/2808)) ([2a1a629](https://github.com/openai/openai-node/commit/2a1a629637be248d5afc45455c0091713d6fb44a))
+
+
+### Documentation
+
+* clarify collaborator-only pull request policy ([#2797](https://github.com/openai/openai-node/issues/2797)) ([764ceed](https://github.com/openai/openai-node/commit/764ceed82bc17919159ca4437c36bd3139354de1))
+
+## [7.23.0](https://github.com/openai/openai-node/compare/v7.22.0...v7.23.0) (2026-09-23)
+
+
+### Features
+
+* **api:** add GCP external storage support ([#2794](https://github.com/openai/openai-node/issues/2794)) ([7cd0629](https://github.com/openai/openai-node/commit/7cd0629a8897b34df07d12fe1ec76050cce5a5a0))
+* **api:** add GPT-Rosalind research model ([#2792](https://github.com/openai/openai-node/issues/2792)) ([d0e6fcd](https://github.com/openai/openai-node/commit/d0e6fcd686dfe5415df110a83e4923abadb8419c))
+
+
+### Chores
+
+* **api:** document exact Chat Completions seed bounds ([#2796](https://github.com/openai/openai-node/issues/2796)) ([13b844f](https://github.com/openai/openai-node/commit/13b844fad0b6a7206fb81fe8b7285593119488ac))
+
+## [7.22.0](https://github.com/openai/openai-node/compare/v7.21.0...v7.22.0) (2026-09-22)
+
+
+### Features
+
+* **api:** add GPT-6 Sol and Luna model identifiers ([#2790](https://github.com/openai/openai-node/issues/2790)) ([cff2135](https://github.com/openai/openai-node/commit/cff2135ff75c54d04be256d19d99fad8ca4a9d3b))
+
+## [7.21.0](https://github.com/openai/openai-node/compare/v7.20.0...v7.21.0) (2026-09-22)
+
+
+### Features
+
+* **api:** add session environment reset events ([#2777](https://github.com/openai/openai-node/issues/2777)) ([5de2360](https://github.com/openai/openai-node/commit/5de2360474aba30a3176ba2dde9ac5e55783efb5))
+
+
+### Bug Fixes
+
+* **api:** preserve model choices and improve request handling ([#2787](https://github.com/openai/openai-node/issues/2787)) ([a4a4396](https://github.com/openai/openai-node/commit/a4a439633e41880108624460c62bf13fd94c171b))
+
+
+### Chores
+
+* **api:** document response management resources ([#2775](https://github.com/openai/openai-node/issues/2775)) ([0472fb3](https://github.com/openai/openai-node/commit/0472fb3d9979c238c552da4a7403fe4631e3707b))
+
+## [7.20.0](https://github.com/openai/openai-node/compare/v7.19.0...v7.20.0) (2026-09-19)
+
+
+### Features
+
+* **api:** add environment-variable vault credentials ([#2768](https://github.com/openai/openai-node/issues/2768)) ([fbccf12](https://github.com/openai/openai-node/commit/fbccf120361a4fd61be8b7e491d9b1cdb920fb45))
+* **api:** add external storage configuration management ([#2773](https://github.com/openai/openai-node/issues/2773)) ([7e89b62](https://github.com/openai/openai-node/commit/7e89b629067e22901a1ad3da4c134442f118da7f))
+* **api:** add safety case retrieval ([#2774](https://github.com/openai/openai-node/issues/2774)) ([d357e64](https://github.com/openai/openai-node/commit/d357e647e79e82a871417cab8d6529287e3b4a76))
+* **api:** add safety warning and deactivation webhook events ([#2772](https://github.com/openai/openai-node/issues/2772)) ([91c7fb5](https://github.com/openai/openai-node/commit/91c7fb534132fce3a9c8ca3650e31401629be7c0))
+* **api:** add SIP media security to incoming call events ([#2770](https://github.com/openai/openai-node/issues/2770)) ([db9a57b](https://github.com/openai/openai-node/commit/db9a57bd901a9a0f50002fbe5ee5b79e7b220c73))
+
+
+### Bug Fixes
+
+* **api:** Preserve request options in legacy GET calls ([#2771](https://github.com/openai/openai-node/issues/2771)) ([541eee3](https://github.com/openai/openai-node/commit/541eee3536eb39c24b324a68dc451752c710c2ee))
+
+## [7.19.0](https://github.com/openai/openai-node/compare/v7.18.0...v7.19.0) (2026-09-18)
+
+
+### Features
+
+* **api:** add webhook endpoint management ([#2764](https://github.com/openai/openai-node/issues/2764)) ([2d18dfc](https://github.com/openai/openai-node/commit/2d18dfc18e4771df2692301ac6ea0d8d97cc8544))
+
+
+### Chores
+
+* **api:** deprecate MCP connector_id ([#2767](https://github.com/openai/openai-node/issues/2767)) ([645c5ad](https://github.com/openai/openai-node/commit/645c5ad06d097712958b51016165b5277c931a84))
+
+## [7.18.0](https://github.com/openai/openai-node/compare/v7.17.0...v7.18.0) (2026-09-17)
+
+
+### Features
+
+* **api:** add agent session model settings ([#2755](https://github.com/openai/openai-node/issues/2755)) ([d1385bb](https://github.com/openai/openai-node/commit/d1385bbb15cfb8b7780b9984c6dd122db1a713ec))
+* **api:** add audio-mini model choices ([#2759](https://github.com/openai/openai-node/issues/2759)) ([b350d59](https://github.com/openai/openai-node/commit/b350d59a28202f8c0fd976d9f14f19cafd3b2c0c))
+* **api:** add managed Responses WebSocket sessions ([#2760](https://github.com/openai/openai-node/issues/2760)) ([a38c533](https://github.com/openai/openai-node/commit/a38c533411c37883f91925b2fc2804cdaedbcc5d))
+* **api:** add prompt-cache prewarming ([#2761](https://github.com/openai/openai-node/issues/2761)) ([f468949](https://github.com/openai/openai-node/commit/f46894993f12d6a79d36dc46ffc8a65415026c72))
+
+
+### Bug Fixes
+
+* **api:** validate WebSocket results and preserve header defaults ([#2763](https://github.com/openai/openai-node/issues/2763)) ([a7e830b](https://github.com/openai/openai-node/commit/a7e830bde9deeeb4a511b27ef03839bfcc6e5583))
+
+
+### Chores
+
+* **api:** clarify incoming SIP call ID usage ([#2758](https://github.com/openai/openai-node/issues/2758)) ([67e9d29](https://github.com/openai/openai-node/commit/67e9d298de6c865956e564f86018ad3908691e78))
+* **api:** update image request examples ([#2762](https://github.com/openai/openai-node/issues/2762)) ([1d244f0](https://github.com/openai/openai-node/commit/1d244f0bc01f7069676a115788102490c5af2c5e))
+
+## [7.17.0](https://github.com/openai/openai-node/compare/v7.16.0...v7.17.0) (2026-09-16)
+
+
+### Features
+
+* **api:** add compaction progress events ([#2749](https://github.com/openai/openai-node/issues/2749)) ([425502d](https://github.com/openai/openai-node/commit/425502d2bf2da1bdd37efda3b0fa5add96fc8a51))
+
+
+### Bug Fixes
+
+* **ci:** retry transient Deno download failures ([#2752](https://github.com/openai/openai-node/issues/2752)) ([e39037b](https://github.com/openai/openai-node/commit/e39037b169234de022ba1d98e0cdb7c5cd8374bd))
+* preserve chat runner abort reasons ([#2607](https://github.com/openai/openai-node/issues/2607)) ([eda4d0c](https://github.com/openai/openai-node/commit/eda4d0cd54271ac9fc05a3e44dfe7fd1c16d2d77))
+* **realtime:** preserve native WebSocket error causes ([#2715](https://github.com/openai/openai-node/issues/2715)) ([58fa72a](https://github.com/openai/openai-node/commit/58fa72a5a241521412775e691e6a1331f89ee245))
+* **responses:** reject function-based API keys in WebSocket constructors ([#2586](https://github.com/openai/openai-node/issues/2586)) ([eea7618](https://github.com/openai/openai-node/commit/eea76181986620d25bae16d8b86e71ee2e5aed4d))
+* **runners:** reject unfinished turns in streaming runTools ([#2716](https://github.com/openai/openai-node/issues/2716)) ([937ed67](https://github.com/openai/openai-node/commit/937ed670ba33ba213771096abffe25e554fc32f7))
+* **streaming:** emit terminal SSE events missing a trailing blank line ([#2726](https://github.com/openai/openai-node/issues/2726)) ([94d6418](https://github.com/openai/openai-node/commit/94d6418a6f9aa32d9196f225ea5efaae92b4135d))
+* **zod:** omit impossible optional branch in strict schemas ([#2751](https://github.com/openai/openai-node/issues/2751)) ([2b4c2c7](https://github.com/openai/openai-node/commit/2b4c2c7f0f37aedad7adeda21bb51a1ab087ac09))
+
+
+### Chores
+
+* update lint tooling and tailor anti-slop for the SDK ([#2753](https://github.com/openai/openai-node/issues/2753)) ([21a03c2](https://github.com/openai/openai-node/commit/21a03c2939c004ffca5555d838adff77e8a74cc8))
+
+
+### Documentation
+
+* **examples:** preserve split UTF-8 in raw stream consumer ([#2714](https://github.com/openai/openai-node/issues/2714)) ([f44152a](https://github.com/openai/openai-node/commit/f44152a6cb5b23efb61a103c976b3bb507df3812))
+
+## [7.16.0](https://github.com/openai/openai-node/compare/v7.15.0...v7.16.0) (2026-09-15)
+
+
+### Features
+
+* **websocket:** add per-iterator incoming event limits ([#2748](https://github.com/openai/openai-node/issues/2748)) ([76e4456](https://github.com/openai/openai-node/commit/76e4456611ad77ef77573b79c48116325fe4e171))
+
+
+### Bug Fixes
+
+* **api:** handle malformed WebSocket events and improve buffering ([#2739](https://github.com/openai/openai-node/issues/2739)) ([b7abc26](https://github.com/openai/openai-node/commit/b7abc265422eca4a6558b1e88c67c21384e400f0))
+* bound fallback abort subscriptions with weak lifetimes ([#2745](https://github.com/openai/openai-node/issues/2745)) ([a93347a](https://github.com/openai/openai-node/commit/a93347a5bd997f4eccb1bf9dc45bfc6d440ac099))
+* **deps-dev:** bump @cloudflare/workers-types from 5.20260830.1 to 5.20260906.1 in /ecosystem-tests/cloudflare-worker ([#2731](https://github.com/openai/openai-node/issues/2731)) ([6cd6579](https://github.com/openai/openai-node/commit/6cd6579bf431bcb0d548b710a30c6c59e4d17a19))
+* **deps-dev:** bump @types/node from 26.2.0 to 26.4.1 ([#2737](https://github.com/openai/openai-node/issues/2737)) ([a95c0bf](https://github.com/openai/openai-node/commit/a95c0bff8493ede75154b3735df105c8445ec80f))
+* **deps-dev:** bump oxfmt from 0.62.0 to 0.66.0 ([#2738](https://github.com/openai/openai-node/issues/2738)) ([0fe46cd](https://github.com/openai/openai-node/commit/0fe46cd474c8e7f1b27bc8d9a21efaaaa56980e5))
+* **deps-dev:** bump oxlint from 1.80.0 to 1.81.0 ([#2730](https://github.com/openai/openai-node/issues/2730)) ([b4986b1](https://github.com/openai/openai-node/commit/b4986b166cc7b00f9e3d49526c034cb8b12ed8df))
+* **deps-dev:** bump puppeteer from 25.9.0 to 25.10.0 in /ecosystem-tests/browser-direct-import ([#2728](https://github.com/openai/openai-node/issues/2728)) ([4f3fdec](https://github.com/openai/openai-node/commit/4f3fdec46fc823cc3d39fadde76754c4f4248a9d))
+* **deps-dev:** bump puppeteer from 25.9.0 to 25.10.0 in /ecosystem-tests/ts-browser-webpack ([#2736](https://github.com/openai/openai-node/issues/2736)) ([a70286b](https://github.com/openai/openai-node/commit/a70286bfe1b24be45e702ccbaf379ef9fa153a92))
+* **deps-dev:** bump webpack from 5.110.2 to 5.110.3 in /ecosystem-tests/ts-browser-webpack ([#2734](https://github.com/openai/openai-node/issues/2734)) ([b08c0bd](https://github.com/openai/openai-node/commit/b08c0bdbf50c4e8bab1bb1209ff6d66000c59b33))
+* **deps-dev:** bump wrangler from 4.127.1 to 4.129.0 in /ecosystem-tests/cloudflare-worker ([#2729](https://github.com/openai/openai-node/issues/2729)) ([e4a9bdd](https://github.com/openai/openai-node/commit/e4a9bdda8d45a33c95265b0a32e76dbd725cc3ae))
+* **deps:** bump undici from 7.29.0 to 7.29.1 in /ecosystem-tests/node-ts-cjs ([#2732](https://github.com/openai/openai-node/issues/2732)) ([b499843](https://github.com/openai/openai-node/commit/b4998438f95a65123a9093ccef1e3cb1be8568c5))
+* **deps:** bump undici from 8.9.0 to 8.10.2 ([#2733](https://github.com/openai/openai-node/issues/2733)) ([d3c6c4f](https://github.com/openai/openai-node/commit/d3c6c4f05d13e7d4736f17c6765089c9079af952))
+* keep callback credentials local to each HTTP request ([#2744](https://github.com/openai/openai-node/issues/2744)) ([35dcdbf](https://github.com/openai/openai-node/commit/35dcdbf24cef0b60f8c2dbfbbef20f7ecb4d766c))
+* **live:** avoid repeated acknowledgment normalization ([#2747](https://github.com/openai/openai-node/issues/2747)) ([dcbbb25](https://github.com/openai/openai-node/commit/dcbbb25c874d2f9bf02ac0c8eb1750c9528a7133))
+* **live:** trim transcript acknowledgment suffixes in linear time ([#2740](https://github.com/openai/openai-node/issues/2740)) ([45a2bf1](https://github.com/openai/openai-node/commit/45a2bf16e1b70d0a44cd8174da38ae8b2ed56169))
+* **responses:** safely format WebSocket error messages ([#2741](https://github.com/openai/openai-node/issues/2741)) ([c94cbf6](https://github.com/openai/openai-node/commit/c94cbf6842d03a2b7ddff842edb7213cdf8c1ca3))
+* **tests:** handle ecosystem proxy socket failures ([#2743](https://github.com/openai/openai-node/issues/2743)) ([1a24082](https://github.com/openai/openai-node/commit/1a240825ce5bd40bc53c378ca246f442cca46b0b))
+* **websocket:** discard unread events when an iterator returns ([#2742](https://github.com/openai/openai-node/issues/2742)) ([482930e](https://github.com/openai/openai-node/commit/482930ebde8fcf42ed2d21973fe5acdb064f25b0))
+
+
+### Chores
+
+* bump smol-toml in Vercel Edge fixture ([#2721](https://github.com/openai/openai-node/issues/2721)) ([3c4e4d2](https://github.com/openai/openai-node/commit/3c4e4d26e3aebd422bc73787e4fcbd1773607785))
+
+## [7.15.0](https://github.com/openai/openai-node/compare/v7.14.0...v7.15.0) (2026-09-10)
+
+
+### Features
+
+* **api:** add Agents API ([#2719](https://github.com/openai/openai-node/issues/2719)) ([20a47f9](https://github.com/openai/openai-node/commit/20a47f9d608885c73a8053a4036b1faec9b5493f))
+
+## [7.14.0](https://github.com/openai/openai-node/compare/v7.13.0...v7.14.0) (2026-09-10)
+
+
+### Features
+
+* **api:** Add Live API ([c037ba7](https://github.com/openai/openai-node/commit/c037ba724235cd58943e95d5b3b98ff76235e83c))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump joi from 18.2.3 to 18.2.5 in /ecosystem-tests/vercel-edge ([#2702](https://github.com/openai/openai-node/issues/2702)) ([029b805](https://github.com/openai/openai-node/commit/029b805b8d65995a9f53d8872ee83cd4b145355b))
+* **deps:** bump next from 15.5.23 to 15.5.25 in /ecosystem-tests/vercel-edge ([#2703](https://github.com/openai/openai-node/issues/2703)) ([e9446db](https://github.com/openai/openai-node/commit/e9446db4bc43ce7977a4957c9990bddb8fc5913f))
+* **deps:** bump sharp from 0.35.3 to 0.35.4 in /ecosystem-tests/vercel-edge ([#2704](https://github.com/openai/openai-node/issues/2704)) ([ca95705](https://github.com/openai/openai-node/commit/ca957050c7cfd8c4a12335ee3345148a660827cc))
+* **deps:** update remaining tooling and fixture patches ([#2712](https://github.com/openai/openai-node/issues/2712)) ([bcaabee](https://github.com/openai/openai-node/commit/bcaabee91cf476446cfd79e4fd71bf0c80fe157b))
+
+## [7.13.0](https://github.com/openai/openai-node/compare/v7.12.1...v7.13.0) (2026-09-09)
+
+
+### Features
+
+* **api:** Add API key expiration controls ([#2708](https://github.com/openai/openai-node/issues/2708)) ([b416806](https://github.com/openai/openai-node/commit/b4168065d3839b3008d557fdbb8972da2e247f24))
+
+## [7.12.1](https://github.com/openai/openai-node/compare/v7.12.0...v7.12.1) (2026-09-09)
+
+Includes the GPT Image 2.5 support from 7.12.0, which was not published to npm.
+
+### Features
+
+* **api:** add GPT Image 2.5 models and image options ([#2705](https://github.com/openai/openai-node/pull/2705)) ([6500a16](https://github.com/openai/openai-node/commit/6500a1670911e8f5a6cbbd9f7ff42800af6450cd))
+
+
+### Bug Fixes
+
+* **ci:** run Cloudflare example regressions before release ([#2706](https://github.com/openai/openai-node/issues/2706)) ([c5cc31c](https://github.com/openai/openai-node/commit/c5cc31c5895b7cc69f49cb36ab2badc5fbd35b51))
+
+## [7.12.0](https://github.com/openai/openai-node/compare/v7.11.0...v7.12.0) (2026-09-08)
+
+
+### Features
+
+* **api:** add GPT Image 2.5 models and image options ([#2705](https://github.com/openai/openai-node/issues/2705)) ([6500a16](https://github.com/openai/openai-node/commit/6500a1670911e8f5a6cbbd9f7ff42800af6450cd))
+
+
+### Bug Fixes
+
+* **assistants:** reject root IDs in run-step deltas ([#2698](https://github.com/openai/openai-node/issues/2698)) ([63dfa4c](https://github.com/openai/openai-node/commit/63dfa4cf506218bcc241c169339e392c0f693dfc))
+* **files:** use a monotonic clock for processing timeout ([#2657](https://github.com/openai/openai-node/issues/2657)) ([bb0f51b](https://github.com/openai/openai-node/commit/bb0f51bed84bf60b0639af7a894fcf538264e435))
+* preserve suppressed workload authorization ([#2699](https://github.com/openai/openai-node/issues/2699)) ([57bbfd3](https://github.com/openai/openai-node/commit/57bbfd37232abd2923e8a2b62435eab14589cbb0))
+
+## [7.11.0](https://github.com/openai/openai-node/compare/v7.10.0...v7.11.0) (2026-09-08)
+
+
+### Features
+
+* **api:** Add prompt cache diagnostics ([#2608](https://github.com/openai/openai-node/issues/2608)) ([f83de8f](https://github.com/openai/openai-node/commit/f83de8fe4c4a309cabae861ab552a3ce6d4a2c65))
+* **api:** add service-account API key expiration fields ([#2618](https://github.com/openai/openai-node/issues/2618)) ([eecbebe](https://github.com/openai/openai-node/commit/eecbebe294be7e657c99a34eb104a6a4b507335c))
+* **api:** correct function argument completion event fields (openapi-545) ([#2611](https://github.com/openai/openai-node/issues/2611)) ([31bf7e7](https://github.com/openai/openai-node/commit/31bf7e79a3bc7a9ab2911abe547d215a12ab6d68))
+* **api:** recognize incomplete web search call status ([#2576](https://github.com/openai/openai-node/issues/2576)) ([c093c44](https://github.com/openai/openai-node/commit/c093c44e311ac8e4bf00f218f170f39c16efc190))
+
+
+### Bug Fixes
+
+* **assistants:** retain terminal message snapshots ([#2650](https://github.com/openai/openai-node/issues/2650)) ([414677e](https://github.com/openai/openai-node/commit/414677e40c9489bb3308200a8d9b23f7e10ad260))
+* **audio:** only signal started recording processes ([#2665](https://github.com/openai/openai-node/issues/2665)) ([cebdf7c](https://github.com/openai/openai-node/commit/cebdf7c0b8b7f206c5c0157117eab64ec1a240cd))
+* **audio:** prefer readable inputs over body metadata ([#2548](https://github.com/openai/openai-node/issues/2548)) ([86ff7d5](https://github.com/openai/openai-node/commit/86ff7d578b6d2269d9da1bf0d0d3ac626eba5d2b))
+* **audio:** use ALSA card identifiers when recording ([#2564](https://github.com/openai/openai-node/issues/2564)) ([67da19c](https://github.com/openai/openai-node/commit/67da19cf48601e2877b672cf4142928498d73a87))
+* **audio:** wait for input cleanup before reporting success ([#2624](https://github.com/openai/openai-node/issues/2624)) ([5ed87fe](https://github.com/openai/openai-node/commit/5ed87fe978355df5cc0c70427f68c6ecc0dff038))
+* **auth:** account for token exchange elapsed time ([#2609](https://github.com/openai/openai-node/issues/2609)) ([b0f6f20](https://github.com/openai/openai-node/commit/b0f6f20b2a90df25c1a764f13bf14ede97b2b760))
+* **auth:** validate Azure metadata access token values ([#2523](https://github.com/openai/openai-node/issues/2523)) ([32b4d35](https://github.com/openai/openai-node/commit/32b4d359e47dbfe130abc15fd4ace4676f22d285))
+* **azure:** carry declared options through withOptions and fix deployment paths ([#2514](https://github.com/openai/openai-node/issues/2514)) ([f8f29fb](https://github.com/openai/openai-node/commit/f8f29fb29f97875d254dde1a7050463ecf3cdf6c))
+* **bedrock:** cancel requests awaiting AWS credentials ([#2610](https://github.com/openai/openai-node/issues/2610)) ([97c94e4](https://github.com/openai/openai-node/commit/97c94e408fe5cee63b639f0e8c17d3264d436313))
+* bound partial number recovery to its token ([#2692](https://github.com/openai/openai-node/issues/2692)) ([0d306ca](https://github.com/openai/openai-node/commit/0d306caaed292ab2339657f97679619703721001))
+* **build:** fail on reported transpile errors ([#2638](https://github.com/openai/openai-node/issues/2638)) ([833e3e8](https://github.com/openai/openai-node/commit/833e3e8dfdc040fe4c4c8d23ff8ff1c504eb5aa0))
+* **build:** fail when a compiler worker is signaled ([#2633](https://github.com/openai/openai-node/issues/2633)) ([cd79cd1](https://github.com/openai/openai-node/commit/cd79cd1d0bdd0958594d2c0a67f9dc954a517b97))
+* **build:** honor configured compiler worker limits ([#2635](https://github.com/openai/openai-node/issues/2635)) ([aa08b44](https://github.com/openai/openai-node/commit/aa08b4498b1923f9fa8c11d0055e83411d9457f3))
+* **build:** narrow Git-install staging detection ([#2621](https://github.com/openai/openai-node/issues/2621)) ([a6170d3](https://github.com/openai/openai-node/commit/a6170d3fb9bcc0070ff71fbe1213ca06c6c3e24e))
+* **build:** postprocess the selected package manifest ([#2620](https://github.com/openai/openai-node/issues/2620)) ([1850d58](https://github.com/openai/openai-node/commit/1850d58b0f0cf669aa7f8cb8ba8c06a9ea857fbd))
+* **build:** preserve CommonJS source-map positions ([#2623](https://github.com/openai/openai-node/issues/2623)) ([df0034d](https://github.com/openai/openai-node/commit/df0034d86fbac0f92247c2ec5333e692aa87b4a0))
+* **build:** preserve config-relative compiler project paths ([#2637](https://github.com/openai/openai-node/issues/2637)) ([3acb064](https://github.com/openai/openai-node/commit/3acb064bb833194ea67ea94f2878d95e1ca56b05))
+* **build:** preserve declaration file import specifiers ([#2659](https://github.com/openai/openai-node/issues/2659)) ([0098c2e](https://github.com/openai/openai-node/commit/0098c2e80991c01043e7eee3752e3fac44525cbd))
+* **ci:** propagate Node matrix check failures ([#2569](https://github.com/openai/openai-node/issues/2569)) ([bff92c9](https://github.com/openai/openai-node/commit/bff92c9c91c6dde8e79e83826fca092425304680))
+* **ci:** serialize release-please branch updates ([#2631](https://github.com/openai/openai-node/issues/2631)) ([bb0e400](https://github.com/openai/openai-node/commit/bb0e400b0d6359e9d918f40f220012a8b72b4f92))
+* clean up failed mock-server startups ([#2558](https://github.com/openai/openai-node/issues/2558)) ([83c92f0](https://github.com/openai/openai-node/commit/83c92f0e16cdac775031fc3f6b74ba12bd5fc38b))
+* **deps:** bump qs to 6.16.0 for security fixes ([#2588](https://github.com/openai/openai-node/issues/2588)) ([4e5c6e3](https://github.com/openai/openai-node/commit/4e5c6e325404db97171534ed76aeb076925a46fc))
+* **docs:** await headers in Next.js webhook examples ([#2595](https://github.com/openai/openai-node/issues/2595)) ([7e48f05](https://github.com/openai/openai-node/commit/7e48f05ed40728f0fee1145ab19d9fac7278ca83))
+* **docs:** correct the chat streaming helper contract ([#2596](https://github.com/openai/openai-node/issues/2596)) ([135ac7e](https://github.com/openai/openai-node/commit/135ac7ef85cebeadf7ba600b59b42f937af44c3d))
+* **docs:** include image detail in the Vision example ([#2598](https://github.com/openai/openai-node/issues/2598)) ([e76bb16](https://github.com/openai/openai-node/commit/e76bb1681229731a5e46a3fee138f50431efd06c))
+* **docs:** omit absent Bedrock provider session tokens ([#2597](https://github.com/openai/openai-node/issues/2597)) ([41f85bd](https://github.com/openai/openai-node/commit/41f85bde828cca667697c044004a21da5c2fe6a6))
+* **ecosystem:** preserve retry delays in parallel workers ([#2673](https://github.com/openai/openai-node/issues/2673)) ([6164745](https://github.com/openai/openai-node/commit/6164745d25621ea98719218b6c6ad666f207dad7))
+* **ecosystem:** reject invalid retry counts ([#2642](https://github.com/openai/openai-node/issues/2642)) ([d0e2bcf](https://github.com/openai/openai-node/commit/d0e2bcf021cb73d8137179cf03948ff35e745f42))
+* **ecosystem:** restore explicit web type-test module markers ([#2584](https://github.com/openai/openai-node/issues/2584)) ([3c189f4](https://github.com/openai/openai-node/commit/3c189f4f290acfde6f3d08471ceff81fb8b6993f))
+* **embeddings:** preserve numeric output with body overrides ([#2549](https://github.com/openai/openai-node/issues/2549)) ([97d1ae7](https://github.com/openai/openai-node/commit/97d1ae720616f7b015ef98aa40dd8281c1a4544b))
+* **embeddings:** preserve numeric responses after request hooks ([#2590](https://github.com/openai/openai-node/issues/2590)) ([5202b13](https://github.com/openai/openai-node/commit/5202b13c8d994aab7133f3d938666021277dbd7f))
+* **embeddings:** reject incomplete float32 vectors ([#2615](https://github.com/openai/openai-node/issues/2615)) ([3940a20](https://github.com/openai/openai-node/commit/3940a2070f509ec23e0064bf2ac638cc67dcc484))
+* **embeddings:** validate response collection before decoding ([#2686](https://github.com/openai/openai-node/issues/2686)) ([888811f](https://github.com/openai/openai-node/commit/888811fa8b4157f3b6dc252b8acc4a8f2a35a474))
+* **events:** preserve unbound listener receivers ([#2644](https://github.com/openai/openai-node/issues/2644)) ([c8238e7](https://github.com/openai/openai-node/commit/c8238e7d8b07ec09c25bfc6f52a625f09a2be106))
+* **examples:** annotate Responses WebSocket turn result ([#2585](https://github.com/openai/openai-node/issues/2585)) ([dde19c5](https://github.com/openai/openai-node/commit/dde19c5c72280516fdfd4e0f4fe987fd1a3eced1))
+* **examples:** avoid extra requests for empty tool calls ([#2672](https://github.com/openai/openai-node/issues/2672)) ([be292d3](https://github.com/openai/openai-node/commit/be292d35ccdf9a1fd77168a4b935a7987b0ea379))
+* **examples:** avoid unhandled WebSocket rejections ([#2669](https://github.com/openai/openai-node/issues/2669)) ([744b0ad](https://github.com/openai/openai-node/commit/744b0ad77f25c13871576f878ca729797607bc8b))
+* **examples:** cancel Edge streams when requests abort ([#2530](https://github.com/openai/openai-node/issues/2530)) ([18100a1](https://github.com/openai/openai-node/commit/18100a1c48944d843ab5315a2b9fdbb7e639b05c))
+* **examples:** close failed streaming responses ([#2531](https://github.com/openai/openai-node/issues/2531)) ([eb9b468](https://github.com/openai/openai-node/commit/eb9b4686c06c79785b871b16d0cd8aed780ee430))
+* **examples:** close multi-agent WebSockets on terminal responses ([#2533](https://github.com/openai/openai-node/issues/2533)) ([51ec453](https://github.com/openai/openai-node/commit/51ec453ad879d51720e0af70b95133b76540d9f0))
+* **examples:** drain manual conversation error output ([#2629](https://github.com/openai/openai-node/issues/2629)) ([e488b53](https://github.com/openai/openai-node/commit/e488b5303f9da64c257ecdeb0ddb761f8093ca2b))
+* **examples:** find structured-output tool calls ([#2572](https://github.com/openai/openai-node/issues/2572)) ([84870a8](https://github.com/openai/openai-node/commit/84870a85c07602ae11a19508be6cb5103fa0275d))
+* **examples:** keep tracking fine-tuning file validation ([#2528](https://github.com/openai/openai-node/issues/2528)) ([63312f2](https://github.com/openai/openai-node/commit/63312f23b98d2f4bff3b8e46ffeb74b9cee56022))
+* **examples:** preserve background stream resume cursors ([#2671](https://github.com/openai/openai-node/issues/2671)) ([b7398e3](https://github.com/openai/openai-node/commit/b7398e34ca7fbc46e562d1e28d8e323055e21566))
+* **examples:** reject early multi-agent WebSocket closure ([#2599](https://github.com/openai/openai-node/issues/2599)) ([c6320f0](https://github.com/openai/openai-node/commit/c6320f0d306b3f7bcf000bd3f5961adfa73b9f2b))
+* **examples:** reject early Realtime socket closure ([#2639](https://github.com/openai/openai-node/issues/2639)) ([7db48ec](https://github.com/openai/openai-node/commit/7db48ecca4999a561faa60bb5040bf145d6e5684))
+* **examples:** reject incomplete image streams ([#2617](https://github.com/openai/openai-node/issues/2617)) ([ef39397](https://github.com/openai/openai-node/commit/ef39397e33c5f39ab35d106d20c7f7fdf7299e16))
+* **examples:** reject incomplete multi-agent streams ([#2666](https://github.com/openai/openai-node/issues/2666)) ([152b98d](https://github.com/openai/openai-node/commit/152b98d04aefcbecececf2caff8412c5cd0b84db))
+* **examples:** reject unsuccessful background responses ([#2600](https://github.com/openai/openai-node/issues/2600)) ([902a931](https://github.com/openai/openai-node/commit/902a931caa0ceebe8d20784dd5f0db36e13eef52))
+* **examples:** reject unsuccessful Responses streams ([#2645](https://github.com/openai/openai-node/issues/2645)) ([86acb95](https://github.com/openai/openai-node/commit/86acb953e27459ba73d6f930c6edb56369dfd002))
+* **examples:** reject unsuccessful structured-tool responses ([#2668](https://github.com/openai/openai-node/issues/2668)) ([99aa303](https://github.com/openai/openai-node/commit/99aa303f3f8bf7bbbd53d52c57d9e2587d29aec8))
+* **examples:** report audio demo failures ([#2570](https://github.com/openai/openai-node/issues/2570)) ([29c0572](https://github.com/openai/openai-node/commit/29c05728c070945243c3a1b558d16b72e420d837))
+* **examples:** report image-streaming failures ([#2563](https://github.com/openai/openai-node/issues/2563)) ([947c555](https://github.com/openai/openai-node/commit/947c555d79b33eab8e589ccdaf8af33766d66a2a))
+* **examples:** report multi-agent streaming failures ([#2550](https://github.com/openai/openai-node/issues/2550)) ([19d9151](https://github.com/openai/openai-node/commit/19d91512bece845ca1c53f6985df2c4506c12123))
+* **examples:** report nonstreaming request failures ([#2603](https://github.com/openai/openai-node/issues/2603)) ([384dc26](https://github.com/openai/openai-node/commit/384dc26d6b16684e081139dfd1d5f301ed6ae11d))
+* **examples:** report premature WebSocket closure ([#2544](https://github.com/openai/openai-node/issues/2544)) ([7eb5f7e](https://github.com/openai/openai-node/commit/7eb5f7e8518af9fc7e923f7dbd17046a4b89e87f))
+* **examples:** report unsuccessful Azure Realtime responses ([#2612](https://github.com/openai/openai-node/issues/2612)) ([2b62209](https://github.com/openai/openai-node/commit/2b6220921a4e4b96e04dd6b5983ae3364378ca2f))
+* **examples:** report unsuccessful fine-tuning jobs ([#2616](https://github.com/openai/openai-node/issues/2616)) ([e761c16](https://github.com/openai/openai-node/commit/e761c16d51cb6238678c5b819bc8a8b9f5ec083a))
+* **examples:** report unsuccessful Realtime responses ([#2559](https://github.com/openai/openai-node/issues/2559)) ([5d3e584](https://github.com/openai/openai-node/commit/5d3e584df36a6911f2e922db8fd9b8767bb6cac2))
+* **examples:** respect raw streaming proxy backpressure ([#2663](https://github.com/openai/openai-node/issues/2663)) ([a11bb1b](https://github.com/openai/openai-node/commit/a11bb1b6c967a3de86d8b436a561daff7cb88771))
+* **examples:** reuse completed background responses ([#2557](https://github.com/openai/openai-node/issues/2557)) ([8e1977b](https://github.com/openai/openai-node/commit/8e1977bb269b6537f445765e4d6b8a778b1eb20d))
+* **examples:** serialize missing book lookup results ([#2573](https://github.com/openai/openai-node/issues/2573)) ([db7e371](https://github.com/openai/openai-node/commit/db7e371968cfdc7e5bceb3672f349b0115c89ad7))
+* **examples:** stop polling failed training files ([#2592](https://github.com/openai/openai-node/issues/2592)) ([1d67945](https://github.com/openai/openai-node/commit/1d67945c5d67ad5244a9882ffd846893c714a8ac))
+* **examples:** support redirected streaming output ([#2546](https://github.com/openai/openai-node/issues/2546)) ([8df2e3a](https://github.com/openai/openai-node/commit/8df2e3add0146dc1af68fb0cee40811ad7c5fa4b))
+* **examples:** use the default audio recording input ([#2593](https://github.com/openai/openai-node/issues/2593)) ([6153484](https://github.com/openai/openai-node/commit/6153484a88c2ce97bc81fe9c773b7c51b2f11d8f))
+* **format:** ignore missing literal file-list paths ([#2670](https://github.com/openai/openai-node/issues/2670)) ([516a849](https://github.com/openai/openai-node/commit/516a849043ade675ecea1a4184b1c95e2e5bdd43))
+* **format:** preserve file-list scope ([#2568](https://github.com/openai/openai-node/issues/2568)) ([7faff0e](https://github.com/openai/openai-node/commit/7faff0e3e61c0f4f8f749e52a9f0515ed49fd2b7))
+* identify modern Edge browser runtime headers ([#2628](https://github.com/openai/openai-node/issues/2628)) ([9cdf6f0](https://github.com/openai/openai-node/commit/9cdf6f0028f7ec2d9ddab2d67196ec11eb9e068a))
+* isolate monthly node review publication ([#2691](https://github.com/openai/openai-node/issues/2691)) ([3970dae](https://github.com/openai/openai-node/commit/3970dae4c7e5977a9bc571b8810e3c6ef81ef36d))
+* isolate realtime connection credentials ([#2690](https://github.com/openai/openai-node/issues/2690)) ([e9db491](https://github.com/openai/openai-node/commit/e9db49106419c094c8b2eaf3c5f0b7337160f011))
+* keep formatter inputs on LF across Git checkouts ([#2515](https://github.com/openai/openai-node/issues/2515)) ([074618f](https://github.com/openai/openai-node/commit/074618fd0b82bbec3cd5cfd9a4c4be4368dce7f7))
+* **lint:** preserve leading-dash generated file paths ([#2640](https://github.com/openai/openai-node/issues/2640)) ([3b91a83](https://github.com/openai/openai-node/commit/3b91a8301953bef1ee3644af687ac7108d9eb659))
+* **pagination:** follow next cursors through empty pages ([#2561](https://github.com/openai/openai-node/issues/2561)) ([9ea39ce](https://github.com/openai/openai-node/commit/9ea39ce8578e584d554640e46c5f73850600ac0c))
+* parse JSON media types case-insensitively ([#2551](https://github.com/openai/openai-node/issues/2551)) ([7ea7926](https://github.com/openai/openai-node/commit/7ea7926aef3e478cf2970c3763b3be5555ed685e))
+* **polling:** honor zero custom polling intervals ([#2518](https://github.com/openai/openai-node/issues/2518)) ([0cd94bb](https://github.com/openai/openai-node/commit/0cd94bbb93cd0a964827d4ab8433c48dfdf5adcb))
+* **polling:** treat a cancelled vector store file as terminal ([#2506](https://github.com/openai/openai-node/issues/2506)) ([43c1007](https://github.com/openai/openai-node/commit/43c1007e027a6b92d8e8901564a5e6a489f50078))
+* preserve alternate Headers inputs ([#2560](https://github.com/openai/openai-node/issues/2560)) ([5d36ff4](https://github.com/openai/openai-node/commit/5d36ff4e05f3b7741ce7b7b0631249bdf2c6b612))
+* preserve CommonJS constructor inheritance ([#2547](https://github.com/openai/openai-node/issues/2547)) ([aafb64e](https://github.com/openai/openai-node/commit/aafb64ecbcc551535dbfe08ee2cb28e70b590aec))
+* preserve cross-realm error causes ([#2555](https://github.com/openai/openai-node/issues/2555)) ([bfec504](https://github.com/openai/openai-node/commit/bfec504aa37e8b3ec08cb82fd0a948426752c3de))
+* preserve own Zod schema definition names ([#2695](https://github.com/openai/openai-node/issues/2695)) ([f65d190](https://github.com/openai/openai-node/commit/f65d190316d34974d4643f7d43187271d7c539f6))
+* preserve package selection in parallel ecosystem tests ([#2516](https://github.com/openai/openai-node/issues/2516)) ([fa0ce41](https://github.com/openai/openai-node/commit/fa0ce416d7e8ffa99df36f0de8e6c3af101f7f24))
+* preserve streamed API error classification ([#2694](https://github.com/openai/openai-node/issues/2694)) ([8e2c6ee](https://github.com/openai/openai-node/commit/8e2c6ee30d50996456341173f4beccba821f398b))
+* **realtime:** preserve base URL routing components ([#2567](https://github.com/openai/openai-node/issues/2567)) ([0f2e22d](https://github.com/openai/openai-node/commit/0f2e22dabcd6bca4817d4c0f6a0bff4fd43c45e1))
+* **responses:** omit parsed values from replayed history ([#2634](https://github.com/openai/openai-node/issues/2634)) ([124b652](https://github.com/openai/openai-node/commit/124b6525497a93315f8563d8e4e3d552cbb0518f))
+* **responses:** parse namespaced function tools ([#2574](https://github.com/openai/openai-node/issues/2574)) ([4d86684](https://github.com/openai/openai-node/commit/4d86684b9b220ef4435317c65868a3ec964199ee))
+* **responses:** validate indexed response collections ([#2687](https://github.com/openai/openai-node/issues/2687)) ([1ecbf52](https://github.com/openai/openai-node/commit/1ecbf52cffcf672236bead52f2ed4ef4e4ff4c18))
+* **runners:** observe cancellation after completion callbacks ([#2591](https://github.com/openai/openai-node/issues/2591)) ([27f5c6a](https://github.com/openai/openai-node/commit/27f5c6ae3b1358c8b90e0c384462d670c2b08798))
+* **runners:** preserve frozen input history ([#2525](https://github.com/openai/openai-node/issues/2525)) ([1211038](https://github.com/openai/openai-node/commit/12110387d6984e8bd2e4e6a3b382bd16d3c1520a))
+* **runners:** reuse caller abort listeners across tool turns ([#2594](https://github.com/openai/openai-node/issues/2594)) ([57d0da4](https://github.com/openai/openai-node/commit/57d0da44d060ab1ac8d6dcd0c49dd2c5aefc15bb))
+* **runners:** suppress content events for input history ([#2520](https://github.com/openai/openai-node/issues/2520)) ([37d6fc2](https://github.com/openai/openai-node/commit/37d6fc22b2c85029e019fedcbde7f430c8aaf02d))
+* serialize tool-call IDs once per completion ([#2688](https://github.com/openai/openai-node/issues/2688)) ([8afb23e](https://github.com/openai/openai-node/commit/8afb23e0c09b0d764f25ef86c4bf874c0ff27e26))
+* **streaming:** abort before early-exit cleanup ([#2613](https://github.com/openai/openai-node/issues/2613)) ([03acf94](https://github.com/openai/openai-node/commit/03acf94b7d76551bf4d612fe7582ddb6975c8ea3))
+* **streaming:** avoid duplicate terminal tool argument events ([#2658](https://github.com/openai/openai-node/issues/2658)) ([12e5db6](https://github.com/openai/openai-node/commit/12e5db694bb5335684733061b60c88e4e413d438))
+* **streaming:** interrupt pending reads on cancellation ([#2556](https://github.com/openai/openai-node/issues/2556)) ([2d7a767](https://github.com/openai/openai-node/commit/2d7a7671a70937917db0388045d7bb8671464501))
+* **streaming:** surface server error frames and settle streams past throwing listeners ([#2502](https://github.com/openai/openai-node/issues/2502)) ([17a661e](https://github.com/openai/openai-node/commit/17a661e350812a3fe92d6350a31e27e7bc09a49d))
+* support Edge Runtime without Node process ([#2552](https://github.com/openai/openai-node/issues/2552)) ([5dc4deb](https://github.com/openai/openai-node/commit/5dc4deb7266b7995016cee839f20f1e7124f7bb9))
+* **test:** cancel Steady commands waiting for cache locks ([#2636](https://github.com/openai/openai-node/issues/2636)) ([8896395](https://github.com/openai/openai-node/commit/889639579aab1c8b9b674b103c19deedbb809999))
+* **test:** preserve unrelated processes on mock startup failure ([#2622](https://github.com/openai/openai-node/issues/2622)) ([6896e66](https://github.com/openai/openai-node/commit/6896e668ec53e52c2bdbf4e550d0a501f616e54c))
+* **test:** reap Steady commands when lease creation fails ([#2664](https://github.com/openai/openai-node/issues/2664)) ([518756a](https://github.com/openai/openai-node/commit/518756a59fa9693c0751fb91403d017cfcd0037a))
+* **test:** reject HTTP errors in mock health checks ([#2667](https://github.com/openai/openai-node/issues/2667)) ([7b9e0b0](https://github.com/openai/openai-node/commit/7b9e0b05c154fa8004d2ac49352318bb5b9ffe63))
+* **test:** reject unknown ecosystem project names ([#2626](https://github.com/openai/openai-node/issues/2626)) ([fcd12bb](https://github.com/openai/openai-node/commit/fcd12bb29cbc53cfcecbbc7bff2416c1d00bd9ea))
+* **test:** run Bun validation with --from-npm ([#2625](https://github.com/openai/openai-node/issues/2625)) ([74f58a9](https://github.com/openai/openai-node/commit/74f58a94bb20d15e41e463b82aa8ed48810cd44b))
+* **test:** use a monotonic Steady lock timeout ([#2661](https://github.com/openai/openai-node/issues/2661)) ([7b5d120](https://github.com/openai/openai-node/commit/7b5d1209090f82f56b4971976147b5c2a859452e))
+* **types:** account for optional event arguments ([#2527](https://github.com/openai/openai-node/issues/2527)) ([548a651](https://github.com/openai/openai-node/commit/548a651c0ee09bd525c7425dbed04541051a3b36))
+* **types:** include missing parsed response stream events ([#2521](https://github.com/openai/openai-node/issues/2521)) ([6a9db07](https://github.com/openai/openai-node/commit/6a9db07b4c4e673f0faaf9c01bfa7d18cc41a13e))
+* **types:** preserve custom tool factory metadata ([#2526](https://github.com/openai/openai-node/issues/2526)) ([13dca7b](https://github.com/openai/openai-node/commit/13dca7b75f9dba00ab0510be463a5eaf8a891f6e))
+* **types:** preserve runnable function tuple positions ([#2524](https://github.com/openai/openai-node/issues/2524)) ([e345d0f](https://github.com/openai/openai-node/commit/e345d0f82341608bbd49c01b7b336e70fff79670))
+* **uploads:** accept cross-realm ArrayBuffers ([#2529](https://github.com/openai/openai-node/issues/2529)) ([69d7bda](https://github.com/openai/openai-node/commit/69d7bda22ef5fb5d28a720c665dd7a8eef6998ea))
+* **uploads:** preserve explicit empty filenames ([#2532](https://github.com/openai/openai-node/issues/2532)) ([eabb487](https://github.com/openai/openai-node/commit/eabb487a7548b49a4fb2eedcff184ac7ae16b7f2))
+* **uploads:** reject zero batch upload concurrency ([#2519](https://github.com/openai/openai-node/issues/2519)) ([8b9405a](https://github.com/openai/openai-node/commit/8b9405ada44885dd7a130ac4ccbaaa4ccbdda948))
+* validate partial image indices in streaming example ([#2693](https://github.com/openai/openai-node/issues/2693)) ([a9a4440](https://github.com/openai/openai-node/commit/a9a4440ba775491251daa4fa27b898e9ecbd3c5e))
+* **zod:** preserve strict schema compatibility with Zod 4.5.4 ([#2677](https://github.com/openai/openai-node/issues/2677)) ([c11870e](https://github.com/openai/openai-node/commit/c11870e4b554adaeaad2d1456eeddf489074d200))
+* **zod:** retain the original tool parameter schema ([#2662](https://github.com/openai/openai-node/issues/2662)) ([fdb038e](https://github.com/openai/openai-node/commit/fdb038e21509264bcdf81741a40988dd694188b1))
+
+
+### Performance Improvements
+
+* **bedrock:** avoid copying repeated query values ([#2545](https://github.com/openai/openai-node/issues/2545)) ([80ab919](https://github.com/openai/openai-node/commit/80ab9197a1166e20fe8435d2e7012f68e4f4f66a))
+
+
+### Chores
+
+* **api:** document throttling and model overload responses — SDK-235 ([#2632](https://github.com/openai/openai-node/issues/2632)) ([9dd0524](https://github.com/openai/openai-node/commit/9dd05249c83c5c94cf062e5f79740d48cc187b74))
+* clarify Response types and remove unused handwritten code ([#2660](https://github.com/openai/openai-node/issues/2660)) ([86152ab](https://github.com/openai/openai-node/commit/86152ab0eaa54335e092d9a07d014aa06e5a4739))
+* **deps-dev:** bump @aws-sdk/credential-provider-node from 3.972.78 to 3.972.81 ([#2681](https://github.com/openai/openai-node/issues/2681)) ([48629a3](https://github.com/openai/openai-node/commit/48629a30f81731ad9f9c5e7c8be9080c28fe7c35))
+* **deps-dev:** bump @cloudflare/workers-types from 5.20260816.1 to 5.20260823.1 in /ecosystem-tests/cloudflare-worker ([#2535](https://github.com/openai/openai-node/issues/2535)) ([dc14bf5](https://github.com/openai/openai-node/commit/dc14bf5bc82e64b662a6133292313254cb2f6f8b))
+* **deps-dev:** bump @cloudflare/workers-types from 5.20260823.1 to 5.20260830.1 in /ecosystem-tests/cloudflare-worker ([#2676](https://github.com/openai/openai-node/issues/2676)) ([ae04066](https://github.com/openai/openai-node/commit/ae04066d06098d96da984de7b4f09364597b621d))
+* **deps-dev:** bump @smithy/signature-v4 from 5.7.2 to 5.7.3 ([#2679](https://github.com/openai/openai-node/issues/2679)) ([41ca20d](https://github.com/openai/openai-node/commit/41ca20db69f66aa85a214ecf6e6e9fcb4b777a4f))
+* **deps-dev:** bump @swc/core from 1.15.47 to 1.16.1 ([#2538](https://github.com/openai/openai-node/issues/2538)) ([5c04dc4](https://github.com/openai/openai-node/commit/5c04dc475a2a78f79164820a27dec4cdb7af01de))
+* **deps-dev:** bump fast-uri from 3.1.5 to 3.1.7 in /ecosystem-tests/ts-browser-webpack ([#2579](https://github.com/openai/openai-node/issues/2579)) ([34380bf](https://github.com/openai/openai-node/commit/34380bfcb7bb61181db0914106c474c058ba329a))
+* **deps-dev:** bump fast-uri from 3.1.5 to 3.1.7 in /ecosystem-tests/vercel-edge ([#2577](https://github.com/openai/openai-node/issues/2577)) ([511d1e4](https://github.com/openai/openai-node/commit/511d1e4777adabee6af51005f6cad768e67ab167))
+* **deps-dev:** bump oxlint from 1.76.0 to 1.79.0 ([#2542](https://github.com/openai/openai-node/issues/2542)) ([2683c3a](https://github.com/openai/openai-node/commit/2683c3afde5422eb5e921fe5fd5bf8a8dea2aae5))
+* **deps-dev:** bump oxlint from 1.79.0 to 1.80.0 ([#2683](https://github.com/openai/openai-node/issues/2683)) ([02d5fb0](https://github.com/openai/openai-node/commit/02d5fb07459740df1ebf8f456f7e9ace061b0605))
+* **deps-dev:** bump puppeteer from 25.7.0 to 25.8.0 in /ecosystem-tests/browser-direct-import ([#2534](https://github.com/openai/openai-node/issues/2534)) ([f039c09](https://github.com/openai/openai-node/commit/f039c09113f05c89675e952eac3445ab844c681b))
+* **deps-dev:** bump puppeteer from 25.7.0 to 25.8.0 in /ecosystem-tests/ts-browser-webpack ([#2539](https://github.com/openai/openai-node/issues/2539)) ([5828818](https://github.com/openai/openai-node/commit/582881834fd44bfee295c1b634be88107d5c0746))
+* **deps-dev:** bump puppeteer from 25.8.0 to 25.9.0 in /ecosystem-tests/browser-direct-import ([#2675](https://github.com/openai/openai-node/issues/2675)) ([bebd72f](https://github.com/openai/openai-node/commit/bebd72fe49b76d7725d30f72544d0af254ab46a1))
+* **deps-dev:** bump puppeteer from 25.8.0 to 25.9.0 in /ecosystem-tests/ts-browser-webpack ([#2680](https://github.com/openai/openai-node/issues/2680)) ([fe3770f](https://github.com/openai/openai-node/commit/fe3770fba82465838d4958dd05a38891e1ec27ba))
+* **deps-dev:** bump ultracite from 7.10.0 to 7.10.5 ([#2537](https://github.com/openai/openai-node/issues/2537)) ([6d37b30](https://github.com/openai/openai-node/commit/6d37b303e1048445b747ad5f4e4228a48b076ef3))
+* **deps-dev:** bump vitest from 4.1.10 to 4.1.11 ([#2541](https://github.com/openai/openai-node/issues/2541)) ([6ea24b3](https://github.com/openai/openai-node/commit/6ea24b32293d16e80eedd30d55651302c58ffdd3))
+* **deps-dev:** bump webpack from 5.109.2 to 5.110.2 in /ecosystem-tests/ts-browser-webpack ([#2682](https://github.com/openai/openai-node/issues/2682)) ([73405d1](https://github.com/openai/openai-node/commit/73405d103b38b29659dc8866803ce6ec9c9ab9ce))
+* **deps-dev:** bump wrangler from 4.125.0 to 4.127.1 in /ecosystem-tests/cloudflare-worker ([#2678](https://github.com/openai/openai-node/issues/2678)) ([0d92742](https://github.com/openai/openai-node/commit/0d92742d449474a365142ca78d07436e00774816))
+* **deps:** bump @azure/identity from 4.13.1 to 4.13.2 ([#2540](https://github.com/openai/openai-node/issues/2540)) ([0318287](https://github.com/openai/openai-node/commit/0318287a0751dcecbc4ba5c70dd90be1dbf72ad8))
+* **deps:** bump express and @types/express ([#2684](https://github.com/openai/openai-node/issues/2684)) ([c581c17](https://github.com/openai/openai-node/commit/c581c17f1edb141a9ca7838a6ecb2e970e16e924))
+* **ecosystem:** remove unused proxy stub ([#2641](https://github.com/openai/openai-node/issues/2641)) ([ce1713a](https://github.com/openai/openai-node/commit/ce1713ab4a34fe8ea4fe72c5007c0e76b40bd6fc))
+* migrate to forked steady ([#2587](https://github.com/openai/openai-node/issues/2587)) ([67ce45d](https://github.com/openai/openai-node/commit/67ce45da4becc96eb482c436f04af99af54f3b7f))
+
+
+### Documentation
+
+* correct Bun ecosystem test instructions ([#2627](https://github.com/openai/openai-node/issues/2627)) ([3434b42](https://github.com/openai/openai-node/commit/3434b427e33dcc38b6c5daa55a3b8cfdc30efc9b))
+* correct error handling diagnostics ([#2630](https://github.com/openai/openai-node/issues/2630)) ([d334d8c](https://github.com/openai/openai-node/commit/d334d8c60d068038f9f137b3dbde2393d8aca7de))
+* **helpers:** remove undefined main call from parsing example ([#2648](https://github.com/openai/openai-node/issues/2648)) ([d8f6be9](https://github.com/openai/openai-node/commit/d8f6be931ce315d41fd0605b03a37cc0c990e441))
+* **realtime:** report unsuccessful responses in the guide ([#2647](https://github.com/openai/openai-node/issues/2647)) ([f58b1fd](https://github.com/openai/openai-node/commit/f58b1fdced2b29c6ed6e40bcc6242e80e058d649))
+* **streaming:** reject unsuccessful background responses ([#2614](https://github.com/openai/openai-node/issues/2614)) ([1025f7a](https://github.com/openai/openai-node/commit/1025f7a2b12f2431bfd89a3e1942746c2e780e3c))
+* **tools:** support TypeScript 4.9 in the function loop ([#2649](https://github.com/openai/openai-node/issues/2649)) ([42e852b](https://github.com/openai/openai-node/commit/42e852b733afc51ea00ef4c5ea3c63ae82780309))
+
+## [7.10.0](https://github.com/openai/openai-node/compare/v7.9.0...v7.10.0) (2026-09-03)
+
+
+### Features
+
+* **api:** add gpt-6-astra and related features ([#2582](https://github.com/openai/openai-node/issues/2582)) ([94ecdc4](https://github.com/openai/openai-node/commit/94ecdc4e4e8d7fb6c2e36e713b7237438267103b))
+
+
+### Documentation
+
+* add canonical SDK security model ([#2566](https://github.com/openai/openai-node/issues/2566)) ([e6a7468](https://github.com/openai/openai-node/commit/e6a746865acf9f836b9b21dbf10afcf81eb160b3))
+
+## [7.9.0](https://github.com/openai/openai-node/compare/v7.8.0...v7.9.0) (2026-09-02)
+
+
+### Features
+
+* **api:** update usage APIs and documentation ([#2565](https://github.com/openai/openai-node/issues/2565)) ([4908505](https://github.com/openai/openai-node/commit/490850592b40f77f6a8769c5c43417bac0e50a36))
+
+
+### Bug Fixes
+
+* **api:** prevent Responses WebSockets from following redirects ([#2513](https://github.com/openai/openai-node/issues/2513)) ([0a4fb1b](https://github.com/openai/openai-node/commit/0a4fb1b23994d27aa73ce96162b18add4dac93d4))
+* load CommonJS under browser export conditions ([#2507](https://github.com/openai/openai-node/issues/2507)) ([222f3d7](https://github.com/openai/openai-node/commit/222f3d7dffd9fd3d3d183473e1a7810e5e027d7e))
+* restore monthly Node version review ([#2553](https://github.com/openai/openai-node/issues/2553)) ([15dc890](https://github.com/openai/openai-node/commit/15dc890326c5156bb49ea7292aa47e718d628d59))
+* support Jest 28 CommonJS package imports ([#2511](https://github.com/openai/openai-node/issues/2511)) ([eea2292](https://github.com/openai/openai-node/commit/eea2292a4a523da9405161dde0a79ac5dc2ecb2a))
+
+
+### Chores
+
+* **deps-dev:** bump browserslist to 4.28.7 across ecosystem tests ([#2554](https://github.com/openai/openai-node/issues/2554)) ([a408e0b](https://github.com/openai/openai-node/commit/a408e0b8d993fb4e04852cbaecbbcd92cee0dd1c))
+* raise custom-code budget to 4,000 lines ([#2562](https://github.com/openai/openai-node/issues/2562)) ([82c5b2d](https://github.com/openai/openai-node/commit/82c5b2def367f88d9c05c83b23dfb78ac6b9f25c))
+
+## [7.8.0](https://github.com/openai/openai-node/compare/v7.7.0...v7.8.0) (2026-08-27)
+
+
+### Features
+
+* **api:** add compute_units to Responses and Chat Completions usage ([#2505](https://github.com/openai/openai-node/issues/2505)) ([f9b1313](https://github.com/openai/openai-node/commit/f9b131388a270451eec7242aa0d302e2135b1d3e))
+* **api:** add default WebSocket User-Agent and audit log events ([#2504](https://github.com/openai/openai-node/issues/2504)) ([9b2f089](https://github.com/openai/openai-node/commit/9b2f0892c9fde399163bea59d4aa9bc4ba0ae03e))
+
+
+### Bug Fixes
+
+* **auth:** clamp the workload-identity refresh buffer to the token lifetime ([#2490](https://github.com/openai/openai-node/issues/2490)) ([76b73a9](https://github.com/openai/openai-node/commit/76b73a9c73aafe11c60a425a82898705f1db966d))
+* **auth:** secure first-class X.509 workload credentials ([#2479](https://github.com/openai/openai-node/issues/2479)) ([1b36c19](https://github.com/openai/openai-node/commit/1b36c19c011bcb9775a5cecb0d8a1bd072b74cd6))
+* **deps:** harden dependency and release boundaries ([#2484](https://github.com/openai/openai-node/issues/2484)) ([b21ff45](https://github.com/openai/openai-node/commit/b21ff456e7bd578547c456e5f7abd1d494a02090))
+* **events:** settle WebSocket waiters when listeners throw ([#2491](https://github.com/openai/openai-node/issues/2491)) ([b5a13a7](https://github.com/openai/openai-node/commit/b5a13a7dc8c95669440ec87662bcae8227b398d9))
+* restore native browser ESM imports ([#2495](https://github.com/openai/openai-node/issues/2495)) ([c8cab1e](https://github.com/openai/openai-node/commit/c8cab1e90eb5daf05d17d5c90492e6728afa91b7))
+* **uploads:** detect multipart bodies from own properties only ([#2492](https://github.com/openai/openai-node/issues/2492)) ([559ffc8](https://github.com/openai/openai-node/commit/559ffc8079d0ae716bbf7915305e7db6ecc016a1))
+
 ## [7.7.0](https://github.com/openai/openai-node/compare/v7.6.0...v7.7.0) (2026-08-26)
 
 

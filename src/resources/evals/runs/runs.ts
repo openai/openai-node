@@ -19,6 +19,120 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pa
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 /**
  * Manage and run evals in the OpenAI platform.
  */
@@ -31,11 +145,14 @@ export class Runs extends APIResource {
    * schema specified in the config of the evaluation.
    */
   create(evalID: string, body: RunCreateParams, options?: RequestOptions): APIPromise<RunCreateResponse> {
-    return this._client.post(path`/evals/${evalID}/runs`, {
-      body,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/evals/${evalID}/runs`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -47,10 +164,10 @@ export class Runs extends APIResource {
     options?: RequestOptions,
   ): APIPromise<RunRetrieveResponse> {
     const { eval_id } = params;
-    return this._client.get(path`/evals/${eval_id}/runs/${runID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/evals/${eval_id}/runs/${runID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -58,14 +175,112 @@ export class Runs extends APIResource {
    */
   list(
     evalID: string,
-    query: RunListParams | null | undefined = {},
+    query?:
+      | (RunListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<RunListResponsesPage, RunListResponse>;
+  list(
+    evalID: string,
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<RunListResponsesPage, RunListResponse>;
+  list(
+    evalID: string,
+    query:
+      | RunListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<RunListResponsesPage, RunListResponse> {
-    return this._client.getAPIList(path`/evals/${evalID}/runs`, CursorPage<RunListResponse>, {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+      ['after', 'limit', 'order', 'status'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as RunListParams | null | undefined;
+    return this._client.getAPIList(
+      path`/evals/${evalID}/runs`,
+      CursorPage<RunListResponse>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -73,10 +288,10 @@ export class Runs extends APIResource {
    */
   delete(runID: string, params: RunDeleteParams, options?: RequestOptions): APIPromise<RunDeleteResponse> {
     const { eval_id } = params;
-    return this._client.delete(path`/evals/${eval_id}/runs/${runID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/evals/${eval_id}/runs/${runID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -84,10 +299,10 @@ export class Runs extends APIResource {
    */
   cancel(runID: string, params: RunCancelParams, options?: RequestOptions): APIPromise<RunCancelResponse> {
     const { eval_id } = params;
-    return this._client.post(path`/evals/${eval_id}/runs/${runID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/evals/${eval_id}/runs/${runID}/cancel`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 }
 
@@ -196,7 +411,7 @@ export namespace CreateEvalCompletionsRunDataSource {
     metadata?: Shared.Metadata | null;
 
     /**
-     * An optional model to filter by (e.g., 'gpt-4o').
+     * An optional model to filter by (e.g., 'gpt-6-astra').
      */
     model?: string | null;
   }
@@ -309,7 +524,7 @@ export namespace CreateEvalCompletionsRunDataSource {
      * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
      * reasoning effort can result in faster responses and fewer tokens used on
      * reasoning in a response. Not all reasoning models support every value. See the
-     * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+     * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
      * model-specific support.
      */
     reasoning_effort?: Shared.ReasoningEffort | null;
@@ -320,7 +535,7 @@ export namespace CreateEvalCompletionsRunDataSource {
      * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
      * Outputs which ensures the model will match your supplied JSON schema. Learn more
      * in the
-     * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+     * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
      *
      * Setting to `{ "type": "json_object" }` enables the older JSON mode, which
      * ensures the message the model generates is valid JSON. Using `json_schema` is
@@ -611,7 +826,7 @@ export namespace RunCreateResponse {
        * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
        * reasoning effort can result in faster responses and fewer tokens used on
        * reasoning in a response. Not all reasoning models support every value. See the
-       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
        * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
@@ -757,7 +972,7 @@ export namespace RunCreateResponse {
        * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
        * reasoning effort can result in faster responses and fewer tokens used on
        * reasoning in a response. Not all reasoning models support every value. See the
-       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
        * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
@@ -776,8 +991,8 @@ export namespace RunCreateResponse {
        * Configuration options for a text response from the model. Can be plain text or
        * structured JSON data. Learn more:
        *
-       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+       * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
        */
       text?: SamplingParams.Text;
 
@@ -789,13 +1004,14 @@ export namespace RunCreateResponse {
        *
        * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
        *   capabilities, like
-       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+       *   or
+       *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
        *   Learn more about
-       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
        * - **Function calls (custom tools)**: Functions that are defined by you, enabling
        *   the model to call your own code. Learn more about
-       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
        */
       tools?: Array<ResponsesAPI.Tool>;
 
@@ -810,8 +1026,8 @@ export namespace RunCreateResponse {
        * Configuration options for a text response from the model. Can be plain text or
        * structured JSON data. Learn more:
        *
-       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+       * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
        */
       export interface Text {
         /**
@@ -819,7 +1035,7 @@ export namespace RunCreateResponse {
          *
          * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
          * ensures the model will match your supplied JSON schema. Learn more in the
-         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
          *
          * The default format is `{ "type": "text" }` with no additional options.
          *
@@ -1100,7 +1316,7 @@ export namespace RunRetrieveResponse {
        * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
        * reasoning effort can result in faster responses and fewer tokens used on
        * reasoning in a response. Not all reasoning models support every value. See the
-       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
        * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
@@ -1246,7 +1462,7 @@ export namespace RunRetrieveResponse {
        * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
        * reasoning effort can result in faster responses and fewer tokens used on
        * reasoning in a response. Not all reasoning models support every value. See the
-       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
        * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
@@ -1265,8 +1481,8 @@ export namespace RunRetrieveResponse {
        * Configuration options for a text response from the model. Can be plain text or
        * structured JSON data. Learn more:
        *
-       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+       * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
        */
       text?: SamplingParams.Text;
 
@@ -1278,13 +1494,14 @@ export namespace RunRetrieveResponse {
        *
        * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
        *   capabilities, like
-       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+       *   or
+       *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
        *   Learn more about
-       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
        * - **Function calls (custom tools)**: Functions that are defined by you, enabling
        *   the model to call your own code. Learn more about
-       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
        */
       tools?: Array<ResponsesAPI.Tool>;
 
@@ -1299,8 +1516,8 @@ export namespace RunRetrieveResponse {
        * Configuration options for a text response from the model. Can be plain text or
        * structured JSON data. Learn more:
        *
-       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+       * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
        */
       export interface Text {
         /**
@@ -1308,7 +1525,7 @@ export namespace RunRetrieveResponse {
          *
          * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
          * ensures the model will match your supplied JSON schema. Learn more in the
-         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
          *
          * The default format is `{ "type": "text" }` with no additional options.
          *
@@ -1586,7 +1803,7 @@ export namespace RunListResponse {
        * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
        * reasoning effort can result in faster responses and fewer tokens used on
        * reasoning in a response. Not all reasoning models support every value. See the
-       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
        * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
@@ -1732,7 +1949,7 @@ export namespace RunListResponse {
        * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
        * reasoning effort can result in faster responses and fewer tokens used on
        * reasoning in a response. Not all reasoning models support every value. See the
-       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
        * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
@@ -1751,8 +1968,8 @@ export namespace RunListResponse {
        * Configuration options for a text response from the model. Can be plain text or
        * structured JSON data. Learn more:
        *
-       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+       * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
        */
       text?: SamplingParams.Text;
 
@@ -1764,13 +1981,14 @@ export namespace RunListResponse {
        *
        * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
        *   capabilities, like
-       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+       *   or
+       *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
        *   Learn more about
-       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
        * - **Function calls (custom tools)**: Functions that are defined by you, enabling
        *   the model to call your own code. Learn more about
-       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
        */
       tools?: Array<ResponsesAPI.Tool>;
 
@@ -1785,8 +2003,8 @@ export namespace RunListResponse {
        * Configuration options for a text response from the model. Can be plain text or
        * structured JSON data. Learn more:
        *
-       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+       * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
        */
       export interface Text {
         /**
@@ -1794,7 +2012,7 @@ export namespace RunListResponse {
          *
          * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
          * ensures the model will match your supplied JSON schema. Learn more in the
-         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
          *
          * The default format is `{ "type": "text" }` with no additional options.
          *
@@ -2083,7 +2301,7 @@ export namespace RunCancelResponse {
        * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
        * reasoning effort can result in faster responses and fewer tokens used on
        * reasoning in a response. Not all reasoning models support every value. See the
-       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
        * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
@@ -2229,7 +2447,7 @@ export namespace RunCancelResponse {
        * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
        * reasoning effort can result in faster responses and fewer tokens used on
        * reasoning in a response. Not all reasoning models support every value. See the
-       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
        * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
@@ -2248,8 +2466,8 @@ export namespace RunCancelResponse {
        * Configuration options for a text response from the model. Can be plain text or
        * structured JSON data. Learn more:
        *
-       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+       * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
        */
       text?: SamplingParams.Text;
 
@@ -2261,13 +2479,14 @@ export namespace RunCancelResponse {
        *
        * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
        *   capabilities, like
-       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+       *   or
+       *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
        *   Learn more about
-       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
        * - **Function calls (custom tools)**: Functions that are defined by you, enabling
        *   the model to call your own code. Learn more about
-       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
        */
       tools?: Array<ResponsesAPI.Tool>;
 
@@ -2282,8 +2501,8 @@ export namespace RunCancelResponse {
        * Configuration options for a text response from the model. Can be plain text or
        * structured JSON data. Learn more:
        *
-       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+       * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
        */
       export interface Text {
         /**
@@ -2291,7 +2510,7 @@ export namespace RunCancelResponse {
          *
          * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
          * ensures the model will match your supplied JSON schema. Learn more in the
-         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
          *
          * The default format is `{ "type": "text" }` with no additional options.
          *
@@ -2519,7 +2738,7 @@ export namespace RunCreateParams {
        * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
        * reasoning effort can result in faster responses and fewer tokens used on
        * reasoning in a response. Not all reasoning models support every value. See the
-       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
        * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
@@ -2665,7 +2884,7 @@ export namespace RunCreateParams {
        * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
        * reasoning effort can result in faster responses and fewer tokens used on
        * reasoning in a response. Not all reasoning models support every value. See the
-       * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+       * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
        * model-specific support.
        */
       reasoning_effort?: Shared.ReasoningEffort | null;
@@ -2684,8 +2903,8 @@ export namespace RunCreateParams {
        * Configuration options for a text response from the model. Can be plain text or
        * structured JSON data. Learn more:
        *
-       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+       * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
        */
       text?: SamplingParams.Text;
 
@@ -2697,13 +2916,14 @@ export namespace RunCreateParams {
        *
        * - **Built-in tools**: Tools that are provided by OpenAI that extend the model's
        *   capabilities, like
-       *   [web search](https://platform.openai.com/docs/guides/tools-web-search) or
-       *   [file search](https://platform.openai.com/docs/guides/tools-file-search).
+       *   [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+       *   or
+       *   [file search](https://developers.openai.com/api/docs/guides/tools-file-search).
        *   Learn more about
-       *   [built-in tools](https://platform.openai.com/docs/guides/tools).
+       *   [built-in tools](https://developers.openai.com/api/docs/guides/tools).
        * - **Function calls (custom tools)**: Functions that are defined by you, enabling
        *   the model to call your own code. Learn more about
-       *   [function calling](https://platform.openai.com/docs/guides/function-calling).
+       *   [function calling](https://developers.openai.com/api/docs/guides/function-calling).
        */
       tools?: Array<ResponsesAPI.Tool>;
 
@@ -2718,8 +2938,8 @@ export namespace RunCreateParams {
        * Configuration options for a text response from the model. Can be plain text or
        * structured JSON data. Learn more:
        *
-       * - [Text inputs and outputs](https://platform.openai.com/docs/guides/text)
-       * - [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+       * - [Text inputs and outputs](https://developers.openai.com/api/docs/guides/text)
+       * - [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
        */
       export interface Text {
         /**
@@ -2727,7 +2947,7 @@ export namespace RunCreateParams {
          *
          * Configuring `{ "type": "json_schema" }` enables Structured Outputs, which
          * ensures the model will match your supplied JSON schema. Learn more in the
-         * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+         * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
          *
          * The default format is `{ "type": "text" }` with no additional options.
          *

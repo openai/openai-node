@@ -12,7 +12,7 @@ import type {
 import type { Response, ResponseCreateParamsBase } from '../../src/resources/responses/responses';
 import { compareType } from '../utils/typing';
 
-const structuredTextParams = {
+const structuredTextParams: ResponseCreateParamsBase = {
   model: 'gpt-5.4-mini',
   input: 'Good large pea',
   text: {
@@ -22,9 +22,10 @@ const structuredTextParams = {
       schema: { type: 'object' },
     },
   },
-} as ResponseCreateParamsBase;
+};
 
 function makeResponse(status: Response['status'], text: string): Response {
+  // SAFETY: The fixture intentionally reuses response lifecycle statuses on its message to exercise incomplete-response parsing without normalizing the wire data.
   return {
     id: 'resp_123',
     created_at: 0,
@@ -34,6 +35,7 @@ function makeResponse(status: Response['status'], text: string): Response {
     metadata: null,
     model: 'gpt-5.4-mini',
     object: 'response',
+    access_programs: null,
     output: [
       {
         id: 'msg_123',

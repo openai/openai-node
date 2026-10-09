@@ -25,6 +25,7 @@ const strictTool: FunctionTool = {
 };
 
 function makeResponse(output: Response['output']): Response {
+  // SAFETY: The parser fixture supplies only response identity, status, and output, which are the fields this parsing test consumes.
   return {
     id: 'resp_123',
     object: 'response',
@@ -123,6 +124,7 @@ describe('response tool parsing', () => {
       ]),
     ).toThrow('get_weather` tool is not marked with `strict: true`');
 
+    // SAFETY: Intentionally pass a custom tool discriminator to verify auto-parsing rejects unsupported tool types.
     expect(() => validateInputTools([{ type: 'custom' } as any])).toThrow(
       'only `function` tool types support auto-parsing',
     );
@@ -210,6 +212,7 @@ describe('response output normalization', () => {
       },
     ]);
 
+    // SAFETY: The local json_schema format carries a custom raw parser; its string discriminator was widened during fixture inference, while this test verifies that parser is called.
     const parsed = parseResponse(response, {
       model: 'gpt-5',
       text: { format },

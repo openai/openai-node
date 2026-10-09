@@ -9,6 +9,120 @@ import { RequestOptions } from '../internal/request-options';
 import { maybeMultipartFormRequestOptions, multipartFormRequestOptions } from '../internal/uploads';
 import { path } from '../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 /**
  * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
  */
@@ -21,7 +135,9 @@ export class Videos extends APIResource {
   create(body: VideoCreateParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       '/videos',
-      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      ),
     );
   }
 
@@ -31,7 +147,10 @@ export class Videos extends APIResource {
    * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   retrieve(videoID: string, options?: RequestOptions): APIPromise<Video> {
-    return this._client.get(path`/videos/${videoID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.get(
+      path`/videos/${videoID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -40,14 +159,110 @@ export class Videos extends APIResource {
    * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   list(
-    query: VideoListParams | null | undefined = {},
+    query?:
+      | (VideoListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<VideosPage, Video>;
+  list(
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<VideosPage, Video>;
+  list(
+    query:
+      | VideoListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<VideosPage, Video> {
-    return this._client.getAPIList('/videos', ConversationCursorPage<Video>, {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ...options,
-      __security: { bearerAuth: true },
-    });
+      ['after', 'limit', 'order'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as VideoListParams | null | undefined;
+    return this._client.getAPIList(
+      '/videos',
+      ConversationCursorPage<Video>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -56,7 +271,10 @@ export class Videos extends APIResource {
    * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   delete(videoID: string, options?: RequestOptions): APIPromise<VideoDeleteResponse> {
-    return this._client.delete(path`/videos/${videoID}`, { ...options, __security: { bearerAuth: true } });
+    return this._client.delete(
+      path`/videos/${videoID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -70,7 +288,9 @@ export class Videos extends APIResource {
   ): APIPromise<VideoCreateCharacterResponse> {
     return this._client.post(
       '/videos/characters',
-      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      ),
     );
   }
 
@@ -83,16 +303,113 @@ export class Videos extends APIResource {
    */
   downloadContent(
     videoID: string,
-    query: VideoDownloadContentParams | null | undefined = {},
+    query?:
+      | (VideoDownloadContentParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): APIPromise<Response>;
+  downloadContent(
+    videoID: string,
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): APIPromise<Response>;
+  downloadContent(
+    videoID: string,
+    query:
+      | VideoDownloadContentParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): APIPromise<Response> {
-    return this._client.get(path`/videos/${videoID}/content`, {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ...options,
-      headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
-      __security: { bearerAuth: true },
-      __binaryResponse: true,
-    });
+      ['variant'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as VideoDownloadContentParams | null | undefined;
+    return this._client.get(
+      path`/videos/${videoID}/content`,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ Accept: 'application/binary' }, options?.headers]),
+        __security: { bearerAuth: true },
+        __binaryResponse: true,
+      })),
+    );
   }
 
   /**
@@ -104,7 +421,9 @@ export class Videos extends APIResource {
   edit(body: VideoEditParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       '/videos/edits',
-      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      ),
     );
   }
 
@@ -116,7 +435,9 @@ export class Videos extends APIResource {
   extend(body: VideoExtendParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       '/videos/extensions',
-      multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        multipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      ),
     );
   }
 
@@ -126,10 +447,10 @@ export class Videos extends APIResource {
    * @deprecated The Sora API is scheduled to permanently shut down on September 24, 2026.
    */
   getCharacter(characterID: string, options?: RequestOptions): APIPromise<VideoGetCharacterResponse> {
-    return this._client.get(path`/videos/characters/${characterID}`, {
-      ...options,
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/videos/characters/${characterID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
   }
 
   /**
@@ -140,7 +461,12 @@ export class Videos extends APIResource {
   remix(videoID: string, body: VideoRemixParams, options?: RequestOptions): APIPromise<Video> {
     return this._client.post(
       path`/videos/${videoID}/remix`,
-      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client),
+      resolveResourceRequestOptions(options, (options) =>
+        maybeMultipartFormRequestOptions(
+          { body, ...options, __security: { bearerAuth: true } },
+          this._client,
+        ),
+      ),
     );
   }
 }
@@ -240,6 +566,56 @@ export interface VideoCreateError {
    * A human-readable description of the error that was returned.
    */
   message: string;
+
+  /**
+   * The Retry-After and Retry-After-Ms headers returned with the original error, if
+   * any.
+   */
+  headers?: { [key: string]: string };
+
+  misalignment?: VideoCreateError.Misalignment;
+}
+
+export namespace VideoCreateError {
+  export interface Misalignment {
+    /**
+     * The public explanation for this block.
+     */
+    detailed_explanation?: string;
+
+    /**
+     * An optional classification; clients must accept additional values.
+     */
+    error_type?:
+      | (string & {})
+      | 'potentially_unintended_data_transfer'
+      | 'potentially_unintended_data_access'
+      | 'potentially_unintended_destructive_activity'
+      | 'other';
+
+    /**
+     * An opaque target for explicitly continuing this review, or null when
+     * unavailable.
+     */
+    review_target?: string | null;
+
+    /**
+     * An optional public continuation instruction.
+     */
+    steer?: Misalignment.Steer;
+  }
+
+  export namespace Misalignment {
+    /**
+     * An optional public continuation instruction.
+     */
+    export interface Steer {
+      /**
+       * The public continuation instruction.
+       */
+      message: string;
+    }
+  }
 }
 
 export type VideoModel =

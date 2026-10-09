@@ -9,6 +9,120 @@ import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 /**
  * Build Assistants that can call models and use tools.
  *
@@ -21,12 +135,15 @@ export class Messages extends APIResource {
    * @deprecated The Assistants API is deprecated in favor of the Responses API
    */
   create(threadID: string, body: MessageCreateParams, options?: RequestOptions): APIPromise<Message> {
-    return this._client.post(path`/threads/${threadID}/messages`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/threads/${threadID}/messages`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -36,11 +153,14 @@ export class Messages extends APIResource {
    */
   retrieve(messageID: string, params: MessageRetrieveParams, options?: RequestOptions): APIPromise<Message> {
     const { thread_id } = params;
-    return this._client.get(path`/threads/${thread_id}/messages/${messageID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.get(
+      path`/threads/${thread_id}/messages/${messageID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -50,12 +170,15 @@ export class Messages extends APIResource {
    */
   update(messageID: string, params: MessageUpdateParams, options?: RequestOptions): APIPromise<Message> {
     const { thread_id, ...body } = params;
-    return this._client.post(path`/threads/${thread_id}/messages/${messageID}`, {
-      body,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.post(
+      path`/threads/${thread_id}/messages/${messageID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -65,15 +188,113 @@ export class Messages extends APIResource {
    */
   list(
     threadID: string,
-    query: MessageListParams | null | undefined = {},
+    query?:
+      | (MessageListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<MessagesPage, Message>;
+  list(
+    threadID: string,
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<MessagesPage, Message>;
+  list(
+    threadID: string,
+    query:
+      | MessageListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
     options?: RequestOptions,
   ): PagePromise<MessagesPage, Message> {
-    return this._client.getAPIList(path`/threads/${threadID}/messages`, CursorPage<Message>, {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+      ['after', 'before', 'limit', 'order', 'run_id'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as MessageListParams | null | undefined;
+    return this._client.getAPIList(
+      path`/threads/${threadID}/messages`,
+      CursorPage<Message>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 
   /**
@@ -87,11 +308,14 @@ export class Messages extends APIResource {
     options?: RequestOptions,
   ): APIPromise<MessageDeleted> {
     const { thread_id } = params;
-    return this._client.delete(path`/threads/${thread_id}/messages/${messageID}`, {
-      ...options,
-      headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-      __security: { bearerAuth: true },
-    });
+    return this._client.delete(
+      path`/threads/${thread_id}/messages/${messageID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
   }
 }
 
@@ -254,9 +478,9 @@ export namespace FilePathDeltaAnnotation {
 
 export interface ImageFile {
   /**
-   * The [File](https://platform.openai.com/docs/api-reference/files) ID of the image
-   * in the message content. Set `purpose="vision"` when uploading the File if you
-   * need to later display the file content.
+   * The [File](https://developers.openai.com/api/reference/resources/files) ID of
+   * the image in the message content. Set `purpose="vision"` when uploading the File
+   * if you need to later display the file content.
    */
   file_id: string;
 
@@ -268,8 +492,9 @@ export interface ImageFile {
 }
 
 /**
- * References an image [File](https://platform.openai.com/docs/api-reference/files)
- * in the content of a message.
+ * References an image
+ * [File](https://developers.openai.com/api/reference/resources/files) in the
+ * content of a message.
  */
 export interface ImageFileContentBlock {
   image_file: ImageFile;
@@ -288,16 +513,17 @@ export interface ImageFileDelta {
   detail?: 'auto' | 'low' | 'high';
 
   /**
-   * The [File](https://platform.openai.com/docs/api-reference/files) ID of the image
-   * in the message content. Set `purpose="vision"` when uploading the File if you
-   * need to later display the file content.
+   * The [File](https://developers.openai.com/api/reference/resources/files) ID of
+   * the image in the message content. Set `purpose="vision"` when uploading the File
+   * if you need to later display the file content.
    */
   file_id?: string;
 }
 
 /**
- * References an image [File](https://platform.openai.com/docs/api-reference/files)
- * in the content of a message.
+ * References an image
+ * [File](https://developers.openai.com/api/reference/resources/files) in the
+ * content of a message.
  */
 export interface ImageFileDeltaBlock {
   /**
@@ -372,7 +598,7 @@ export interface ImageURLDeltaBlock {
 
 /**
  * Represents a message within a
- * [thread](https://platform.openai.com/docs/api-reference/threads).
+ * [thread](https://developers.openai.com/api/docs/assistants/migration).
  */
 export interface Message {
   /**
@@ -382,7 +608,7 @@ export interface Message {
 
   /**
    * If applicable, the ID of the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) that
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) that
    * authored this message.
    */
   assistant_id: string | null;
@@ -438,7 +664,7 @@ export interface Message {
   role: 'user' | 'assistant';
 
   /**
-   * The ID of the [run](https://platform.openai.com/docs/api-reference/runs)
+   * The ID of the [run](https://developers.openai.com/api/docs/assistants/migration)
    * associated with the creation of this message. Value is `null` when messages are
    * created manually using the create message or create thread endpoints.
    */
@@ -451,8 +677,8 @@ export interface Message {
   status: 'in_progress' | 'incomplete' | 'completed';
 
   /**
-   * The [thread](https://platform.openai.com/docs/api-reference/threads) ID that
-   * this message belongs to.
+   * The [thread](https://developers.openai.com/api/docs/assistants/migration) ID
+   * that this message belongs to.
    */
   thread_id: string;
 }
@@ -491,8 +717,9 @@ export namespace Message {
 }
 
 /**
- * References an image [File](https://platform.openai.com/docs/api-reference/files)
- * in the content of a message.
+ * References an image
+ * [File](https://developers.openai.com/api/reference/resources/files) in the
+ * content of a message.
  */
 export type MessageContent =
   | ImageFileContentBlock
@@ -501,8 +728,9 @@ export type MessageContent =
   | RefusalContentBlock;
 
 /**
- * References an image [File](https://platform.openai.com/docs/api-reference/files)
- * in the content of a message.
+ * References an image
+ * [File](https://developers.openai.com/api/reference/resources/files) in the
+ * content of a message.
  */
 export type MessageContentDelta =
   | ImageFileDeltaBlock
@@ -511,8 +739,9 @@ export type MessageContentDelta =
   | ImageURLDeltaBlock;
 
 /**
- * References an image [File](https://platform.openai.com/docs/api-reference/files)
- * in the content of a message.
+ * References an image
+ * [File](https://developers.openai.com/api/reference/resources/files) in the
+ * content of a message.
  */
 export type MessageContentPartParam = ImageFileContentBlock | ImageURLContentBlock | TextContentBlockParam;
 
@@ -708,8 +937,9 @@ export namespace MessageCreateParams {
 
 export interface MessageRetrieveParams {
   /**
-   * The ID of the [thread](https://platform.openai.com/docs/api-reference/threads)
-   * to which this message belongs.
+   * The ID of the
+   * [thread](https://developers.openai.com/api/docs/assistants/migration) to which
+   * this message belongs.
    */
   thread_id: string;
 }

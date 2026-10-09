@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import OpenAI from 'openai';
 import { bedrock as bearerBedrock } from 'openai/providers/bedrock';
 import { bedrock } from 'openai/providers/bedrock/aws';
@@ -24,6 +25,12 @@ const RUNTIME_PROVIDERS = [
   },
 ] as const;
 
+beforeEach(() => {
+  // oxlint-disable-next-line unicorn/no-useless-undefined -- Vitest requires its second argument when removing an environment variable.
+  vi.stubEnv('AWS_BEDROCK_BASE_URL', undefined);
+});
+afterEach(() => vi.unstubAllEnvs());
+
 function sseResponse(events: readonly unknown[]): Response {
   const body = events
     .map((event) => `data: ${typeof event === 'string' ? event : JSON.stringify(event)}`)
@@ -33,7 +40,7 @@ function sseResponse(events: readonly unknown[]): Response {
   });
 }
 
-function chatChunk(delta: object, finishReason: 'stop' | null = null) {
+function chatChunk(delta: OpenAI.Chat.ChatCompletionChunk.Choice.Delta, finishReason: 'stop' | null = null) {
   return {
     id: 'chatcmpl_runtime_stream',
     object: 'chat.completion.chunk',

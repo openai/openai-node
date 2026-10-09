@@ -1,12 +1,6 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { jest } from '@jest/globals';
-import { uploadWebApiTestCases } from '../src/uploadWebApiTestCases.ts';
 import worker from '../src/worker.ts';
-
-const uploadModule = '../src/uploadWebApiTestCases.js';
-const uploadModuleFactory = () => ({ uploadWebApiTestCases });
-jest.mock(uploadModule, uploadModuleFactory, { virtual: true });
-jest.unstable_mockModule(uploadModule, uploadModuleFactory, { virtual: true });
 
 function authenticatedRequest(apiKey) {
 	const timestamp = String(Date.now());

@@ -5,6 +5,7 @@ import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestIni
 import { uuid4 } from './internal/utils/uuid';
 import { validatePositiveInteger, isAbsoluteURL, safeJSON, hasOwn } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
+import { addRequestAbortListener, retainRequestAbortCallback } from './internal/utils/abort';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
 import { addRequestID, defaultParseResponse, type APIResponseProps } from './internal/parse';
@@ -41,10 +42,17 @@ import {
   type NextCursorPageParams,
   NextCursorPageResponse,
   PageResponse,
+  type TokenPageParams,
+  TokenPageResponse,
 } from './core/pagination';
 import * as Uploads from './core/uploads';
 import * as API from './resources/index';
 import { APIPromise } from './core/api-promise';
+import {
+  getDeferredRealtimeAPIKeyCache,
+  resolveRealtimeAPIKey,
+  validateCapturedAPIKey,
+} from './internal/realtime-credentials';
 import {
   Batch,
   BatchCreateParams,
@@ -69,6 +77,15 @@ import {
   ContentProvenanceCheckCreateParams,
   ContentProvenanceChecks,
 } from './resources/content-provenance-checks';
+import {
+  Decision,
+  DecisionCreateParams,
+  DecisionInputImage,
+  DecisionInputMessage,
+  DecisionInputPart,
+  DecisionInputText,
+  Decisions,
+} from './resources/decisions';
 import {
   CreateEmbeddingResponse,
   Embedding,
@@ -166,8 +183,10 @@ import {
 } from './resources/evals/evals';
 import { FineTuning } from './resources/fine-tuning/fine-tuning';
 import { Graders } from './resources/graders/graders';
+import { Live } from './resources/live/live';
 import { Realtime } from './resources/realtime/realtime';
 import { Responses } from './resources/responses/responses';
+import { Safety } from './resources/safety/safety';
 import {
   DeletedSkill,
   Skill,
@@ -252,6 +271,7 @@ import {
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
+import { mergeWebSocketAuthHeaders, webSocketHeaderRemovals } from './internal/ws';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import { readEnv } from './internal/utils/env';
@@ -296,8 +316,9 @@ export interface ClientOptions {
    *
    * - Accepts either a static string or an async function that resolves to a string.
    * - Defaults to process.env['OPENAI_API_KEY'].
-   * - When a function is provided, it is invoked before each request so you can rotate
-   *   or refresh credentials at runtime.
+   * - When a function is provided, it is invoked when building bearer authentication
+   *   headers for each attempt, including retries and direct `buildRequest()` calls.
+   *   Each invocation's result is used for its own request.
    * - The function must return a non-empty string; otherwise an OpenAIError is thrown.
    * - If the function throws, the error is wrapped in an OpenAIError with the original
    *   error available as `cause`.
@@ -479,9 +500,12 @@ export class OpenAI {
       continueRequest?: <T>(operation: () => Promise<T>) => Promise<T>;
     }
   >();
+  static #sanitizedLoggers = new globalThis.WeakSet<Logger>();
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
+  private _apiKeyInvocation = 0;
+  private _lastCachedAPIKeyInvocation = 0;
   private _workloadIdentityAuth?: WorkloadIdentityAuth | X509WorkloadIdentityAuth;
 
   /**
@@ -599,7 +623,7 @@ export class OpenAI {
     this.baseURL = options.baseURL!;
     this.#explicitDataResidency = residencyBaseURL !== undefined || inheritedResidencySelection;
     this.timeout = options.timeout ?? OpenAI.DEFAULT_TIMEOUT; /* 10 minutes */
-    this.logger = options.logger ?? console;
+    this.logger = this.#sanitizeLogger(options.logger ?? console);
     const defaultLogLevel = 'warn';
     // Set default logLevel early so that we can log a warning in parseLogLevel.
     this.logLevel = defaultLogLevel;
@@ -608,7 +632,7 @@ export class OpenAI {
       parseLogLevel(readEnv('OPENAI_LOG'), "process.env['OPENAI_LOG']", this) ??
       defaultLogLevel;
     this.fetchOptions = options.fetchOptions;
-    this.maxRetries = options.maxRetries ?? 2;
+    this.maxRetries = this.#normalizeRetries(options.maxRetries);
     this.fetch = options.fetch ?? Shims.getDefaultFetch();
     this.#encoder = Opts.FallbackEncoder;
 
@@ -732,6 +756,36 @@ export class OpenAI {
     return this._options.defaultQuery;
   }
 
+  /** @internal Client request headers for each new WebSocket handshake. */
+  _buildWebSocketHeaders(
+    authHeaders: Record<string, string>,
+    removedHeaders?: Set<string>,
+  ): Record<string, string> {
+    const context = webSocketHeaderRemovals.get(this);
+    if (context?.baseHeaders) {
+      return mergeWebSocketAuthHeaders(
+        { headers: context.baseHeaders },
+        authHeaders,
+        context.removedHeaders ?? new Set(),
+      ).headers;
+    }
+    const headers = buildHeaders([
+      {
+        'User-Agent': this.getUserAgent(),
+        'OpenAI-Organization': this.organization,
+        'OpenAI-Project': this.project,
+      },
+      authHeaders,
+      this._options.defaultHeaders,
+    ]);
+    headers.nulls.forEach((name) => (removedHeaders ?? context?.removedHeaders)?.add(name));
+    const result = Object.fromEntries(headers.values);
+    if (context) {
+      context.baseHeaders = { ...result };
+    }
+    return result;
+  }
+
   protected validateHeaders(
     { values, nulls }: NullableHeaders,
     schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean } = {
@@ -812,10 +866,11 @@ export class OpenAI {
           : await authentication.getToken();
       return buildHeaders([{ Authorization: `Bearer ${token}` }]);
     }
-    if (this.apiKey == null) {
+    const { apiKey } = await resolveRealtimeAPIKey(this);
+    if (apiKey == null) {
       return undefined;
     }
-    return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+    return buildHeaders([{ Authorization: `Bearer ${apiKey}` }]);
   }
 
   protected async adminAPIKeyAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
@@ -848,12 +903,29 @@ export class OpenAI {
     return Errors.APIError.generate(status, normalizedError, message, headers);
   }
 
-  async _callApiKey(): Promise<boolean> {
-    if (this._provider) return false;
+  _hasApiKeyProvider(): boolean {
+    return typeof this._options.apiKey === 'function';
+  }
+
+  /**
+   * Resolves and retains a provider key, returning whether a provider was invoked.
+   * Overrides should forward `capture` (or call it with their resolved key) for local credentials.
+   * @internal
+   */
+  async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
+    if (this._provider) {
+      capture?.(this.apiKey);
+      return false;
+    }
 
     const apiKey = this._options.apiKey;
-    if (typeof apiKey !== 'function') return false;
+    if (typeof apiKey !== 'function') {
+      capture?.(this.apiKey);
+      return false;
+    }
 
+    const deferredCache = getDeferredRealtimeAPIKeyCache(this);
+    const invocation = ++this._apiKeyInvocation;
     let token: unknown;
     try {
       token = await apiKey();
@@ -871,7 +943,23 @@ export class OpenAI {
         `Expected 'apiKey' function argument to return a string but it returned ${token}`,
       );
     }
-    this.apiKey = token;
+    const resolvedToken = token;
+    const commit = () => {
+      if (capture) validateCapturedAPIKey(this, resolvedToken);
+      if (invocation < this._lastCachedAPIKeyInvocation) {
+        return resolvedToken;
+      }
+      this.apiKey = resolvedToken;
+      const cached = capture ? this.apiKey : resolvedToken;
+      this._lastCachedAPIKeyInvocation = invocation;
+      return cached;
+    };
+    if (deferredCache) {
+      deferredCache.providerKey = resolvedToken;
+      deferredCache.commit = commit;
+    }
+    const cached = deferredCache ? validateCapturedAPIKey(this, resolvedToken) : commit();
+    capture?.(cached);
     return true;
   }
 
@@ -881,34 +969,401 @@ export class OpenAI {
     defaultBaseURL?: string | undefined,
   ): string {
     const baseURL = (!this.#baseURLOverridden() && defaultBaseURL) || this.baseURL;
-    const url = isAbsoluteURL(path)
-      ? new URL(path)
-      : new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+    let url: URL;
+    let baseQuery: Record<string, string> = {};
+    let baseParams: URLSearchParams | undefined;
+    if (isAbsoluteURL(path)) {
+      url = new URL(path);
+    } else if (baseURL.includes('?')) {
+      const base = new URL(baseURL);
+      baseParams = new URLSearchParams(base.search);
+      baseQuery = Object.fromEntries(baseParams);
+      base.search = '';
+      base.hash = '';
+      url = new URL(
+        base.toString() + (base.pathname.endsWith('/') && path.startsWith('/') ? path.slice(1) : path),
+      );
+    } else {
+      url = new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+    }
 
     const defaultQuery = this.defaultQuery();
     const pathQuery = Object.fromEntries(url.searchParams);
-    if (!isEmptyObj(defaultQuery) || !isEmptyObj(pathQuery)) {
-      query = { ...pathQuery, ...defaultQuery, ...query };
+    let overridingQuery: Record<string, unknown> | undefined;
+    if (!isEmptyObj(baseQuery) || !isEmptyObj(defaultQuery) || !isEmptyObj(pathQuery)) {
+      overridingQuery = { ...pathQuery, ...defaultQuery, ...query };
+      query = { ...baseQuery, ...overridingQuery };
     }
 
     if (typeof query === 'object' && query && !Array.isArray(query)) {
       url.search = this.stringifyQuery(query);
+      if (baseParams && overridingQuery) {
+        const seen = new Set<string>();
+        const repeated = new Set<string>();
+        for (const key of baseParams.keys()) {
+          if (seen.has(key) && !hasOwn(overridingQuery, key)) {
+            repeated.add(key);
+          }
+          seen.add(key);
+        }
+        if (repeated.size) {
+          const merged = new URLSearchParams();
+          for (const [key, value] of url.searchParams) {
+            if (!repeated.has(key)) merged.append(key, value);
+          }
+          for (const [key, value] of baseParams) {
+            if (repeated.has(key)) merged.append(key, value);
+          }
+          url.search = merged.toString();
+        }
+      }
     }
 
     return url.toString();
   }
 
+  #normalizeRetries(value: unknown): number {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 2;
+  }
+
+  #isSensitiveLogKey(key: string): boolean {
+    const normalized = key.replace(/[^a-z0-9]/gi, '').toLowerCase();
+    return /authorization|authentication|cookie|session|signature|assertion|connectionstring|devicecode|codeverifier|accountkey|mtlskey|proxyauth|(?:api|access|secret|private|security|refresh|id|bearer|aws|azure|openai|admin|client|proxy|auth)[a-z0-9]*(?:key|token|secret|password|passwd|pwd|credential|auth)|^(?:auth|key|sig|sas|jwt|bearer|pfx|p12)$|(?:sid|token|secret|password|passwd|pwd|credential|passphrase|apikey|accesskey|privatekey|username)s?$/.test(
+      normalized,
+    );
+  }
+
+  #sanitizeLogValue(value: unknown, seen: WeakMap<object, unknown>): unknown {
+    const maxDepth = 64;
+    const maxValues = 4096;
+    const redactString = (entry: string): string =>
+      entry
+        .replace(/((?:[a-z][a-z0-9+.-]*:)?\/\/)([^/\s?#]*@)(?=[^/\s?#]+)/gi, '$1[REDACTED]@')
+        .replace(/(^|[\s(=])([^/\s]+:[^/\s]*@)(?=[^/\s@]+)/gi, '$1[REDACTED]@')
+        .replace(/(^|[\s,;])([a-z][a-z0-9_-]*)(\s*:\s*)([^\r\n,;]+)/gi, (match, prefix, key, separator) =>
+          this.#isSensitiveLogKey(key) ? `${prefix}${key}${separator}[REDACTED]` : match,
+        )
+        .replace(/(^|[?&#;])([^=&;\s?#/]+)=([^&;\s#]+)/g, (match, separator, key) => {
+          let decoded = key;
+          try {
+            decoded = globalThis.decodeURIComponent(key);
+          } catch {}
+          return this.#isSensitiveLogKey(decoded) ? `${separator}${key}=[REDACTED]` : match;
+        });
+    const getLogString = (entry: unknown): string | undefined => {
+      try {
+        return globalThis.String.prototype.valueOf.call(entry);
+      } catch {
+        return undefined;
+      }
+    };
+    const isSensitiveLogLabel = (entry: unknown): boolean => {
+      const label = getLogString(entry);
+      if (label !== undefined) return this.#isSensitiveLogKey(label);
+      try {
+        return entry instanceof globalThis.String;
+      } catch {
+        return true;
+      }
+    };
+
+    type PendingLogValue = {
+      value: unknown;
+      depth: number;
+      assign: (sanitized: unknown) => void;
+    };
+    type LogPropertyDescriptor = {
+      descriptor: PropertyDescriptor | undefined;
+      failed: boolean;
+    };
+    const pending: PendingLogValue[] = [];
+    const pendingMaps: Array<{
+      map: Map<unknown, unknown>;
+      entries: Array<[unknown, unknown]>;
+    }> = [];
+    let sanitizedValue: unknown;
+
+    const getOwnLogDescriptor = (entry: object, key: PropertyKey): LogPropertyDescriptor => {
+      try {
+        return {
+          descriptor: globalThis.Object.getOwnPropertyDescriptor(entry, key),
+          failed: false,
+        };
+      } catch {
+        return { descriptor: undefined, failed: true };
+      }
+    };
+
+    const enqueue = (entry: unknown, depth: number, assign: (sanitized: unknown) => void): void => {
+      if (depth > maxDepth || pending.length >= maxValues) {
+        assign('[REDACTED]');
+        return;
+      }
+      pending.push({ value: entry, depth, assign });
+    };
+
+    enqueue(value, 0, (entry) => {
+      sanitizedValue = entry;
+    });
+
+    for (let cursor = 0; cursor < pending.length; cursor += 1) {
+      const { value: current, depth, assign } = pending[cursor]!;
+
+      if (typeof current === 'string') {
+        assign(redactString(current));
+        continue;
+      }
+      // Functions can carry inspection hooks; symbols can expose secret descriptions.
+      if (typeof current === 'function' || typeof current === 'symbol') {
+        assign('[REDACTED]');
+        continue;
+      }
+      if (typeof current !== 'object' || current === null) {
+        assign(current);
+        continue;
+      }
+
+      const previous = seen.get(current);
+      if (previous !== undefined) {
+        assign(previous);
+        continue;
+      }
+
+      // Brand checks and native operations can throw for caller-provided proxies.
+      try {
+        const boxedString = getLogString(current);
+        if (boxedString !== undefined) {
+          const sanitized = new globalThis.String(redactString(boxedString));
+          seen.set(current, sanitized);
+          assign(sanitized);
+          continue;
+        }
+        // Proxies and counterfeit String objects cannot expose their native payload.
+        // Do not let their indexed characters bypass whole-string redaction.
+        if (current instanceof globalThis.String) {
+          seen.set(current, '[REDACTED]');
+          assign('[REDACTED]');
+          continue;
+        }
+
+        const RuntimeHeaders = globalThis.Headers;
+        if (typeof RuntimeHeaders === 'function' && current instanceof RuntimeHeaders) {
+          const sanitized = new RuntimeHeaders();
+          seen.set(current, sanitized);
+          assign(sanitized);
+          RuntimeHeaders.prototype.forEach.call(current, (entry: string, key: string) => {
+            sanitized.set(key, this.#isSensitiveLogKey(key) ? '[REDACTED]' : redactString(entry));
+          });
+          continue;
+        }
+
+        if (current instanceof URL) {
+          const sanitized = new URL(URL.prototype.toString.call(current));
+          seen.set(current, sanitized);
+          assign(sanitized);
+          if (sanitized.username) sanitized.username = '[REDACTED]';
+          if (sanitized.password) sanitized.password = '[REDACTED]';
+          for (const [key] of sanitized.searchParams) {
+            if (this.#isSensitiveLogKey(key)) sanitized.searchParams.set(key, '[REDACTED]');
+          }
+          if (sanitized.hash) sanitized.hash = redactString(sanitized.hash);
+          continue;
+        }
+
+        if (Array.isArray(current)) {
+          const lengthDescriptor = getOwnLogDescriptor(current, 'length');
+          if (
+            lengthDescriptor.failed ||
+            !lengthDescriptor.descriptor ||
+            !('value' in lengthDescriptor.descriptor) ||
+            typeof lengthDescriptor.descriptor.value !== 'number'
+          ) {
+            seen.set(current, '[REDACTED]');
+            assign('[REDACTED]');
+            continue;
+          }
+
+          const sanitized: unknown[] = [];
+          seen.set(current, sanitized);
+          assign(sanitized);
+          const limit = Math.min(lengthDescriptor.descriptor.value, maxValues);
+          const firstDescriptor = getOwnLogDescriptor(current, '0');
+          const firstKey =
+            !firstDescriptor.failed && firstDescriptor.descriptor && 'value' in firstDescriptor.descriptor
+              ? firstDescriptor.descriptor.value
+              : undefined;
+          for (let index = 0; index < limit; index += 1) {
+            const property = index === 0 ? firstDescriptor : getOwnLogDescriptor(current, `${index}`);
+            if (property.failed) {
+              sanitized[index] = '[REDACTED]';
+              continue;
+            }
+            const descriptor = property.descriptor;
+            if (!descriptor?.enumerable) continue;
+            if (
+              index === 1 &&
+              (firstDescriptor.failed ||
+                (firstDescriptor.descriptor && !('value' in firstDescriptor.descriptor)) ||
+                isSensitiveLogLabel(firstKey))
+            ) {
+              sanitized[index] = '[REDACTED]';
+              continue;
+            }
+            if (!('value' in descriptor)) {
+              sanitized[index] = '[REDACTED]';
+              continue;
+            }
+            enqueue(descriptor.value, depth + 1, (entry) => {
+              sanitized[index] = entry;
+            });
+          }
+          sanitized.length = limit;
+          if (lengthDescriptor.descriptor.value > limit) sanitized[limit] = '[REDACTED]';
+          continue;
+        }
+
+        if (current instanceof globalThis.Map) {
+          const sanitized = new globalThis.Map<unknown, unknown>();
+          const entries: Array<[unknown, unknown]> = [];
+          pendingMaps.push({ map: sanitized, entries });
+          seen.set(current, sanitized);
+          assign(sanitized);
+          globalThis.Map.prototype.forEach.call(current, (entry: unknown, key: unknown) => {
+            const pair: [unknown, unknown] = ['[REDACTED]', '[REDACTED]'];
+            entries.push(pair);
+            enqueue(key, depth + 1, (safeKey) => {
+              // Unsupported values must not expose the original object as a key.
+              if (
+                typeof safeKey !== 'function' &&
+                typeof safeKey !== 'symbol' &&
+                !(typeof key === 'object' && key !== null && safeKey === key)
+              ) {
+                pair[0] = safeKey;
+              }
+            });
+            if (isSensitiveLogLabel(key)) {
+              return;
+            }
+            enqueue(entry, depth + 1, (safeEntry) => {
+              pair[1] = safeEntry;
+            });
+          });
+          continue;
+        }
+
+        if (current instanceof globalThis.Set) {
+          const sanitized = new globalThis.Set<unknown>();
+          seen.set(current, sanitized);
+          assign(sanitized);
+          globalThis.Set.prototype.forEach.call(current, (entry: unknown) => {
+            enqueue(entry, depth + 1, (safeEntry) => {
+              sanitized.add(safeEntry);
+            });
+          });
+          continue;
+        }
+
+        if (current instanceof globalThis.Date) {
+          assign(new globalThis.Date(globalThis.Date.prototype.getTime.call(current)));
+          continue;
+        }
+
+        const RuntimeReadableStream = (globalThis as any).ReadableStream;
+        if (
+          (typeof RuntimeReadableStream === 'function' && current instanceof RuntimeReadableStream) ||
+          current instanceof globalThis.ArrayBuffer ||
+          globalThis.ArrayBuffer.isView(current)
+        ) {
+          // Opaque payloads may carry credentials or custom inspection hooks.
+          // Redact their log representation without reading or consuming them.
+          seen.set(current, '[REDACTED]');
+          assign('[REDACTED]');
+          continue;
+        }
+
+        let keys: PropertyKey[];
+        try {
+          keys = globalThis.Reflect.ownKeys(current);
+        } catch {
+          seen.set(current, '[REDACTED]');
+          assign('[REDACTED]');
+          continue;
+        }
+
+        const sanitized: Record<string, unknown> = {};
+        seen.set(current, sanitized);
+        assign(sanitized);
+        for (const key of keys) {
+          if (typeof key !== 'string') continue;
+          const property = getOwnLogDescriptor(current, key);
+          if (property.failed) {
+            sanitized[key] = '[REDACTED]';
+            continue;
+          }
+          const descriptor = property.descriptor;
+          if (!descriptor?.enumerable) continue;
+          if (this.#isSensitiveLogKey(key)) {
+            sanitized[key] = '[REDACTED]';
+            continue;
+          }
+          if (!('value' in descriptor)) {
+            sanitized[key] = '[REDACTED]';
+            continue;
+          }
+          enqueue(descriptor.value, depth + 1, (safeEntry) => {
+            sanitized[key] = safeEntry;
+          });
+        }
+      } catch {
+        seen.set(current, '[REDACTED]');
+        assign('[REDACTED]');
+      }
+    }
+
+    // Populate in input order after both keys and values have been sanitized.
+    // Budget fallbacks can assign immediately while earlier entries are queued.
+    for (const { map, entries } of pendingMaps) {
+      for (const [key, entry] of entries) map.set(key, entry);
+    }
+
+    return sanitizedValue;
+  }
+  #sanitizeLogger(logger: Logger): Logger {
+    if (OpenAI.#sanitizedLoggers.has(logger)) return logger;
+
+    const sanitized = new globalThis.Proxy(Object.create(null) as Logger, {
+      get: (_facade, property) => {
+        const value = globalThis.Reflect.get(logger, property, logger);
+        if (typeof value !== 'function') return value;
+        if (
+          typeof property !== 'string' ||
+          !['debug', 'info', 'warn', 'error', 'trace', 'log'].includes(property)
+        ) {
+          return value.bind(logger);
+        }
+
+        return (...args: unknown[]) => {
+          const seen = new WeakMap<object, unknown>();
+          return globalThis.Reflect.apply(
+            value,
+            logger,
+            args.map((entry) => this.#sanitizeLogValue(entry, seen)),
+          );
+        };
+      },
+      set: (_facade, property, value) => globalThis.Reflect.set(logger, property, value, logger),
+    });
+    OpenAI.#sanitizedLoggers.add(sanitized);
+    return sanitized;
+  }
+
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
+   * Function-based credentials are resolved later, when building authentication
+   * headers, including for direct `buildRequest()` calls. Overriding this hook
+   * does not bypass that resolution.
    */
-  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {
-    if (this._provider) return;
-
-    const security = options.__security ?? { bearerAuth: true };
-    if (security.bearerAuth) {
-      await this._callApiKey();
-    }
-  }
+  protected async prepareOptions(options: FinalRequestOptions): Promise<void> {}
 
   /**
    * Used as a callback for mutating the given `RequestInit` object.
@@ -1089,6 +1544,8 @@ export class OpenAI {
           props.options,
           retriesRemaining,
           props.retryOfRequestLogID ?? props.requestLogID,
+          undefined,
+          props.requestSignal,
         );
         Object.assign(props, next);
       } finally {
@@ -1150,9 +1607,11 @@ export class OpenAI {
     retryOfRequestLogID: string | undefined,
   ): Promise<APIResponseProps> {
     const options = await optionsInput;
-    const maxRetries = options.maxRetries ?? this.maxRetries;
+    const maxRetries = this.#normalizeRetries(options.maxRetries ?? this.maxRetries);
     if (retriesRemaining == null) {
       retriesRemaining = maxRetries;
+    } else {
+      retriesRemaining = Math.min(this.#normalizeRetries(retriesRemaining), maxRetries);
     }
 
     const x509Authentication = this.#x509Authentication;
@@ -1238,16 +1697,22 @@ export class OpenAI {
     const retryLogStr = retryOfRequestLogID === undefined ? '' : `, retryOf: ${retryOfRequestLogID}`;
     const startTime = x509Authentication?.requestStartedAt(options) ?? Date.now();
 
-    loggerFor(this).debug(
-      `[${requestLogID}] sending request`,
-      formatRequestDetails({
-        retryOfRequestLogID,
-        method: options.method,
-        url,
-        options: x509Authentication ? { body: req.body, ...x509Authentication.requestSnapshot() } : options,
-        headers: req.headers,
-      }),
-    );
+    if (this.logLevel === 'debug') {
+      // Summarize serialized strings without reparsing or re-running caller serialization hooks.
+      const body = typeof req.body === 'string' ? { type: 'string', length: req.body.length } : req.body;
+      loggerFor(this).debug(
+        `[${requestLogID}] sending request`,
+        formatRequestDetails({
+          retryOfRequestLogID,
+          method: options.method,
+          url,
+          options: x509Authentication
+            ? { body, ...x509Authentication.requestSnapshot() }
+            : { ...options, body },
+          headers: req.headers,
+        }),
+      );
+    }
 
     const callerSignal = x509Authentication ? x509Authentication.requestSnapshot().signal : options.signal;
     if (callerSignal?.aborted || req.signal?.aborted) {
@@ -1299,7 +1764,13 @@ export class OpenAI {
             message: x509Authentication ? 'X.509 workload identity API connection failed.' : response.message,
           }),
         );
-        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+        return this.retryRequest(
+          options,
+          retriesRemaining,
+          retryOfRequestLogID ?? requestLogID,
+          undefined,
+          req.signal,
+        );
       }
       const terminalMessage = hasStreamingBody
         ? 'error; streaming body cannot be retried'
@@ -1423,6 +1894,7 @@ export class OpenAI {
           retriesRemaining,
           retryOfRequestLogID ?? requestLogID,
           response.headers,
+          req.signal,
         );
       }
 
@@ -1478,7 +1950,15 @@ export class OpenAI {
       helperMethod: options.__metadata?.['helperMethod'],
       ...(continueRequest ? { continueRequest } : {}),
     });
-    return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
+    return {
+      response,
+      options,
+      controller,
+      requestSignal: req.signal,
+      requestLogID,
+      retryOfRequestLogID,
+      startTime,
+    };
   }
 
   getAPIList<Item, PageClass extends Pagination.AbstractPage<Item> = Pagination.AbstractPage<Item>>(
@@ -1534,7 +2014,7 @@ export class OpenAI {
     if (this._workloadIdentityAuth && !this.#x509Fetch && schemes.bearerAuth) {
       const headers = init.headers as Headers;
       const authHeader = headers.get('Authorization');
-      if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
+      if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
         const token = await this._workloadIdentityAuth.getToken();
         headers.set('Authorization', `Bearer ${token}`);
       }
@@ -1555,7 +2035,8 @@ export class OpenAI {
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
     const composed = !!signal && composedCallerSignals.get(controller) === signal;
-    if (signal && !composed) signal.addEventListener('abort', abort, { once: true });
+    const cleanup =
+      signal && !composed ? addRequestAbortListener(signal, abort, controller.signal) : undefined;
 
     const timeout = setTimeout(abort, ms);
 
@@ -1577,9 +2058,13 @@ export class OpenAI {
 
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await (this.#x509Fetch ?? this.fetch).call(undefined, url, fetchOptions);
+      const response = await (this.#x509Fetch ?? this.fetch).call(undefined, url, fetchOptions);
+      if (cleanup) {
+        retainRequestAbortCallback(response.body ?? response, abort, controller.signal);
+      }
+      return response;
     } catch (err) {
-      if (signal && !composed) signal.removeEventListener('abort', abort);
+      cleanup?.();
       throw err;
     } finally {
       clearTimeout(timeout);
@@ -1614,6 +2099,7 @@ export class OpenAI {
     retriesRemaining: number,
     requestLogID: string,
     responseHeaders?: Headers | undefined,
+    requestSignal: AbortSignal | null | undefined = options.signal,
   ): Promise<APIResponseProps> {
     let timeoutMillis: number | undefined;
 
@@ -1645,7 +2131,7 @@ export class OpenAI {
       timeoutMillis < 0 ||
       timeoutMillis > 60 * 1000
     ) {
-      const maxRetries = options.maxRetries ?? this.maxRetries;
+      const maxRetries = this.#normalizeRetries(options.maxRetries ?? this.maxRetries);
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
     const x509Authentication = this.#x509Authentication;
@@ -1661,7 +2147,17 @@ export class OpenAI {
     if (x509Authentication) {
       await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.effectiveSignal());
     } else {
-      await sleep(timeoutMillis);
+      const retrySignals =
+        requestSignal === options.signal ? [requestSignal] : [requestSignal, options.signal];
+      try {
+        await sleep(timeoutMillis, ...retrySignals);
+      } catch (error) {
+        const abortedSignal = retrySignals.find((signal) => signal?.aborted);
+        if (abortedSignal) {
+          throw this._makeUserAbortError(abortedSignal);
+        }
+        throw error;
+      }
     }
 
     return this.makeRequest(options, retriesRemaining - 1, requestLogID);
@@ -1682,6 +2178,12 @@ export class OpenAI {
     return sleepSeconds * jitter * 1000;
   }
 
+  /**
+   * Builds a request, resolving callback credentials when constructing authentication
+   * headers, after any subclass request-option rewrites. Calling this method directly
+   * also resolves credentials. Complete replacement builders own authentication and
+   * can call `this.authHeaders()` to resolve headers with request-local credentials.
+   */
   async buildRequest(
     inputOptions: FinalRequestOptions,
     { retryCount = 0 }: { retryCount?: number } = {},
@@ -1726,6 +2228,10 @@ export class OpenAI {
         options.signal = snapshot.signal;
       }
     }
+    const authenticationHeaders =
+      this._provider || x509Authentication
+        ? undefined
+        : await this.authHeaders(inputOptions, inputOptions.__security ?? { bearerAuth: true });
     const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
 
     if (isStreamingBody) {
@@ -1740,6 +2246,7 @@ export class OpenAI {
       options: inputOptions,
       method,
       bodyHeaders,
+      authenticationHeaders,
       retryCount,
       x509Headers,
       x509Timeout: explicitTimeout ? options.timeout : undefined,
@@ -1764,6 +2271,7 @@ export class OpenAI {
     options,
     method,
     bodyHeaders,
+    authenticationHeaders,
     retryCount,
     x509Headers,
     x509Timeout,
@@ -1772,6 +2280,7 @@ export class OpenAI {
     options: FinalRequestOptions;
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
+    authenticationHeaders: NullableHeaders | undefined;
     retryCount: number;
     x509Headers?: { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } | undefined;
     x509Timeout: number | undefined;
@@ -1797,9 +2306,10 @@ export class OpenAI {
         'OpenAI-Organization': x509Tenant ? x509Tenant.organization : this.organization,
         'OpenAI-Project': x509Tenant ? x509Tenant.project : this.project,
       },
-      this._provider || this.#x509Authentication?.isPlanningRequest()
-        ? undefined
-        : await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
+      // X.509 owns streaming uploads before authentication so it can retire them on failure.
+      this.#x509Authentication && !this.#x509Authentication.isPlanningRequest()
+        ? await this.authHeaders(options, options.__security ?? { bearerAuth: true })
+        : authenticationHeaders,
       x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
       bodyHeaders,
       x509Headers?.requestHeaders ?? options.headers,
@@ -1918,6 +2428,7 @@ export class OpenAI {
   static toFile = Uploads.toFile;
   static toStreamingFile = Uploads.toStreamingFile;
 
+  decisions: API.Decisions = new API.Decisions(this);
   /**
    * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
    */
@@ -1948,6 +2459,7 @@ export class OpenAI {
   fineTuning: API.FineTuning = new API.FineTuning(this);
   graders: API.Graders = new API.Graders(this);
   vectorStores: API.VectorStores = new API.VectorStores(this);
+  safety: API.Safety = new API.Safety(this);
   webhooks: API.Webhooks = new API.Webhooks(this);
   beta: API.Beta = new API.Beta(this);
   /**
@@ -1959,7 +2471,11 @@ export class OpenAI {
    */
   uploads: API.Uploads = new API.Uploads(this);
   admin: API.Admin = new API.Admin(this);
+  /**
+   * Create and manage model responses.
+   */
   responses: API.Responses = new API.Responses(this);
+  live: API.Live = new API.Live(this);
   realtime: API.Realtime = new API.Realtime(this);
   /**
    * Manage conversations and conversation items.
@@ -1977,6 +2493,7 @@ export class OpenAI {
   videos: API.Videos = new API.Videos(this);
 }
 
+OpenAI.Decisions = Decisions;
 OpenAI.Completions = Completions;
 OpenAI.Chat = Chat;
 OpenAI.Embeddings = Embeddings;
@@ -1989,18 +2506,25 @@ OpenAI.Models = Models;
 OpenAI.FineTuning = FineTuning;
 OpenAI.Graders = Graders;
 OpenAI.VectorStores = VectorStores;
+OpenAI.Safety = Safety;
 OpenAI.Webhooks = Webhooks;
 OpenAI.Beta = Beta;
 OpenAI.Batches = Batches;
 OpenAI.Uploads = UploadsAPIUploads;
 OpenAI.Admin = Admin;
 OpenAI.Responses = Responses;
+OpenAI.Live = Live;
 OpenAI.Realtime = Realtime;
 OpenAI.Conversations = Conversations;
 OpenAI.Evals = Evals;
 OpenAI.Containers = Containers;
 OpenAI.Skills = Skills;
 OpenAI.Videos = Videos;
+OpenAI.ConversationCursorPage = Pagination.ConversationCursorPage;
+OpenAI.CursorPage = Pagination.CursorPage;
+OpenAI.NextCursorPage = Pagination.NextCursorPage;
+OpenAI.Page = Pagination.Page;
+OpenAI.TokenPage = Pagination.TokenPage;
 
 const composedCallerSignals = new WeakMap<AbortController, AbortSignal>();
 
@@ -2088,6 +2612,19 @@ export declare namespace OpenAI {
     type NextCursorPageResponse as NextCursorPageResponse,
   };
 
+  export import TokenPage = Pagination.TokenPage;
+  export { type TokenPageParams as TokenPageParams, type TokenPageResponse as TokenPageResponse };
+
+  export {
+    Decisions as Decisions,
+    type Decision as Decision,
+    type DecisionInputImage as DecisionInputImage,
+    type DecisionInputMessage as DecisionInputMessage,
+    type DecisionInputPart as DecisionInputPart,
+    type DecisionInputText as DecisionInputText,
+    type DecisionCreateParams as DecisionCreateParams,
+  };
+
   export {
     Completions as Completions,
     type Completion as Completion,
@@ -2155,10 +2692,10 @@ export declare namespace OpenAI {
 
   export {
     Files as Files,
-    type FileContent as FileContent,
     type FileDeleted as FileDeleted,
     type FileObject as FileObject,
     type FilePurpose as FilePurpose,
+    type FileContent as FileContent,
     type FileObjectsPage as FileObjectsPage,
     type FileCreateParams as FileCreateParams,
     type FileListParams as FileListParams,
@@ -2234,6 +2771,8 @@ export declare namespace OpenAI {
     type VectorStoreSearchParams as VectorStoreSearchParams,
   };
 
+  export { Safety as Safety };
+
   export { Webhooks as Webhooks };
 
   export { Beta as Beta };
@@ -2259,6 +2798,8 @@ export declare namespace OpenAI {
   export { Admin as Admin };
 
   export { Responses as Responses };
+
+  export { Live as Live };
 
   export { Realtime as Realtime };
 

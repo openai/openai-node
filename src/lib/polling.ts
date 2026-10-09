@@ -92,8 +92,8 @@ function sleepUntilAborted(milliseconds: number, signal: AbortSignal): Promise<v
 
 /**
  * Repeatedly retrieves a lifecycle resource using the existing polling-helper
- * headers. Intermediate states wait for the explicit interval, server interval,
- * or five-second default; terminal states return the same parsed object.
+ * headers. Intermediate states wait for the explicit interval (including zero),
+ * the server interval, or five-second default; terminal states return the same parsed object.
  * The caller's signal interrupts intermediate waits, unknown states retry
  * immediately, and retrieval errors propagate unchanged.
  *
@@ -120,9 +120,10 @@ export async function pollWithResponse<T extends { status: string }>(
 
     if (intermediateStatuses.includes(status)) {
       let sleepInterval = 5000;
+      const pollIntervalMs = options?.pollIntervalMs;
 
-      if (options?.pollIntervalMs) {
-        sleepInterval = options.pollIntervalMs;
+      if (pollIntervalMs || pollIntervalMs === 0) {
+        sleepInterval = pollIntervalMs;
       } else {
         const headerInterval = response.headers.get('openai-poll-after-ms');
         if (headerInterval) {

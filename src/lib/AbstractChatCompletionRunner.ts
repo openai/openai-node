@@ -1,4 +1,4 @@
-import { APIUserAbortError, OpenAIError } from '../error';
+import { OpenAIError } from '../error';
 import type OpenAI from '../index';
 import type { RequestOptions } from '../internal/request-options';
 import { uuid4 } from '../internal/utils/uuid';
@@ -128,6 +128,7 @@ export class AbstractChatCompletionRunner<
 > extends EventStream<EventTypes> {
   protected _chatCompletions: ParsedChatCompletion<ParsedT>[] = [];
   #completionArrivedBeforeAbort = false;
+  #afterCompletionInvoked = false;
   /** Mutable conversation history, including initial input, assistant replies, and tool results. */
   messages: ChatCompletionMessageParam[] = [];
 
@@ -141,6 +142,7 @@ export class AbstractChatCompletionRunner<
     this._emit('chatCompletion', chatCompletion);
     const message = chatCompletion.choices[0]?.message;
     if (message) {
+      // SAFETY: An API assistant message is also accepted as a subsequent conversation message; this preserves that existing input/output bridge.
       this._addMessage(message as ChatCompletionMessageParam);
     }
     return chatCompletion;
@@ -150,8 +152,9 @@ export class AbstractChatCompletionRunner<
     this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, ParsedT>,
     message: ChatCompletionMessageParam,
     emit = true,
+    normalizeContent = true,
   ) {
-    if (!('content' in message)) {
+    if (normalizeContent && !('content' in message)) {
       message.content = null;
     }
 
@@ -161,6 +164,7 @@ export class AbstractChatCompletionRunner<
       this._emit('message', message);
       if (isToolMessage(message) && message.content) {
         // Note, this assumes that {role: 'tool', content: …} is always the result of a call of tool of type=function.
+        // SAFETY: The legacy function-tool result event assumes textual tool output, as documented by the adjacent compatibility comment.
         this._emit('functionToolCallResult', message.content as string);
       } else if (isAssistantMessage(message) && message.tool_calls) {
         for (const tool_call of message.tool_calls) {
@@ -204,6 +208,7 @@ export class AbstractChatCompletionRunner<
       const message = this.messages[i];
       if (isAssistantMessage(message)) {
         // Audio is intentionally omitted from the final message snapshot.
+        // SAFETY: The assistant-message branch normalizes missing content and refusal to null when constructing the completed message.
         const ret: Omit<ChatCompletionMessage, 'audio'> = {
           ...message,
           content: (message as ChatCompletionMessage).content ?? null,
@@ -255,6 +260,7 @@ export class AbstractChatCompletionRunner<
       if (
         isToolMessage(message) &&
         message.content != null &&
+        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Chat history and tool-choice inputs can contain runtime variants that select different runner behavior.
         typeof message.content === 'string' &&
         this.messages.some(
           (x) =>
@@ -305,6 +311,9 @@ export class AbstractChatCompletionRunner<
   protected override _emitFinal(
     this: AbstractChatCompletionRunner<AbstractChatCompletionRunnerEvents, ParsedT>,
   ) {
+    if (this.#afterCompletionInvoked) {
+      this.#throwIfAborted();
+    }
     const completion = this._chatCompletions[this._chatCompletions.length - 1];
     if (completion) {
       this._emit('finalChatCompletion', completion);
@@ -330,6 +339,12 @@ export class AbstractChatCompletionRunner<
 
     if (this._chatCompletions.some((c) => c.usage)) {
       this._emit('totalUsage', this.#calculateTotalUsage());
+    }
+  }
+
+  #throwIfAborted() {
+    if (this.controller.signal.aborted) {
+      throw this._userAbortError();
     }
   }
 
@@ -363,7 +378,7 @@ export class AbstractChatCompletionRunner<
     options?: RequestOptions,
   ): Promise<ChatCompletion> {
     for (const message of params.messages) {
-      this._addMessage(message, false);
+      this._addMessage(message, false, false);
     }
     return await this._createChatCompletion(client, params, options);
   }
@@ -380,10 +395,20 @@ export class AbstractChatCompletionRunner<
   ) {
     const role = 'tool' as const;
     const { tool_choice = 'auto', stream, toolContext: inputToolContext, ...restParams } = params;
+    // SAFETY: The generic runner parameters tie toolContext to ToolContext; undefined remains valid when the caller omits it under that contract.
     const toolContext = inputToolContext as ToolContext;
     const singleFunctionToCall =
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Chat history and tool-choice inputs can contain runtime variants that select different runner behavior.
       typeof tool_choice !== 'string' && tool_choice.type === 'function' && tool_choice?.function?.name;
     const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS, afterCompletion } = options || {};
+    const runAfterCompletion = async (completion: ChatCompletion) => {
+      if (afterCompletion == null) {
+        return;
+      }
+      this.#afterCompletionInvoked = true;
+      await afterCompletion(completion, runner);
+      this.#throwIfAborted();
+    };
 
     // Normalize tool definitions before invoking callbacks.
     const inputTools = params.tools.map((tool): RunnableToolFunction<any> => {
@@ -392,6 +417,7 @@ export class AbstractChatCompletionRunner<
           throw new OpenAIError('Tool given to `.runTools()` that does not have an associated function');
         }
 
+        // SAFETY: The auto-parseable tool supplies its own validated parameter schema and parser; this bridges the legacy runnable-tool parameter type.
         return {
           type: 'function',
           function: {
@@ -405,7 +431,8 @@ export class AbstractChatCompletionRunner<
         };
       }
 
-      return tool as any as RunnableToolFunction<any>;
+      // SAFETY: Unbranded tools follow the existing runnable-tool contract; the function-tool branch below performs its normal dispatch.
+      return tool as RunnableToolFunction<any>;
     });
 
     const functionsByName: Record<string, RunnableFunction<any, ToolContext>> = Object.create(null);
@@ -415,6 +442,9 @@ export class AbstractChatCompletionRunner<
       }
     }
 
+    // SAFETY: The runnable function's parameter schema is forwarded as JSON keyword properties without changing or inspecting its values.
+    // SAFETY: This is the intentional non-function tool pass-through; the runnable and wire types differ in index signatures, not the forwarded value.
+    // SAFETY: Omitting the tools list preserves the optional wire field; the existing conditional result type is broader than the runnable helper's declaration.
     const tools: ChatCompletionTool[] =
       'tools' in params
         ? inputTools.map((t) =>
@@ -423,17 +453,19 @@ export class AbstractChatCompletionRunner<
                   type: 'function',
                   function: {
                     name: t.function.name || t.function.function.name,
+                    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Tool parameter schemas use the published open JSON Schema dictionary contract, including arbitrary extensions.
                     parameters: t.function.parameters as Record<string, unknown>,
                     description: t.function.description,
                     strict: t.function.strict,
                   },
                 }
-              : (t as unknown as ChatCompletionTool),
+              : // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- Preserve the existing non-function tool pass-through; runnable and wire schema interfaces have incompatible index signatures.
+                (t as unknown as ChatCompletionTool),
           )
         : (undefined as any);
 
     for (const message of params.messages) {
-      this._addMessage(message, false);
+      this._addMessage(message, false, false);
     }
 
     type ToolCallResult = {
@@ -479,20 +511,34 @@ export class AbstractChatCompletionRunner<
           parsed = await fn.parse(args);
         } catch (error) {
           if (this.controller.signal.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
           }
           const content = error instanceof Error ? error.message : String(error);
           return { message: { role, tool_call_id, content }, functionCalled: false };
         }
         if (this.controller.signal.aborted) {
-          throw new APIUserAbortError();
+          throw this._userAbortError();
         }
-        rawContent = await fn.function(parsed, runner, toolContext);
+        try {
+          rawContent = await fn.function(parsed, runner, toolContext);
+        } catch (error) {
+          if (this.controller.signal.aborted && Object.is(error, this.controller.signal.reason)) {
+            throw this._userAbortError();
+          }
+          throw error;
+        }
       } else {
         if (this.controller.signal.aborted && !bufferedToolCall) {
-          throw new APIUserAbortError();
+          throw this._userAbortError();
         }
-        rawContent = await fn.function(args, runner, toolContext);
+        try {
+          rawContent = await fn.function(args, runner, toolContext);
+        } catch (error) {
+          if (this.controller.signal.aborted && Object.is(error, this.controller.signal.reason)) {
+            throw this._userAbortError();
+          }
+          throw error;
+        }
       }
 
       const content = AbstractChatCompletionRunner.#stringifyFunctionCallResult(rawContent);
@@ -519,7 +565,7 @@ export class AbstractChatCompletionRunner<
         throw new OpenAIError(`missing message in ChatCompletion response`);
       }
       if (!message.tool_calls?.length) {
-        await afterCompletion?.(chatCompletion, runner);
+        await runAfterCompletion(chatCompletion);
         return;
       }
 
@@ -530,11 +576,11 @@ export class AbstractChatCompletionRunner<
             this._addMessage(result.message);
           }
           if (this.controller.signal.aborted) {
-            throw new APIUserAbortError();
+            throw this._userAbortError();
           }
 
           if (singleFunctionToCall && result.functionCalled) {
-            await afterCompletion?.(chatCompletion, runner);
+            await runAfterCompletion(chatCompletion);
             return;
           }
         }
@@ -559,15 +605,17 @@ export class AbstractChatCompletionRunner<
           }
         }
         if (this.controller.signal.aborted) {
-          throw new APIUserAbortError();
+          throw this._userAbortError();
         }
       }
 
-      await afterCompletion?.(chatCompletion, runner);
+      await runAfterCompletion(chatCompletion);
     }
   }
 
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Public tool callbacks can return any JavaScript value; this boundary normalizes their results for the API.
   static #stringifyFunctionCallResult(rawContent: unknown): string {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Chat history and tool-choice inputs can contain runtime variants that select different runner behavior.
     if (typeof rawContent === 'string') {
       return rawContent;
     }

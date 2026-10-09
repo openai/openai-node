@@ -33,6 +33,18 @@ import {
 } from './certificates';
 import * as DataRetentionAPI from './data-retention';
 import { DataRetention, DataRetentionUpdateParams, OrganizationDataRetention } from './data-retention';
+import * as ExternalStorageAPI from './external-storage';
+import {
+  AwsExternalStorageProvider,
+  AzureExternalStorageProvider,
+  ExternalStorage,
+  ExternalStorageConfiguration,
+  ExternalStorageConfigurationsPage,
+  ExternalStorageCreateParams,
+  ExternalStorageDeleted,
+  ExternalStorageListParams,
+  GcpExternalStorageProvider,
+} from './external-storage';
 import * as InvitesAPI from './invites';
 import {
   Invite,
@@ -136,6 +148,7 @@ export class Organization extends APIResource {
   groups: GroupsAPI.Groups = new GroupsAPI.Groups(this._client);
   roles: RolesAPI.Roles = new RolesAPI.Roles(this._client);
   dataRetention: DataRetentionAPI.DataRetention = new DataRetentionAPI.DataRetention(this._client);
+  externalStorage: ExternalStorageAPI.ExternalStorage = new ExternalStorageAPI.ExternalStorage(this._client);
   spendLimit: SpendLimitAPI.SpendLimit = new SpendLimitAPI.SpendLimit(this._client);
   spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
@@ -150,6 +163,7 @@ Organization.Users = Users;
 Organization.Groups = Groups;
 Organization.Roles = Roles;
 Organization.DataRetention = DataRetention;
+Organization.ExternalStorage = ExternalStorage;
 Organization.SpendLimit = SpendLimit;
 Organization.SpendAlerts = SpendAlerts;
 Organization.Certificates = Certificates;
@@ -243,6 +257,18 @@ export declare namespace Organization {
     DataRetention as DataRetention,
     type OrganizationDataRetention as OrganizationDataRetention,
     type DataRetentionUpdateParams as DataRetentionUpdateParams,
+  };
+
+  export {
+    ExternalStorage as ExternalStorage,
+    type AwsExternalStorageProvider as AwsExternalStorageProvider,
+    type AzureExternalStorageProvider as AzureExternalStorageProvider,
+    type ExternalStorageConfiguration as ExternalStorageConfiguration,
+    type ExternalStorageDeleted as ExternalStorageDeleted,
+    type GcpExternalStorageProvider as GcpExternalStorageProvider,
+    type ExternalStorageConfigurationsPage as ExternalStorageConfigurationsPage,
+    type ExternalStorageCreateParams as ExternalStorageCreateParams,
+    type ExternalStorageListParams as ExternalStorageListParams,
   };
 
   export {

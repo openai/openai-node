@@ -38,7 +38,9 @@ let response = await client.responses.create({
 });
 
 while (true) {
-  const calls = response.output.filter((item) => item.type === 'function_call');
+  const calls = response.output.filter(
+    (item): item is OpenAI.Responses.ResponseFunctionToolCall => item.type === 'function_call',
+  );
 
   if (response.status !== 'completed') {
     const details = response.error ?? response.incomplete_details;

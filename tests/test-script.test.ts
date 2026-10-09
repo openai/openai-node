@@ -81,7 +81,7 @@ printf '%s\\0' "$@" > "$VITEST_ARGS_FILE"
     chmodSync(path, 0o755);
   }
 
-  function runTestScript(args: string[], suite = 'all'): { jestArgs: string[]; vitestArgs: string[] } {
+  function runTestScript(args: string[], suite = 'all') {
     const jestArgsFile = path.join(fixtureDir, 'jest-args');
     const vitestArgsFile = path.join(fixtureDir, 'vitest-args');
     const result = spawnSync(

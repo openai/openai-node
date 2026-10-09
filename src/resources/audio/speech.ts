@@ -5,6 +5,13 @@ import { APIPromise } from '../../core/api-promise';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 /**
  * Turn audio into text or text into audio.
  */
@@ -19,7 +26,7 @@ export class Speech extends APIResource {
    * const speech = await client.audio.speech.create({
    *   input: 'input',
    *   model: 'tts-1',
-   *   voice: 'alloy',
+   *   voice: 'ash',
    * });
    *
    * const content = await speech.blob();
@@ -27,13 +34,16 @@ export class Speech extends APIResource {
    * ```
    */
   create(body: SpeechCreateParams, options?: RequestOptions): APIPromise<Response> {
-    return this._client.post('/audio/speech', {
-      body,
-      ...options,
-      headers: buildHeaders([{ Accept: 'application/octet-stream' }, options?.headers]),
-      __security: { bearerAuth: true },
-      __binaryResponse: true,
-    });
+    return this._client.post(
+      '/audio/speech',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ Accept: 'application/octet-stream' }, options?.headers]),
+        __security: { bearerAuth: true },
+        __binaryResponse: true,
+      })),
+    );
   }
 }
 
@@ -46,7 +56,8 @@ export interface SpeechCreateParams {
   input: string;
 
   /**
-   * One of the available [TTS models](https://platform.openai.com/docs/models#tts):
+   * One of the available
+   * [TTS models](https://developers.openai.com/api/docs/guides/text-to-speech):
    * `tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`, or `gpt-4o-mini-tts-2025-12-15`.
    */
   model: (string & {}) | SpeechModel;
@@ -57,7 +68,8 @@ export interface SpeechCreateParams {
    * `shimmer`, `verse`, `marin`, and `cedar`. You may also provide a custom voice
    * object with an `id`, for example `{ "id": "voice_1234" }`. Previews of the
    * voices are available in the
-   * [Text to speech guide](https://platform.openai.com/docs/guides/text-to-speech#voice-options).
+   * [Text to speech guide](https://developers.openai.com/api/docs/guides/text-to-speech#voice-options).
+   * Custom voices must be created from audio samples.
    */
   voice:
     | string
@@ -71,6 +83,9 @@ export interface SpeechCreateParams {
     | 'verse'
     | 'marin'
     | 'cedar'
+    | 'fable'
+    | 'onyx'
+    | 'nova'
     | SpeechCreateParams.ID;
 
   /**

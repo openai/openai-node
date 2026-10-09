@@ -68,7 +68,7 @@ function commitAssistantStreamArrayProjection(projection: AssistantStreamDeltaPr
   }
 }
 
-function isPrimitiveAssistantStreamValue(value: unknown): boolean {
+function isPrimitiveAssistantStreamValue(value: unknown): value is string | number {
   return typeof value === 'string' || typeof value === 'number';
 }
 
@@ -118,6 +118,7 @@ function getAssistantStreamDeltaIndex(
     );
   }
 
+  // SAFETY: Number.isSafeInteger rejects non-numbers before numeric comparisons; the remaining checks enforce the permitted index range.
   if (
     !Number.isSafeInteger(index) ||
     (index as number) < 0 ||
@@ -128,6 +129,7 @@ function getAssistantStreamDeltaIndex(
     throw new OpenAIError(`Assistant stream delta contains an invalid ${kind} index: ${safeIndex}`);
   }
 
+  // SAFETY: Number.isSafeInteger rejects non-numbers before numeric comparisons; the remaining checks enforce the permitted index range.
   return index as number;
 }
 
@@ -323,6 +325,7 @@ function applyAssistantStreamArrayDelta(
         }
         accumulator[index] = deltaEntry;
       } else {
+        // SAFETY: The preceding validation accepts this accumulated record before recursively merging the matching delta entry.
         accumulator[index] = applyRecord(accumulatedEntry as AssistantStreamRecord, deltaEntry);
       }
     } else {
@@ -398,11 +401,14 @@ export function assertSafeAssistantStreamDelta(value: unknown): void {
 
 export function accumulateAssistantStreamDelta<Accumulator extends object>(
   accumulator: Accumulator,
+  // oxlint-disable-next-line anti-slop/no-object-parameters -- This exported accumulator accepts heterogeneous partial SDK deltas and validates their properties at runtime.
   delta: object,
   cacheArrays = false,
 ): Accumulator {
   assertSafeAssistantStreamDelta(delta);
+  // SAFETY: The generic accumulator uses record entries after delta validation; recursive merge retains the original accumulator's public type.
   const accumulatorRecord = accumulator as AssistantStreamRecord;
+  // SAFETY: The generic accumulator uses record entries after delta validation; recursive merge retains the original accumulator's public type.
   const deltaRecord = delta as AssistantStreamRecord;
   const projection = createAssistantStreamDeltaProjection(
     cacheArrays && !isAssistantStreamValueExternallyMutable(accumulator),

@@ -33,6 +33,7 @@ export function parseLiteralDef(def: ZodLiteralDef, refs: Refs): JsonSchema7Lite
   }
 
   if (refs.target === 'openApi3') {
+    // SAFETY: The OpenAPI branch represents a primitive literal with enum instead of const, retaining the vendored converter's target compatibility.
     return {
       type: parsedType === 'bigint' ? 'integer' : parsedType,
       enum: [def.value],

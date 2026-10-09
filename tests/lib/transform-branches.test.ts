@@ -47,6 +47,7 @@ describe('JSON Schema child traversal', () => {
 });
 
 describe('local JSON Schema reference resolution', () => {
+  // SAFETY: This valid Draft 7 fixture includes legacy dependencies, which the SDK's reduced JSONSchema type omits; reference traversal must distinguish its schema and property entries.
   const root = {
     type: 'object',
     $defs: {
@@ -128,7 +129,7 @@ describe('reference annotations and resource identity', () => {
 
 describe('oneOf reference rewrites', () => {
   test('rewrites pointers that traverse an actual moved oneOf schema branch', () => {
-    const root = {
+    const root: JSONSchema = {
       type: 'object',
       properties: {
         variant: {
@@ -136,7 +137,7 @@ describe('oneOf reference rewrites', () => {
         },
         alias: { $ref: '#/properties/variant/oneOf/0/properties/slash~1key' },
       },
-    } as JSONSchema;
+    };
 
     rewriteLocalRefsIntoMovedOneOfBranches(root);
 
@@ -182,6 +183,7 @@ describe('object intersection normalization for exclusivity', () => {
   });
 
   test('preserves own prototype-named schema metadata while flattening an intersection', () => {
+    // SAFETY: Parse the literal hostile schema without object-literal prototype semantics so the regression preserves an own __proto__ key.
     const branch = JSON.parse(
       '{"type":"object","properties":{"value":{"type":"string"}},"required":["value"],"__proto__":{"polluted":"YES"}}',
     ) as JSONSchema;
@@ -197,17 +199,18 @@ describe('object intersection normalization for exclusivity', () => {
       value: { polluted: 'YES' },
       writable: true,
     });
-    expect((normalized as Record<string, unknown>)['polluted']).toBeUndefined();
-    expect((Object.prototype as Record<string, unknown>)['polluted']).toBeUndefined();
+    expect(normalized).not.toHaveProperty('polluted');
+    expect(Object.prototype).not.toHaveProperty('polluted');
     expect(normalized?.title).toBe('preserved annotation');
     expect(schema.allOf).toEqual([branch]);
   });
 
+  // SAFETY: Deliberately include invalid JSON Schema keyword values so strict-schema normalization must reject or preserve them at runtime.
   test.each([
     { allOf: [false] },
     { allOf: [{ type: 'object', properties: { value: { type: 'string' } } }, { type: 'string' }] },
     { allOf: [{ type: 'object', required: [1] }, { type: 'object' }] },
-  ] as unknown as JSONSchema[])('fails closed for unsupported intersection shapes', (schema) => {
+  ] as JSONSchema[])('fails closed for unsupported intersection shapes', (schema) => {
     expect(normalizeObjectAllOfForExclusivity(schema, schema)).toBeUndefined();
   });
 });
@@ -235,6 +238,7 @@ describe('strict schema edge cases', () => {
 
   test.each([1, ['value', 1]])('rejects malformed required property declarations', (required) => {
     expect(() =>
+      // SAFETY: Deliberately include invalid JSON Schema keyword values so strict-schema normalization must reject or preserve them at runtime.
       toStrictJsonSchema({
         type: 'object',
         properties: { value: { type: 'string' } },
@@ -243,12 +247,13 @@ describe('strict schema edge cases', () => {
     ).toThrow('Expected `required` to be an array of strings');
   });
 
+  // SAFETY: Deliberately include invalid JSON Schema keyword values so strict-schema normalization must reject or preserve them at runtime.
   test.each([
     { enum: ['non-null'] },
     { enum: 'invalid' },
     { oneOf: [{ type: 'null' }, { type: 'null' }] },
     { type: ['string', 'null'], not: { type: 'null' } },
-  ] as unknown as JSONSchema[])(
+  ] as JSONSchema[])(
     'does not silently accept optional properties when null is not proven valid',
     (property) => {
       expect(() =>
@@ -263,7 +268,7 @@ describe('strict schema edge cases', () => {
   test.each([{ anyOf: [false, false] }, { anyOf: [true] }, { anyOf: [false, true] }] as const)(
     'rejects root unions that cannot be reduced to a single object branch',
     ({ anyOf }) => {
-      expect(() => toStrictJsonSchema({ type: 'object', anyOf: [...anyOf] } as JSONSchema)).toThrow(
+      expect(() => toStrictJsonSchema({ type: 'object', anyOf: [...anyOf] })).toThrow(
         'Root schema must not use `anyOf`',
       );
     },

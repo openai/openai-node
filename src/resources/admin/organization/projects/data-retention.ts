@@ -5,6 +5,13 @@ import { APIPromise } from '../../../../core/api-promise';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class DataRetention extends APIResource {
   /**
    * Retrieves project data retention controls.
@@ -18,10 +25,13 @@ export class DataRetention extends APIResource {
    * ```
    */
   retrieve(projectID: string, options?: RequestOptions): APIPromise<ProjectDataRetention> {
-    return this._client.get(path`/organization/projects/${projectID}/data_retention`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/projects/${projectID}/data_retention`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -41,11 +51,14 @@ export class DataRetention extends APIResource {
     body: DataRetentionUpdateParams,
     options?: RequestOptions,
   ): APIPromise<ProjectDataRetention> {
-    return this._client.post(path`/organization/projects/${projectID}/data_retention`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/projects/${projectID}/data_retention`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

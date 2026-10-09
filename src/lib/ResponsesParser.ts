@@ -2,6 +2,7 @@ import { OpenAIError } from '../error';
 import type { ChatCompletionTool } from '../resources/chat/completions';
 import type {
   FunctionTool,
+  NamespaceTool,
   ParsedContent,
   ParsedResponse,
   ParsedResponseFunctionToolCall,
@@ -87,6 +88,7 @@ export function maybeParseResponse<
     };
 
     if (needsOutputText(response, parsed)) {
+      // SAFETY: The copy retains every response field and only adds parsed metadata; addOutputText accepts that original response structure.
       addOutputText(parsed as Response);
     }
 
@@ -97,9 +99,10 @@ export function maybeParseResponse<
 }
 
 /**
- * Parses completed response text and strict function-tool arguments.
+ * Parses completed response text and strict function-tool arguments, matching
+ * namespaced functions by both namespace and name.
  *
- * Incomplete or nonterminal responses keep their parsed values as `null`, and
+ * Incomplete responses and messages with an explicit non-final phase stay unparsed.
  * `output_parsed` returns the first successfully parsed output-text item.
  */
 export function parseResponse<
@@ -117,7 +120,10 @@ export function parseResponse<
           if (content.type === 'output_text') {
             return {
               ...content,
-              parsed: shouldParse ? parseTextFormat(params, content.text) : null,
+              parsed:
+                shouldParse && (item.phase == null || item.phase === 'final_answer')
+                  ? parseTextFormat(params, content.text)
+                  : null,
             };
           }
 
@@ -158,6 +164,7 @@ export function parseResponse<
     },
   });
 
+  // SAFETY: The output_parsed getter was installed immediately above and returns the first parsed content or null.
   return parsed as ParsedResponse<ParsedT>;
 }
 
@@ -177,7 +184,13 @@ export function hasAutoParseableInput(params: ResponseCreateParamsWithTools): bo
   return (
     Array.isArray(params.tools) &&
     params.tools.some(
-      (tool) => isAutoParsableTool(tool) || (tool.type === 'function' && tool.strict === true),
+      (tool) =>
+        isAutoParsableTool(tool) ||
+        (tool.type === 'function' && tool.strict === true) ||
+        (tool.type === 'namespace' &&
+          tool.tools.some(
+            (nested) => nested.type === 'function' && (isAutoParsableTool(nested) || nested.strict === true),
+          )),
     )
   );
 }
@@ -195,6 +208,7 @@ type ToolOptions = {
 /** A Responses API function tool with an argument parser and optional executable callback. */
 export type AutoParseableResponseTool<
   OptionsT extends ToolOptions,
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- This public conditional type detects any callable callback without constraining its return type.
   HasFunction = OptionsT['function'] extends (...args: never[]) => unknown ? true : false,
 > = FunctionTool & {
   /** Type-only marker for parsed tool arguments; this property does not exist at runtime. */
@@ -220,9 +234,9 @@ export function makeParseableResponseTool<OptionsT extends ToolOptions>(
     /** Converts the raw JSON argument string into the function's typed argument value. */
     parser: (content: string) => OptionsT['arguments'];
     /** Optional callback available to helpers that execute the parsed function. */
-    callback: ((args: any) => any) | undefined;
+    callback: ((args: OptionsT['arguments']) => any) | undefined;
   },
-): AutoParseableResponseTool<OptionsT['arguments']> {
+): AutoParseableResponseTool<OptionsT> {
   const obj = { ...tool };
 
   Object.defineProperties(obj, {
@@ -240,7 +254,8 @@ export function makeParseableResponseTool<OptionsT extends ToolOptions>(
     },
   });
 
-  return obj as AutoParseableResponseTool<OptionsT['arguments']>;
+  // SAFETY: The non-enumerable parser brand and callbacks were installed on this copied tool immediately above.
+  return obj as AutoParseableResponseTool<OptionsT>;
 }
 
 /** Returns whether a Responses API tool carries the SDK's argument-parser marker. */
@@ -248,18 +263,40 @@ export function isAutoParsableTool(tool: any): tool is AutoParseableResponseTool
   return tool?.['$brand'] === 'auto-parseable-tool';
 }
 
-function getInputToolByName(input_tools: Tool[], name: string): FunctionTool | undefined {
-  return input_tools.find((tool) => tool.type === 'function' && tool.name === name) as
-    | FunctionTool
-    | undefined;
+function getInputToolByName(
+  input_tools: Tool[],
+  name: string,
+  namespace?: string,
+): FunctionTool | NamespaceTool.Function | undefined {
+  for (const tool of input_tools) {
+    if (namespace == null) {
+      if (tool.type === 'function' && tool.name === name) {
+        return tool;
+      }
+    } else if (tool.type === 'namespace' && tool.name === namespace) {
+      return tool.tools.find(
+        (nested): nested is NamespaceTool.Function => nested.type === 'function' && nested.name === name,
+      );
+    }
+  }
+  // Hosted discovery exposes a deferred top-level function under its own name.
+  // A declared namespace above owns that identity, even if it has no matching function.
+  if (namespace === name) {
+    return input_tools.find(
+      (tool): tool is FunctionTool =>
+        tool.type === 'function' && tool.name === name && tool.defer_loading === true,
+    );
+  }
+  return undefined;
 }
 
 function parseToolCall<Params extends ResponseCreateParamsBase>(
   params: Params,
   toolCall: ResponseFunctionToolCall,
 ): ParsedResponseFunctionToolCall {
-  const inputTool = getInputToolByName(params.tools ?? [], toolCall.name);
+  const inputTool = getInputToolByName(params.tools ?? [], toolCall.name, toolCall.namespace);
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- Parsing replaces the initial null with an arbitrary caller-parser result, so unknown is required.
   let parsedArguments: unknown = null;
   if (isAutoParsableTool(inputTool)) {
     parsedArguments = inputTool.$parseRaw(toolCall.arguments);
@@ -276,7 +313,7 @@ function parseToolCall<Params extends ResponseCreateParamsBase>(
   };
 }
 
-/** Returns whether a response function call matches a strict or auto-parseable request tool. */
+/** Matches a response function call to a strict or auto-parseable tool by namespace and name. */
 export function shouldParseToolCall(
   params: ResponseCreateParamsNonStreaming | null | undefined,
   toolCall: ResponseFunctionToolCall,
@@ -285,7 +322,7 @@ export function shouldParseToolCall(
     return false;
   }
 
-  const inputTool = getInputToolByName(params.tools ?? [], toolCall.name);
+  const inputTool = getInputToolByName(params.tools ?? [], toolCall.name, toolCall.namespace);
   return isAutoParsableTool(inputTool) || inputTool?.strict || false;
 }
 

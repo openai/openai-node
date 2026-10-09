@@ -21,9 +21,78 @@ export type AllModels =
   | 'gpt-5.1-codex-max'
   | 'gpt-daybreak-blue-latest'
   | 'gpt-daybreak-red-latest'
-  | 'gpt-5.6-cyber';
+  | 'gpt-5.6-cyber'
+  | 'gpt-rosalind-research';
 
+/**
+ * Deprecated values:
+ *
+ * - "gpt-5.3-chat-latest", "gpt-5.2-chat-latest": Announced shutdown date:
+ *   2026-08-10. See https://developers.openai.com/api/docs/deprecations for
+ *   details and recommended replacements.
+ * - "gpt-5.1-codex", "gpt-5.1-chat-latest", "gpt-5-chat-latest",
+ *   "gpt-4o-search-preview", "gpt-4o-mini-search-preview",
+ *   "gpt-4o-search-preview-2025-03-11", "gpt-4o-mini-search-preview-2025-03-11":
+ *   Announced shutdown date: 2026-07-23. See
+ *   https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ * - "gpt-5.1-mini": Not a supported model ID. Retained for SDK compatibility.
+ * - "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-2025-08-07",
+ *   "gpt-5-mini-2025-08-07", "gpt-5-nano-2025-08-07", "o3", "o3-2025-04-16":
+ *   Announced shutdown date: 2026-12-11. See
+ *   https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ * - "gpt-4.1-nano", "gpt-4.1-nano-2025-04-14", "o4-mini", "o4-mini-2025-04-16",
+ *   "o3-mini", "o3-mini-2025-01-31", "o1", "o1-2024-12-17", "gpt-4o-2024-05-13",
+ *   "gpt-4-turbo", "gpt-4-turbo-2024-04-09", "gpt-4-1106-preview", "gpt-4",
+ *   "gpt-4-0613", "gpt-3.5-turbo", "gpt-3.5-turbo-0125": Announced shutdown date:
+ *   2026-10-23. See https://developers.openai.com/api/docs/deprecations for
+ *   details and recommended replacements.
+ * - "o1-preview", "o1-preview-2024-09-12": Announced shutdown date: 2025-07-28.
+ *   See https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ * - "o1-mini", "o1-mini-2024-09-12": Announced shutdown date: 2025-10-27. See
+ *   https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ * - "gpt-audio-mini", "gpt-audio-mini-2025-12-15": Announced shutdown date:
+ *   2027-01-20. See https://developers.openai.com/api/docs/deprecations for
+ *   details and recommended replacements.
+ * - "gpt-4o-audio-preview", "gpt-4o-audio-preview-2024-12-17",
+ *   "gpt-4o-audio-preview-2025-06-03", "gpt-4o-mini-audio-preview",
+ *   "gpt-4o-mini-audio-preview-2024-12-17": Announced shutdown date: 2026-05-07.
+ *   See https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ * - "gpt-4o-audio-preview-2024-10-01": Announced shutdown date: 2025-10-10. See
+ *   https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ * - "chatgpt-4o-latest": Announced shutdown date: 2026-02-17. See
+ *   https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ * - "codex-mini-latest": Announced shutdown date: 2026-02-12. See
+ *   https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ * - "gpt-4-0125-preview", "gpt-4-turbo-preview", "gpt-4-0314": Announced shutdown
+ *   date: 2026-03-26. See https://developers.openai.com/api/docs/deprecations for
+ *   details and recommended replacements.
+ * - "gpt-4-vision-preview": Announced shutdown date: 2024-12-06. See
+ *   https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ * - "gpt-4-32k", "gpt-4-32k-0314", "gpt-4-32k-0613": Announced shutdown date:
+ *   2025-06-06. See https://developers.openai.com/api/docs/deprecations for
+ *   details and recommended replacements.
+ * - "gpt-3.5-turbo-16k", "gpt-3.5-turbo-0301", "gpt-3.5-turbo-0613",
+ *   "gpt-3.5-turbo-16k-0613": Announced shutdown date: 2024-09-13. See
+ *   https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ * - "gpt-3.5-turbo-1106": Announced shutdown date: 2026-09-28. See
+ *   https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ */
 export type ChatModel =
+  | 'gpt-6-astra'
+  | 'gpt-6.1-sol'
+  | 'gpt-6-sol'
+  | 'gpt-6-luna'
   | 'gpt-5.6-sol'
   | 'gpt-5.6-terra'
   | 'gpt-5.6-luna'
@@ -74,6 +143,8 @@ export type ChatModel =
   | 'gpt-4o-2024-11-20'
   | 'gpt-4o-2024-08-06'
   | 'gpt-4o-2024-05-13'
+  | 'gpt-audio-mini'
+  | 'gpt-audio-mini-2025-12-15'
   | 'gpt-4o-audio-preview'
   | 'gpt-4o-audio-preview-2024-10-01'
   | 'gpt-4o-audio-preview-2024-12-17'
@@ -201,6 +272,50 @@ export interface ErrorObject {
   param: string | null;
 
   type: string;
+
+  misalignment?: ErrorObject.Misalignment;
+}
+
+export namespace ErrorObject {
+  export interface Misalignment {
+    /**
+     * The public explanation for this block.
+     */
+    detailed_explanation?: string;
+
+    /**
+     * An optional classification; clients must accept additional values.
+     */
+    error_type?:
+      | (string & {})
+      | 'potentially_unintended_data_transfer'
+      | 'potentially_unintended_data_access'
+      | 'potentially_unintended_destructive_activity'
+      | 'other';
+
+    /**
+     * An opaque target for explicitly continuing this review, or null when
+     * unavailable.
+     */
+    review_target?: string | null;
+
+    /**
+     * An optional public continuation instruction.
+     */
+    steer?: Misalignment.Steer;
+  }
+
+  export namespace Misalignment {
+    /**
+     * An optional public continuation instruction.
+     */
+    export interface Steer {
+      /**
+       * The public continuation instruction.
+       */
+      message: string;
+    }
+  }
 }
 
 export interface FunctionDefinition {
@@ -218,8 +333,8 @@ export interface FunctionDefinition {
 
   /**
    * The parameters the functions accepts, described as a JSON Schema object. See the
-   * [guide](https://platform.openai.com/docs/guides/function-calling) for examples,
-   * and the
+   * [guide](https://developers.openai.com/api/docs/guides/function-calling) for
+   * examples, and the
    * [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for
    * documentation about the format.
    *
@@ -232,15 +347,15 @@ export interface FunctionDefinition {
    * set to true, the model will follow the exact schema defined in the `parameters`
    * field. Only a subset of JSON Schema is supported when `strict` is `true`. Learn
    * more about Structured Outputs in the
-   * [function calling guide](https://platform.openai.com/docs/guides/function-calling).
+   * [function calling guide](https://developers.openai.com/api/docs/guides/function-calling).
    */
   strict?: boolean | null;
 }
 
 /**
  * The parameters the functions accepts, described as a JSON Schema object. See the
- * [guide](https://platform.openai.com/docs/guides/function-calling) for examples,
- * and the
+ * [guide](https://developers.openai.com/api/docs/guides/function-calling) for
+ * examples, and the
  * [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for
  * documentation about the format.
  *
@@ -261,10 +376,8 @@ export type Metadata = { [key: string]: string };
 export type OAuthErrorCode = 'invalid_grant' | 'invalid_subject_token' | (string & {});
 
 /**
- * **gpt-5 and o-series models only**
- *
  * Configuration options for
- * [reasoning models](https://platform.openai.com/docs/guides/reasoning).
+ * [reasoning models](https://developers.openai.com/api/docs/guides/reasoning).
  */
 export interface Reasoning {
   /**
@@ -282,7 +395,7 @@ export interface Reasoning {
    * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
    * reasoning effort can result in faster responses and fewer tokens used on
    * reasoning in a response. Not all reasoning models support every value. See the
-   * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+   * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
    * model-specific support.
    */
   effort?: ReasoningEffort | null;
@@ -319,7 +432,7 @@ export interface Reasoning {
  * are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
  * reasoning effort can result in faster responses and fewer tokens used on
  * reasoning in a response. Not all reasoning models support every value. See the
- * [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+ * [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning) for
  * model-specific support.
  */
 export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
@@ -339,7 +452,7 @@ export interface ResponseFormatJSONObject {
 /**
  * JSON Schema response format. Used to generate structured JSON responses. Learn
  * more about
- * [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs).
+ * [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
  */
 export interface ResponseFormatJSONSchema {
   /**
@@ -381,7 +494,7 @@ export namespace ResponseFormatJSONSchema {
      * true, the model will always follow the exact schema defined in the `schema`
      * field. Only a subset of JSON Schema is supported when `strict` is `true`. To
      * learn more, read the
-     * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+     * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
      */
     strict?: boolean | null;
   }
@@ -399,7 +512,7 @@ export interface ResponseFormatText {
 
 /**
  * A custom grammar for the model to follow when generating text. Learn more in the
- * [custom grammars guide](https://platform.openai.com/docs/guides/custom-grammars).
+ * [custom grammars guide](https://developers.openai.com/api/docs/guides/function-calling#context-free-grammars).
  */
 export interface ResponseFormatTextGrammar {
   /**
@@ -415,7 +528,7 @@ export interface ResponseFormatTextGrammar {
 
 /**
  * Configure the model to generate valid Python code. See the
- * [custom grammars guide](https://platform.openai.com/docs/guides/custom-grammars)
+ * [custom grammars guide](https://developers.openai.com/api/docs/guides/function-calling#context-free-grammars)
  * for more details.
  */
 export interface ResponseFormatTextPython {
@@ -446,4 +559,5 @@ export type ResponsesModel =
   | 'gpt-5.1-codex-max'
   | 'gpt-daybreak-blue-latest'
   | 'gpt-daybreak-red-latest'
-  | 'gpt-5.6-cyber';
+  | 'gpt-5.6-cyber'
+  | 'gpt-rosalind-research';

@@ -144,6 +144,7 @@ export default {
 			};
 
 			uploadWebApiTestCases({
+				// SAFETY: The ecosystem client exposes the same files API, but the shared test helper resolves a separately installed copy of the SDK types.
 				client: client as any,
 				it,
 				expectEqual,

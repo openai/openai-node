@@ -5,6 +5,13 @@ import { APIPromise } from '../../../../core/api-promise';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
 export class ModelPermissions extends APIResource {
   /**
    * Returns model permissions for a project.
@@ -18,10 +25,13 @@ export class ModelPermissions extends APIResource {
    * ```
    */
   retrieve(projectID: string, options?: RequestOptions): APIPromise<ProjectModelPermissions> {
-    return this._client.get(path`/organization/projects/${projectID}/model_permissions`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.get(
+      path`/organization/projects/${projectID}/model_permissions`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -41,11 +51,14 @@ export class ModelPermissions extends APIResource {
     body: ModelPermissionUpdateParams,
     options?: RequestOptions,
   ): APIPromise<ProjectModelPermissions> {
-    return this._client.post(path`/organization/projects/${projectID}/model_permissions`, {
-      body,
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.post(
+      path`/organization/projects/${projectID}/model_permissions`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 
   /**
@@ -60,10 +73,13 @@ export class ModelPermissions extends APIResource {
    * ```
    */
   delete(projectID: string, options?: RequestOptions): APIPromise<ProjectModelPermissionsDeleted> {
-    return this._client.delete(path`/organization/projects/${projectID}/model_permissions`, {
-      ...options,
-      __security: { adminAPIKeyAuth: true },
-    });
+    return this._client.delete(
+      path`/organization/projects/${projectID}/model_permissions`,
+      resolveResourceRequestOptions(options, (options) => ({
+        ...options,
+        __security: { adminAPIKeyAuth: true },
+      })),
+    );
   }
 }
 

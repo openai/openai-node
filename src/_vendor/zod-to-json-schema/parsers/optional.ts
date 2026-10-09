@@ -15,23 +15,22 @@ export const parseOptionalDef = (
     return parseDef(def.innerType._def, { ...refs, currentPath: refs.currentPath }, forceResolution);
   }
 
+  // `not: {}` accepts no JSON values and is unsupported by strict Structured Outputs.
+  // Keep the wrapper, but generate only its real branch at the correct reference path.
+  // Override callbacks retain their existing output and path contract.
+  const omitNeverBranch = refs.openaiStrictMode && !refs.override;
   const innerSchema = parseDef(
     def.innerType._def,
     {
       ...refs,
-      currentPath: [...refs.currentPath, 'anyOf', '1'],
+      currentPath: [...refs.currentPath, 'anyOf', omitNeverBranch ? '0' : '1'],
     },
     forceResolution,
   );
 
   return innerSchema
     ? {
-        anyOf: [
-          {
-            not: {},
-          },
-          innerSchema,
-        ],
+        anyOf: omitNeverBranch ? [innerSchema] : [{ not: {} }, innerSchema],
       }
     : {};
 };

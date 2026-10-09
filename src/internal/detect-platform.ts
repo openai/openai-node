@@ -75,7 +75,7 @@ const getPlatformProperties = (): PlatformProperties => {
       'X-Stainless-OS': 'Unknown',
       'X-Stainless-Arch': `other:${EdgeRuntime}`,
       'X-Stainless-Runtime': 'edge',
-      'X-Stainless-Runtime-Version': (globalThis as any).process.version,
+      'X-Stainless-Runtime-Version': (globalThis as any).process?.version ?? 'unknown',
     };
   }
   // Check if Node.js
@@ -128,7 +128,7 @@ function getBrowserInfo(): BrowserInfo | null {
 
   // NOTE: The order matters here!
   const browserPatterns = [
-    { key: 'edge' as const, pattern: /Edge(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+    { key: 'edge' as const, pattern: /\bEdg(?:e|A|iOS)?\b(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
     { key: 'ie' as const, pattern: /MSIE(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
     { key: 'ie' as const, pattern: /Trident(?:.*rv\:(\d+)\.(\d+)(?:\.(\d+))?)?/ },
     { key: 'chrome' as const, pattern: /Chrome(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },

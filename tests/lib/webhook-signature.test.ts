@@ -62,6 +62,7 @@ describe('webhook signature compatibility', () => {
       payload,
       headers,
       secret,
+      // SAFETY: Deliberately include JavaScript null tolerance in the table to preserve its runtime timestamp-validation behavior.
       tolerance as number | undefined,
     );
 
@@ -186,6 +187,6 @@ describe('webhook signature compatibility', () => {
     const { payload, headers, secret } = createFixture();
     const verify = createClient().webhooks.verifySignature;
 
-    await expect(Reflect.apply(verify, {}, [payload, headers, secret])).rejects.toBeInstanceOf(TypeError);
+    await expect(verify.call({}, payload, headers, secret)).rejects.toBeInstanceOf(TypeError);
   });
 });

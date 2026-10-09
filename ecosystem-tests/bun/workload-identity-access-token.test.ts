@@ -11,6 +11,7 @@ function createLoopbackClient(token: string, tokenType: TokenType) {
     exchange: 0,
     api: 0,
     provider: 0,
+    // SAFETY: The observation starts without an authorization header and is later assigned the header string captured by the request hook.
     authorization: null as string | null,
   };
 
@@ -74,6 +75,7 @@ async function expectPrivateRejection(client: OpenAI, token: string): Promise<vo
     throw new Error('Expected a sanitized workload-identity authentication failure.');
   }
   expect(failure.message).toBe(SAFE_ERROR);
+  // SAFETY: The preceding instance assertion or Error check establishes the error class before these diagnostic fields are inspected.
   expect((failure as Error & { cause?: unknown }).cause).toBeUndefined();
   expect(failure.message).not.toContain(token);
   expect(failure.stack ?? '').not.toContain(token);

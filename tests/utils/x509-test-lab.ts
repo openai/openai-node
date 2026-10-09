@@ -171,6 +171,7 @@ export function createX509TestLab(): X509TestLab {
 }
 
 function observeRequest(request: IncomingMessage): ObservedRequest {
+  // SAFETY: This lab accepts plain or TLS sockets; TLS-only fields are optional and are read only when present.
   const socket = request.socket as Partial<TLSSocket>;
   return {
     authority: request.headers.host,

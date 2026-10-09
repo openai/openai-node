@@ -4,7 +4,379 @@ import { APIResource } from '../../core/resource';
 import { buildHeaders, HeadersLike } from '../../internal/headers';
 import { verifyWebhookSignature, webhookSignatureRequiresSigning } from '../../lib/webhook-signature';
 
+import * as EventTypesAPI from './event-types';
+import { EventTypes } from './event-types';
+import { APIPromise } from '../../core/api-promise';
+import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
+import { RequestOptions } from '../../internal/request-options';
+import { path } from '../../internal/utils/path';
+
+function resolveResourceRequestOptions(
+  options: RequestOptions | undefined,
+  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
+): Promise<RequestOptions> {
+  return Promise.resolve(options).then(buildOptions);
+}
+
+// Recognizable options across SDK runtime versions. Keep this independent of
+// private RequestOptions fields so older handwritten runtimes still compile.
+const normalizeRequestOptionsForQueryKeys = new Set([
+  'method',
+  'path',
+  'query',
+  'body',
+  'headers',
+  'maxRetries',
+  'stream',
+  'timeout',
+  'httpAgent',
+  'fetchOptions',
+  'signal',
+  'idempotencyKey',
+  'defaultBaseURL',
+  '__metadata',
+  '__binaryRequest',
+  '__binaryResponse',
+  '__streamClass',
+  '__security',
+  '__synthesizeEventData',
+]);
+
+function normalizeRequestOptionsForQuery(
+  value: unknown,
+  queryKeys: ReadonlyArray<string>,
+  options: RequestOptions | undefined,
+):
+  | ({
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    })
+  | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  // Optional never fields can still be explicitly undefined unless consumers
+  // enable exactOptionalPropertyTypes. Snapshot data without invoking getters.
+  const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).filter(
+    ([, descriptor]) => descriptor.enumerable && (!('value' in descriptor) || descriptor.value !== undefined),
+  );
+  const keys = entries.map(([key]) => key);
+  const requestOnly = keys.some(
+    (key) => normalizeRequestOptionsForQueryKeys.has(key) && !queryKeys.includes(key),
+  );
+  if (!requestOnly) return undefined;
+  // Declared query fields, including stream, must use the query argument.
+  // Mixing them with request-only options is ambiguous and could change the return type.
+  if (
+    options !== undefined ||
+    keys.some((key) => !normalizeRequestOptionsForQueryKeys.has(key) || queryKeys.includes(key))
+  ) {
+    throw new TypeError('Query parameters and request options must be passed as separate arguments.');
+  }
+  // The query position must not gain authority to change the request destination
+  // or transport. Those overrides require the explicit request options argument.
+  if (
+    keys.some(
+      (key) => !['headers', 'maxRetries', 'timeout', 'signal', 'idempotencyKey', 'query'].includes(key),
+    )
+  ) {
+    throw new TypeError('Pass transport overrides in the explicit request options argument.');
+  }
+  // Copy only the validated fields. Spreading value would reintroduce undefined
+  // transport overrides, and deleting them would mutate the caller's object.
+  return Object.fromEntries(
+    entries.map(([key, descriptor]) => {
+      if ('value' in descriptor) return [key, descriptor.value];
+      return [key, descriptor.get ? Reflect.apply(descriptor.get, value, []) : undefined];
+    }),
+  ) as {
+    [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+  } & {
+    [
+      K in
+        | 'method'
+        | 'path'
+        | 'body'
+        | 'stream'
+        | 'httpAgent'
+        | 'fetchOptions'
+        | 'defaultBaseURL'
+        | '__metadata'
+        | '__binaryRequest'
+        | '__binaryResponse'
+        | '__streamClass'
+        | '__security'
+        | '__synthesizeEventData'
+    ]?: never;
+  };
+}
+
 export class Webhooks extends APIResource {
+  eventTypes: EventTypesAPI.EventTypes = new EventTypesAPI.EventTypes(this._client);
+
+  /**
+   * Creates a webhook endpoint for the authenticated project.
+   *
+   * @example
+   * ```ts
+   * const webhookEndpointWithSecret =
+   *   await client.webhooks.create({
+   *     event_types: ['batch.completed'],
+   *     name: 'x',
+   *     url: 'https://',
+   *   });
+   * ```
+   */
+  create(body: WebhookCreateParams, options?: RequestOptions): APIPromise<WebhookEndpointWithSecret> {
+    return this._client.post(
+      '/webhook_endpoints',
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
+  }
+
+  /**
+   * Retrieves a webhook endpoint for the authenticated project.
+   *
+   * @example
+   * ```ts
+   * const webhookEndpoint = await client.webhooks.retrieve(
+   *   'whe_123',
+   * );
+   * ```
+   */
+  retrieve(webhookEndpointID: string, options?: RequestOptions): APIPromise<WebhookEndpoint> {
+    return this._client.get(
+      path`/webhook_endpoints/${webhookEndpointID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
+  }
+
+  /**
+   * Updates a webhook endpoint for the authenticated project.
+   *
+   * @example
+   * ```ts
+   * const webhookEndpoint = await client.webhooks.update('whe_123');
+   * ```
+   */
+  update(
+    webhookEndpointID: string,
+    body: WebhookUpdateParams | null | undefined = {},
+    options?: RequestOptions,
+  ): APIPromise<WebhookEndpoint> {
+    return this._client.post(
+      path`/webhook_endpoints/${webhookEndpointID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
+  }
+
+  /**
+   * Returns webhook endpoints for the authenticated project in newest-first order.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const webhookEndpoint of client.webhooks.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(
+    query?:
+      | (WebhookListParams &
+          (
+            | {
+                [
+                  K in
+                    | 'method'
+                    | 'path'
+                    | 'query'
+                    | 'body'
+                    | 'headers'
+                    | 'maxRetries'
+                    | 'stream'
+                    | 'timeout'
+                    | 'httpAgent'
+                    | 'fetchOptions'
+                    | 'signal'
+                    | 'idempotencyKey'
+                    | 'defaultBaseURL'
+                    | '__metadata'
+                    | '__binaryRequest'
+                    | '__binaryResponse'
+                    | '__streamClass'
+                    | '__security'
+                    | '__synthesizeEventData'
+                ]?: never;
+              }
+            | null
+            | undefined
+          ))
+      | null
+      | undefined,
+    options?: RequestOptions,
+  ): PagePromise<WebhookEndpointsPage, WebhookEndpoint>;
+  list(
+    options?: {
+      [K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query']?: RequestOptions[K];
+    } & {
+      [
+        K in
+          | 'method'
+          | 'path'
+          | 'body'
+          | 'stream'
+          | 'httpAgent'
+          | 'fetchOptions'
+          | 'defaultBaseURL'
+          | '__metadata'
+          | '__binaryRequest'
+          | '__binaryResponse'
+          | '__streamClass'
+          | '__security'
+          | '__synthesizeEventData'
+      ]?: never;
+    },
+  ): PagePromise<WebhookEndpointsPage, WebhookEndpoint>;
+  list(
+    query:
+      | WebhookListParams
+      | ({
+          [
+            K in 'headers' | 'maxRetries' | 'timeout' | 'signal' | 'idempotencyKey' | 'query'
+          ]?: RequestOptions[K];
+        } & {
+          [
+            K in
+              | 'method'
+              | 'path'
+              | 'body'
+              | 'stream'
+              | 'httpAgent'
+              | 'fetchOptions'
+              | 'defaultBaseURL'
+              | '__metadata'
+              | '__binaryRequest'
+              | '__binaryResponse'
+              | '__streamClass'
+              | '__security'
+              | '__synthesizeEventData'
+          ]?: never;
+        })
+      | null
+      | undefined = {},
+    options?: RequestOptions,
+  ): PagePromise<WebhookEndpointsPage, WebhookEndpoint> {
+    const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
+      query,
+      ['after', 'limit'],
+      options,
+    );
+    if (normalizeRequestOptionsForQueryOptions !== undefined) {
+      options = normalizeRequestOptionsForQueryOptions;
+      query = {};
+    }
+    query = query as WebhookListParams | null | undefined;
+    return this._client.getAPIList(
+      '/webhook_endpoints',
+      CursorPage<WebhookEndpoint>,
+      resolveResourceRequestOptions(options, (options) => ({
+        query,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
+  }
+
+  /**
+   * Deletes a webhook endpoint for the authenticated project.
+   *
+   * @example
+   * ```ts
+   * const deletedWebhookEndpoint = await client.webhooks.delete(
+   *   'whe_123',
+   * );
+   * ```
+   */
+  delete(webhookEndpointID: string, options?: RequestOptions): APIPromise<DeletedWebhookEndpoint> {
+    return this._client.delete(
+      path`/webhook_endpoints/${webhookEndpointID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
+  }
+
+  /**
+   * Rotates the signing secret for a webhook endpoint in the authenticated project.
+   *
+   * @example
+   * ```ts
+   * const webhookEndpointWithSecret =
+   *   await client.webhooks.rotateSecret('whe_123');
+   * ```
+   */
+  rotateSecret(
+    webhookEndpointID: string,
+    body: WebhookRotateSecretParams | null | undefined = {},
+    options?: RequestOptions,
+  ): APIPromise<WebhookEndpointWithSecret> {
+    return this._client.post(
+      path`/webhook_endpoints/${webhookEndpointID}/rotate_secret`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
+  }
+
+  /**
+   * Sends a sample event to a webhook endpoint for the authenticated project.
+   *
+   * @example
+   * ```ts
+   * const webhookEndpointTestResult =
+   *   await client.webhooks.test('whe_123', {
+   *     event_type: 'batch.completed',
+   *   });
+   * ```
+   */
+  test(
+    webhookEndpointID: string,
+    body: WebhookTestParams,
+    options?: RequestOptions,
+  ): APIPromise<WebhookEndpointTestResult> {
+    return this._client.post(
+      path`/webhook_endpoints/${webhookEndpointID}/test`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        __security: { bearerAuth: true },
+      })),
+    );
+  }
+
   /**
    * Validates that the given payload was sent by OpenAI and parses the payload.
    */
@@ -77,6 +449,340 @@ export class Webhooks extends APIResource {
     }
 
     return value;
+  }
+}
+
+export type WebhookEndpointsPage = CursorPage<WebhookEndpoint>;
+
+/**
+ * Sent when setup fails for a prewarmed OpenAI-hosted environment before it is
+ * attached to a session.
+ */
+export interface AgentEnvironmentFailedWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * Identifies the environment whose lifecycle changed.
+   */
+  data: AgentEnvironmentFailedWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.environment.failed`.
+   */
+  type: 'agent.environment.failed';
+}
+
+export namespace AgentEnvironmentFailedWebhookEvent {
+  /**
+   * Identifies the environment whose lifecycle changed.
+   */
+  export interface Data {
+    /**
+     * The ID of the environment.
+     */
+    id: string;
+  }
+}
+
+/**
+ * Sent when a prewarmed OpenAI-hosted environment finishes setup before being
+ * attached to a session.
+ */
+export interface AgentEnvironmentReadyWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * Identifies the environment whose lifecycle changed.
+   */
+  data: AgentEnvironmentReadyWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.environment.ready`.
+   */
+  type: 'agent.environment.ready';
+}
+
+export namespace AgentEnvironmentReadyWebhookEvent {
+  /**
+   * Identifies the environment whose lifecycle changed.
+   */
+  export interface Data {
+    /**
+     * The ID of the environment.
+     */
+    id: string;
+  }
+}
+
+/**
+ * Sent when an agent session requires an action. Retrieve the session for action
+ * details.
+ */
+export interface AgentSessionActionRequiredWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  data: AgentSessionActionRequiredWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.session.action_required`.
+   */
+  type: 'agent.session.action_required';
+}
+
+export namespace AgentSessionActionRequiredWebhookEvent {
+  export interface Data {
+    /**
+     * The ID of the session.
+     */
+    id: string;
+
+    /**
+     * The action type. Retrieve the session for action details.
+     */
+    required_action: Data.RequiredAction;
+  }
+
+  export namespace Data {
+    /**
+     * The action type. Retrieve the session for action details.
+     */
+    export interface RequiredAction {
+      type: 'computer_use_approval_request' | 'function_call' | 'environment_connection';
+    }
+  }
+}
+
+/**
+ * Sent when an agent session is created.
+ */
+export interface AgentSessionCreatedWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  data: AgentSessionCreatedWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.session.created`.
+   */
+  type: 'agent.session.created';
+}
+
+export namespace AgentSessionCreatedWebhookEvent {
+  export interface Data {
+    /**
+     * The ID of the session.
+     */
+    id: string;
+
+    /**
+     * The environment type: `none`, `openai_hosted`, or `self_hosted`.
+     */
+    environment_type: string;
+
+    connect?: Data.Connect;
+
+    /**
+     * The ID of the environment, when one exists.
+     */
+    environment_id?: string;
+  }
+
+  export namespace Data {
+    export interface Connect {
+      /**
+       * The URL used to connect the self-hosted environment.
+       */
+      remote_url: string;
+    }
+  }
+}
+
+/**
+ * Sent when an agent session fails.
+ */
+export interface AgentSessionFailedWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  data: AgentSessionFailedWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.session.failed`.
+   */
+  type: 'agent.session.failed';
+}
+
+export namespace AgentSessionFailedWebhookEvent {
+  export interface Data {
+    /**
+     * The ID of the session.
+     */
+    id: string;
+
+    /**
+     * The environment type: `none`, `openai_hosted`, or `self_hosted`.
+     */
+    environment_type: string;
+
+    /**
+     * The ID of the environment, when one exists.
+     */
+    environment_id?: string;
+  }
+}
+
+/**
+ * Sent when an agent session becomes idle.
+ */
+export interface AgentSessionIdleWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  data: AgentSessionIdleWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.session.idle`.
+   */
+  type: 'agent.session.idle';
+}
+
+export namespace AgentSessionIdleWebhookEvent {
+  export interface Data {
+    /**
+     * The ID of the session.
+     */
+    id: string;
+
+    /**
+     * The environment type: `none`, `openai_hosted`, or `self_hosted`.
+     */
+    environment_type: string;
+
+    /**
+     * The ID of the environment, when one exists.
+     */
+    environment_id?: string;
+  }
+}
+
+/**
+ * Sent when an agent session enters the in-progress state.
+ */
+export interface AgentSessionInProgressWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  data: AgentSessionInProgressWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.session.in_progress`.
+   */
+  type: 'agent.session.in_progress';
+}
+
+export namespace AgentSessionInProgressWebhookEvent {
+  export interface Data {
+    /**
+     * The ID of the session.
+     */
+    id: string;
+
+    /**
+     * The environment type: `none`, `openai_hosted`, or `self_hosted`.
+     */
+    environment_type: string;
+
+    /**
+     * The ID of the environment, when one exists.
+     */
+    environment_id?: string;
   }
 }
 
@@ -246,6 +952,23 @@ export namespace BatchFailedWebhookEvent {
      */
     id: string;
   }
+}
+
+export interface DeletedWebhookEndpoint {
+  /**
+   * The ID of the deleted webhook endpoint.
+   */
+  id: string;
+
+  /**
+   * Whether the endpoint was deleted.
+   */
+  deleted: boolean;
+
+  /**
+   * The object type, which is always webhook_endpoint.deleted.
+   */
+  object: 'webhook_endpoint.deleted';
 }
 
 /**
@@ -501,6 +1224,8 @@ export namespace FineTuningJobSucceededWebhookEvent {
 }
 
 /**
+ * @deprecated Deprecated: use `live.transport.incoming`. Retained for existing
+ * subscriptions during migration; new subscriptions to this event are not allowed.
  * Sent when an incoming API SIP session is available for Live acceptance. The same
  * pending session can also emit `realtime.call.incoming`; the first successful
  * Realtime or Live accept endpoint selects the runtime surface.
@@ -538,15 +1263,108 @@ export namespace LiveCallIncomingWebhookEvent {
    */
   export interface Data {
     /**
-     * The Transceiver `rtc_...` ID of the pending SIP session. The same value appears
-     * as `call_id` in `realtime.call.incoming`.
+     * The `live_...` ID of the pending SIP session. Pass this value unchanged to Live
+     * call controls and sideband connections. The corresponding
+     * `realtime.call.incoming` event uses a separate `rtc_...` call ID.
      */
     session_id: string;
 
     /**
-     * Headers from the SIP Invite.
+     * Headers from the SIP INVITE, excluding SIP authorization headers. Retained
+     * names, values, repeated entries, and order are preserved. Treat these values as
+     * untrusted call metadata.
      */
     sip_headers: Array<Data.SipHeader>;
+
+    /**
+     * Media protection selected on the SIP leg during SDP negotiation. `srtp`
+     * indicates SRTP; `rtp` indicates unencrypted RTP. Omitted when unknown. This does
+     * not describe SIP signaling security or confirm that media has flowed. Clients
+     * should handle unrecognized values as unknown.
+     */
+    sip_media_security?: 'rtp' | 'srtp' | (string & {});
+  }
+
+  export namespace Data {
+    /**
+     * A header from the SIP Invite.
+     */
+    export interface SipHeader {
+      /**
+       * Name of the SIP Header.
+       */
+      name: string;
+
+      /**
+       * Value of the SIP Header.
+       */
+      value: string;
+    }
+  }
+}
+
+/**
+ * Sent when an incoming API SIP session is available for Live acceptance. The same
+ * pending session can also emit `realtime.call.incoming`; the first successful
+ * Realtime or Live accept endpoint selects the runtime surface.
+ */
+export interface LiveTransportIncomingWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp (in seconds) of when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * Event data payload.
+   */
+  data: LiveTransportIncomingWebhookEvent.Data;
+
+  /**
+   * The type of the event. Always `live.transport.incoming`.
+   */
+  type: 'live.transport.incoming';
+
+  /**
+   * The object of the event. Always `event`.
+   */
+  object?: 'event';
+}
+
+export namespace LiveTransportIncomingWebhookEvent {
+  /**
+   * Event data payload.
+   */
+  export interface Data {
+    /**
+     * The `live_...` ID of the pending SIP session. Forward this value unchanged when
+     * accepting or rejecting the call through the Live API.
+     */
+    session_id: string;
+
+    /**
+     * Headers from the SIP INVITE, excluding SIP authorization headers. Retained
+     * names, values, repeated entries, and order are preserved. Treat these values as
+     * untrusted call metadata.
+     */
+    sip_headers: Array<Data.SipHeader>;
+
+    /**
+     * The incoming transport type. Always `sip`.
+     */
+    type: 'sip';
+
+    /**
+     * Media protection selected on the SIP leg during SDP negotiation. `srtp`
+     * indicates SRTP; `rtp` indicates unencrypted RTP. Omitted when unknown. This does
+     * not describe SIP signaling security or confirm that media has flowed. Clients
+     * should handle unrecognized values as unknown.
+     */
+    sip_media_security?: 'rtp' | 'srtp' | (string & {});
   }
 
   export namespace Data {
@@ -569,8 +1387,8 @@ export namespace LiveCallIncomingWebhookEvent {
 
 /**
  * Sent when an incoming API SIP session is available for Realtime acceptance. The
- * same pending session can also emit `live.call.incoming`; the first successful
- * Realtime or Live accept endpoint selects the runtime surface.
+ * same pending session can also emit `live.transport.incoming`; the first
+ * successful Realtime or Live accept endpoint selects the runtime surface.
  */
 export interface RealtimeCallIncomingWebhookEvent {
   /**
@@ -605,15 +1423,26 @@ export namespace RealtimeCallIncomingWebhookEvent {
    */
   export interface Data {
     /**
-     * The Transceiver `rtc_...` ID of the pending SIP session. The same value appears
-     * as `session_id` in `live.call.incoming`.
+     * The ID of the pending SIP call. Pass this value unchanged when accepting or
+     * rejecting the call through the Realtime API. For the Live API, use the
+     * `session_id` from `live.transport.incoming` instead.
      */
     call_id: string;
 
     /**
-     * Headers from the SIP Invite.
+     * Headers from the SIP INVITE, excluding SIP authorization headers. Retained
+     * names, values, repeated entries, and order are preserved. Treat these values as
+     * untrusted call metadata.
      */
     sip_headers: Array<Data.SipHeader>;
+
+    /**
+     * Media protection selected on the SIP leg during SDP negotiation. `srtp`
+     * indicates SRTP; `rtp` indicates unencrypted RTP. Omitted when unknown. This does
+     * not describe SIP signaling security or confirm that media has flowed. Clients
+     * should handle unrecognized values as unknown.
+     */
+    sip_media_security?: 'rtp' | 'srtp' | (string & {});
   }
 
   export namespace Data {
@@ -803,9 +1632,161 @@ export namespace ResponseIncompleteWebhookEvent {
 }
 
 /**
- * Sent when a batch API request has been cancelled.
+ * Sent when an approved safety alert is available for an API project.
+ */
+export interface SafetyAlertCreatedWebhookEvent {
+  /**
+   * The unique ID of the webhook event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp in seconds when the event was created.
+   */
+  created_at: number;
+
+  data: SafetyAlertCreatedWebhookEvent.Data;
+
+  /**
+   * Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * Always `safety.alert.created`.
+   */
+  type: 'safety.alert.created';
+}
+
+export namespace SafetyAlertCreatedWebhookEvent {
+  export interface Data {
+    /**
+     * The safety alert ID to pass to `GET /v1/safety/alerts/{id}`.
+     */
+    id: string;
+  }
+}
+
+/**
+ * Sent when a deactivation is issued for a safety identifier in your organization.
+ */
+export interface SafetyDeactivationIssuedWebhookEvent {
+  /**
+   * The unique ID of the webhook event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp in seconds when the event was created.
+   */
+  created_at: number;
+
+  data: SafetyDeactivationIssuedWebhookEvent.Data;
+
+  /**
+   * Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * Always `safety.deactivation_issued`.
+   */
+  type: 'safety.deactivation_issued';
+}
+
+export namespace SafetyDeactivationIssuedWebhookEvent {
+  export interface Data {
+    /**
+     * The safety case ID to pass to `GET /v1/safety/cases/{id}`.
+     */
+    id: string;
+  }
+}
+
+/**
+ * Sent when an approved safety alert is available for an enterprise workspace.
+ */
+export interface SafetyOrgAlertCreatedWebhookEvent {
+  /**
+   * The unique ID of the webhook event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp in seconds when the event was created.
+   */
+  created_at: number;
+
+  data: SafetyOrgAlertCreatedWebhookEvent.Data;
+
+  /**
+   * Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * Always `safety.org_alert.created`.
+   */
+  type: 'safety.org_alert.created';
+}
+
+export namespace SafetyOrgAlertCreatedWebhookEvent {
+  export interface Data {
+    /**
+     * The safety alert ID to pass to `GET /v1/safety/alerts/{id}`.
+     */
+    id: string;
+  }
+}
+
+/**
+ * Sent when a warning is issued for a safety identifier in your organization.
+ */
+export interface SafetyWarningIssuedWebhookEvent {
+  /**
+   * The unique ID of the webhook event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp in seconds when the event was created.
+   */
+  created_at: number;
+
+  data: SafetyWarningIssuedWebhookEvent.Data;
+
+  /**
+   * Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * Always `safety.warning_issued`.
+   */
+  type: 'safety.warning_issued';
+}
+
+export namespace SafetyWarningIssuedWebhookEvent {
+  export interface Data {
+    /**
+     * The safety case ID to pass to `GET /v1/safety/cases/{id}`.
+     */
+    id: string;
+  }
+}
+
+/**
+ * Sent when setup fails for a prewarmed OpenAI-hosted environment before it is
+ * attached to a session.
  */
 export type UnwrapWebhookEvent =
+  | AgentEnvironmentFailedWebhookEvent
+  | AgentEnvironmentReadyWebhookEvent
+  | AgentSessionActionRequiredWebhookEvent
+  | AgentSessionCreatedWebhookEvent
+  | AgentSessionFailedWebhookEvent
+  | AgentSessionIdleWebhookEvent
+  | AgentSessionInProgressWebhookEvent
   | BatchCancelledWebhookEvent
   | BatchCompletedWebhookEvent
   | BatchExpiredWebhookEvent
@@ -817,18 +1798,325 @@ export type UnwrapWebhookEvent =
   | FineTuningJobFailedWebhookEvent
   | FineTuningJobSucceededWebhookEvent
   | LiveCallIncomingWebhookEvent
+  | LiveTransportIncomingWebhookEvent
   | RealtimeCallIncomingWebhookEvent
   | ResponseCancelledWebhookEvent
   | ResponseCompletedWebhookEvent
   | ResponseFailedWebhookEvent
-  | ResponseIncompleteWebhookEvent;
+  | ResponseIncompleteWebhookEvent
+  | SafetyAlertCreatedWebhookEvent
+  | SafetyDeactivationIssuedWebhookEvent
+  | SafetyOrgAlertCreatedWebhookEvent
+  | SafetyWarningIssuedWebhookEvent;
+
+export interface WebhookEndpoint {
+  /**
+   * The unique ID of the webhook endpoint.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp when the endpoint was created.
+   */
+  created_at: number;
+
+  /**
+   * The event types that trigger deliveries to this endpoint.
+   */
+  event_types: Array<string>;
+
+  /**
+   * The human-readable name of the endpoint.
+   */
+  name: string;
+
+  /**
+   * The object type, which is always webhook_endpoint.
+   */
+  object: 'webhook_endpoint';
+
+  /**
+   * A masked hint for the endpoint's signing secret.
+   */
+  signing_secret_hint: string | null;
+
+  /**
+   * The HTTPS URL that receives webhook deliveries.
+   */
+  url: string;
+
+  /**
+   * The Unix timestamp of the last endpoint configuration or signing-secret change.
+   * Initialized at creation; tests and unchanged updates do not advance it.
+   */
+  updated_at?: number;
+}
+
+export interface WebhookEndpointList {
+  /**
+   * The webhook endpoints in this page.
+   */
+  data: Array<WebhookEndpoint>;
+
+  /**
+   * The ID of the first endpoint in this page.
+   */
+  first_id: string | null;
+
+  /**
+   * Whether more webhook endpoints are available.
+   */
+  has_more: boolean;
+
+  /**
+   * The ID of the last endpoint in this page.
+   */
+  last_id: string | null;
+
+  /**
+   * The object type, which is always list.
+   */
+  object: 'list';
+}
+
+export interface WebhookEndpointTestResult {
+  /**
+   * The event type sent in the test.
+   */
+  event_type: string;
+
+  /**
+   * The object type, which is always webhook_endpoint.test.
+   */
+  object: 'webhook_endpoint.test';
+
+  /**
+   * The HTTP status code returned by the endpoint.
+   */
+  status_code: number;
+
+  /**
+   * Whether the test request completed. Always true for returned results; use
+   * status_code to determine the endpoint response.
+   */
+  success: true;
+
+  /**
+   * The ID of the webhook endpoint that received the test.
+   */
+  webhook_endpoint_id: string;
+}
+
+export interface WebhookEndpointWithSecret {
+  /**
+   * The unique ID of the webhook endpoint.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp when the endpoint was created.
+   */
+  created_at: number;
+
+  /**
+   * The event types that trigger deliveries to this endpoint.
+   */
+  event_types: Array<string>;
+
+  /**
+   * The human-readable name of the endpoint.
+   */
+  name: string;
+
+  /**
+   * The object type, which is always webhook_endpoint.
+   */
+  object: 'webhook_endpoint';
+
+  /**
+   * The endpoint's signing secret. This is returned only when the endpoint is
+   * created or the secret is rotated.
+   */
+  signing_secret: string;
+
+  /**
+   * A masked hint for the endpoint's signing secret.
+   */
+  signing_secret_hint: string | null;
+
+  /**
+   * The HTTPS URL that receives webhook deliveries.
+   */
+  url: string;
+
+  /**
+   * The Unix timestamp of the last endpoint configuration or signing-secret change.
+   * Initialized at creation; tests and unchanged updates do not advance it.
+   */
+  updated_at?: number;
+}
+
+export interface WebhookEventTypeList {
+  /**
+   * The webhook event types available to the authenticated project.
+   */
+  data: Array<string>;
+
+  /**
+   * The object type, which is always list.
+   */
+  object: 'list';
+}
+
+export interface WebhookCreateParams {
+  /**
+   * The event types that trigger deliveries to this endpoint.
+   */
+  event_types: Array<
+    | 'batch.completed'
+    | 'batch.failed'
+    | 'batch.expired'
+    | 'batch.cancelled'
+    | 'response.completed'
+    | 'response.failed'
+    | 'response.cancelled'
+    | 'response.incomplete'
+    | 'eval.run.succeeded'
+    | 'eval.run.failed'
+    | 'eval.run.canceled'
+    | 'fine_tuning.job.succeeded'
+    | 'fine_tuning.job.failed'
+    | 'fine_tuning.job.cancelled'
+    | 'realtime.call.incoming'
+    | 'video.completed'
+    | 'video.failed'
+    | 'agent.environment.ready'
+    | 'agent.environment.failed'
+    | 'agent.session.created'
+    | 'agent.session.action_required'
+    | 'agent.session.in_progress'
+    | 'agent.session.idle'
+    | 'agent.session.failed'
+    | 'safety.alert.created'
+  >;
+
+  /**
+   * A human-readable name for the webhook endpoint.
+   */
+  name: string;
+
+  /**
+   * The HTTPS URL that receives webhook deliveries.
+   */
+  url: string;
+}
+
+export interface WebhookUpdateParams {
+  /**
+   * The complete set of event types that should trigger deliveries.
+   */
+  event_types?: Array<
+    | 'batch.completed'
+    | 'batch.failed'
+    | 'batch.expired'
+    | 'batch.cancelled'
+    | 'response.completed'
+    | 'response.failed'
+    | 'response.cancelled'
+    | 'response.incomplete'
+    | 'eval.run.succeeded'
+    | 'eval.run.failed'
+    | 'eval.run.canceled'
+    | 'fine_tuning.job.succeeded'
+    | 'fine_tuning.job.failed'
+    | 'fine_tuning.job.cancelled'
+    | 'realtime.call.incoming'
+    | 'video.completed'
+    | 'video.failed'
+    | 'agent.environment.ready'
+    | 'agent.environment.failed'
+    | 'agent.session.created'
+    | 'agent.session.action_required'
+    | 'agent.session.in_progress'
+    | 'agent.session.idle'
+    | 'agent.session.failed'
+    | 'safety.alert.created'
+  >;
+
+  /**
+   * A new human-readable name for the webhook endpoint.
+   */
+  name?: string;
+
+  /**
+   * A new HTTPS URL that receives webhook deliveries.
+   */
+  url?: string;
+}
+
+export interface WebhookListParams extends Omit<CursorPageParams, 'after'> {
+  /**
+   * ID of the last webhook endpoint from the previous page.
+   */
+  after?: string | null;
+}
+
+export interface WebhookRotateSecretParams {
+  /**
+   * Whether to keep the previous signing secret valid for 24 hours after rotation.
+   * Defaults to false, which invalidates the previous secret immediately.
+   */
+  keep_old_secret_active_for_24_hours?: boolean;
+}
+
+export interface WebhookTestParams {
+  /**
+   * The event type to send as a sample delivery.
+   */
+  event_type:
+    | 'batch.completed'
+    | 'batch.failed'
+    | 'batch.expired'
+    | 'batch.cancelled'
+    | 'response.completed'
+    | 'response.failed'
+    | 'response.cancelled'
+    | 'response.incomplete'
+    | 'eval.run.succeeded'
+    | 'eval.run.failed'
+    | 'eval.run.canceled'
+    | 'fine_tuning.job.succeeded'
+    | 'fine_tuning.job.failed'
+    | 'fine_tuning.job.cancelled'
+    | 'realtime.call.incoming'
+    | 'video.completed'
+    | 'video.failed'
+    | 'agent.environment.ready'
+    | 'agent.environment.failed'
+    | 'agent.session.created'
+    | 'agent.session.action_required'
+    | 'agent.session.in_progress'
+    | 'agent.session.idle'
+    | 'agent.session.failed'
+    | 'safety.alert.created';
+}
+
+Webhooks.EventTypes = EventTypes;
 
 export declare namespace Webhooks {
   export {
+    type AgentEnvironmentFailedWebhookEvent as AgentEnvironmentFailedWebhookEvent,
+    type AgentEnvironmentReadyWebhookEvent as AgentEnvironmentReadyWebhookEvent,
+    type AgentSessionActionRequiredWebhookEvent as AgentSessionActionRequiredWebhookEvent,
+    type AgentSessionCreatedWebhookEvent as AgentSessionCreatedWebhookEvent,
+    type AgentSessionFailedWebhookEvent as AgentSessionFailedWebhookEvent,
+    type AgentSessionIdleWebhookEvent as AgentSessionIdleWebhookEvent,
+    type AgentSessionInProgressWebhookEvent as AgentSessionInProgressWebhookEvent,
     type BatchCancelledWebhookEvent as BatchCancelledWebhookEvent,
     type BatchCompletedWebhookEvent as BatchCompletedWebhookEvent,
     type BatchExpiredWebhookEvent as BatchExpiredWebhookEvent,
     type BatchFailedWebhookEvent as BatchFailedWebhookEvent,
+    type DeletedWebhookEndpoint as DeletedWebhookEndpoint,
     type EvalRunCanceledWebhookEvent as EvalRunCanceledWebhookEvent,
     type EvalRunFailedWebhookEvent as EvalRunFailedWebhookEvent,
     type EvalRunSucceededWebhookEvent as EvalRunSucceededWebhookEvent,
@@ -836,11 +2124,29 @@ export declare namespace Webhooks {
     type FineTuningJobFailedWebhookEvent as FineTuningJobFailedWebhookEvent,
     type FineTuningJobSucceededWebhookEvent as FineTuningJobSucceededWebhookEvent,
     type LiveCallIncomingWebhookEvent as LiveCallIncomingWebhookEvent,
+    type LiveTransportIncomingWebhookEvent as LiveTransportIncomingWebhookEvent,
     type RealtimeCallIncomingWebhookEvent as RealtimeCallIncomingWebhookEvent,
     type ResponseCancelledWebhookEvent as ResponseCancelledWebhookEvent,
     type ResponseCompletedWebhookEvent as ResponseCompletedWebhookEvent,
     type ResponseFailedWebhookEvent as ResponseFailedWebhookEvent,
     type ResponseIncompleteWebhookEvent as ResponseIncompleteWebhookEvent,
+    type SafetyAlertCreatedWebhookEvent as SafetyAlertCreatedWebhookEvent,
+    type SafetyDeactivationIssuedWebhookEvent as SafetyDeactivationIssuedWebhookEvent,
+    type SafetyOrgAlertCreatedWebhookEvent as SafetyOrgAlertCreatedWebhookEvent,
+    type SafetyWarningIssuedWebhookEvent as SafetyWarningIssuedWebhookEvent,
     type UnwrapWebhookEvent as UnwrapWebhookEvent,
+    type WebhookEndpoint as WebhookEndpoint,
+    type WebhookEndpointList as WebhookEndpointList,
+    type WebhookEndpointTestResult as WebhookEndpointTestResult,
+    type WebhookEndpointWithSecret as WebhookEndpointWithSecret,
+    type WebhookEventTypeList as WebhookEventTypeList,
+    type WebhookEndpointsPage as WebhookEndpointsPage,
+    type WebhookCreateParams as WebhookCreateParams,
+    type WebhookUpdateParams as WebhookUpdateParams,
+    type WebhookListParams as WebhookListParams,
+    type WebhookRotateSecretParams as WebhookRotateSecretParams,
+    type WebhookTestParams as WebhookTestParams,
   };
+
+  export { EventTypes as EventTypes };
 }

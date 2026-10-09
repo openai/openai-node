@@ -14,6 +14,7 @@ class TestEmitter extends EventEmitter<Events> {
   }
 
   emitNamed(event: string, value: string) {
+    // SAFETY: The fixture intentionally uses prototype-property event names outside the static event map to verify registration, lookup, and dispatch isolation.
     this._emit(event as 'message', value);
   }
 
@@ -38,6 +39,7 @@ class TestEmitter extends EventEmitter<Events> {
   }
 
   hasListener(event: string) {
+    // SAFETY: The fixture intentionally uses prototype-property event names outside the static event map to verify registration, lookup, and dispatch isolation.
     return this._hasListener(event as keyof Events);
   }
 }
@@ -47,6 +49,7 @@ describe('core EventEmitter', () => {
     'safely emits unobserved Object.prototype event %s',
     (eventName) => {
       const emitter = new TestEmitter();
+      // SAFETY: The fixture intentionally uses prototype-property event names outside the static event map to verify registration, lookup, and dispatch isolation.
       const event = eventName as keyof Events;
 
       expect(emitter.hasListener(event)).toBeFalsy();
@@ -59,6 +62,7 @@ describe('core EventEmitter', () => {
     'supports regular and one-time Object.prototype event listeners for %s',
     (eventName) => {
       const emitter = new TestEmitter();
+      // SAFETY: The fixture intentionally uses prototype-property event names outside the static event map to verify registration, lookup, and dispatch isolation.
       const event = eventName as 'message';
       const repeated = vi.fn();
       const once = vi.fn();
