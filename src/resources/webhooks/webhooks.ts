@@ -455,6 +455,48 @@ export class Webhooks extends APIResource {
 export type WebhookEndpointsPage = CursorPage<WebhookEndpoint>;
 
 /**
+ * Sent when an agent environment expires and can no longer resume from a snapshot.
+ */
+export interface AgentEnvironmentExpiredWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * Identifies the environment whose lifecycle changed.
+   */
+  data: AgentEnvironmentExpiredWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.environment.expired`.
+   */
+  type: 'agent.environment.expired';
+}
+
+export namespace AgentEnvironmentExpiredWebhookEvent {
+  /**
+   * Identifies the environment whose lifecycle changed.
+   */
+  export interface Data {
+    /**
+     * The ID of the environment.
+     */
+    id: string;
+  }
+}
+
+/**
  * Sent when setup fails for a prewarmed OpenAI-hosted environment before it is
  * attached to a session.
  */
@@ -529,6 +571,48 @@ export interface AgentEnvironmentReadyWebhookEvent {
 }
 
 export namespace AgentEnvironmentReadyWebhookEvent {
+  /**
+   * Identifies the environment whose lifecycle changed.
+   */
+  export interface Data {
+    /**
+     * The ID of the environment.
+     */
+    id: string;
+  }
+}
+
+/**
+ * Sent when an agent environment is suspended and can resume from a snapshot.
+ */
+export interface AgentEnvironmentSuspendedWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * Identifies the environment whose lifecycle changed.
+   */
+  data: AgentEnvironmentSuspendedWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.environment.suspended`.
+   */
+  type: 'agent.environment.suspended';
+}
+
+export namespace AgentEnvironmentSuspendedWebhookEvent {
   /**
    * Identifies the environment whose lifecycle changed.
    */
@@ -1807,7 +1891,9 @@ export type UnwrapWebhookEvent =
   | SafetyAlertCreatedWebhookEvent
   | SafetyDeactivationIssuedWebhookEvent
   | SafetyOrgAlertCreatedWebhookEvent
-  | SafetyWarningIssuedWebhookEvent;
+  | SafetyWarningIssuedWebhookEvent
+  | AgentEnvironmentSuspendedWebhookEvent
+  | AgentEnvironmentExpiredWebhookEvent;
 
 export interface WebhookEndpoint {
   /**
@@ -1998,6 +2084,8 @@ export interface WebhookCreateParams {
     | 'agent.session.idle'
     | 'agent.session.failed'
     | 'safety.alert.created'
+    | 'agent.environment.suspended'
+    | 'agent.environment.expired'
   >;
 
   /**
@@ -2041,6 +2129,8 @@ export interface WebhookUpdateParams {
     | 'agent.session.idle'
     | 'agent.session.failed'
     | 'safety.alert.created'
+    | 'agent.environment.suspended'
+    | 'agent.environment.expired'
   >;
 
   /**
@@ -2098,15 +2188,19 @@ export interface WebhookTestParams {
     | 'agent.session.in_progress'
     | 'agent.session.idle'
     | 'agent.session.failed'
-    | 'safety.alert.created';
+    | 'safety.alert.created'
+    | 'agent.environment.suspended'
+    | 'agent.environment.expired';
 }
 
 Webhooks.EventTypes = EventTypes;
 
 export declare namespace Webhooks {
   export {
+    type AgentEnvironmentExpiredWebhookEvent as AgentEnvironmentExpiredWebhookEvent,
     type AgentEnvironmentFailedWebhookEvent as AgentEnvironmentFailedWebhookEvent,
     type AgentEnvironmentReadyWebhookEvent as AgentEnvironmentReadyWebhookEvent,
+    type AgentEnvironmentSuspendedWebhookEvent as AgentEnvironmentSuspendedWebhookEvent,
     type AgentSessionActionRequiredWebhookEvent as AgentSessionActionRequiredWebhookEvent,
     type AgentSessionCreatedWebhookEvent as AgentSessionCreatedWebhookEvent,
     type AgentSessionFailedWebhookEvent as AgentSessionFailedWebhookEvent,
