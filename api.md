@@ -479,11 +479,13 @@ Types:
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionDeleted</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentConnectedEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentDisconnectedEvent</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentExpiredEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentFailedEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentPendingEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentReadyEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentResetEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentState</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentSuspendedEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionErrorEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionFailedEvent</a></code>
