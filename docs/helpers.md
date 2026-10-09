@@ -640,9 +640,12 @@ not emitted as `error` events; listen for `abort` instead.
 The event fired when the stream receives a signal to abort. After this event, `done()` and the `final*` helpers
 reject with the same `APIUserAbortError`.
 
-#### `.on('totalUsage', (usage: CompletionUsage) => …)` (without `stream`, usage is not currently reported with `stream`)
+#### `.on('totalUsage', (usage: CompletionUsage) => …)`
 
-The event fired at the end, returning the total usage of the call.
+Fired at successful completion when at least one response includes usage. Reports token totals across all
+chat completions in the run, including the prompt and completion token details received from the API.
+For streaming requests, pass `stream_options: { include_usage: true }` to request usage. Missing usage or
+detail fields cannot be recovered; the aggregate includes only the counts received.
 
 #### `.on('end', () => …)`
 
@@ -687,9 +690,13 @@ A promise which resolves with the last function tool call, or `undefined` if no 
 A promise which resolves with the last function tool result, or `undefined` if no matching tool message is
 found.
 
-#### `await .totalUsage()` (without `stream`, usage is not currently reported with `stream`)
+#### `await .totalUsage()`
 
-A promise which resolves with the total usage.
+Waits for successful completion and resolves with token totals across all chat completions in the run,
+including the prompt and completion token details received from the API. For streaming requests, pass
+`stream_options: { include_usage: true }` to request usage. Only received counts are aggregated; omitted
+detail fields remain omitted, and explicit zeros are preserved. If no response includes usage, the three
+top-level token totals are zero and the `totalUsage` event is not emitted.
 
 ### Chat Fields
 

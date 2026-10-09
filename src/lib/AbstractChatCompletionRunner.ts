@@ -2,6 +2,7 @@ import { OpenAIError } from '../error';
 import type OpenAI from '../index';
 import type { RequestOptions } from '../internal/request-options';
 import { uuid4 } from '../internal/utils/uuid';
+import { hasOwn, isObj } from '../internal/utils/values';
 import { isAutoParsableTool, parseChatCompletion } from '../lib/parser';
 import type {
   ChatCompletion,
@@ -292,6 +293,28 @@ export class AbstractChatCompletionRunner<
         total.completion_tokens += usage.completion_tokens;
         total.prompt_tokens += usage.prompt_tokens;
         total.total_tokens += usage.total_tokens;
+        for (const key of ['completion_tokens_details', 'prompt_tokens_details'] as const) {
+          const details = usage[key];
+          if (isObj(details)) {
+            // SAFETY: Both token detail types contain only optional numeric counts.
+            const totalDetails = (total[key] ??= {}) as Record<string, number>;
+            for (const name in details) {
+              if (!hasOwn(details, name)) {
+                continue;
+              }
+              const count = details[name];
+              // oxlint-disable-next-line anti-slop/no-runtime-typeof -- API-compatible endpoints can return nonnumeric detail values despite the declared response type.
+              if (typeof count === 'number') {
+                Object.defineProperty(totalDetails, name, {
+                  value: (hasOwn(totalDetails, name) ? (totalDetails[name] ?? 0) : 0) + count,
+                  enumerable: true,
+                  configurable: true,
+                  writable: true,
+                });
+              }
+            }
+          }
+        }
       }
     }
     return total;

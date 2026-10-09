@@ -1,0 +1,304 @@
+import { vi } from 'vitest';
+import OpenAI from 'openai';
+import type { ChatCompletionToolRunnerParams } from 'openai/resources/chat/completions';
+
+const usage: OpenAI.CompletionUsage = {
+  prompt_tokens: 100,
+  completion_tokens: 20,
+  total_tokens: 120,
+  prompt_tokens_details: {
+    audio_tokens: 2,
+    cache_write_tokens: 3,
+    cached_tokens: 80,
+    image_tokens: 5,
+    text_tokens: 93,
+  },
+  completion_tokens_details: {
+    accepted_prediction_tokens: 4,
+    audio_tokens: 0,
+    reasoning_tokens: 5,
+    rejected_prediction_tokens: 1,
+    text_tokens: 15,
+  },
+};
+
+const plainUsage: OpenAI.CompletionUsage = {
+  prompt_tokens: 10,
+  completion_tokens: 2,
+  total_tokens: 12,
+};
+
+// Computed __proto__ creates an own JSON field rather than changing the prototype.
+const collidingDetails = { cached_tokens: 0, reasoning_tokens: 0, constructor: 2, ['__proto__']: 3 };
+const collidingUsage = {
+  ...plainUsage,
+  prompt_tokens_details: collidingDetails,
+  completion_tokens_details: collidingDetails,
+};
+const summedCollidingDetails = { cached_tokens: 0, reasoning_tokens: 0, constructor: 4, ['__proto__']: 6 };
+
+type WireUsage = Omit<OpenAI.CompletionUsage, 'prompt_tokens_details' | 'completion_tokens_details'> & {
+  prompt_tokens_details?: unknown;
+  completion_tokens_details?: unknown;
+};
+const mixedDetailsUsage: WireUsage = {
+  ...plainUsage,
+  prompt_tokens_details: { cached_tokens: '2', audio_tokens: 0, image_tokens: null, text_tokens: true },
+  completion_tokens_details: { reasoning_tokens: 2, audio_tokens: [], text_tokens: {} },
+};
+
+const invalidDetailString = 'x'.repeat(64 * 1024);
+
+const cases: {
+  name: string;
+  usages: (WireUsage | undefined)[];
+  expected: OpenAI.CompletionUsage;
+  listenForUsage?: boolean;
+}[] = [
+  { name: 'single completion', usages: [usage], expected: usage },
+  {
+    name: 'skips malformed detail containers',
+    usages: [
+      ...[invalidDetailString, [0, 2], true, 7, null].map((details) => ({
+        ...plainUsage,
+        prompt_tokens_details: details,
+        completion_tokens_details: details,
+      })),
+      usage,
+    ],
+    expected: { ...usage, prompt_tokens: 150, completion_tokens: 30, total_tokens: 180 },
+  },
+  {
+    name: 'finalizes malformed details without a usage listener',
+    usages: [
+      {
+        ...plainUsage,
+        prompt_tokens_details: invalidDetailString,
+        completion_tokens_details: invalidDetailString,
+      },
+    ],
+    expected: plainUsage,
+    listenForUsage: false,
+  },
+  {
+    name: 'ignores nonnumeric detail counts',
+    usages: [mixedDetailsUsage, mixedDetailsUsage],
+    expected: {
+      prompt_tokens: 20,
+      completion_tokens: 4,
+      total_tokens: 24,
+      prompt_tokens_details: { audio_tokens: 0 },
+      completion_tokens_details: { reasoning_tokens: 4 },
+    },
+  },
+  { name: 'own keys colliding with the prototype', usages: [collidingUsage], expected: collidingUsage },
+  {
+    name: 'sums own keys colliding with the prototype',
+    usages: [collidingUsage, collidingUsage],
+    expected: {
+      prompt_tokens: 20,
+      completion_tokens: 4,
+      total_tokens: 24,
+      prompt_tokens_details: summedCollidingDetails,
+      completion_tokens_details: summedCollidingDetails,
+    },
+  },
+  {
+    name: 'multiple completions',
+    usages: [usage, usage],
+    expected: {
+      prompt_tokens: 200,
+      completion_tokens: 40,
+      total_tokens: 240,
+      prompt_tokens_details: {
+        audio_tokens: 4,
+        cache_write_tokens: 6,
+        cached_tokens: 160,
+        image_tokens: 10,
+        text_tokens: 186,
+      },
+      completion_tokens_details: {
+        accepted_prediction_tokens: 8,
+        audio_tokens: 0,
+        reasoning_tokens: 10,
+        rejected_prediction_tokens: 2,
+        text_tokens: 30,
+      },
+    },
+  },
+  {
+    name: 'missing usage and details between completions',
+    usages: [plainUsage, usage, undefined, plainUsage],
+    expected: { ...usage, prompt_tokens: 120, completion_tokens: 24, total_tokens: 144 },
+  },
+  {
+    name: 'partial details and explicit zeros',
+    usages: [
+      { ...plainUsage, prompt_tokens_details: { cached_tokens: 0 } },
+      { ...plainUsage, completion_tokens_details: { reasoning_tokens: 0 } },
+      { ...plainUsage, prompt_tokens_details: { audio_tokens: 2 } },
+    ],
+    expected: {
+      prompt_tokens: 30,
+      completion_tokens: 6,
+      total_tokens: 36,
+      prompt_tokens_details: { cached_tokens: 0, audio_tokens: 2 },
+      completion_tokens_details: { reasoning_tokens: 0 },
+    },
+  },
+  { name: 'omitted details', usages: [plainUsage], expected: plainUsage },
+  {
+    name: 'empty details',
+    usages: [{ ...plainUsage, prompt_tokens_details: {}, completion_tokens_details: {} }],
+    expected: { ...plainUsage, prompt_tokens_details: {}, completion_tokens_details: {} },
+  },
+  {
+    name: 'omitted usage',
+    usages: [undefined],
+    expected: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+  },
+];
+
+describe.each([false, true])('runner totalUsage with stream: %s', (stream) => {
+  afterEach(() => vi.restoreAllMocks());
+  test.each(cases)('$name', async ({ usages, expected, listenForUsage = true }) => {
+    if (!listenForUsage) {
+      const { entries } = Object;
+      vi.spyOn(Object, 'entries').mockImplementation((value) => {
+        if (value === invalidDetailString) {
+          throw new Error('Malformed details must not reach eager entry enumeration');
+        }
+        return entries(value);
+      });
+    }
+    let requestIndex = 0;
+    const fetch = vi.fn(async () => {
+      const index = requestIndex;
+      requestIndex += 1;
+      const last = index === usages.length - 1;
+      const completionUsage = usages[index];
+      const message: OpenAI.ChatCompletionMessage = {
+        role: 'assistant',
+        content: last ? 'Done' : null,
+        refusal: null,
+        ...(last
+          ? {}
+          : {
+              tool_calls: [
+                {
+                  id: `call_${index}`,
+                  type: 'function',
+                  function: { name: 'get_weather', arguments: '{}' },
+                },
+              ],
+            }),
+      };
+      const completion = {
+        id: `chatcmpl_${index}`,
+        object: 'chat.completion',
+        created: 0,
+        model: 'gpt-4o-mini',
+        choices: [{ index: 0, message, finish_reason: last ? 'stop' : 'tool_calls', logprobs: null }],
+        ...(completionUsage ? { usage: completionUsage } : {}),
+      };
+      if (!stream) {
+        return Response.json(completion);
+      }
+      const chunks = [
+        {
+          ...completion,
+          object: 'chat.completion.chunk',
+          usage: null,
+          choices: [
+            {
+              index: 0,
+              delta: {
+                role: message.role,
+                content: message.content,
+                ...(message.tool_calls
+                  ? {
+                      tool_calls: message.tool_calls.map((tool, toolIndex) => ({
+                        ...tool,
+                        index: toolIndex,
+                      })),
+                    }
+                  : {}),
+              },
+              finish_reason: last ? 'stop' : 'tool_calls',
+              logprobs: null,
+            },
+          ],
+        },
+        { ...completion, object: 'chat.completion.chunk', choices: [] },
+      ];
+      return new Response(
+        `${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`,
+        {
+          headers: { 'Content-Type': 'text/event-stream' },
+        },
+      );
+    });
+    const client = new OpenAI({ apiKey: 'test-key', fetch });
+    const params: ChatCompletionToolRunnerParams<[string]> = {
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: 'What is the weather?' }],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'get_weather',
+            description: 'Get the weather',
+            parameters: {},
+            function: () => 'Sunny',
+          },
+        },
+      ],
+    };
+    const totalUsage = vi.fn();
+    const originalUsages: (OpenAI.CompletionUsage | undefined)[] = [];
+    const recordUsage = (completion: OpenAI.ChatCompletion) => {
+      originalUsages.push(structuredClone(completion.usage));
+      Object.freeze(completion.usage?.prompt_tokens_details);
+      Object.freeze(completion.usage?.completion_tokens_details);
+      Object.freeze(completion.usage);
+    };
+    const runner = (() => {
+      if (stream) {
+        const streamingRunner = client.chat.completions
+          .runTools({ ...params, stream: true, stream_options: { include_usage: true } })
+          .on('chatCompletion', recordUsage);
+        if (listenForUsage) {
+          streamingRunner.on('totalUsage', totalUsage);
+        }
+        return streamingRunner;
+      }
+      const bufferedRunner = client.chat.completions
+        .runTools({ ...params, stream: false })
+        .on('chatCompletion', recordUsage);
+      if (listenForUsage) {
+        bufferedRunner.on('totalUsage', totalUsage);
+      }
+      return bufferedRunner;
+    })();
+
+    await runner.done();
+    const firstTotal = await runner.totalUsage();
+    expect(firstTotal).toStrictEqual(expected);
+    if (listenForUsage && usages.some((item) => item !== undefined)) {
+      expect(totalUsage).toHaveBeenCalledTimes(1);
+      expect(totalUsage).toHaveBeenCalledWith(expected);
+    } else {
+      expect(totalUsage).not.toHaveBeenCalled();
+    }
+    if (firstTotal.prompt_tokens_details) {
+      firstTotal.prompt_tokens_details.cached_tokens = 999;
+    }
+    if (firstTotal.completion_tokens_details) {
+      firstTotal.completion_tokens_details.reasoning_tokens = 999;
+    }
+    expect(await runner.totalUsage()).toStrictEqual(expected);
+    expect(fetch).toHaveBeenCalledTimes(usages.length);
+    expect(originalUsages.map((item) => item ?? undefined)).toStrictEqual(usages);
+    expect(runner.allChatCompletions().map((completion) => completion.usage)).toStrictEqual(originalUsages);
+  });
+});
