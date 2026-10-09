@@ -1637,6 +1637,36 @@ export interface AgentSessionEnvironmentDisconnectedEvent {
 }
 
 /**
+ * Emitted after a suspended hosted session environment and its checkpoint expire.
+ */
+export interface AgentSessionEnvironmentExpiredEvent {
+  /**
+   * The current environment state.
+   */
+  environment: AgentSessionEnvironmentState;
+
+  /**
+   * The unique ID of the event.
+   */
+  event_id: string;
+
+  /**
+   * The ID of the session associated with the event.
+   */
+  session_id: string;
+
+  /**
+   * The ID of the turn associated with the event, when applicable.
+   */
+  turn_id: string | null;
+
+  /**
+   * The type of the object. Always `agent.session.environment.expired`.
+   */
+  type: 'agent.session.environment.expired';
+}
+
+/**
  * Emitted when a session environment fails.
  */
 export interface AgentSessionEnvironmentFailedEvent {
@@ -1783,9 +1813,12 @@ export interface AgentSessionEnvironmentState {
    * - `ready` - The environment is ready to connect.
    * - `connected` - The environment is connected.
    * - `disconnected` - The environment is disconnected.
+   * - `suspended` - The environment is stopped and can be resumed from its private
+   *   checkpoint.
+   * - `expired` - The environment and its private checkpoint have expired.
    * - `failed` - The environment failed to connect.
    */
-  status: 'pending' | 'ready' | 'connected' | 'disconnected' | 'failed';
+  status: 'pending' | 'ready' | 'connected' | 'disconnected' | 'suspended' | 'expired' | 'failed';
 
   /**
    * The environment type.
@@ -1813,6 +1846,36 @@ export namespace AgentSessionEnvironmentState {
      */
     type: string;
   }
+}
+
+/**
+ * Emitted after an idle hosted session environment is checkpointed and stopped.
+ */
+export interface AgentSessionEnvironmentSuspendedEvent {
+  /**
+   * The current environment state.
+   */
+  environment: AgentSessionEnvironmentState;
+
+  /**
+   * The unique ID of the event.
+   */
+  event_id: string;
+
+  /**
+   * The ID of the session associated with the event.
+   */
+  session_id: string;
+
+  /**
+   * The ID of the turn associated with the event, when applicable.
+   */
+  turn_id: string | null;
+
+  /**
+   * The type of the object. Always `agent.session.environment.suspended`.
+   */
+  type: 'agent.session.environment.suspended';
 }
 
 /**
@@ -1846,6 +1909,8 @@ export interface AgentSessionErrorEvent {
 export type AgentSessionEvent =
   | AgentSessionErrorEvent
   | AgentSessionEnvironmentReadyEvent
+  | AgentSessionEnvironmentSuspendedEvent
+  | AgentSessionEnvironmentExpiredEvent
   | AgentSessionEnvironmentResetEvent
   | AgentOutputCommandExecutionOutputDeltaEvent
   | AgentSessionCreatedEvent
@@ -5515,11 +5580,13 @@ export declare namespace Agents {
     type AgentSessionDeleted as AgentSessionDeleted,
     type AgentSessionEnvironmentConnectedEvent as AgentSessionEnvironmentConnectedEvent,
     type AgentSessionEnvironmentDisconnectedEvent as AgentSessionEnvironmentDisconnectedEvent,
+    type AgentSessionEnvironmentExpiredEvent as AgentSessionEnvironmentExpiredEvent,
     type AgentSessionEnvironmentFailedEvent as AgentSessionEnvironmentFailedEvent,
     type AgentSessionEnvironmentPendingEvent as AgentSessionEnvironmentPendingEvent,
     type AgentSessionEnvironmentReadyEvent as AgentSessionEnvironmentReadyEvent,
     type AgentSessionEnvironmentResetEvent as AgentSessionEnvironmentResetEvent,
     type AgentSessionEnvironmentState as AgentSessionEnvironmentState,
+    type AgentSessionEnvironmentSuspendedEvent as AgentSessionEnvironmentSuspendedEvent,
     type AgentSessionErrorEvent as AgentSessionErrorEvent,
     type AgentSessionEvent as AgentSessionEvent,
     type AgentSessionFailedEvent as AgentSessionFailedEvent,

@@ -347,8 +347,13 @@ export interface EnvironmentInfo {
 
   /**
    * The current environment connection status.
+   *
+   * - `ready` - Provisioning succeeded and the environment is available for
+   *   attachment or use.
+   * - `suspended` - The sandbox is stopped and can be resumed from its private
+   *   checkpoint.
    */
-  status: 'pending' | 'ready' | 'connected' | 'disconnected' | 'expired' | 'failed';
+  status: 'pending' | 'ready' | 'connected' | 'disconnected' | 'expired' | 'failed' | 'suspended';
 
   /**
    * Whether the environment is hosted by OpenAI or by the application.
