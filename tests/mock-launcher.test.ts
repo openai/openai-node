@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { vi } from 'vitest';
 
 const root = process.cwd();
 const steadyArguments = [
@@ -53,11 +54,27 @@ function readPid(filename: string): number | undefined {
   return Number.isSafeInteger(pid) && pid > 0 ? pid : undefined;
 }
 
+async function cleanupFixture(fixture: string, pid: number | undefined) {
+  if (pid !== undefined) {
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch (error) {
+      // SAFETY: An already-exited fixture process needs no signal; other failures must surface.
+      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') {
+        throw error;
+      }
+    }
+    // The daemon outlives the launcher shell, so wait for its PID before removing its cwd.
+    await vi.waitFor(() => expect(isProcessRunning(pid)).toBe(false), { timeout: 5000, interval: 20 });
+  }
+  rmSync(fixture, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+}
+
 describe('Steady mock launcher', () => {
   test.each([
     ['foreground', false],
     ['daemon', true],
-  ])('runs the pinned local launcher without pnpm in %s mode', (_mode, daemon) => {
+  ])('runs the pinned local launcher without pnpm in %s mode', async (_mode, daemon) => {
     const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-mock-launcher-'));
     const checkout = path.join(fixture, 'checkout');
     const executableDirectory = path.join(fixture, 'executables');
@@ -84,7 +101,8 @@ describe('Steady mock launcher', () => {
           "fs.appendFileSync(process.env.STEADY_OBSERVATIONS, JSON.stringify(observation) + '\\n');",
           "if (args[0] === '--version') process.stdout.write('0.22.2\\n');",
           "else if (process.env.STEADY_DAEMON === 'true') {",
-          "  process.on('SIGTERM', () => process.exit(0));",
+          // Keep shutdown asynchronous on POSIX too, so teardown must wait for process exit.
+          "  process.on('SIGTERM', () => setTimeout(() => process.exit(0), 100));",
           '  setInterval(() => {}, 1000);',
           '}',
         ].join('\n'),
@@ -153,10 +171,10 @@ describe('Steady mock launcher', () => {
       }
     } finally {
       steadyPid ??= readPid(steadyPidFile);
-      if (steadyPid !== undefined && isProcessRunning(steadyPid)) {
-        process.kill(steadyPid, 'SIGTERM');
-      }
-      rmSync(fixture, { recursive: true, force: true });
+      await cleanupFixture(fixture, steadyPid);
+    }
+    if (steadyPid !== undefined) {
+      expect(isProcessRunning(steadyPid)).toBe(false);
     }
   });
 
@@ -199,7 +217,7 @@ exit 23`,
     }
   });
 
-  test('terminates the daemon if it times out before becoming healthy', () => {
+  test('terminates the daemon if it times out before becoming healthy', async () => {
     const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-mock-launcher-timeout-'));
     const checkout = path.join(fixture, 'checkout');
     const bashEnvironment = path.join(fixture, 'bash-env');
@@ -268,10 +286,7 @@ sleep() {
       }
     } finally {
       steadyPid ??= readPid(steadyPidFile);
-      if (steadyPid !== undefined && isProcessRunning(steadyPid)) {
-        process.kill(steadyPid, 'SIGTERM');
-      }
-      rmSync(fixture, { recursive: true, force: true });
+      await cleanupFixture(fixture, steadyPid);
     }
   });
 });

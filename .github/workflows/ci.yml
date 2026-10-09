@@ -118,6 +118,9 @@ jobs:
       - name: Check build
         run: pnpm build
 
+      - name: Check mock launcher fixture cleanup
+        run: ./scripts/test tests/mock-launcher.test.ts
+
   node_matrix:
     name: Read Node.js test matrix
     runs-on: ${{ vars.SDK_GHA_RUNNER || 'ubuntu-latest' }}
