@@ -47,12 +47,39 @@ const mixedDetailsUsage: WireUsage = {
   completion_tokens_details: { reasoning_tokens: 2, audio_tokens: [], text_tokens: {} },
 };
 
+const invalidDetailString = 'x'.repeat(64 * 1024);
+
 const cases: {
   name: string;
   usages: (WireUsage | undefined)[];
   expected: OpenAI.CompletionUsage;
+  listenForUsage?: boolean;
 }[] = [
   { name: 'single completion', usages: [usage], expected: usage },
+  {
+    name: 'skips malformed detail containers',
+    usages: [
+      ...[invalidDetailString, [0, 2], true, 7, null].map((details) => ({
+        ...plainUsage,
+        prompt_tokens_details: details,
+        completion_tokens_details: details,
+      })),
+      usage,
+    ],
+    expected: { ...usage, prompt_tokens: 150, completion_tokens: 30, total_tokens: 180 },
+  },
+  {
+    name: 'finalizes malformed details without a usage listener',
+    usages: [
+      {
+        ...plainUsage,
+        prompt_tokens_details: invalidDetailString,
+        completion_tokens_details: invalidDetailString,
+      },
+    ],
+    expected: plainUsage,
+    listenForUsage: false,
+  },
   {
     name: 'ignores nonnumeric detail counts',
     usages: [mixedDetailsUsage, mixedDetailsUsage],
@@ -133,7 +160,17 @@ const cases: {
 ];
 
 describe.each([false, true])('runner totalUsage with stream: %s', (stream) => {
-  test.each(cases)('$name', async ({ usages, expected }) => {
+  afterEach(() => vi.restoreAllMocks());
+  test.each(cases)('$name', async ({ usages, expected, listenForUsage = true }) => {
+    if (!listenForUsage) {
+      const { entries } = Object;
+      vi.spyOn(Object, 'entries').mockImplementation((value) => {
+        if (value === invalidDetailString) {
+          throw new Error('Malformed details must not reach eager entry enumeration');
+        }
+        return entries(value);
+      });
+    }
     let requestIndex = 0;
     const fetch = vi.fn(async () => {
       const index = requestIndex;
@@ -225,19 +262,29 @@ describe.each([false, true])('runner totalUsage with stream: %s', (stream) => {
       Object.freeze(completion.usage?.completion_tokens_details);
       Object.freeze(completion.usage);
     };
-    const runner = stream
-      ? client.chat.completions
+    const runner = (() => {
+      if (stream) {
+        const streamingRunner = client.chat.completions
           .runTools({ ...params, stream: true, stream_options: { include_usage: true } })
-          .on('totalUsage', totalUsage)
-          .on('chatCompletion', recordUsage)
-      : client.chat.completions
-          .runTools({ ...params, stream: false })
-          .on('totalUsage', totalUsage)
           .on('chatCompletion', recordUsage);
+        if (listenForUsage) {
+          streamingRunner.on('totalUsage', totalUsage);
+        }
+        return streamingRunner;
+      }
+      const bufferedRunner = client.chat.completions
+        .runTools({ ...params, stream: false })
+        .on('chatCompletion', recordUsage);
+      if (listenForUsage) {
+        bufferedRunner.on('totalUsage', totalUsage);
+      }
+      return bufferedRunner;
+    })();
 
+    await runner.done();
     const firstTotal = await runner.totalUsage();
     expect(firstTotal).toStrictEqual(expected);
-    if (usages.some((item) => item !== undefined)) {
+    if (listenForUsage && usages.some((item) => item !== undefined)) {
       expect(totalUsage).toHaveBeenCalledTimes(1);
       expect(totalUsage).toHaveBeenCalledWith(expected);
     } else {
