@@ -28,12 +28,54 @@ const plainUsage: OpenAI.CompletionUsage = {
   total_tokens: 12,
 };
 
+// Computed __proto__ creates an own JSON field rather than changing the prototype.
+const collidingDetails = { cached_tokens: 0, reasoning_tokens: 0, constructor: 2, ['__proto__']: 3 };
+const collidingUsage = {
+  ...plainUsage,
+  prompt_tokens_details: collidingDetails,
+  completion_tokens_details: collidingDetails,
+};
+const summedCollidingDetails = { cached_tokens: 0, reasoning_tokens: 0, constructor: 4, ['__proto__']: 6 };
+
+type WireUsage = Omit<OpenAI.CompletionUsage, 'prompt_tokens_details' | 'completion_tokens_details'> & {
+  prompt_tokens_details?: unknown;
+  completion_tokens_details?: unknown;
+};
+const mixedDetailsUsage: WireUsage = {
+  ...plainUsage,
+  prompt_tokens_details: { cached_tokens: '2', audio_tokens: 0, image_tokens: null, text_tokens: true },
+  completion_tokens_details: { reasoning_tokens: 2, audio_tokens: [], text_tokens: {} },
+};
+
 const cases: {
   name: string;
-  usages: (OpenAI.CompletionUsage | undefined)[];
+  usages: (WireUsage | undefined)[];
   expected: OpenAI.CompletionUsage;
 }[] = [
   { name: 'single completion', usages: [usage], expected: usage },
+  {
+    name: 'ignores nonnumeric detail counts',
+    usages: [mixedDetailsUsage, mixedDetailsUsage],
+    expected: {
+      prompt_tokens: 20,
+      completion_tokens: 4,
+      total_tokens: 24,
+      prompt_tokens_details: { audio_tokens: 0 },
+      completion_tokens_details: { reasoning_tokens: 4 },
+    },
+  },
+  { name: 'own keys colliding with the prototype', usages: [collidingUsage], expected: collidingUsage },
+  {
+    name: 'sums own keys colliding with the prototype',
+    usages: [collidingUsage, collidingUsage],
+    expected: {
+      prompt_tokens: 20,
+      completion_tokens: 4,
+      total_tokens: 24,
+      prompt_tokens_details: summedCollidingDetails,
+      completion_tokens_details: summedCollidingDetails,
+    },
+  },
   {
     name: 'multiple completions',
     usages: [usage, usage],
@@ -114,7 +156,7 @@ describe.each([false, true])('runner totalUsage with stream: %s', (stream) => {
               ],
             }),
       };
-      const completion: OpenAI.ChatCompletion = {
+      const completion = {
         id: `chatcmpl_${index}`,
         object: 'chat.completion',
         created: 0,
@@ -125,7 +167,7 @@ describe.each([false, true])('runner totalUsage with stream: %s', (stream) => {
       if (!stream) {
         return Response.json(completion);
       }
-      const chunks: OpenAI.ChatCompletionChunk[] = [
+      const chunks = [
         {
           ...completion,
           object: 'chat.completion.chunk',

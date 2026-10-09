@@ -2,6 +2,7 @@ import { OpenAIError } from '../error';
 import type OpenAI from '../index';
 import type { RequestOptions } from '../internal/request-options';
 import { uuid4 } from '../internal/utils/uuid';
+import { hasOwn } from '../internal/utils/values';
 import { isAutoParsableTool, parseChatCompletion } from '../lib/parser';
 import type {
   ChatCompletion,
@@ -298,8 +299,14 @@ export class AbstractChatCompletionRunner<
             // SAFETY: Both token detail types contain only optional numeric counts.
             const totalDetails = (total[key] ??= {}) as Record<string, number>;
             for (const [name, count] of Object.entries(details)) {
-              if (count !== undefined) {
-                totalDetails[name] = (totalDetails[name] ?? 0) + count;
+              // oxlint-disable-next-line anti-slop/no-runtime-typeof -- API-compatible endpoints can return nonnumeric detail values despite the declared response type.
+              if (typeof count === 'number') {
+                Object.defineProperty(totalDetails, name, {
+                  value: (hasOwn(totalDetails, name) ? (totalDetails[name] ?? 0) : 0) + count,
+                  enumerable: true,
+                  configurable: true,
+                  writable: true,
+                });
               }
             }
           }
