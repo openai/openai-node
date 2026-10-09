@@ -1,5 +1,23 @@
 # Changelog
 
+## [7.32.0](https://github.com/openai/openai-node/compare/v7.31.0...v7.32.0) (2026-10-09)
+
+
+### Features
+
+* **api:** add agent environment suspension and expiration ([#2904](https://github.com/openai/openai-node/issues/2904)) ([6e4ed63](https://github.com/openai/openai-node/commit/6e4ed63cf86567bf6527e75b4952659d0f9c8ea1))
+
+
+### Bug Fixes
+
+* **deps:** bump next from 15.5.25 to 15.5.27 in /ecosystem-tests/vercel-edge ([#2896](https://github.com/openai/openai-node/issues/2896)) ([88b4c05](https://github.com/openai/openai-node/commit/88b4c0529bd771abddc20876253b140eb7a6262e))
+* **runners:** preserve detailed token usage in totalUsage ([#2900](https://github.com/openai/openai-node/issues/2900)) ([88bb984](https://github.com/openai/openai-node/commit/88bb98485668c50a22fba9c0e04dfb5f784db239))
+
+
+### Documentation
+
+* fix migration guide types troubleshooting link ([#2901](https://github.com/openai/openai-node/issues/2901)) ([690e5d7](https://github.com/openai/openai-node/commit/690e5d762ebd516a7a937dc78cb6b45058ee920e))
+
 ## [7.31.0](https://github.com/openai/openai-node/compare/v7.30.1...v7.31.0) (2026-10-09)
 
 
