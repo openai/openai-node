@@ -380,7 +380,7 @@ import 'openai/shims/web';
 import OpenAI from 'openai';
 ```
 
-The `openai/shims` imports have been removed. Your global types must now be [correctly configured](#minimum-types-requirements).
+The `openai/shims` imports have been removed. Your global types must now be [correctly configured](#typescript-troubleshooting).
 
 ### Zod helpers optionality error
 
