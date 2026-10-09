@@ -4,7 +4,13 @@ import { APIResource } from '../../../core/resource';
 import * as AgentsAPI from './agents';
 import * as TurnsAPI from './sessions/turns/turns';
 import * as EnvironmentsAPI from './environments/environments';
-import { EnvironmentInfo, Environments } from './environments/environments';
+import {
+  EnvironmentCreateParams,
+  EnvironmentInfo,
+  EnvironmentInfosPage,
+  EnvironmentListParams,
+  Environments,
+} from './environments/environments';
 import * as SessionsAPI from './sessions/sessions';
 import {
   SessionCreateParams,
@@ -3768,6 +3774,7 @@ export namespace Environment {
 export type EnvironmentParam =
   | EnvironmentParam.EnvironmentParamNone
   | EnvironmentParam.EnvironmentParamOpenAIHosted
+  | EnvironmentParam.EnvironmentParamPrewarmed
   | EnvironmentParam.EnvironmentParamSelfHosted;
 
 export namespace EnvironmentParam {
@@ -3782,8 +3789,8 @@ export namespace EnvironmentParam {
   }
 
   /**
-   * An existing OpenAI-hosted environment or new inline/template-based hosted
-   * configuration.
+   * New inline/template-based hosted configuration. Use EnvironmentParamPrewarmed
+   * to attach an existing environment.
    */
   export interface EnvironmentParamOpenAIHosted {
     /**
@@ -3812,6 +3819,9 @@ export namespace EnvironmentParam {
      * Environment variables made available to the agent.
      */
     env?: { [key: string]: string } | null;
+
+    /** Use EnvironmentParamPrewarmed to attach an existing environment instead. */
+    environment_id?: never;
 
     /**
      * A reusable hosted template applied before inline session configuration. Omitted
@@ -3851,6 +3861,11 @@ export namespace EnvironmentParam {
      */
     skills?: Array<AgentsAPI.HostedSkillParam> | null;
   }
+
+  /** An existing hosted environment, with no inline or template configuration. */
+  export type EnvironmentParamPrewarmed = { type: 'openai_hosted'; environment_id: string } & {
+    [Field in Exclude<keyof EnvironmentParamOpenAIHosted, 'type' | 'environment_id'>]?: never;
+  };
 
   export namespace EnvironmentParamOpenAIHosted {
     /**
@@ -5580,7 +5595,13 @@ export declare namespace Agents {
     type AgentListParams as AgentListParams,
   };
 
-  export { Environments as Environments, type EnvironmentInfo as EnvironmentInfo };
+  export {
+    Environments as Environments,
+    type EnvironmentInfo as EnvironmentInfo,
+    type EnvironmentInfosPage as EnvironmentInfosPage,
+    type EnvironmentCreateParams as EnvironmentCreateParams,
+    type EnvironmentListParams as EnvironmentListParams,
+  };
 
   export {
     Vaults as Vaults,

@@ -455,6 +455,92 @@ export class Webhooks extends APIResource {
 export type WebhookEndpointsPage = CursorPage<WebhookEndpoint>;
 
 /**
+ * Sent when setup fails for a prewarmed OpenAI-hosted environment before it is
+ * attached to a session.
+ */
+export interface AgentEnvironmentFailedWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * Identifies the environment whose lifecycle changed.
+   */
+  data: AgentEnvironmentFailedWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.environment.failed`.
+   */
+  type: 'agent.environment.failed';
+}
+
+export namespace AgentEnvironmentFailedWebhookEvent {
+  /**
+   * Identifies the environment whose lifecycle changed.
+   */
+  export interface Data {
+    /**
+     * The ID of the environment.
+     */
+    id: string;
+  }
+}
+
+/**
+ * Sent when a prewarmed OpenAI-hosted environment finishes setup before being
+ * attached to a session.
+ */
+export interface AgentEnvironmentReadyWebhookEvent {
+  /**
+   * The unique ID of the event.
+   */
+  id: string;
+
+  /**
+   * The Unix timestamp, in seconds, when the event was created.
+   */
+  created_at: number;
+
+  /**
+   * Identifies the environment whose lifecycle changed.
+   */
+  data: AgentEnvironmentReadyWebhookEvent.Data;
+
+  /**
+   * The object type. Always `event`.
+   */
+  object: 'event';
+
+  /**
+   * The event type. Always `agent.environment.ready`.
+   */
+  type: 'agent.environment.ready';
+}
+
+export namespace AgentEnvironmentReadyWebhookEvent {
+  /**
+   * Identifies the environment whose lifecycle changed.
+   */
+  export interface Data {
+    /**
+     * The ID of the environment.
+     */
+    id: string;
+  }
+}
+
+/**
  * Sent when an agent session requires an action. Retrieve the session for action
  * details.
  */
@@ -1690,10 +1776,12 @@ export namespace SafetyWarningIssuedWebhookEvent {
 }
 
 /**
- * Sent when an agent session requires an action. Retrieve the session for action
- * details.
+ * Sent when setup fails for a prewarmed OpenAI-hosted environment before it is
+ * attached to a session.
  */
 export type UnwrapWebhookEvent =
+  | AgentEnvironmentFailedWebhookEvent
+  | AgentEnvironmentReadyWebhookEvent
   | AgentSessionActionRequiredWebhookEvent
   | AgentSessionCreatedWebhookEvent
   | AgentSessionFailedWebhookEvent
@@ -1902,6 +1990,8 @@ export interface WebhookCreateParams {
     | 'realtime.call.incoming'
     | 'video.completed'
     | 'video.failed'
+    | 'agent.environment.ready'
+    | 'agent.environment.failed'
     | 'agent.session.created'
     | 'agent.session.action_required'
     | 'agent.session.in_progress'
@@ -1943,6 +2033,8 @@ export interface WebhookUpdateParams {
     | 'realtime.call.incoming'
     | 'video.completed'
     | 'video.failed'
+    | 'agent.environment.ready'
+    | 'agent.environment.failed'
     | 'agent.session.created'
     | 'agent.session.action_required'
     | 'agent.session.in_progress'
@@ -1999,6 +2091,8 @@ export interface WebhookTestParams {
     | 'realtime.call.incoming'
     | 'video.completed'
     | 'video.failed'
+    | 'agent.environment.ready'
+    | 'agent.environment.failed'
     | 'agent.session.created'
     | 'agent.session.action_required'
     | 'agent.session.in_progress'
@@ -2011,6 +2105,8 @@ Webhooks.EventTypes = EventTypes;
 
 export declare namespace Webhooks {
   export {
+    type AgentEnvironmentFailedWebhookEvent as AgentEnvironmentFailedWebhookEvent,
+    type AgentEnvironmentReadyWebhookEvent as AgentEnvironmentReadyWebhookEvent,
     type AgentSessionActionRequiredWebhookEvent as AgentSessionActionRequiredWebhookEvent,
     type AgentSessionCreatedWebhookEvent as AgentSessionCreatedWebhookEvent,
     type AgentSessionFailedWebhookEvent as AgentSessionFailedWebhookEvent,
