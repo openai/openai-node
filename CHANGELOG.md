@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.31.0](https://github.com/openai/openai-node/compare/v7.30.1...v7.31.0) (2026-10-09)
+
+
+### Features
+
+* **api:** add prewarmed hosted environments ([#2898](https://github.com/openai/openai-node/issues/2898)) ([7a0be86](https://github.com/openai/openai-node/commit/7a0be8677196fbd29e565f583a694fedc63524df))
+
 ## [7.30.1](https://github.com/openai/openai-node/compare/v7.30.0...v7.30.1) (2026-10-08)
 
 
