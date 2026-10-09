@@ -7,7 +7,7 @@
   "private": true,
   "dependencies": {
     "@azure/identity": "^4.2.0",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.1",
     "express": "^5.2.1",
     "openai": "file:..",
     "undici": "^8.9.0",

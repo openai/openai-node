@@ -594,6 +594,12 @@ export namespace VideoCreateError {
       | 'other';
 
     /**
+     * An opaque target for explicitly continuing this review, or null when
+     * unavailable.
+     */
+    review_target?: string | null;
+
+    /**
      * An optional public continuation instruction.
      */
     steer?: Misalignment.Steer;

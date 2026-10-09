@@ -90,7 +90,7 @@ describe.each(['OpenAI', 'Azure AD', 'legacy Bedrock'] as const)('%s HTTP creden
       { authorization: 'Bearer synthetic-first' },
       { authorization: 'Bearer synthetic-second' },
     ]);
-    expect(client.apiKey).toBe('synthetic-first');
+    expect(client.apiKey).toBe('synthetic-second');
   });
 });
 

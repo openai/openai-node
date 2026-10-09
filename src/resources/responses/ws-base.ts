@@ -123,6 +123,8 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
    */
   protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
 
+  private _cancelRefresh: (() => void) | undefined;
+
   send(event: ResponsesAPI.ResponsesClientEvent) {
     if (!this.socket) {
       throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
@@ -175,6 +177,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     this._intentionallyClosed = true;
     this._closeCode = props?.code ?? 1000;
     this._closeReason = props?.reason ?? 'OK';
+    this._cancelRefresh?.();
     try {
       this.socket.close(this._closeCode, this._closeReason);
     } catch (err) {
@@ -419,10 +422,13 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     };
   }
 
-  private _connect(): TSocket {
-    this.url = buildURL(this._client, this._parameters ?? {});
+  private _connect(
+    createSocket: (url: URL) => TSocket = (url) => this._createSocket(url, this._authHeaders()),
+    url: URL = buildURL(this._client, this._parameters ?? {}),
+  ): TSocket {
+    this.url = url;
 
-    const socket = this._createSocket(this.url, this._authHeaders());
+    const socket = createSocket(this.url);
 
     socket.on('message', (data: string | ArrayBuffer | ArrayBufferView, isBinary: boolean) => {
       if (isBinary) {
@@ -630,7 +636,22 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
       let closeCodePromise: Promise<number> | undefined;
       try {
         const oldSocket = this.socket;
-        this.socket = this._connect();
+        const url = buildURL(this._client, this._parameters ?? {});
+        const canceled = new Promise<undefined>((resolve) => {
+          this._cancelRefresh = () => resolve(undefined);
+        });
+        let createSocket: ((url: URL) => TSocket) | undefined;
+        try {
+          createSocket = await Promise.race([this._prepareReconnectSocket(), canceled]);
+        } finally {
+          this._cancelRefresh = undefined;
+        }
+        if (!this._canReconnect(closeCode)) {
+          this._isReconnecting = false;
+          this._emitPermanentClose(this._closeCode, this._closeReason);
+          return;
+        }
+        this.socket = this._connect(createSocket, url);
         // Registered synchronously after _connect() and before any
         // await so the code is captured even when ws emits 'close'
         // in the same tick as 'error' (e.g. abortHandshake).
@@ -647,6 +668,15 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
         this._internalEvents._emit('reconnected');
         return;
       } catch {
+        if (this._intentionallyClosed) {
+          // A public close observer may have thrown after lifecycle cleanup.
+          // Only emit here if the reconnect itself had not already closed.
+          if (this._isReconnecting) {
+            this._isReconnecting = false;
+            this._emitPermanentClose(this._closeCode, this._closeReason);
+          }
+          return;
+        }
         if (closeCodePromise) {
           // ws may emit 'error' before 'close', so await the code
           // rather than reading it synchronously.
@@ -720,8 +750,12 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     this._emit('close', code, reason, unsent);
   }
 
-  protected _authHeaders(): Record<string, string> {
-    const apiKey = this._client.apiKey;
+  protected _prepareReconnectSocket(): Promise<(url: URL) => TSocket> {
+    const authHeaders = this._authHeaders();
+    return Promise.resolve((url) => this._createSocket(url, authHeaders));
+  }
+
+  protected _authHeaders(apiKey = this._client.apiKey): Record<string, string> {
     return typeof apiKey === 'string' && apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
   }
 }

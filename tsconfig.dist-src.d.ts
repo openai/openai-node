@@ -1,3 +1,4 @@
+import './tsconfig.dist-src-node';
 // Keep published source navigation independent of consumers installing @types/node.
 // oxlint-disable-next-line unicorn/require-module-specifiers -- keep ambient globals scoped to a module
 export {};
@@ -21,7 +22,8 @@ declare global {
 
   interface BufferConstructor {
     from(input: string, encoding: 'base64' | 'utf-8'): Buffer<ArrayBuffer> & Uint8Array;
-    from(input: ArrayBuffer): Buffer<ArrayBuffer> & Uint8Array;
+    from(input: ArrayBuffer | ArrayLike<number>): Buffer<ArrayBuffer> & Uint8Array;
+    isBuffer(value: unknown): value is Buffer;
     concat(list: readonly Buffer[]): Buffer<ArrayBuffer> & Uint8Array;
   }
 

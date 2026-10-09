@@ -48,7 +48,11 @@ import {
 import * as Uploads from './core/uploads';
 import * as API from './resources/index';
 import { APIPromise } from './core/api-promise';
-import { resolveRealtimeAPIKey } from './internal/realtime-credentials';
+import {
+  getDeferredRealtimeAPIKeyCache,
+  resolveRealtimeAPIKey,
+  validateCapturedAPIKey,
+} from './internal/realtime-credentials';
 import {
   Batch,
   BatchCreateParams,
@@ -73,6 +77,15 @@ import {
   ContentProvenanceCheckCreateParams,
   ContentProvenanceChecks,
 } from './resources/content-provenance-checks';
+import {
+  Decision,
+  DecisionCreateParams,
+  DecisionInputImage,
+  DecisionInputMessage,
+  DecisionInputPart,
+  DecisionInputText,
+  Decisions,
+} from './resources/decisions';
 import {
   CreateEmbeddingResponse,
   Embedding,
@@ -258,6 +271,7 @@ import {
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
+import { mergeWebSocketAuthHeaders, webSocketHeaderRemovals } from './internal/ws';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import { readEnv } from './internal/utils/env';
@@ -490,6 +504,8 @@ export class OpenAI {
   protected idempotencyHeader?: string;
   protected _options: ClientOptions;
   private _provider: ProviderRuntime | undefined;
+  private _apiKeyInvocation = 0;
+  private _lastCachedAPIKeyInvocation = 0;
   private _workloadIdentityAuth?: WorkloadIdentityAuth | X509WorkloadIdentityAuth;
 
   /**
@@ -741,18 +757,33 @@ export class OpenAI {
   }
 
   /** @internal Client request headers for each new WebSocket handshake. */
-  _buildWebSocketHeaders(authHeaders: Record<string, string>): Record<string, string> {
-    return Object.fromEntries(
-      buildHeaders([
-        {
-          'User-Agent': this.getUserAgent(),
-          'OpenAI-Organization': this.organization,
-          'OpenAI-Project': this.project,
-        },
+  _buildWebSocketHeaders(
+    authHeaders: Record<string, string>,
+    removedHeaders?: Set<string>,
+  ): Record<string, string> {
+    const context = webSocketHeaderRemovals.get(this);
+    if (context?.baseHeaders) {
+      return mergeWebSocketAuthHeaders(
+        { headers: context.baseHeaders },
         authHeaders,
-        this._options.defaultHeaders,
-      ]).values,
-    );
+        context.removedHeaders ?? new Set(),
+      ).headers;
+    }
+    const headers = buildHeaders([
+      {
+        'User-Agent': this.getUserAgent(),
+        'OpenAI-Organization': this.organization,
+        'OpenAI-Project': this.project,
+      },
+      authHeaders,
+      this._options.defaultHeaders,
+    ]);
+    headers.nulls.forEach((name) => (removedHeaders ?? context?.removedHeaders)?.add(name));
+    const result = Object.fromEntries(headers.values);
+    if (context) {
+      context.baseHeaders = { ...result };
+    }
+    return result;
   }
 
   protected validateHeaders(
@@ -877,11 +908,8 @@ export class OpenAI {
   }
 
   /**
-   * Resolves a function-based API key and retains the resolved value on this client.
-   * Returns whether a provider was invoked. Internal callers can capture this
-   * invocation's key before another request updates the shared `apiKey` property.
-   * Overrides should forward `capture` or invoke it with their own resolved key
-   * to preserve invocation-local credentials in concurrent requests and Realtime factories.
+   * Resolves and retains a provider key, returning whether a provider was invoked.
+   * Overrides should forward `capture` (or call it with their resolved key) for local credentials.
    * @internal
    */
   async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
@@ -896,6 +924,8 @@ export class OpenAI {
       return false;
     }
 
+    const deferredCache = getDeferredRealtimeAPIKeyCache(this);
+    const invocation = ++this._apiKeyInvocation;
     let token: unknown;
     try {
       token = await apiKey();
@@ -913,8 +943,23 @@ export class OpenAI {
         `Expected 'apiKey' function argument to return a string but it returned ${token}`,
       );
     }
-    this.apiKey = token;
-    capture?.(this.apiKey);
+    const resolvedToken = token;
+    const commit = () => {
+      if (capture) validateCapturedAPIKey(this, resolvedToken);
+      if (invocation < this._lastCachedAPIKeyInvocation) {
+        return resolvedToken;
+      }
+      this.apiKey = resolvedToken;
+      const cached = capture ? this.apiKey : resolvedToken;
+      this._lastCachedAPIKeyInvocation = invocation;
+      return cached;
+    };
+    if (deferredCache) {
+      deferredCache.providerKey = resolvedToken;
+      deferredCache.commit = commit;
+    }
+    const cached = deferredCache ? validateCapturedAPIKey(this, resolvedToken) : commit();
+    capture?.(cached);
     return true;
   }
 
@@ -924,18 +969,54 @@ export class OpenAI {
     defaultBaseURL?: string | undefined,
   ): string {
     const baseURL = (!this.#baseURLOverridden() && defaultBaseURL) || this.baseURL;
-    const url = isAbsoluteURL(path)
-      ? new URL(path)
-      : new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+    let url: URL;
+    let baseQuery: Record<string, string> = {};
+    let baseParams: URLSearchParams | undefined;
+    if (isAbsoluteURL(path)) {
+      url = new URL(path);
+    } else if (baseURL.includes('?')) {
+      const base = new URL(baseURL);
+      baseParams = new URLSearchParams(base.search);
+      baseQuery = Object.fromEntries(baseParams);
+      base.search = '';
+      base.hash = '';
+      url = new URL(
+        base.toString() + (base.pathname.endsWith('/') && path.startsWith('/') ? path.slice(1) : path),
+      );
+    } else {
+      url = new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+    }
 
     const defaultQuery = this.defaultQuery();
     const pathQuery = Object.fromEntries(url.searchParams);
-    if (!isEmptyObj(defaultQuery) || !isEmptyObj(pathQuery)) {
-      query = { ...pathQuery, ...defaultQuery, ...query };
+    let overridingQuery: Record<string, unknown> | undefined;
+    if (!isEmptyObj(baseQuery) || !isEmptyObj(defaultQuery) || !isEmptyObj(pathQuery)) {
+      overridingQuery = { ...pathQuery, ...defaultQuery, ...query };
+      query = { ...baseQuery, ...overridingQuery };
     }
 
     if (typeof query === 'object' && query && !Array.isArray(query)) {
       url.search = this.stringifyQuery(query);
+      if (baseParams && overridingQuery) {
+        const seen = new Set<string>();
+        const repeated = new Set<string>();
+        for (const key of baseParams.keys()) {
+          if (seen.has(key) && !hasOwn(overridingQuery, key)) {
+            repeated.add(key);
+          }
+          seen.add(key);
+        }
+        if (repeated.size) {
+          const merged = new URLSearchParams();
+          for (const [key, value] of url.searchParams) {
+            if (!repeated.has(key)) merged.append(key, value);
+          }
+          for (const [key, value] of baseParams) {
+            if (repeated.has(key)) merged.append(key, value);
+          }
+          url.search = merged.toString();
+        }
+      }
     }
 
     return url.toString();
@@ -2347,6 +2428,7 @@ export class OpenAI {
   static toFile = Uploads.toFile;
   static toStreamingFile = Uploads.toStreamingFile;
 
+  decisions: API.Decisions = new API.Decisions(this);
   /**
    * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
    */
@@ -2411,6 +2493,7 @@ export class OpenAI {
   videos: API.Videos = new API.Videos(this);
 }
 
+OpenAI.Decisions = Decisions;
 OpenAI.Completions = Completions;
 OpenAI.Chat = Chat;
 OpenAI.Embeddings = Embeddings;
@@ -2533,6 +2616,16 @@ export declare namespace OpenAI {
   export { type TokenPageParams as TokenPageParams, type TokenPageResponse as TokenPageResponse };
 
   export {
+    Decisions as Decisions,
+    type Decision as Decision,
+    type DecisionInputImage as DecisionInputImage,
+    type DecisionInputMessage as DecisionInputMessage,
+    type DecisionInputPart as DecisionInputPart,
+    type DecisionInputText as DecisionInputText,
+    type DecisionCreateParams as DecisionCreateParams,
+  };
+
+  export {
     Completions as Completions,
     type Completion as Completion,
     type CompletionChoice as CompletionChoice,
@@ -2599,10 +2692,10 @@ export declare namespace OpenAI {
 
   export {
     Files as Files,
-    type FileContent as FileContent,
     type FileDeleted as FileDeleted,
     type FileObject as FileObject,
     type FilePurpose as FilePurpose,
+    type FileContent as FileContent,
     type FileObjectsPage as FileObjectsPage,
     type FileCreateParams as FileCreateParams,
     type FileListParams as FileListParams,

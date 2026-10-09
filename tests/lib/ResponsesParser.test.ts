@@ -35,6 +35,7 @@ function makeResponse(status: Response['status'], text: string): Response {
     metadata: null,
     model: 'gpt-5.4-mini',
     object: 'response',
+    access_programs: null,
     output: [
       {
         id: 'msg_123',

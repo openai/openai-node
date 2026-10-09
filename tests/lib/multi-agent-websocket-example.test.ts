@@ -25,6 +25,7 @@ function terminalEvent(status: TerminalStatus): TerminalEvent {
   const response: BetaResponse = {
     id: 'resp_example',
     object: 'response',
+    access_programs: null,
     created_at: 1,
     status,
     error: status === 'failed' ? { code: 'server_error', message: 'Synthetic server failure' } : null,

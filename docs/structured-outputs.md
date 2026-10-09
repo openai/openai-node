@@ -42,6 +42,11 @@ if (response.output_parsed) {
 output. For example, incomplete responses are left unparsed so their status and `incomplete_details` remain
 available.
 
+Responses helpers parse message text only when `phase` is `final_answer`, missing, or `null`.
+Other phases, including `commentary`, keep their original text with `parsed: null` and cannot
+be selected as `output_parsed`. This also applies to `responses.stream().finalResponse()`,
+including streams retrieved by response ID. Final answers still undergo normal schema validation.
+
 The Zod helpers support schemas imported from `zod/v3`, `zod/v4`, and `zod/v4-mini`. Use the import that
 matches the Zod version in your application.
 
@@ -85,6 +90,23 @@ for (const item of response.output) {
 The helper generates `strict: true` and validates the arguments. It does not execute the function or send the
 result back to the model. See the [tools guide](tools.md) for the complete Responses API tool loop and the
 [Structured Outputs tools example](../examples/responses/structured-outputs-tools.ts).
+
+To defer a function until tool search discovers it, pass `defer_loading` directly to
+`zodResponsesFunction()` or `standardResponsesFunction()`. The returned tool retains its argument parser
+for both `responses.parse()` and `responses.stream()`:
+
+```ts
+const lookup = zodResponsesFunction({
+  name: 'lookup_item',
+  parameters: z.object({ item_id: z.string() }),
+  defer_loading: true,
+});
+const response = await client.responses.parse({
+  model: MODEL,
+  input: 'Look up item A123.',
+  tools: [{ type: 'tool_search' }, lookup],
+});
+```
 
 ## Standard Schema validators
 

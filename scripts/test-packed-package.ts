@@ -99,6 +99,8 @@ const packedPackagePath = require('node:path');
   const requiresOptionalPeer = (source: string): boolean =>
     (source.startsWith('_vendor/zod-to-json-schema/') && !standaloneZodParsers.has(source)) ||
     source === 'helpers/zod.ts' ||
+    source === 'helpers/beta/agents/zod.ts' ||
+    source === 'helpers/beta/agents/filesystem.ts' ||
     source === 'helpers/audio.ts' ||
     source === 'providers/bedrock/aws.ts' ||
     source === 'auth/x509-transport.ts' ||
@@ -195,9 +197,21 @@ const packedPackagePath = require('node:path');
       websocketPeer,
       [
         "declare module 'ws' {",
+        '  interface TLSBuffer extends ArrayLike<number> {',
+        '    readonly buffer: ArrayBufferLike;',
+        '    readonly byteLength: number;',
+        '    readonly byteOffset: number;',
+        '  }',
         '  export interface ClientOptions {',
+        '    ca?: string | TLSBuffer | (string | TLSBuffer)[] | undefined;',
+        '    cert?: string | TLSBuffer | (string | TLSBuffer)[] | undefined;',
+        '    crl?: string | TLSBuffer | (string | TLSBuffer)[] | undefined;',
+        '    key?: string | TLSBuffer | (string | TLSBuffer | { pem: string | TLSBuffer; passphrase?: string | undefined })[] | undefined;',
+        '    pfx?: string | TLSBuffer | (string | TLSBuffer | { buf: string | TLSBuffer; passphrase?: string | undefined })[] | undefined;',
         '    followRedirects?: boolean | undefined;',
         '    headers?: Record<string, string> | undefined;',
+        '    maxPayload?: number | undefined;',
+        '    perMessageDeflate?: boolean | object | undefined;',
         '  }',
         '  export class WebSocket {',
         '    constructor(address: string | URL, options?: ClientOptions);',
@@ -665,6 +679,16 @@ const packedPackagePath = require('node:path');
       '--eval',
       "import OpenAI from 'openai'; new OpenAI({ apiKey: 'synthetic-browser-api-key', dangerouslyAllowBrowser: true });",
     ]);
+    fs.symlinkSync(
+      path.join(root, 'node_modules/ws'),
+      path.join(temporaryDirectory, 'node_modules/ws'),
+      'dir',
+    );
+    fs.copyFileSync(
+      path.join(root, 'scripts/fixtures/responses-ws-module-formats.cjs'),
+      path.join(temporaryDirectory, 'responses-ws-module-formats.cjs'),
+    );
+    run(process.execPath, ['--test', 'responses-ws-module-formats.cjs']);
     fs.symlinkSync(path.join(root, 'node_modules/undici'), optionalUndici, 'dir');
     for (const [inputType, consumer] of [
       [

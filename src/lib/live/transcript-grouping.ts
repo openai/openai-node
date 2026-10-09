@@ -124,10 +124,11 @@ export class TranscriptGrouping {
   }
 
   advance(timeMs: number, hasIncomingUser = false): GroupingUpdate[] {
+    // Compare against deadline()'s sums so fractional deadlines remain reachable.
     if (
       this.current &&
       this.buffered &&
-      timeMs - this.current.endMs >= this.options.minTurnSeparationMs &&
+      timeMs >= this.current.endMs + this.options.minTurnSeparationMs &&
       !this.keepBackchannel(timeMs)
     ) {
       this.buffered = this.maybeDropBackchannel(timeMs);
@@ -138,7 +139,7 @@ export class TranscriptGrouping {
     if (
       this.current?.speaker === 'assistant' &&
       !hasIncomingUser &&
-      timeMs - this.current.endMs >= this.options.assistantSilenceMs
+      timeMs >= this.current.endMs + this.options.assistantSilenceMs
     ) {
       return this.finishCurrent('inactivity');
     }
@@ -339,7 +340,7 @@ export class TranscriptGrouping {
       this.buffered?.canDropAsBackchannel === true &&
       !this.userContinued() &&
       !this.recentAssistant() &&
-      timeMs - this.buffered.endMs < this.options.backchannelIsolationMs
+      timeMs < this.buffered.endMs + this.options.backchannelIsolationMs
     );
   }
 
@@ -353,12 +354,12 @@ export class TranscriptGrouping {
     if (this.recentAssistant()) {
       return this.buffered;
     }
-    if (next && next.startMs - this.buffered.endMs < this.options.backchannelIsolationMs) {
+    if (next && next.startMs < this.buffered.endMs + this.options.backchannelIsolationMs) {
       return this.buffered;
     }
     if (
       !next &&
-      (timeMs === undefined || timeMs - this.buffered.endMs < this.options.backchannelIsolationMs)
+      (timeMs === undefined || timeMs < this.buffered.endMs + this.options.backchannelIsolationMs)
     ) {
       return this.buffered;
     }

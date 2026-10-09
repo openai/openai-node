@@ -14,7 +14,7 @@ describe('resource speech', () => {
     await client.audio.speech.create({
       input: 'input',
       model: 'tts-1',
-      voice: 'alloy',
+      voice: 'ash',
       instructions: 'instructions',
       response_format: 'mp3',
       speed: 0.25,

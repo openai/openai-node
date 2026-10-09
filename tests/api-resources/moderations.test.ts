@@ -23,7 +23,7 @@ describe('resource moderations', () => {
   test('create: required and optional params', async () => {
     await client.moderations.create({
       input: 'I want to kill them.',
-      model: 'omni-moderation-latest',
+      model: 'omni-moderation-2024-09-26',
     });
   });
 });

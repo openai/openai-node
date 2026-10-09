@@ -28,6 +28,7 @@ import type {
   ChatCompletionTokenLogprob,
 } from '../resources/chat/completions/completions';
 import { Stream } from '../streaming';
+import { normalizeChatCompletionChunk, type ChatCompletionWireChunk } from './chat-completions/streaming';
 import { AbstractChatCompletionRunner } from './AbstractChatCompletionRunner';
 import type { AbstractChatCompletionRunnerEvents, RunnerOptions } from './AbstractChatCompletionRunner';
 import type {
@@ -211,7 +212,7 @@ type ChatCompletionReadableStreamMessageChunk = Pick<ChatCompletionChunk, 'id' |
 
 /** A raw completion chunk or serialized message preserved in a transportable stream. */
 export type ChatCompletionReadableStreamItem =
-  | ChatCompletionChunk
+  | ChatCompletionWireChunk
   | ChatCompletionReadableStreamMessage
   | ChatCompletionReadableStreamMessageChunk;
 
@@ -1855,7 +1856,7 @@ export class ChatCompletionStream<ParsedT = null>
         continue;
       }
 
-      const chunk = item;
+      const chunk = normalizeChatCompletionChunk(item);
 
       if (chatId && chunk.id && chatId !== chunk.id) {
         // A new request has been made.
@@ -1915,7 +1916,13 @@ export class ChatCompletionStream<ParsedT = null>
 
       let choice = snapshot.choices[index];
       if (!choice) {
-        const newChoice = { finish_reason, index, message: {}, logprobs: null, ...other };
+        const newChoice = {
+          finish_reason: finish_reason ?? null,
+          index,
+          message: {},
+          logprobs: null,
+          ...other,
+        };
         snapshot.choices[index] = newChoice;
         choice = newChoice;
       }

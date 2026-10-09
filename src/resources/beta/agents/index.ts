@@ -3,6 +3,9 @@
 export {
   Agents,
   type Agent,
+  type AgentBrowserAuthenticationCancelParam,
+  type AgentBrowserAuthenticationSubmitParam,
+  type AgentBrowserOriginAccessParam,
   type AgentCloseSubagentCallItem,
   type AgentCommandExecutionItem,
   type AgentContent,
@@ -107,7 +110,13 @@ export {
   type AgentSessionItemsPage,
   type AgentsPage,
 } from './agents';
-export { Environments, type EnvironmentInfo } from './environments/index';
+export {
+  Environments,
+  type EnvironmentInfo,
+  type EnvironmentCreateParams,
+  type EnvironmentListParams,
+  type EnvironmentInfosPage,
+} from './environments/index';
 export {
   Sessions,
   type SessionCreateParams,

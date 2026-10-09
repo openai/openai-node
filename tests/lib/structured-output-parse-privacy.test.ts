@@ -147,6 +147,7 @@ function makeResponse(
     metadata: null,
     model: 'gpt-test',
     object: 'response',
+    access_programs: null,
     output:
       args === undefined
         ? [

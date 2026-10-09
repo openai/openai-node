@@ -1,3 +1,22 @@
+# Contributing
+
+## Contribution policy
+
+We welcome bug reports, feature requests, minimal reproductions, and root-cause
+analysis through [GitHub issues](https://github.com/openai/openai-node/issues).
+
+**Pull requests are limited to repository collaborators. We do not accept pull
+requests from non-collaborators**, including documentation or example changes.
+If you are not a collaborator, please open an issue instead of preparing a pull
+request. Include the affected version, expected and actual behavior, and a small,
+sanitized reproduction when applicable.
+
+Report suspected security vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md), rather than in issues or pull requests.
+
+The development and pull request instructions below are for maintainers and
+repository collaborators.
+
 ## Setting up the environment
 
 This repository uses the [`pnpm`](https://pnpm.io/installation) version pinned by `package.json`.
@@ -234,8 +253,10 @@ To save the machine-readable Vitest benchmark report:
 $ pnpm bench:json
 ```
 
-This writes `benchmark-results.json` in the repository root. The report is ignored
-by Git and uploaded as an artifact by the performance-benchmark job in normal CI.
+This writes `benchmark-results.json` in the repository root using the Vitest JSON
+reporter. Benchmark measurements are in each test case's `benchmarks` field; reports
+from Vitest 4 use a different schema. The report is ignored by Git and uploaded as
+an artifact by the performance-benchmark job in normal CI.
 The separate, manually triggered or scheduled benchmark workflow also uploads a
 runtime, runner, revision, and fixture-hash metadata file. Pass a benchmark name
 or file filter directly to run only part of the suite, for example:

@@ -240,7 +240,7 @@ export interface ScoreModelGrader {
   type: 'score_model';
 
   /**
-   * The range of the score. Defaults to `[0, 1]`.
+   * The service requires two numbers for the score range. Defaults to `[0, 1]`.
    */
   range?: Array<number>;
 

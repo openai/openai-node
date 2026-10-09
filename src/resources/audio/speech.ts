@@ -26,7 +26,7 @@ export class Speech extends APIResource {
    * const speech = await client.audio.speech.create({
    *   input: 'input',
    *   model: 'tts-1',
-   *   voice: 'alloy',
+   *   voice: 'ash',
    * });
    *
    * const content = await speech.blob();
@@ -69,6 +69,7 @@ export interface SpeechCreateParams {
    * object with an `id`, for example `{ "id": "voice_1234" }`. Previews of the
    * voices are available in the
    * [Text to speech guide](https://developers.openai.com/api/docs/guides/text-to-speech#voice-options).
+   * Custom voices must be created from audio samples.
    */
   voice:
     | string
@@ -82,6 +83,9 @@ export interface SpeechCreateParams {
     | 'verse'
     | 'marin'
     | 'cedar'
+    | 'fable'
+    | 'onyx'
+    | 'nova'
     | SpeechCreateParams.ID;
 
   /**

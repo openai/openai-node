@@ -23,3 +23,20 @@ type _ReadableStream<R = any> = NeverToAny<
 >;
 
 export type { _ReadableStream as ReadableStream };
+
+/** @ts-ignore */
+type _DOMWritableStream<R = any> = globalThis.WritableStream<R>;
+
+/** @ts-ignore */
+type _NodeWritableStream<R = any> = import('stream/web').WritableStream<R>;
+
+type _ConditionalNodeWritableStream<R = any> = typeof globalThis extends { WritableStream: any }
+  ? never
+  : _NodeWritableStream<R>;
+
+type _WritableStream<R = any> = NeverToAny<
+  | ([0] extends [1 & _DOMWritableStream<R>] ? never : _DOMWritableStream<R>)
+  | ([0] extends [1 & _ConditionalNodeWritableStream<R>] ? never : _ConditionalNodeWritableStream<R>)
+>;
+
+export type { _WritableStream as WritableStream };

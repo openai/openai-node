@@ -166,6 +166,7 @@ Types:
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceOptions</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceShell</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolChoiceTypes</a></code>
+- <code><a href="./src/resources/responses/responses.ts">ToolSearchOutputNamespaceTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">ToolSearchTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">WebSearchPreviewTool</a></code>
 - <code><a href="./src/resources/responses/responses.ts">WebSearchTool</a></code>

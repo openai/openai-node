@@ -66,6 +66,7 @@ function completed(responseID: string, output: Response['output'] = []): Respons
     response: {
       id: responseID,
       object: 'response',
+      access_programs: null,
       created_at: 1,
       status: 'completed',
       error: null,

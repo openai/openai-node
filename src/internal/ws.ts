@@ -1,6 +1,7 @@
 import { concatBytes, encodeUTF8 } from './utils/bytes';
 import { OpenAIError } from '../core/error';
 import type { WebSocketLike } from './ws-adapter';
+import type { OpenAI } from '../client';
 
 const webSocketErrors = new WeakMap<WebSocketLike, Error>();
 
@@ -73,7 +74,7 @@ export type ReconnectingOverrides<Parameters = Record<string, unknown>> =
  */
 export type RawWebSocketData = string | ArrayBufferLike | ArrayBufferView | ArrayBufferView[];
 
-interface CredentialedWebSocketOptions {
+export interface CredentialedWebSocketOptions {
   auth?: string | null | undefined;
   followRedirects?: boolean | undefined;
   headers?: object | null | undefined;
@@ -99,19 +100,57 @@ const REDIRECT_SAFE_WEBSOCKET_HEADERS = new Set([
   'x-trace-id',
 ]);
 
+const WEBSOCKET_METADATA_HEADER_NAMES = new Set([
+  'accept',
+  'accept-encoding',
+  'accept-language',
+  'content-type',
+  'x-request-id',
+  'x-client-request-id',
+  'x-correlation-id',
+  'traceparent',
+  'tracestate',
+  'sentry-trace',
+  'x-amzn-trace-id',
+  'x-cloud-trace-context',
+  'x-datadog-trace-id',
+  'x-datadog-parent-id',
+  'x-datadog-sampling-priority',
+  'x-datadog-origin',
+  'x-datadog-tags',
+  'baggage',
+  'b3',
+]);
+
+// Request and tracing metadata do not authenticate a Responses socket, but remain protected on redirects.
+export const WEBSOCKET_METADATA_HEADERS = {
+  has: (name: string, values: readonly unknown[]): boolean =>
+    WEBSOCKET_METADATA_HEADER_NAMES.has(name) ||
+    name.startsWith('x-b3-') ||
+    (name === 'sec-websocket-protocol' &&
+      !values.some(
+        (value) =>
+          typeof value === 'string' &&
+          value.split(',').some((protocol) => protocol.trim().startsWith('openai-insecure-api-key.')),
+      )),
+};
+
 function isWebSocketCredentialHeader(name: string): boolean {
   return !REDIRECT_SAFE_WEBSOCKET_HEADERS.has(name.toLowerCase().split('_').join('-'));
 }
 
 /**
  * Snapshots credential values in final socket options before validation and dispatch.
- * Reports potential caller authentication, including custom headers; the server
- * remains responsible for validating credentials. Noncredential headers are left intact.
+ * Reports potential caller authentication, excluding additional metadata when requested.
+ * The server remains responsible for validating credentials. Noncredential headers are left intact.
  */
-export function snapshotWebSocketCredentials(options: {
-  auth?: unknown;
-  headers?: Record<string, unknown> | undefined;
-}): boolean {
+export function snapshotWebSocketCredentials(
+  options: {
+    auth?: unknown;
+    headers?: Record<string, unknown> | undefined;
+  },
+  metadataHeaders?: { has: (name: string, values: readonly unknown[]) => boolean },
+): boolean {
   if (options.auth !== null && options.auth !== undefined) {
     options.auth = String(options.auth);
   }
@@ -135,16 +174,105 @@ export function snapshotWebSocketCredentials(options: {
     }
     headers[name] = snapshot;
     const values = Array.isArray(snapshot) ? snapshot : [snapshot];
-    credentials.set(
-      name.toLowerCase(),
-      values.some((item) => typeof item === 'string' && item.trim().length > 0),
-    );
+    if (!metadataHeaders?.has(normalizedName, values)) {
+      credentials.set(
+        name.toLowerCase(),
+        values.some((item) => typeof item === 'string' && item.trim().length > 0),
+      );
+    }
   }
   // Node applies header names case-insensitively, and Authorization overrides Basic auth.
   return (
     [...credentials.values()].some(Boolean) ||
     (!credentials.has('authorization') && typeof options.auth === 'string' && options.auth.trim().length > 0)
   );
+}
+
+/** Merge transport authentication before explicit caller overrides and header removals. */
+export function mergeWebSocketAuthHeaders<Options extends CredentialedWebSocketOptions>(
+  options: Options,
+  authHeaders: Record<string, string>,
+  removedHeaders: ReadonlySet<string>,
+) {
+  const headers = new Map(Object.entries(authHeaders).map(([name, value]) => [name.toLowerCase(), value]));
+  for (const name of removedHeaders) {
+    headers.delete(name);
+  }
+  for (const [name, value] of Object.entries(options.headers ?? {})) {
+    headers.set(name, value);
+  }
+  return { ...options, headers: Object.fromEntries(headers) };
+}
+
+/** Removal sink for one synchronous header-hook call, including legacy one-argument overrides. */
+export const webSocketHeaderRemovals = new WeakMap<
+  OpenAI,
+  { removedHeaders: Set<string> | undefined; baseHeaders: Record<string, string> | undefined }
+>();
+const preparedWebSocketHeaders = new WeakMap<
+  object,
+  { baseHeaders: Record<string, string> | undefined; transportHeaders: Map<string, boolean> }
+>();
+
+/** Build a WebSocket handshake with explicit caller headers applied after the client defaults. */
+export function buildWebSocketOptions<Options extends Pick<CredentialedWebSocketOptions, 'headers'>>(
+  client: OpenAI,
+  authHeaders: Record<string, string>,
+  options: Options | null | undefined,
+  removedHeaders?: Set<string>,
+  usePreparedHeaders = false,
+) {
+  // Capture the base result even through older overrides that forward only one argument.
+  const previous = webSocketHeaderRemovals.get(client);
+  const prepared = usePreparedHeaders && options ? preparedWebSocketHeaders.get(options) : undefined;
+  const context: NonNullable<ReturnType<typeof webSocketHeaderRemovals.get>> = {
+    removedHeaders,
+    baseHeaders: prepared?.baseHeaders,
+  };
+  webSocketHeaderRemovals.set(client, context);
+  let headers: Map<string, string>;
+  try {
+    headers = new Map(
+      Object.entries(client._buildWebSocketHeaders(authHeaders, removedHeaders)).map(([name, value]) => [
+        name.toLowerCase(),
+        value,
+      ]),
+    );
+  } finally {
+    if (previous) {
+      webSocketHeaderRemovals.set(client, previous);
+    } else {
+      webSocketHeaderRemovals.delete(client);
+    }
+  }
+  // The first hook output is not a caller override of the final, credentialed hook.
+  // Save transport names and explicit nulls separately, then reuse their validated values.
+  const transportHeaders = new Map<string, boolean>();
+  const currentHeaders = new Map(Object.entries(options?.headers ?? {}));
+  const overrides = prepared
+    ? [...prepared.transportHeaders].map(
+        ([name, removed]) => [name, removed ? null : currentHeaders.get(name)] as const,
+      )
+    : currentHeaders;
+  for (const [name, value] of overrides) {
+    const normalizedName = name.toLowerCase();
+    if (value === null) {
+      headers.delete(normalizedName);
+      removedHeaders?.add(normalizedName);
+      transportHeaders.set(normalizedName, true);
+    } else if (value !== undefined) {
+      headers.set(normalizedName, value);
+      removedHeaders?.delete(normalizedName);
+      transportHeaders.set(normalizedName, false);
+    }
+  }
+  const result = {
+    ...options,
+    headers: Object.fromEntries(headers),
+    followRedirects: false,
+  };
+  preparedWebSocketHeaders.set(result, { baseHeaders: context.baseHeaders, transportHeaders });
+  return result;
 }
 
 /** Prevents WebSocket redirects from forwarding caller or SDK credentials to another origin. */
@@ -299,16 +427,18 @@ export class SendQueue<T = unknown> {
   /**
    * Send every queued message via `send`. If `send` throws, the failing
    * message and all subsequent messages are re-queued and the error is
-   * re-thrown so the caller can report it.
+   * re-thrown so the caller can report it. Endpoints that cannot safely replay
+   * an attempted write use `requeueFailed: false`. Never-attempted messages
+   * remain queued, including messages enqueued during the failed send.
    */
-  flush(send: (data: RawWebSocketData) => void): void {
+  flush(send: (data: RawWebSocketData) => void, options?: { requeueFailed?: boolean }): void {
     const pending = this._queue.splice(0);
     this._bytes = 0;
     for (let i = 0; i < pending.length; i++) {
       try {
         send(pending[i]!.data);
       } catch (err) {
-        const remaining = pending.slice(i);
+        const remaining = pending.slice(options?.requeueFailed === false ? i + 1 : i);
         this._queue = [...remaining, ...this._queue];
         this._bytes = this._queue.reduce((sum, item) => sum + item.byteLength, 0);
         throw err;
