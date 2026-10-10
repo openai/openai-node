@@ -592,6 +592,7 @@ Methods:
 
 - <code title="post /vaults">client.beta.agents.vaults.<a href="./src/resources/beta/agents/vaults/vaults.ts">create</a>({ ...params }) -> Vault</code>
 - <code title="get /vaults/{vault_id}">client.beta.agents.vaults.<a href="./src/resources/beta/agents/vaults/vaults.ts">retrieve</a>(vaultID) -> Vault</code>
+- <code title="post /vaults/{vault_id}">client.beta.agents.vaults.<a href="./src/resources/beta/agents/vaults/vaults.ts">update</a>(vaultID, { ...params }) -> Vault</code>
 - <code title="get /vaults">client.beta.agents.vaults.<a href="./src/resources/beta/agents/vaults/vaults.ts">list</a>({ ...params }) -> VaultsPage</code>
 - <code title="delete /vaults/{vault_id}">client.beta.agents.vaults.<a href="./src/resources/beta/agents/vaults/vaults.ts">delete</a>(vaultID) -> VaultDeleted</code>
 

@@ -322,7 +322,7 @@ export class Credentials extends APIResource {
   ): PagePromise<CredentialsPage, Credential> {
     const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ['after', 'limit', 'order', 'status'],
+      ['after', 'limit', 'metadata', 'order', 'status'],
       options,
     );
     if (normalizeRequestOptionsForQueryOptions !== undefined) {
@@ -1044,6 +1044,14 @@ export interface CredentialListParams extends Omit<CursorPageParams, 'limit'> {
    * between 1 and 100.
    */
   limit?: number | null;
+
+  /**
+   * Exact string matches supplied as `metadata[key]=value`. All supplied pairs must
+   * match. Up to 16 pairs, with keys from 1 to 64 characters and values up to 512
+   * characters. Filtering is eventually consistent; metadata changes may take time
+   * to appear.
+   */
+  metadata?: { [key: string]: string };
 
   /**
    * Sort order by the `created_at` timestamp. Use `asc` for ascending order or

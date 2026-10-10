@@ -188,6 +188,31 @@ export class Vaults extends APIResource {
   }
 
   /**
+   * Updates the name or metadata of an active vault. Omitted fields remain
+   * unchanged. See
+   * [vaults](https://developers.openai.com/api/docs/guides/agents-api/tools/vaults).
+   *
+   * @example
+   * ```ts
+   * const vault = await client.beta.agents.vaults.update(
+   *   'vault_id',
+   *   { name: 'Research vault' },
+   * );
+   * ```
+   */
+  update(vaultID: string, body: VaultUpdateParams, options?: RequestOptions): APIPromise<Vault> {
+    return this._client.post(
+      path`/vaults/${vaultID}`,
+      resolveResourceRequestOptions(options, (options) => ({
+        body,
+        ...options,
+        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+        __security: { bearerAuth: true },
+      })),
+    );
+  }
+
+  /**
    * Lists vaults using ID-based pagination. See
    * [vaults](https://developers.openai.com/api/docs/guides/agents-api/tools/vaults).
    *
@@ -287,7 +312,7 @@ export class Vaults extends APIResource {
   ): PagePromise<VaultsPage, Vault> {
     const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ['after', 'limit', 'order', 'status'],
+      ['after', 'limit', 'metadata', 'order', 'status'],
       options,
     );
     if (normalizeRequestOptionsForQueryOptions !== undefined) {
@@ -407,12 +432,34 @@ export interface VaultCreateParams {
   name?: string;
 }
 
+export interface VaultUpdateParams {
+  /**
+   * Replaces all metadata. Omit to leave unchanged, or pass {} to clear it. Up to 16
+   * string key-value pairs, with keys up to 64 and values up to 512 characters.
+   */
+  metadata?: { [key: string]: string };
+
+  /**
+   * A replacement name. Omit to leave unchanged, or pass null to clear it. The name
+   * is trimmed before storage. It must contain 1 to 256 UTF-8 bytes after trimming.
+   */
+  name?: string | null;
+}
+
 export interface VaultListParams extends Omit<CursorPageParams, 'limit'> {
   /**
    * The maximum number of resources to return. Defaults to 20. Values are clamped
    * between 1 and 100.
    */
   limit?: number | null;
+
+  /**
+   * Exact string matches supplied as `metadata[key]=value`. All supplied pairs must
+   * match. Up to 16 pairs, with keys from 1 to 64 characters and values up to 512
+   * characters. Filtering is eventually consistent; metadata changes may take time
+   * to appear.
+   */
+  metadata?: { [key: string]: string };
 
   /**
    * Sort order by the `created_at` timestamp. Use `asc` for ascending order or
@@ -440,6 +487,7 @@ export declare namespace Vaults {
     type VaultStatusFilter as VaultStatusFilter,
     type VaultsPage as VaultsPage,
     type VaultCreateParams as VaultCreateParams,
+    type VaultUpdateParams as VaultUpdateParams,
     type VaultListParams as VaultListParams,
   };
 
