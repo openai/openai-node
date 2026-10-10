@@ -134,6 +134,7 @@ export {
   type VaultStatus,
   type VaultStatusFilter,
   type VaultCreateParams,
+  type VaultUpdateParams,
   type VaultListParams,
   type VaultsPage,
 } from './vaults/index';
