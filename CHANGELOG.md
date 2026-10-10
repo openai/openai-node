@@ -1,5 +1,20 @@
 # Changelog
 
+## [7.33.0](https://github.com/openai/openai-node/compare/v7.32.0...v7.33.0) (2026-10-10)
+
+
+### Features
+
+* **api:** add billing_not_active session error code ([#2911](https://github.com/openai/openai-node/issues/2911)) ([ee3f743](https://github.com/openai/openai-node/commit/ee3f743a0cc375bcb8b447e1095840987d6b3f42))
+* **api:** add vault updates and metadata filters ([#2906](https://github.com/openai/openai-node/issues/2906)) ([1bbc425](https://github.com/openai/openai-node/commit/1bbc425c836eca65222e7a3a2e79e53a6881ce9c))
+
+
+### Chores
+
+* **api:** clarify Decisions question and answer descriptions ([#2910](https://github.com/openai/openai-node/issues/2910)) ([b5c7300](https://github.com/openai/openai-node/commit/b5c73007569ec7aa3654a35e6693e8725a40545a))
+* **api:** document 128-character safety identifiers ([#2909](https://github.com/openai/openai-node/issues/2909)) ([75a6810](https://github.com/openai/openai-node/commit/75a681079f07d0aaaffb88a79b637abf67b8db7a))
+* **api:** document Files API rate-limit responses ([#2908](https://github.com/openai/openai-node/issues/2908)) ([250b6ac](https://github.com/openai/openai-node/commit/250b6ac955a14a068607aa896249781cf0f46637))
+
 ## [7.32.0](https://github.com/openai/openai-node/compare/v7.31.0...v7.32.0) (2026-10-09)
 
 
