@@ -117,7 +117,8 @@ export namespace Decision {
   }
 
   /**
-   * The host may decline one question without disclosing its refusal score.
+   * The model declined to answer this question. Other questions in the same request
+   * can still receive answers.
    */
   export interface AnswerResourceRefusal {
     name: string | null;
@@ -198,10 +199,10 @@ export interface DecisionInputText {
 
 export interface DecisionCreateParams {
   /**
-   * Shared evidence, as a string or an array of user messages containing text and
-   * inline images. Non-user roles, function calls, function-call outputs, files,
-   * audio, and item references are not supported. At most 128 image parts are
-   * allowed across all messages in one request.
+   * The text or images to evaluate for every question. Provide a text string or user
+   * messages containing text and inline images. Images must be inline data URLs; at
+   * most 128 images are allowed across all messages in one request. External URLs,
+   * files, audio, tools, and item references are not supported.
    */
   input: string | Array<DecisionInputMessage>;
 
@@ -221,6 +222,9 @@ export interface DecisionCreateParams {
 }
 
 export namespace DecisionCreateParams {
+  /**
+   * Estimate how likely it is that a statement about the input is true.
+   */
   export interface QuestionParamPredicate {
     instructions: string;
 
@@ -232,6 +236,9 @@ export namespace DecisionCreateParams {
     name?: string;
   }
 
+  /**
+   * Choose from the supplied options based on the input.
+   */
   export interface QuestionParamChoice {
     choices: Array<QuestionParamChoice.Choice>;
 
@@ -256,6 +263,9 @@ export namespace DecisionCreateParams {
     }
   }
 
+  /**
+   * Rate the input against the supplied ordered levels.
+   */
   export interface QuestionParamScore {
     instructions: string;
 
