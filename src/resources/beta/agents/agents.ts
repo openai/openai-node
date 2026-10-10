@@ -28,6 +28,7 @@ import {
   VaultListParams,
   VaultStatus,
   VaultStatusFilter,
+  VaultUpdateParams,
   Vaults,
   VaultsPage,
 } from './vaults/vaults';
@@ -5678,6 +5679,7 @@ export declare namespace Agents {
     type VaultStatusFilter as VaultStatusFilter,
     type VaultsPage as VaultsPage,
     type VaultCreateParams as VaultCreateParams,
+    type VaultUpdateParams as VaultUpdateParams,
     type VaultListParams as VaultListParams,
   };
 

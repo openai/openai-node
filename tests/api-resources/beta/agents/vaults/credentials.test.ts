@@ -117,6 +117,7 @@ describe('resource credentials', () => {
         {
           after: 'after',
           limit: 0,
+          metadata: { foo: 'string' },
           order: 'asc',
           status: 'active',
         },

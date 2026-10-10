@@ -44,6 +44,17 @@ describe('resource vaults', () => {
     expect(dataAndResponse.response).toBe(rawResponse);
   });
 
+  test('update', async () => {
+    const responsePromise = client.beta.agents.vaults.update('vault_id', {});
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
   test('list', async () => {
     const responsePromise = client.beta.agents.vaults.list();
     const rawResponse = await responsePromise.asResponse();
@@ -62,6 +73,7 @@ describe('resource vaults', () => {
         {
           after: 'after',
           limit: 0,
+          metadata: { foo: 'string' },
           order: 'asc',
           status: 'active',
         },
