@@ -1089,19 +1089,7 @@ export namespace AuditLogListResponse {
         | ExternalStorageAPI.AwsExternalStorageProvider
         | ExternalStorageAPI.AzureExternalStorageProvider
         | ExternalStorageAPI.GcpExternalStorageProvider
-        | Data.Oci;
-    }
-
-    export namespace Data {
-      export interface Oci {
-        bucket: string;
-
-        region: string;
-
-        tenancy_ocid: string;
-
-        type: 'oci';
-      }
+        | ExternalStorageAPI.OciExternalStorageProvider;
     }
   }
 

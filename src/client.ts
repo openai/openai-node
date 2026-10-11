@@ -5,6 +5,7 @@ import type { HTTPMethod, PromiseOrValue, MergedRequestInit, FinalizedRequestIni
 import { uuid4 } from './internal/utils/uuid';
 import { validatePositiveInteger, isAbsoluteURL, safeJSON, hasOwn } from './internal/utils/values';
 import { sleep } from './internal/utils/sleep';
+import { addRequestAbortListener, retainRequestAbortCallback } from './internal/utils/abort';
 export type { Logger, LogLevel } from './internal/utils/log';
 import { castToError, isAbortError } from './internal/errors';
 import { addRequestID, defaultParseResponse, type APIResponseProps } from './internal/parse';
@@ -429,7 +430,10 @@ export class OpenAI {
   #encoder: Opts.RequestEncoder;
   // Preserve an explicit global selection without storing a second routing URL.
   #explicitDataResidency = false;
-  #responseAttempts = new WeakMap<AbortController, { timeout: number; retriesRemaining: number }>();
+  #responseAttempts = new WeakMap<
+    AbortController,
+    { timeout: number; retriesRemaining: number; hasStreamingBody: boolean }
+  >();
   static #sanitizedLoggers = new globalThis.WeakSet<Logger>();
   protected idempotencyHeader?: string;
   private _options: ClientOptions;
@@ -1147,6 +1151,7 @@ export class OpenAI {
         const retriesRemaining = attempt?.retriesRemaining ?? 0;
         if (
           !retriesRemaining ||
+          attempt?.hasStreamingBody ||
           props.options.__metadata?.['hasStreamingBody'] ||
           ((globalThis as any).ReadableStream &&
             props.options.body instanceof (globalThis as any).ReadableStream) ||
@@ -1198,6 +1203,8 @@ export class OpenAI {
       retryCount: maxRetries - retriesRemaining,
     });
 
+    const hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
+
     await this.prepareRequest(req, { url, options });
 
     /** Not an API request ID, just for correlating local log entries. */
@@ -1240,7 +1247,7 @@ export class OpenAI {
       const isTimeout =
         isAbortError(response) ||
         /timed? ?out/i.test(String(response) + ('cause' in response ? String(response.cause) : ''));
-      if (retriesRemaining) {
+      if (retriesRemaining && !hasStreamingBody) {
         loggerFor(this).info(
           `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - ${retryMessage}`,
         );
@@ -1261,11 +1268,14 @@ export class OpenAI {
           req.signal,
         );
       }
+      const terminalMessage = hasStreamingBody
+        ? 'error; streaming body cannot be retried'
+        : 'error; no more retries left';
       loggerFor(this).info(
-        `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - error; no more retries left`,
+        `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - ${terminalMessage}`,
       );
       loggerFor(this).debug(
-        `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} (error; no more retries left)`,
+        `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} (${terminalMessage})`,
         formatRequestDetails({
           retryOfRequestLogID,
           url,
@@ -1302,7 +1312,7 @@ export class OpenAI {
 
     if (!response.ok) {
       const shouldRetry = await this.shouldRetry(response);
-      if (retriesRemaining && shouldRetry) {
+      if (retriesRemaining && shouldRetry && !hasStreamingBody) {
         const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
 
         // We don't need the body of this response.
@@ -1327,7 +1337,11 @@ export class OpenAI {
         );
       }
 
-      const retryMessage = shouldRetry ? `error; no more retries left` : `error; not retryable`;
+      const retryMessage = shouldRetry
+        ? hasStreamingBody
+          ? `error; streaming body cannot be retried`
+          : `error; no more retries left`
+        : `error; not retryable`;
 
       loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
 
@@ -1363,7 +1377,7 @@ export class OpenAI {
       }),
     );
 
-    this.#responseAttempts.set(controller, { timeout, retriesRemaining });
+    this.#responseAttempts.set(controller, { timeout, retriesRemaining, hasStreamingBody });
     return {
       response,
       options,
@@ -1418,7 +1432,8 @@ export class OpenAI {
     const { signal, method, ...options } = init || {};
     const abort = this._makeAbort(controller);
     const composed = !!signal && composedCallerSignals.get(controller) === signal;
-    if (signal && !composed) signal.addEventListener('abort', abort, { once: true });
+    const cleanup =
+      signal && !composed ? addRequestAbortListener(signal, abort, controller.signal) : undefined;
 
     const timeout = setTimeout(abort, ms);
 
@@ -1440,9 +1455,13 @@ export class OpenAI {
 
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      return await this.fetch.call(undefined, url, fetchOptions);
+      const response = await this.fetch.call(undefined, url, fetchOptions);
+      if (cleanup) {
+        retainRequestAbortCallback(response.body ?? response, abort, controller.signal);
+      }
+      return response;
     } catch (err) {
-      if (signal && !composed) signal.removeEventListener('abort', abort);
+      cleanup?.();
       throw err;
     } finally {
       clearTimeout(timeout);
@@ -1550,7 +1569,15 @@ export class OpenAI {
     const url = this.buildURL(path!, query as Record<string, unknown>, defaultBaseURL);
     if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
     options.timeout = options.timeout ?? this.timeout;
-    const { bodyHeaders, body } = this.buildBody({ options });
+    const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
+
+    if (isStreamingBody) {
+      inputOptions.__metadata = {
+        ...inputOptions.__metadata,
+        hasStreamingBody: true,
+      };
+    }
+
     const reqHeaders = await this.buildHeaders({ options: inputOptions, method, bodyHeaders, retryCount });
 
     const req: FinalizedRequestInit = {
@@ -1621,6 +1648,7 @@ export class OpenAI {
   private buildBody({ options }: { options: FinalRequestOptions }): {
     bodyHeaders: HeadersLike;
     body: BodyInit | undefined;
+    isStreamingBody: boolean;
   } {
     const { body, headers: rawHeaders } = options;
     if (!body) {
@@ -1629,11 +1657,25 @@ export class OpenAI {
       // content-type for those, and only elide it for operations with no body at
       // all (e.g. GET/DELETE).
       if (body == null && 'body' in options) {
-        return this.#encoder({ body, headers: buildHeaders([rawHeaders]) });
+        return { ...this.#encoder({ body, headers: buildHeaders([rawHeaders]) }), isStreamingBody: false };
       }
-      return { bodyHeaders: undefined, body: undefined };
+      return { bodyHeaders: undefined, body: undefined, isStreamingBody: false };
     }
     const headers = buildHeaders([rawHeaders]);
+
+    const isReadableStream =
+      typeof (globalThis as any).ReadableStream !== 'undefined' &&
+      body instanceof (globalThis as any).ReadableStream;
+
+    const isRetryableBody =
+      !isReadableStream &&
+      (typeof body === 'string' ||
+        body instanceof ArrayBuffer ||
+        ArrayBuffer.isView(body) ||
+        (typeof (globalThis as any).Blob !== 'undefined' && body instanceof (globalThis as any).Blob) ||
+        body instanceof URLSearchParams ||
+        body instanceof FormData);
+
     if (
       // Pass raw type verbatim
       ArrayBuffer.isView(body) ||
@@ -1649,15 +1691,19 @@ export class OpenAI {
       // `URLSearchParams` -> `application/x-www-form-urlencoded`
       body instanceof URLSearchParams ||
       // Send chunked stream (each chunk has own `length`)
-      ((globalThis as any).ReadableStream && body instanceof (globalThis as any).ReadableStream)
+      isReadableStream
     ) {
-      return { bodyHeaders: undefined, body: body as BodyInit };
+      return { bodyHeaders: undefined, body: body as BodyInit, isStreamingBody: !isRetryableBody };
     } else if (
       typeof body === 'object' &&
       (Symbol.asyncIterator in body ||
         (Symbol.iterator in body && 'next' in body && typeof body.next === 'function'))
     ) {
-      return { bodyHeaders: undefined, body: Shims.ReadableStreamFrom(body as AsyncIterable<Uint8Array>) };
+      return {
+        bodyHeaders: undefined,
+        body: Shims.ReadableStreamFrom(body as AsyncIterable<Uint8Array>),
+        isStreamingBody: true,
+      };
     } else if (
       typeof body === 'object' &&
       headers.values.get('content-type') === 'application/x-www-form-urlencoded'
@@ -1665,9 +1711,10 @@ export class OpenAI {
       return {
         bodyHeaders: { 'content-type': 'application/x-www-form-urlencoded' },
         body: this.stringifyQuery(body),
+        isStreamingBody: false,
       };
     } else {
-      return this.#encoder({ body, headers });
+      return { ...this.#encoder({ body, headers }), isStreamingBody: false };
     }
   }
 

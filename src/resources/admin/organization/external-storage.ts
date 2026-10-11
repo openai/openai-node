@@ -383,21 +383,9 @@ export interface ExternalStorageConfiguration {
     | AwsExternalStorageProvider
     | AzureExternalStorageProvider
     | GcpExternalStorageProvider
-    | ExternalStorageConfiguration.Oci;
+    | OciExternalStorageProvider;
 
   status: 'pending' | 'validated' | 'unhealthy';
-}
-
-export namespace ExternalStorageConfiguration {
-  export interface Oci {
-    bucket: string;
-
-    region: string;
-
-    tenancy_ocid: string;
-
-    type: 'oci';
-  }
 }
 
 export interface ExternalStorageDeleted {
@@ -422,6 +410,16 @@ export interface GcpExternalStorageProvider {
   workload_identity_project_number: string;
 
   workload_identity_provider_id: string;
+}
+
+export interface OciExternalStorageProvider {
+  bucket: string;
+
+  region: string;
+
+  tenancy_ocid: string;
+
+  type: 'oci';
 }
 
 export interface ExternalStorageCreateParams {
@@ -498,6 +496,7 @@ export declare namespace ExternalStorage {
     type ExternalStorageConfiguration as ExternalStorageConfiguration,
     type ExternalStorageDeleted as ExternalStorageDeleted,
     type GcpExternalStorageProvider as GcpExternalStorageProvider,
+    type OciExternalStorageProvider as OciExternalStorageProvider,
     type ExternalStorageConfigurationsPage as ExternalStorageConfigurationsPage,
     type ExternalStorageCreateParams as ExternalStorageCreateParams,
     type ExternalStorageListParams as ExternalStorageListParams,

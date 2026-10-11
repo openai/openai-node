@@ -44,6 +44,7 @@ import {
   ExternalStorageDeleted,
   ExternalStorageListParams,
   GcpExternalStorageProvider,
+  OciExternalStorageProvider,
 } from './external-storage';
 import * as InvitesAPI from './invites';
 import {
@@ -266,6 +267,7 @@ export declare namespace Organization {
     type ExternalStorageConfiguration as ExternalStorageConfiguration,
     type ExternalStorageDeleted as ExternalStorageDeleted,
     type GcpExternalStorageProvider as GcpExternalStorageProvider,
+    type OciExternalStorageProvider as OciExternalStorageProvider,
     type ExternalStorageConfigurationsPage as ExternalStorageConfigurationsPage,
     type ExternalStorageCreateParams as ExternalStorageCreateParams,
     type ExternalStorageListParams as ExternalStorageListParams,
