@@ -1266,6 +1266,12 @@ export interface AgentSession {
    * The IDs of vaults made available to the session.
    */
   vault_ids: Array<string>;
+
+  /**
+   * Configured spending limit and best-effort consumption, in USD cents. Unlimited
+   * sessions omit this object.
+   */
+  spend_control?: AgentSession.SpendControl;
 }
 
 export namespace AgentSession {
@@ -1489,6 +1495,22 @@ export namespace AgentSession {
      * The type of the object. Always `environment_connection`.
      */
     type: 'environment_connection';
+  }
+
+  /**
+   * Configured spending limit and best-effort consumption, in USD cents. Unlimited
+   * sessions omit this object.
+   */
+  export interface SpendControl {
+    /**
+     * Best-effort recorded spend floored to whole USD cents, or null when unavailable.
+     */
+    consumed: number | null;
+
+    /**
+     * The configured positive limit in USD cents.
+     */
+    limit: number;
   }
 }
 
