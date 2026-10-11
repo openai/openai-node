@@ -633,18 +633,54 @@ export class OpenAI {
     defaultBaseURL?: string | undefined,
   ): string {
     const baseURL = (!this.#baseURLOverridden() && defaultBaseURL) || this.baseURL;
-    const url = isAbsoluteURL(path)
-      ? new URL(path)
-      : new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+    let url: URL;
+    let baseQuery: Record<string, string> = {};
+    let baseParams: URLSearchParams | undefined;
+    if (isAbsoluteURL(path)) {
+      url = new URL(path);
+    } else if (baseURL.includes('?')) {
+      const base = new URL(baseURL);
+      baseParams = new URLSearchParams(base.search);
+      baseQuery = Object.fromEntries(baseParams);
+      base.search = '';
+      base.hash = '';
+      url = new URL(
+        base.toString() + (base.pathname.endsWith('/') && path.startsWith('/') ? path.slice(1) : path),
+      );
+    } else {
+      url = new URL(baseURL + (baseURL.endsWith('/') && path.startsWith('/') ? path.slice(1) : path));
+    }
 
     const defaultQuery = this.defaultQuery();
     const pathQuery = Object.fromEntries(url.searchParams);
-    if (!isEmptyObj(defaultQuery) || !isEmptyObj(pathQuery)) {
-      query = { ...pathQuery, ...defaultQuery, ...query };
+    let overridingQuery: Record<string, unknown> | undefined;
+    if (!isEmptyObj(baseQuery) || !isEmptyObj(defaultQuery) || !isEmptyObj(pathQuery)) {
+      overridingQuery = { ...pathQuery, ...defaultQuery, ...query };
+      query = { ...baseQuery, ...overridingQuery };
     }
 
     if (typeof query === 'object' && query && !Array.isArray(query)) {
       url.search = this.stringifyQuery(query);
+      if (baseParams && overridingQuery) {
+        const seen = new Set<string>();
+        const repeated = new Set<string>();
+        for (const key of baseParams.keys()) {
+          if (seen.has(key) && !hasOwn(overridingQuery, key)) {
+            repeated.add(key);
+          }
+          seen.add(key);
+        }
+        if (repeated.size) {
+          const merged = new URLSearchParams();
+          for (const [key, value] of url.searchParams) {
+            if (!repeated.has(key)) merged.append(key, value);
+          }
+          for (const [key, value] of baseParams) {
+            if (repeated.has(key)) merged.append(key, value);
+          }
+          url.search = merged.toString();
+        }
+      }
     }
 
     return url.toString();
@@ -1132,6 +1168,8 @@ export class OpenAI {
           props.options,
           retriesRemaining,
           props.retryOfRequestLogID ?? props.requestLogID,
+          undefined,
+          props.requestSignal,
         );
         Object.assign(props, next);
       } finally {
@@ -1215,7 +1253,13 @@ export class OpenAI {
             message: response.message,
           }),
         );
-        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+        return this.retryRequest(
+          options,
+          retriesRemaining,
+          retryOfRequestLogID ?? requestLogID,
+          undefined,
+          req.signal,
+        );
       }
       loggerFor(this).info(
         `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - error; no more retries left`,
@@ -1279,6 +1323,7 @@ export class OpenAI {
           retriesRemaining,
           retryOfRequestLogID ?? requestLogID,
           response.headers,
+          req.signal,
         );
       }
 
@@ -1319,7 +1364,15 @@ export class OpenAI {
     );
 
     this.#responseAttempts.set(controller, { timeout, retriesRemaining });
-    return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
+    return {
+      response,
+      options,
+      controller,
+      requestSignal: req.signal,
+      requestLogID,
+      retryOfRequestLogID,
+      startTime,
+    };
   }
 
   getAPIList<Item, PageClass extends Pagination.AbstractPage<Item> = Pagination.AbstractPage<Item>>(
@@ -1424,6 +1477,7 @@ export class OpenAI {
     retriesRemaining: number,
     requestLogID: string,
     responseHeaders?: Headers | undefined,
+    requestSignal: AbortSignal | null | undefined = options.signal,
   ): Promise<APIResponseProps> {
     let timeoutMillis: number | undefined;
 
@@ -1457,7 +1511,16 @@ export class OpenAI {
       const maxRetries = this.#normalizeRetries(options.maxRetries ?? this.maxRetries);
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
-    await sleep(timeoutMillis);
+    const retrySignals = requestSignal === options.signal ? [requestSignal] : [requestSignal, options.signal];
+    try {
+      await sleep(timeoutMillis, ...retrySignals);
+    } catch (error) {
+      const abortedSignal = retrySignals.find((signal) => signal?.aborted);
+      if (abortedSignal) {
+        throw this._makeUserAbortError(abortedSignal);
+      }
+      throw error;
+    }
 
     return this.makeRequest(options, retriesRemaining - 1, requestLogID);
   }

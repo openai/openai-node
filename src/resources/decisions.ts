@@ -239,6 +239,9 @@ export namespace DecisionCreateParams {
    * Choose from the supplied options based on the input.
    */
   export interface QuestionParamChoice {
+    /**
+     * Provide between 2 and 255 choices. Each choice must be unique.
+     */
     choices: Array<QuestionParamChoice.Choice>;
 
     instructions: string;
