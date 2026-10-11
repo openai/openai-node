@@ -115,7 +115,7 @@ describe('resource credentials', () => {
         'vault_id',
         {
           after: 'after',
-          limit: 0,
+          limit: 1,
           metadata: { foo: 'string' },
           order: 'asc',
           status: 'active',

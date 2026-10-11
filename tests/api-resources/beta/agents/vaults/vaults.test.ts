@@ -72,7 +72,7 @@ describe('resource vaults', () => {
       client.beta.agents.vaults.list(
         {
           after: 'after',
-          limit: 0,
+          limit: 1,
           metadata: { foo: 'string' },
           order: 'asc',
           status: 'active',

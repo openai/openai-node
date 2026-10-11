@@ -446,13 +446,7 @@ export interface VaultUpdateParams {
   name?: string | null;
 }
 
-export interface VaultListParams extends Omit<CursorPageParams, 'limit'> {
-  /**
-   * The maximum number of resources to return. Defaults to 20. Values are clamped
-   * between 1 and 100.
-   */
-  limit?: number | null;
-
+export interface VaultListParams extends CursorPageParams {
   /**
    * Exact string matches supplied as `metadata[key]=value`. All supplied pairs must
    * match. Up to 16 pairs, with keys from 1 to 64 characters and values up to 512
@@ -462,8 +456,7 @@ export interface VaultListParams extends Omit<CursorPageParams, 'limit'> {
   metadata?: { [key: string]: string };
 
   /**
-   * Sort order by the `created_at` timestamp. Use `asc` for ascending order or
-   * `desc` for descending order. Defaults to `desc`.
+   * The order in which resources are returned. Defaults to `desc`.
    *
    * - `asc` - Returns resources in ascending order.
    * - `desc` - Returns resources in descending order.

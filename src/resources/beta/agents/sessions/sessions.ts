@@ -553,7 +553,7 @@ export namespace SessionUpdateParams {
   }
 }
 
-export interface SessionListParams extends Omit<CursorPageParams, 'limit'> {
+export interface SessionListParams extends CursorPageParams {
   /**
    * Only return sessions whose root agent has this ID. Omit to return sessions for
    * all agents.
@@ -561,13 +561,7 @@ export interface SessionListParams extends Omit<CursorPageParams, 'limit'> {
   agent_id?: string;
 
   /**
-   * The maximum number of resources to return.
-   */
-  limit?: number | null;
-
-  /**
-   * Sort order by the `created_at` timestamp. Use `asc` for ascending order or
-   * `desc` for descending order. Defaults to `desc`.
+   * The order in which resources are returned. Defaults to `desc`.
    *
    * - `asc` - Returns resources in ascending order.
    * - `desc` - Returns resources in descending order.
