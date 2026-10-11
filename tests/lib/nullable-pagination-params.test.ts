@@ -12,13 +12,16 @@ import type { WebhookListParams } from 'openai/resources/webhooks/webhooks';
 test('preserves schema-nullable inherited list parameters', () => {
   expectTypeOf<WebhookListParams['after']>().toEqualTypeOf<string | null | undefined>();
   expectTypeOf<AdminAPIKeyListParams['after']>().toEqualTypeOf<string | null | undefined>();
-  expectTypeOf<ArtifactListParams['after']>().toEqualTypeOf<string | null | undefined>();
-  expectTypeOf<ArtifactListParams['limit']>().toEqualTypeOf<number | null | undefined>();
-  expectTypeOf<AgentListParams['limit']>().toEqualTypeOf<number | null | undefined>();
   expectTypeOf<FileListParams['limit']>().toEqualTypeOf<number | null | undefined>();
-  expectTypeOf<SessionListParams['limit']>().toEqualTypeOf<number | null | undefined>();
-  expectTypeOf<CredentialListParams['limit']>().toEqualTypeOf<number | null | undefined>();
-  expectTypeOf<VaultListParams['limit']>().toEqualTypeOf<number | null | undefined>();
+});
+
+test('matches optional non-null beta agent pagination parameters', () => {
+  expectTypeOf<ArtifactListParams['after']>().toEqualTypeOf<string | undefined>();
+  expectTypeOf<ArtifactListParams['limit']>().toEqualTypeOf<number | undefined>();
+  expectTypeOf<AgentListParams['limit']>().toEqualTypeOf<number | undefined>();
+  expectTypeOf<SessionListParams['limit']>().toEqualTypeOf<number | undefined>();
+  expectTypeOf<CredentialListParams['limit']>().toEqualTypeOf<number | undefined>();
+  expectTypeOf<VaultListParams['limit']>().toEqualTypeOf<number | undefined>();
 });
 
 test('keeps shared pagination parameters narrow and existing callers compatible', () => {
