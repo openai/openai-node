@@ -128,6 +128,7 @@ export type BuiltInVoice =
   | 'quartz'
   | 'ripple'
   | 'sage'
+  | 'shida'
   | 'shimmer'
   | 'stone'
   | 'tempo'
