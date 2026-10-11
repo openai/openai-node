@@ -5536,12 +5536,7 @@ export interface AgentUpdateParams {
   tools?: Array<PersistedAgentToolParam> | null;
 }
 
-export interface AgentListParams extends Omit<CursorPageParams, 'limit'> {
-  /**
-   * The maximum number of resources to return.
-   */
-  limit?: number | null;
-
+export interface AgentListParams extends CursorPageParams {
   /**
    * The order in which resources are returned. Defaults to `desc`.
    *
