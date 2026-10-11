@@ -44,6 +44,7 @@ export {
   type ExternalStorageConfiguration,
   type ExternalStorageDeleted,
   type GcpExternalStorageProvider,
+  type OciExternalStorageProvider,
   type ExternalStorageCreateParams,
   type ExternalStorageListParams,
   type ExternalStorageConfigurationsPage,

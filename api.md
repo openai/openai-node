@@ -1339,6 +1339,7 @@ Types:
 - <code><a href="./src/resources/admin/organization/external-storage.ts">ExternalStorageConfiguration</a></code>
 - <code><a href="./src/resources/admin/organization/external-storage.ts">ExternalStorageDeleted</a></code>
 - <code><a href="./src/resources/admin/organization/external-storage.ts">GcpExternalStorageProvider</a></code>
+- <code><a href="./src/resources/admin/organization/external-storage.ts">OciExternalStorageProvider</a></code>
 
 Methods:
 
