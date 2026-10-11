@@ -379,7 +379,11 @@ export interface ExternalStorageConfiguration {
 
   project_id: string;
 
-  provider: AwsExternalStorageProvider | AzureExternalStorageProvider | GcpExternalStorageProvider;
+  provider:
+    | AwsExternalStorageProvider
+    | AzureExternalStorageProvider
+    | GcpExternalStorageProvider
+    | OciExternalStorageProvider;
 
   status: 'pending' | 'validated' | 'unhealthy';
 }
@@ -408,13 +412,24 @@ export interface GcpExternalStorageProvider {
   workload_identity_provider_id: string;
 }
 
+export interface OciExternalStorageProvider {
+  bucket: string;
+
+  region: string;
+
+  tenancy_ocid: string;
+
+  type: 'oci';
+}
+
 export interface ExternalStorageCreateParams {
   project_id: string;
 
   provider:
     | ExternalStorageCreateParams.Aws
     | ExternalStorageCreateParams.Azure
-    | ExternalStorageCreateParams.Gcp;
+    | ExternalStorageCreateParams.Gcp
+    | ExternalStorageCreateParams.Oci;
 }
 
 export namespace ExternalStorageCreateParams {
@@ -451,6 +466,16 @@ export namespace ExternalStorageCreateParams {
 
     workload_identity_provider_id: string;
   }
+
+  export interface Oci {
+    bucket: string;
+
+    region: string;
+
+    tenancy_ocid: string;
+
+    type: 'oci';
+  }
 }
 
 export interface ExternalStorageListParams extends Omit<CursorPageParams, 'after'> {
@@ -471,6 +496,7 @@ export declare namespace ExternalStorage {
     type ExternalStorageConfiguration as ExternalStorageConfiguration,
     type ExternalStorageDeleted as ExternalStorageDeleted,
     type GcpExternalStorageProvider as GcpExternalStorageProvider,
+    type OciExternalStorageProvider as OciExternalStorageProvider,
     type ExternalStorageConfigurationsPage as ExternalStorageConfigurationsPage,
     type ExternalStorageCreateParams as ExternalStorageCreateParams,
     type ExternalStorageListParams as ExternalStorageListParams,

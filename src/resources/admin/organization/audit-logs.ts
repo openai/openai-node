@@ -1088,7 +1088,8 @@ export namespace AuditLogListResponse {
       provider?:
         | ExternalStorageAPI.AwsExternalStorageProvider
         | ExternalStorageAPI.AzureExternalStorageProvider
-        | ExternalStorageAPI.GcpExternalStorageProvider;
+        | ExternalStorageAPI.GcpExternalStorageProvider
+        | ExternalStorageAPI.OciExternalStorageProvider;
     }
   }
 
