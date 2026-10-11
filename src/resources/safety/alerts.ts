@@ -54,6 +54,12 @@ export interface SafetyAlert {
   request_paused: boolean;
 
   response_id: string;
+
+  /**
+   * A generated explanation, temporarily available for eligible zero data retention
+   * alerts. Omitted when unavailable.
+   */
+  detailed_explanation?: string | null;
 }
 
 export declare namespace Alerts {
