@@ -421,6 +421,12 @@ export interface SessionCreateParamsBase {
   metadata?: { [key: string]: string } | null;
 
   /**
+   * Optional spending limit in USD cents. Omission or null creates an unlimited
+   * session.
+   */
+  spend_control?: SessionCreateParams.SpendControl | null;
+
+  /**
    * Whether to stream session events as server-sent events. Defaults to `false`.
    */
   stream?: boolean;
@@ -481,6 +487,17 @@ export namespace SessionCreateParams {
     tools?: Array<AgentsAPI.AgentToolParam> | null;
   }
 
+  /**
+   * Optional spending limit in USD cents. Omission or null creates an unlimited
+   * session.
+   */
+  export interface SpendControl {
+    /**
+     * Positive USD cents, or null to remove the limit.
+     */
+    limit: number | null;
+  }
+
   export type SessionCreateParamsNonStreaming = SessionsAPI.SessionCreateParamsNonStreaming;
   export type SessionCreateParamsStreaming = SessionsAPI.SessionCreateParamsStreaming;
 }
@@ -511,6 +528,12 @@ export interface SessionUpdateParams {
    * characters.
    */
   metadata?: { [key: string]: string } | null;
+
+  /**
+   * Omit to retain the limit; null or a null limit removes it without resetting
+   * spend.
+   */
+  spend_control?: SessionUpdateParams.SpendControl | null;
 }
 
 export namespace SessionUpdateParams {
@@ -550,6 +573,17 @@ export namespace SessionUpdateParams {
        */
       effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
     }
+  }
+
+  /**
+   * Omit to retain the limit; null or a null limit removes it without resetting
+   * spend.
+   */
+  export interface SpendControl {
+    /**
+     * Positive USD cents, or null to remove the limit.
+     */
+    limit: number | null;
   }
 }
 

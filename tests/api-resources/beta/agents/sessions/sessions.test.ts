@@ -46,6 +46,7 @@ describe('resource sessions', () => {
       agent_id: 'agent_id',
       input: 'x',
       metadata: { foo: 'string' },
+      spend_control: { limit: 1 },
       stream: false,
       vault_ids: ['string'],
     });
@@ -85,6 +86,7 @@ describe('resource sessions', () => {
             service_tier: 'auto',
           },
           metadata: { foo: 'string' },
+          spend_control: { limit: 1 },
         },
         { path: '/_stainless_unknown_path' },
       ),
