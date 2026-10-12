@@ -136,6 +136,33 @@ describe('resource usage', () => {
     });
   });
 
+  test('decisions: only required params', async () => {
+    const responsePromise = client.admin.organization.usage.decisions({ start_time: 0 });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('decisions: required and optional params', async () => {
+    await client.admin.organization.usage.decisions({
+      start_time: 0,
+      api_key_ids: ['string'],
+      batch: true,
+      bucket_width: '1m',
+      end_time: 0,
+      group_by: ['project_id'],
+      limit: 0,
+      models: ['string'],
+      page: 'page',
+      project_ids: ['string'],
+      user_ids: ['string'],
+    });
+  });
+
   test('embeddings: only required params', async () => {
     const responsePromise = client.admin.organization.usage.embeddings({ start_time: 0 });
     const rawResponse = await responsePromise.asResponse();
