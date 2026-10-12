@@ -1163,6 +1163,7 @@ Types:
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageCodeInterpreterSessionsResponse</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageCompletionsResponse</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageCostsResponse</a></code>
+- <code><a href="./src/resources/admin/organization/usage.ts">UsageDecisionsResponse</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageEmbeddingsResponse</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageFileSearchCallsResponse</a></code>
 - <code><a href="./src/resources/admin/organization/usage.ts">UsageImagesResponse</a></code>
@@ -1177,6 +1178,7 @@ Methods:
 - <code title="get /organization/usage/code_interpreter_sessions">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">codeInterpreterSessions</a>({ ...params }) -> UsageCodeInterpreterSessionsResponse</code>
 - <code title="get /organization/usage/completions">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">completions</a>({ ...params }) -> UsageCompletionsResponse</code>
 - <code title="get /organization/costs">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">costs</a>({ ...params }) -> UsageCostsResponse</code>
+- <code title="get /organization/usage/decisions">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">decisions</a>({ ...params }) -> UsageDecisionsResponse</code>
 - <code title="get /organization/usage/embeddings">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">embeddings</a>({ ...params }) -> UsageEmbeddingsResponse</code>
 - <code title="get /organization/usage/file_search_calls">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">fileSearchCalls</a>({ ...params }) -> UsageFileSearchCallsResponse</code>
 - <code title="get /organization/usage/images">client.admin.organization.usage.<a href="./src/resources/admin/organization/usage.ts">images</a>({ ...params }) -> UsageImagesResponse</code>
