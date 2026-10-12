@@ -6,6 +6,7 @@ import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, Page, PagePromise } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
+import { pollVectorStoreFile } from '../../lib/vector-store-polling';
 import { path } from '../../internal/utils/path';
 
 function resolveResourceRequestOptions(
@@ -313,6 +314,20 @@ export class Files extends APIResource {
         __security: { bearerAuth: true },
       })),
     );
+  }
+
+  /**
+   * Wait for the vector store file to finish processing.
+   *
+   * Note: this will return even if the file failed to process, you need to check
+   * file.last_error and file.status to handle these cases
+   */
+  async poll(
+    vectorStoreID: string,
+    fileID: string,
+    options?: RequestOptions & { pollIntervalMs?: number },
+  ): Promise<VectorStoreFile> {
+    return await pollVectorStoreFile(this, vectorStoreID, fileID, options);
   }
 
   /**

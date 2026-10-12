@@ -8,6 +8,7 @@ import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
+import { pollVectorStoreFileBatch } from '../../lib/vector-store-polling';
 import { path } from '../../internal/utils/path';
 
 function resolveResourceRequestOptions(
@@ -95,6 +96,20 @@ export class FileBatches extends APIResource {
         __security: { bearerAuth: true },
       })),
     );
+  }
+
+  /**
+   * Wait for the given file batch to be processed.
+   *
+   * Note: this will return even if one of the files failed to process, you need to
+   * check batch.file_counts.failed_count to handle this case.
+   */
+  async poll(
+    vectorStoreID: string,
+    batchID: string,
+    options?: RequestOptions & { pollIntervalMs?: number },
+  ): Promise<VectorStoreFileBatch> {
+    return await pollVectorStoreFileBatch(this, vectorStoreID, batchID, options);
   }
 }
 
