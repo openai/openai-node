@@ -1860,12 +1860,13 @@ export namespace SafetyWarningIssuedWebhookEvent {
 }
 
 /**
- * Sent when setup fails for a prewarmed OpenAI-hosted environment before it is
- * attached to a session.
+ * Sent when an agent environment expires and can no longer resume from a snapshot.
  */
 export type UnwrapWebhookEvent =
+  | AgentEnvironmentExpiredWebhookEvent
   | AgentEnvironmentFailedWebhookEvent
   | AgentEnvironmentReadyWebhookEvent
+  | AgentEnvironmentSuspendedWebhookEvent
   | AgentSessionActionRequiredWebhookEvent
   | AgentSessionCreatedWebhookEvent
   | AgentSessionFailedWebhookEvent
@@ -1891,9 +1892,7 @@ export type UnwrapWebhookEvent =
   | SafetyAlertCreatedWebhookEvent
   | SafetyDeactivationIssuedWebhookEvent
   | SafetyOrgAlertCreatedWebhookEvent
-  | SafetyWarningIssuedWebhookEvent
-  | AgentEnvironmentSuspendedWebhookEvent
-  | AgentEnvironmentExpiredWebhookEvent;
+  | SafetyWarningIssuedWebhookEvent;
 
 export interface WebhookEndpoint {
   /**
@@ -2078,14 +2077,14 @@ export interface WebhookCreateParams {
     | 'video.failed'
     | 'agent.environment.ready'
     | 'agent.environment.failed'
+    | 'agent.environment.suspended'
+    | 'agent.environment.expired'
     | 'agent.session.created'
     | 'agent.session.action_required'
     | 'agent.session.in_progress'
     | 'agent.session.idle'
     | 'agent.session.failed'
     | 'safety.alert.created'
-    | 'agent.environment.suspended'
-    | 'agent.environment.expired'
   >;
 
   /**
@@ -2123,14 +2122,14 @@ export interface WebhookUpdateParams {
     | 'video.failed'
     | 'agent.environment.ready'
     | 'agent.environment.failed'
+    | 'agent.environment.suspended'
+    | 'agent.environment.expired'
     | 'agent.session.created'
     | 'agent.session.action_required'
     | 'agent.session.in_progress'
     | 'agent.session.idle'
     | 'agent.session.failed'
     | 'safety.alert.created'
-    | 'agent.environment.suspended'
-    | 'agent.environment.expired'
   >;
 
   /**
@@ -2183,14 +2182,14 @@ export interface WebhookTestParams {
     | 'video.failed'
     | 'agent.environment.ready'
     | 'agent.environment.failed'
+    | 'agent.environment.suspended'
+    | 'agent.environment.expired'
     | 'agent.session.created'
     | 'agent.session.action_required'
     | 'agent.session.in_progress'
     | 'agent.session.idle'
     | 'agent.session.failed'
-    | 'safety.alert.created'
-    | 'agent.environment.suspended'
-    | 'agent.environment.expired';
+    | 'safety.alert.created';
 }
 
 Webhooks.EventTypes = EventTypes;

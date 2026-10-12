@@ -377,7 +377,7 @@ export interface EnvironmentInfo {
    * - `suspended` - The sandbox is stopped and can be resumed from its private
    *   checkpoint.
    */
-  status: 'pending' | 'ready' | 'connected' | 'disconnected' | 'expired' | 'failed' | 'suspended';
+  status: 'pending' | 'ready' | 'connected' | 'disconnected' | 'suspended' | 'expired' | 'failed';
 
   /**
    * Whether the environment is hosted by OpenAI or by the application.
@@ -537,7 +537,7 @@ export namespace EnvironmentCreateParams {
 
 export interface EnvironmentListParams extends CursorPageParams {
   /**
-   * The order in which environments are returned. Defaults to `desc`.
+   * The order in which resources are returned. Defaults to `desc`.
    *
    * - `asc` - Returns resources in ascending order.
    * - `desc` - Returns resources in descending order.
