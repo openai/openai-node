@@ -38,8 +38,8 @@ describe('resource environments', () => {
           },
         ],
         network: {
-          access: 'enabled',
-          allowed_domains: ['string'],
+          access: 'restricted',
+          allowed_domains: ['example.com'],
           blocked_domains: ['string'],
         },
         packages: {

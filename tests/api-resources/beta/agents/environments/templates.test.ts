@@ -37,9 +37,9 @@ describe('resource templates', () => {
           ],
           name: 'x',
           network: {
-            access: 'enabled',
-            allowed_domains: ['string'],
-            blocked_domains: ['string'],
+            access: 'restricted',
+            allowed_domains: ['example.com'],
+            blocked_domains: [],
           },
           packages: {
             npm: ['string'],
@@ -112,9 +112,9 @@ describe('resource templates', () => {
           ],
           name: 'x',
           network: {
-            access: 'enabled',
-            allowed_domains: ['string'],
-            blocked_domains: ['string'],
+            access: 'restricted',
+            allowed_domains: ['example.com'],
+            blocked_domains: [],
           },
           packages: {
             npm: ['string'],
