@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Owned support fixture</title>
+    <style>
+      main {
+        padding: 36px;
+      }
+      button,
+      input,
+      select {
+        display: block;
+        margin: 16px 0;
+        padding: 12px;
+      }
+      iframe {
+        width: 680px;
+        height: 580px;
+      }
+    </style>
+  </head>
+  <body>
+    <main data-record-id="T-1042">
+      <h1>Ticket <span id="record">T-1042</span></h1>
+      <form>
+        <label>Guest<input aria-label="Guest" data-browser-field="guest" type="text" required /></label>
+        <label
+          >Team<select aria-label="Team" data-browser-field="team">
+            <option>Billing</option>
+            <option>Account</option>
+          </select></label
+        >
+        <button type="button" id="route">Route</button>
+        <button type="submit">Submit</button>
+      </form>
+      <div role="button" id="custom" contenteditable="true">Custom editor</div>
+      <input type="password" aria-label="Private field" value="PRIVATE_FIXTURE_VALUE" />
+      <span hidden>PRIVATE_HIDDEN_VALUE</span>
+    </main>
+    <script>
+      const row = document.querySelector('main');
+      const form = document.querySelector('form');
+      const record = document.querySelector('#record');
+      const route = document.querySelector('#route');
+      let recordId = 'T-1042';
+      let lastRoute;
+      let lastSubmit;
+      function bind(id) {
+        recordId = id;
+        row.dataset.recordId = id;
+        record.textContent = id;
+        if (lastRoute) route.removeEventListener('click', lastRoute);
+        if (lastSubmit) form.removeEventListener('submit', lastSubmit);
+        lastRoute = () => fetch('/effect', { method: 'POST', body: JSON.stringify({ id, action: 'route' }) });
+        lastSubmit = (event) => {
+          event.preventDefault();
+          fetch('/effect', { method: 'POST', body: JSON.stringify({ id, action: 'submit' }) });
+        };
+        route.addEventListener('click', lastRoute);
+        form.addEventListener('submit', lastSubmit);
+      }
+      bind(recordId);
+      window.recycle = () => bind('T-2043');
+      window.armInputTrap = () => {
+        row.addEventListener('pointerover', window.recycle, { once: true });
+        form.addEventListener('focusin', window.recycle, { once: true });
+      };
+    </script>
+  </body>
+</html>

@@ -2,8 +2,35 @@ import { APIPromise } from 'openai/core/api-promise';
 
 import util from 'node:util';
 import OpenAI from 'openai';
-import { APIUserAbortError } from 'openai';
+import { APIUserAbortError, ComputerToolset, type ComputerDriver } from 'openai';
+import { ComputerToolset as HelperComputerToolset } from 'openai/helpers/computer';
 const defaultFetch = fetch;
+
+test('root computer exports preserve the helper identity and driver type', async () => {
+  expect(ComputerToolset).toBe(HelperComputerToolset);
+  const driver: ComputerDriver = {
+    click: jest.fn(),
+    double_click: jest.fn(),
+    drag: jest.fn(),
+    move: jest.fn(),
+    scroll: jest.fn(),
+    keypress: jest.fn(),
+    type: jest.fn(),
+    wait: jest.fn(),
+    screenshot: () => ({ type: 'computer_screenshot', file_id: 'file-fixture' }),
+  };
+  const output = await new ComputerToolset(driver).execute(
+    {
+      type: 'computer_call',
+      id: 'cu_fixture',
+      call_id: 'call_fixture',
+      status: 'completed',
+      actions: [{ type: 'screenshot' }],
+    },
+    { beforeAction: () => true },
+  );
+  expect(output.output).toEqual({ type: 'computer_screenshot', file_id: 'file-fixture' });
+});
 
 describe('instantiate client', () => {
   const env = process.env;
