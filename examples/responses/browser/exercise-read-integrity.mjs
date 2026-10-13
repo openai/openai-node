@@ -56,6 +56,52 @@ try {
       await fixture.close();
     }
   }
+  for (const member of ['read_page', 'find', 'click']) {
+    const fixture = await browser.newContext();
+    const borrowed = createBrowserDriver(fixture);
+    const sentinel = await browser.newPage();
+    try {
+      await sentinel.setContent('<p>Caller still owns this page</p>');
+      const target = await fixture.newPage();
+      await target.setContent('<button>Current choice</button>');
+      const state = await borrowed.state();
+      const [{ id: selected }] = state.tabs;
+      const prior = await borrowed.read_page({ tab_id: selected, filter: 'all' });
+      const [{ ref }] = prior.elements;
+      await target.evaluate(() => {
+        const { matches: nativeMatches } = Element.prototype;
+        let first = true;
+        // oxlint-disable-next-line eslint/no-extend-native -- Finite page-owned method exercises a stalled renderer.
+        Element.prototype.matches = function matches(selector) {
+          if (first) {
+            first = false;
+            const until = performance.now() + 8000;
+            while (performance.now() < until) {
+              // The local fixture deliberately consumes one finite renderer slice.
+            }
+          }
+          return nativeMatches.call(this, selector);
+        };
+      });
+      const started = performance.now();
+      if (member === 'read_page') {
+        await assert.rejects(borrowed.read_page({ tab_id: selected, filter: 'all' }), /timed out/u);
+      } else if (member === 'find') {
+        await assert.rejects(borrowed.find({ tab_id: selected, query: 'Current choice' }), /timed out/u);
+      } else {
+        await assert.rejects(borrowed.click({ tab_id: selected, target: ref }), /timed out/u);
+      }
+      assert.ok(performance.now() - started < 7200, 'Renderer work exceeded the driver observation deadline');
+      await assert.rejects(borrowed.state(), /retired/u);
+      await assert.rejects(borrowed.click({ tab_id: selected, target: ref }), /retired/u);
+      assert.equal(target.isClosed(), false);
+      assert.equal(await sentinel.textContent('p'), 'Caller still owns this page');
+      checks += 1;
+    } finally {
+      await fixture.close();
+      await sentinel.close();
+    }
+  }
   /* eslint-enable no-await-in-loop */
   const context = await browser.newContext();
   await context.route('**/*', (route) => route.fulfill({ contentType: 'text/html', body: html }));

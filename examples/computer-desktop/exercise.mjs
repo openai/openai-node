@@ -130,9 +130,33 @@ try {
   assert.equal(postTicket.browser_effects, 1);
   assert.equal(postTicket.file_empty, true);
 
+  await execute(main, [
+    { type: 'click', button: 'left', x: 700, y: 180 },
+    { type: 'type', text: `${'synthetic fixture '.repeat(192)}\nDesktop receipt D-2201` },
+    { type: 'keypress', keys: ['CTRL', 'S'] },
+  ]);
+  const longText = await main.verify();
+  assert.equal(
+    longText.file_empty,
+    false,
+    'A type action longer than 2,000 characters must reach the editor.',
+  );
+  assert.equal(longText.file_matches, false);
+  assert.equal(longText.browser_effects, 1);
+  // Remove the first line using only editor actions. The exact receipt began after character 2,000.
+  await execute(main, [
+    { type: 'keypress', keys: ['HOME'] },
+    { type: 'keypress', keys: ['CTRL', 'SHIFT', 'HOME'] },
+    { type: 'keypress', keys: ['BACKSPACE'] },
+    { type: 'keypress', keys: ['CTRL', 'S'] },
+  ]);
+  const suffix = await main.verify();
+  assert.equal(suffix.file_matches, true, 'The suffix beyond character 2,000 must be saved in full.');
+
   const edited = frame(
     await execute(main, [
       { type: 'click', button: 'left', x: 700, y: 180 },
+      { type: 'keypress', keys: ['CTRL', 'A'] },
       { type: 'type', text: 'Desktop receipt D-2201' },
       { type: 'keypress', keys: ['CTRL', 'S'] },
       { type: 'wait' },

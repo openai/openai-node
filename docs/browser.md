@@ -208,7 +208,7 @@ does not expose them to the model.
 
 | Method             | Required arguments               | Result                           |
 | ------------------ | -------------------------------- | -------------------------------- |
-| `read_diagnostics` | `tab_id`, `source`, `limit`      | `BrowserReadV1` with no elements |
+| `read_diagnostics` | `tab_id`, `source`, `limit`      | `BrowserTextReadV1`             |
 | `run_script`       | `tab_id`, `source`, `timeout_ms` | Text                             |
 | `upload_file`      | `grant_id`                       | `BrowserFileOutcome`             |
 | `download_file`    | `grant_id`                       | `BrowserFileOutcome`             |
@@ -352,6 +352,7 @@ not contain enough information to verify them.
 Use a trusted OpenAI client. Custom client hooks and transports can change requests
 and retry behavior after the helper validates its inputs; your application owns those changes.
 For Responses and Decisions runs, a fixed caller-supplied idempotency key applies to the first request. Later turns get fresh keys; HTTP retries of one request retain its key.
+Each continuation captures headers and the idempotency key together, even when no key is present. Other native request options remain live until dispatch.
 Supply trusted per-run `requestOptions` too. Without a ledger, native request options
 can change the request body, path, base URL, or fetch settings after validation.
 Ledger runs accept a narrower set of options.

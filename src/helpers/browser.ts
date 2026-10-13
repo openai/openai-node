@@ -352,6 +352,11 @@ export interface BrowserReadV1 {
   omitted: (typeof readOmissions)[number][];
 }
 
+/** A diagnostic report contains text and omissions, without actionable elements. */
+export interface BrowserTextReadV1 extends BrowserReadV1 {
+  elements: never[];
+}
+
 /** A bounded section read. Scope refs select subsequent reads and cannot authorize element actions. */
 export interface BrowserScopedReadV1 extends BrowserReadV1 {
   scopes: { ref: string; label: string }[];
@@ -378,7 +383,7 @@ export type BrowserResult<M extends BrowserMember> = M extends 'screenshot' | 'z
     : M extends 'read_page_scoped'
       ? BrowserScopedReadV1
       : M extends 'read_diagnostics'
-        ? BrowserReadV1
+        ? BrowserTextReadV1
         : M extends 'run_script'
           ? string
           : M extends 'upload_file' | 'download_file'
