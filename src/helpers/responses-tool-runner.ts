@@ -377,6 +377,21 @@ function ledgerCopy<T>(value: T, omitUndefinedProperties = false): T {
 function ledgerTools(tools: Tool[]): Promise<Tool[]> {
   return Promise.all(
     tools.map(async (tool) => {
+      if (tool.type === 'code_interpreter' && typeof tool.container !== 'string') {
+        const policy = tool.container.network_policy;
+        if (policy?.type === 'allowlist' && policy.domain_secrets) {
+          return {
+            ...tool,
+            container: {
+              ...tool.container,
+              network_policy: {
+                ...policy,
+                domain_secrets: policy.domain_secrets.map((secret) => ({ ...secret, value: '' })),
+              },
+            },
+          };
+        }
+      }
       if (tool.type !== 'mcp') {
         return tool;
       }
@@ -962,7 +977,11 @@ export class ResponsesToolRunner {
             isObj(tool) &&
             hasOwn(tool, 'name') &&
             typeof tool.name === 'string' &&
-            hasOwn(tool, 'input_schema');
+            hasOwn(tool, 'input_schema') &&
+            (!hasOwn(tool, 'description') ||
+              tool.description === undefined ||
+              tool.description === null ||
+              typeof tool.description === 'string');
         }
         break;
       }
@@ -1749,12 +1768,14 @@ export class ResponsesToolRunner {
       if (
         !filter ||
         hasOwn(filter, 'read_only') ||
-        !hasOwn(filter, 'tool_names') ||
-        !Array.isArray(filter.tool_names)
+        (hasOwn(filter, 'tool_names') && !Array.isArray(filter.tool_names))
       ) {
         return undefined;
       }
-      if (filter.tool_names.includes(name)) {
+      if (
+        !hasOwn(filter, 'tool_names') ||
+        (Array.isArray(filter.tool_names) && filter.tool_names.includes(name))
+      ) {
         if (matched !== undefined) {
           return undefined;
         }
@@ -2789,15 +2810,26 @@ export class ResponsesToolRunner {
       const attemptedIds = new Set(attempted);
       const hasServerTools = declarations.some((tool) => allowedServerTypes.has(tool.type));
       try {
-        if (ledger && options.ledger?.resumeFrom && ledger.consumed_requests < maxSteps) {
+        const initialHistory = ledger?.history ?? input;
+        const importedMcp = initialHistory.filter(
+          (item) =>
+            hasOwn(item, 'type') &&
+            (item.type === 'mcp_approval_request' ||
+              item.type === 'mcp_approval_response' ||
+              item.type === 'mcp_call'),
+        );
+        if ((ledger?.consumed_requests ?? 0) < maxSteps && importedMcp.length > 0) {
+          if (!ledger) {
+            this.validateHistory(contextBudget ? initialHistory : importedMcp, declarations);
+          }
           const selection = ResponsesToolRunner.localSelection(
             hasOwn(parameters, 'tool_choice') ? parameters.tool_choice : undefined,
           );
           // A completed local approval is not evidence that the remote call ran.
-          // History was validated above: keep consumed grants and all receipts,
+          // Imported MCP history was validated above: keep consumed grants and all receipts,
           // but ask the current owner again before recording or sending the rest.
-          const unresolved = approvedMcpRequests(ledger.history);
-          for (const item of ledger.history) {
+          const unresolved = approvedMcpRequests(importedMcp);
+          for (const item of importedMcp) {
             if (
               hasOwn(item, 'type') &&
               item.type === 'mcp_approval_response' &&

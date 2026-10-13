@@ -1356,6 +1356,48 @@ describe('MCP approval tool choice', () => {
     },
   );
 
+  test.each([
+    { fields: {}, valid: true },
+    { fields: { description: null }, valid: true },
+    { fields: { description: 'Read a local fixture' }, valid: true },
+    { fields: { description: 3 }, valid: false },
+    { fields: { description: false }, valid: false },
+    { fields: { description: { text: 'read' } }, valid: false },
+  ])('MCP list metadata before sibling dispatch: $fields', async ({ fields, valid }) => {
+    const listed: ResponseOutputItem.McpListTools = {
+      type: 'mcp_list_tools',
+      id: 'listed',
+      server_label: 'desk',
+      // @ts-expect-error Invalid native metadata must be checked before sibling effects.
+      tools: [{ name: 'read', input_schema: {}, annotations: ['free', 1, null], ...fields }],
+    };
+    const h = harness([{ output: [call('record', {}), listed] }, { output: [message] }]);
+    const execute = vi.fn(() => 'permitted');
+    const approveMcp = vi.fn(() => true);
+    const runner = new ResponsesToolRunner({ functions: [{ tool: functionTool('record'), execute }] });
+    const result = runner.run(
+      h.client,
+      {
+        ...input,
+        tools: [mcp],
+        tool_choice: { type: 'allowed_tools', mode: 'auto', tools: [{ type: 'function', name: 'record' }] },
+      },
+      { approveMcp },
+    );
+    if (valid) {
+      await result;
+      expect(execute).toHaveBeenCalledOnce();
+      expect(h.bodies).toHaveLength(2);
+      expect(h.bodies[1]?.['input']).toContainEqual(listed);
+      expect(h.bodies[1]?.['input']).not.toContainEqual(expect.objectContaining({ type: 'mcp_call' }));
+    } else {
+      await expect(result).rejects.toBeInstanceOf(ResponsesToolRunnerError);
+      expect(execute).not.toHaveBeenCalled();
+      expect(h.bodies).toHaveLength(1);
+    }
+    expect(approveMcp).not.toHaveBeenCalled();
+  });
+
   test.each(choices)(
     'checks $label before the approval callback',
     async ({ choice, allowed, allowedTools }) => {
@@ -1968,6 +2010,15 @@ describe('declared MCP approval rules', () => {
     },
     { name: 'read-only policy', policy: { always: { read_only: true } }, request: false, allowed: true },
     {
+      name: 'universal always refuses a direct call',
+      policy: { always: {} },
+      request: false,
+      allowed: false,
+    },
+    { name: 'universal always asks for approval', policy: { always: {} }, request: true, allowed: true },
+    { name: 'universal never accepts a direct call', policy: { never: {} }, request: false, allowed: true },
+    { name: 'universal never refuses a request', policy: { never: {} }, request: true, allowed: false },
+    {
       name: 'overlapping filters',
       policy: { always: { tool_names: ['read'] }, never: { tool_names: ['read'] } },
       request: false,
@@ -2113,14 +2164,63 @@ describe('MCP declaration and grant admission', () => {
       expect(execute).toHaveBeenCalledOnce();
       expect(h.bodies).toHaveLength(2);
     } else {
-      await expect(result).rejects.toThrow('MCP call does not match an approved request.');
+      await expect(result).rejects.toThrow();
       expect(execute).not.toHaveBeenCalled();
-      expect(h.bodies).toHaveLength(scenario === 'saved-history' ? 0 : 1);
+      expect(h.bodies).toHaveLength(['saved-history', 'repeated-history'].includes(scenario) ? 0 : 1);
       expect(saved.writes).toEqual([]);
     }
-    expect(approveMcp).not.toHaveBeenCalled();
+    let approvals = 0;
+    if (scenario === 'independent-grants') {
+      approvals = 2;
+    } else if (scenario === 'same-output') {
+      approvals = 1;
+    }
+    expect(approveMcp).toHaveBeenCalledTimes(approvals);
     expect(history).toEqual(original);
   });
+
+  test.each(
+    ['ordinary', 'budget', 'ledger'].flatMap((mode) =>
+      ['allow', 'deny', 'missing', 'invalid'].map((decision) => ({ mode, decision })),
+    ),
+  )(
+    'reauthorizes imported MCP grants before first save or request: $mode $decision',
+    async ({ mode, decision }) => {
+      const history: ResponseInputItem[] = [approval, receipt, { role: 'user', content: 'continue' }];
+      const original = structuredClone(history);
+      const saved = recording();
+      const h = harness([{ output: [message] }]);
+      const approveMcp = vi.fn(() => {
+        expect(h.bodies).toEqual([]);
+        expect(saved.writes).toEqual([]);
+        return decision === 'invalid' ? 'yes' : decision === 'allow';
+      });
+      const result = new ResponsesToolRunner({}).run(
+        h.client,
+        { ...input, input: history, tools: [mcp] },
+        {
+          ...(mode === 'budget' ? { contextBudget: { maxInputBytes: 8000, maxInputImages: 0 } } : {}),
+          ...(mode === 'ledger' ? { ledger: saved.ledger } : {}),
+          // @ts-expect-error Exercise rejection of a non-boolean callback result through the public API.
+          approveMcp: decision === 'missing' ? undefined : approveMcp,
+        },
+      );
+      if (decision === 'missing' || decision === 'invalid') {
+        await expect(result).rejects.toBeInstanceOf(ResponsesToolRunnerError);
+        expect(h.bodies).toEqual([]);
+        expect(saved.writes).toEqual([]);
+      } else {
+        await result;
+        const expected = { ...receipt, approve: decision === 'allow' };
+        expect(h.bodies[0]?.['input']).toContainEqual(expected);
+        if (mode === 'ledger') {
+          expect(saved.writes[0]?.history).toContainEqual(expected);
+        }
+      }
+      expect(approveMcp).toHaveBeenCalledTimes(decision === 'missing' ? 0 : 1);
+      expect(history).toEqual(original);
+    },
+  );
 });
 
 describe('reviewed native observations', () => {
@@ -2716,6 +2816,79 @@ test('ledger omits MCP credentials while requests and resume use the current cre
   expect(noSave).not.toHaveBeenCalled();
   expect(noRequest.bodies).toHaveLength(0);
   expect(execute).toHaveBeenCalledTimes(1);
+});
+
+const interpreterCredential = (revision: number) => `fixture-interpreter-credential-${revision}`;
+const interpreterPolicy = (revision: number, domain = 'fixture.invalid', name = 'fixture_auth'): Tool => ({
+  type: 'code_interpreter',
+  container: {
+    type: 'auto',
+    network_policy: {
+      type: 'allowlist',
+      allowed_domains: ['fixture.invalid'],
+      domain_secrets: [{ domain, name, value: interpreterCredential(revision) }],
+    },
+  },
+});
+
+test('ledger keeps interpreter policy identity while rotating current domain credentials', async () => {
+  const execute = vi.fn(() => 'recorded');
+  const runner = new ResponsesToolRunner({
+    functions: [{ tool: { type: 'function', name: 'record', parameters: {}, strict: false }, execute }],
+  });
+  const old = interpreterPolicy(1);
+  const original = harness([{ output: [call('record', {})] }, { output: [message] }]);
+  const create = original.client.responses.create.bind(original.client.responses);
+  vi.spyOn(original.client.responses, 'create').mockImplementation((params, options) =>
+    create(params, options)._thenUnwrap((response) => {
+      if (!('output' in response)) {
+        throw new Error('Expected non-streaming checkpoint fixture');
+      }
+      response.tools = [old];
+      return response;
+    }),
+  );
+  const saved = recording();
+  await runner.run(original.client, { ...input, tools: [old] }, { ledger: saved.ledger });
+  expect(original.bodies[0]?.['tools']).toContainEqual(old);
+  expect(JSON.stringify(saved.writes).includes(interpreterCredential(1))).toBe(false);
+  const boundary = saved.writes.find(
+    (value) => value.phase === 'boundary' && value.returned_call_ids.length === 1,
+  );
+  if (!boundary) {
+    throw new Error('Expected interpreter boundary');
+  }
+  const refreshed = interpreterPolicy(2);
+  const resumed = harness([{ output: [message] }]);
+  const current = recording();
+  await runner.run(
+    resumed.client,
+    { ...input, input: 'fresh observation', tools: [refreshed] },
+    {
+      ledger: { ...current.ledger, resumeFrom: boundary },
+    },
+  );
+  expect(resumed.bodies[0]?.['tools']).toContainEqual(refreshed);
+  expect(JSON.stringify(current.writes).includes(interpreterCredential(2))).toBe(false);
+  for (const changed of [
+    interpreterPolicy(2, 'other.invalid'),
+    interpreterPolicy(2, 'fixture.invalid', 'different_auth'),
+  ]) {
+    const untouched = harness([]);
+    const save = vi.fn();
+    // oxlint-disable-next-line no-await-in-loop -- Prove each identity change stops before its own save and request.
+    await expect(
+      runner.run(
+        untouched.client,
+        { ...input, input: 'fresh observation', tools: [changed] },
+        {
+          ledger: { runId: current.ledger.runId, save, resumeFrom: boundary },
+        },
+      ),
+    ).rejects.toBeInstanceOf(TypeError);
+    expect(untouched.bodies).toHaveLength(0);
+    expect(save).not.toHaveBeenCalled();
+  }
 });
 
 test('MCP checkpoint hashing keeps the original nested input snapshot', async () => {
@@ -4800,7 +4973,7 @@ describe('mixed server tools', () => {
       runner.run(h.client, { ...input, input: [approval, receipt, changed, receipt], tools: [mcp] }),
     ).rejects.toBeInstanceOf(ResponsesToolRunnerError);
     expect(effect).not.toHaveBeenCalled();
-    expect(h.bodies).toHaveLength(1);
+    expect(h.bodies).toHaveLength(0);
   });
   test.each([false, true])(
     'does not retry MCP after a retryable HTTP failure (automatic=%s)',

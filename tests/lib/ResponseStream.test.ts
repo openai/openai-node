@@ -1899,6 +1899,36 @@ describe('.stream()', () => {
     await expect(stream[Symbol.asyncIterator]().next()).resolves.toEqual({ value: undefined, done: true });
   });
 
+  it.each([
+    'response.created',
+    'response.queued',
+    'response.in_progress',
+    'response.completed',
+    'response.failed',
+    'response.incomplete',
+  ] as const)('rejects a nonobject %s response instead of fabricating an empty one', async (type) => {
+    const events: ResponseStreamEvent[] = [];
+    if (type !== 'response.created') {
+      events.push({ type: 'response.created', sequence_number: 0, response: makeResponse() });
+    }
+    // @ts-expect-error Simulate malformed provider JSON at the public replay boundary.
+    events.push({ type, sequence_number: 1, response: null });
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+    await expect(stream.finalResponse()).rejects.toBeInstanceOf(OpenAIError);
+  });
+
+  it.each([{ response: false }, { response: 42 }, { response: 'malformed' }, { response: [] }])(
+    'rejects nonrecord created response value $response',
+    async ({ response }) => {
+      const events: ResponseStreamEvent[] = [
+        // @ts-expect-error Simulate invalid scalar or array JSON at the public replay boundary.
+        { type: 'response.created', sequence_number: 0, response },
+      ];
+      const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      await expect(stream.finalResponse()).rejects.toBeInstanceOf(OpenAIError);
+    },
+  );
+
   it('preserves failed response snapshots when no separate error event is sent', async () => {
     const created = {
       type: 'response.created',

@@ -22,7 +22,7 @@ import {
   validateResponseOutputItemIdentity,
 } from '../../internal/responses/response-accumulator';
 import { ensureCanonicalOutputText } from '../../internal/responses/canonical-output-text';
-import { hasOwn } from '../../internal/utils/values';
+import { hasOwn, isObj } from '../../internal/utils/values';
 import type { ParseableToolsParams } from '../ResponsesParser';
 import { addOutputText, maybeParseResponse } from '../ResponsesParser';
 import { Stream } from '../../streaming';
@@ -208,6 +208,9 @@ export class ResponseStream<ParsedT = null>
         throw new OpenAIError('Lifecycle events require their own response field.');
       }
       const { response: wireResponse, ...fields } = event;
+      if (!isObj(wireResponse)) {
+        throw new OpenAIError('Lifecycle events require a response object.');
+      }
       let response = structuredClone(wireResponse);
       if (!hasOwn(response, 'output') || response.output == null) {
         let output: Response['output'];
