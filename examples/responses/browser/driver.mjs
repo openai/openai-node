@@ -155,6 +155,7 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
   const pixelURLs = new Set(publicViewports);
   const nonce = randomBytes(16).toString('hex');
   const tabs = new Map();
+  const pageListeners = new Map();
   const pageGenerations = new WeakMap();
   let active = null;
   let sequence = 0;
@@ -266,14 +267,27 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
       return;
     }
     if (![...tabs.values()].includes(page)) {
-      if (ownedURLs && tabs.size >= 100) {
+      if (tabs.size >= 100) {
         unusable = true;
-        refs.clear();
-        // This disposable context belongs to the fixture, not its caller.
-        // oxlint-disable-next-line promise/prefer-await-to-then -- The synchronous page event retires immediately and drains close.
-        void context.close().catch(() => {
-          // Remain retired even when close fails.
-        });
+        referenceGeneration += 1;
+        if (ownedURLs) {
+          refs.clear();
+          // This disposable context belongs to the fixture, not its caller.
+          // oxlint-disable-next-line promise/prefer-await-to-then -- The synchronous page event retires immediately and drains close.
+          void context.close().catch(() => {
+            // Remain retired even when close fails.
+          });
+        } else {
+          context.removeListener('page', remember);
+          for (const [tracked, listeners] of pageListeners) {
+            for (const [event, listener] of Object.entries(listeners)) {
+              tracked.removeListener(event, listener);
+            }
+          }
+          retireBorrowedReferences();
+          tabs.clear();
+          pageListeners.clear();
+        }
         return;
       }
       sequence += 1;
@@ -281,30 +295,36 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
       tabs.set(tabId, page);
       pageGenerations.set(page, 0);
       void invalidateReferences();
-      page.on('framenavigated', () => {
+      const framenavigated = () => {
         if (!unusable) {
           pageGenerations.set(page, pageGenerations.get(page) + 1);
           void invalidateReferences();
         }
         notice('navigation', tabId);
-      });
-      page.on('framedetached', () => {
+      };
+      const framedetached = () => {
         if (!unusable) {
           pageGenerations.set(page, pageGenerations.get(page) + 1);
           void invalidateReferences();
         }
-      });
-      page.on('close', () => {
+      };
+      const close = () => {
         if (!unusable) {
           void invalidateReferences();
         }
         notice('tab_closed', tabId);
         tabs.delete(tabId);
+        pageListeners.delete(page);
         pageGenerations.delete(page);
         if (active === tabId) {
           active = [...tabs.keys()][0] ?? null;
         }
-      });
+      };
+      const listeners = { framenavigated, framedetached, close };
+      pageListeners.set(page, listeners);
+      for (const [event, listener] of Object.entries(listeners)) {
+        page.on(event, listener);
+      }
       if (ownedURLs) {
         active = tabId;
         notice('tab_opened', tabId);
@@ -363,7 +383,9 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
       }
     } catch {
       refs.delete(ref);
-      await entry.handle.dispose();
+      await entry.handle.dispose().catch(() => {
+        // Navigation may already have destroyed this captured handle.
+      });
       throw new BrowserError('Element ref is stale. Read the page again.');
     }
     return entry.handle;

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { once } from 'node:events';
+import { EventEmitter, once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import { chromium } from 'playwright';
@@ -19,6 +19,30 @@ await once(server, 'listening');
 const url = `http://127.0.0.1:${server.address().port}/fixture`;
 const second = `http://127.0.0.1:${server.address().port}/second`;
 try {
+  // Exercise the registration boundary without starting 101 renderer processes.
+  // oxlint-disable-next-line unicorn/prefer-event-target -- Playwright contexts use Node's EventEmitter interface.
+  const borrowedOwner = new EventEmitter();
+  let closed = false;
+  borrowedOwner.close = async () => {
+    closed = true;
+  };
+  const limited = createBrowserDriver(borrowedOwner);
+  for (let i = 0; i < 101; i += 1) {
+    if (i === 100) {
+      // oxlint-disable-next-line no-await-in-loop -- Observe the last admissible count before the next page arrives.
+      const lastAdmitted = await limited.state();
+      assert.equal(lastAdmitted.tabs.length, 100);
+    }
+    // oxlint-disable-next-line unicorn/prefer-event-target -- Page registration requires Playwright's EventEmitter interface.
+    const stub = new EventEmitter();
+    stub.isClosed = () => false;
+    stub.url = () => 'about:blank';
+    stub.evaluate = async () => 'Caller tab';
+    borrowedOwner.emit('page', stub);
+  }
+  await assert.rejects(limited.state(), /retired/u);
+  assert.equal(closed, false);
+  checks += 3;
   /* eslint-disable no-await-in-loop -- Close each caller-owned fixture before the next bounded override. */
   for (const replaced of ['options', 'encoder']) {
     const fixture = await browser.newContext();
@@ -219,6 +243,30 @@ try {
   await driver.type({ tab_id: tab, target: entry.ref, text: 'same reference' });
   assert.equal(await page.locator('#allowed').inputValue(), 'same reference');
   checks += 14;
+  const nativePageEvaluate = page.evaluate.bind(page);
+  page.evaluate = async (...args) => {
+    const target = args[1]?.checkedNode;
+    if (target) {
+      target.dispose = async () => {
+        throw new Error('SYNTHETIC_DISPOSAL_6902');
+      };
+      throw new Error('SYNTHETIC_PAGE_URL_6902');
+    }
+    return await nativePageEvaluate(...args);
+  };
+  try {
+    await assert.rejects(driver.type({ tab_id: tab, target: entry.ref, text: 'must not type' }), (error) => {
+      assert.match(String(error), /stale/iu);
+      assert.doesNotMatch(String(error.stack), /SYNTHETIC_/u);
+      return true;
+    });
+  } finally {
+    page.evaluate = nativePageEvaluate;
+  }
+  assert.equal(await page.locator('#allowed').inputValue(), 'same reference');
+  const reread = await read();
+  assert.ok(reread.elements.some((item) => item.label === 'Allowed'));
+  checks += 3;
   const fullReady = Promise.withResolvers();
   const fullGate = Promise.withResolvers();
   const textReady = Promise.withResolvers();
