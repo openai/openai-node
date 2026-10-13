@@ -1,7 +1,41 @@
 // Exercise public and owner-launched pages on the actual loopback server. No SDK requests.
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { chromium } from 'playwright';
 import { createDemoServer } from './server.mjs';
+
+if (typeof process.getuid === 'function') {
+  const temporary = await mkdtemp(path.join(tmpdir(), 'demo-key-file-'));
+  const fifo = path.join(temporary, 'key');
+  const execute = promisify(execFile);
+  try {
+    await execute('mkfifo', ['-m', '600', fifo]);
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => !name.startsWith('OPENAI_')),
+    );
+    await assert.rejects(
+      execute(process.execPath, [fileURLToPath(new URL('server.mjs', import.meta.url)), '--key-file', fifo], {
+        env,
+        timeout: 3000,
+      }),
+      (error) => {
+        assert.equal(error.killed, false, 'A special key file must be rejected without waiting for a writer');
+        assert.equal(error.signal, null);
+        assert.equal(error.code, 1);
+        assert.match(error.stderr, /owner-only regular file/u);
+        return true;
+      },
+    );
+    console.log('PASS key-file startup rejects an owner-only FIFO without blocking');
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
+}
 
 const app = await createDemoServer({ port: 0 });
 const browser = await chromium.launch({ headless: true });

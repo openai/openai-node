@@ -30,7 +30,7 @@ async function readKey(path) {
   }
   // File-open flags must be combined; no-follow prevents symlink replacement of the selected file.
   // oxlint-disable-next-line no-bitwise
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW);
   try {
     const stat = await handle.stat();
     // Check the permission bits as supplied by the filesystem.

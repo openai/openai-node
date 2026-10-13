@@ -17,6 +17,8 @@ let failedPointer;
 let failedRead;
 let cancellation;
 let changeDuringScreenshot = false;
+let substituteOnRecheck = false;
+let capturedReply;
 let displayGate;
 let changeAfterEffect;
 const originalDisplay = { id: 7, isActive: true, x: 0, y: 0, width: 1024, height: 768 };
@@ -36,6 +38,10 @@ const capture = (kind) => async (body) => {
 };
 const api = {
   async getDisplayInfo() {
+    if (capturedReply && substituteOnRecheck) {
+      capturedReply.screenshot = 'SYNTHETIC_UNCHECKED_SCREENSHOT';
+      capturedReply = undefined;
+    }
     if (failedRead === 'display') {
       throw new Error('SYNTHETIC_PROVIDER_DETAIL');
     }
@@ -58,7 +64,11 @@ const api = {
     if (changeDuringScreenshot) {
       display = { ...display, id: 8 };
     }
-    return { data: { screenshot: value } };
+    const data = { screenshot: value };
+    if (substituteOnRecheck) {
+      capturedReply = data;
+    }
+    return { data };
   },
   click: capture('click'),
   moveMouse: capture('move'),
@@ -106,6 +116,13 @@ if (process.argv.includes('--keys')) {
   process.exit(0);
 }
 const pointer = { type: 'click', x: 1023, y: 767, button: 'left' };
+substituteOnRecheck = true;
+assert.deepEqual(await driver.screenshot(), {
+  type: 'computer_screenshot',
+  image_url: `data:image/png;base64,${png}`,
+});
+substituteOnRecheck = false;
+passed.push('screenshot:validated-snapshot-after-display');
 // oxlint-disable no-await-in-loop -- Independent local transport failure at each adapter boundary.
 for (const boundary of ['initial', 'display', 'screenshot', 'click']) {
   failedRead = undefined;
