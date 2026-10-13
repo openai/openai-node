@@ -47,6 +47,10 @@ const server = createServer({ allowHalfOpen: true }, (socket) => {
       writeFileSync('../../ready-entered', '1');
       return;
     }
+    if (action.type !== 'ready' && ${JSON.stringify(mode)} === 'malformed') {
+      socket.end('SYNTHETIC_8738_NOT_JSON\\n');
+      return;
+    }
     if (action.type === 'ready' || action.type === 'verify') {
       socket.end(JSON.stringify({ ok: true }) + '\\n');
     } else {
@@ -91,6 +95,29 @@ async function waitForInput(root, id) {
 
 const runtimes = [];
 try {
+  for (const member of ['verify', 'seal', 'captureFrame']) {
+    // Each controlled child owns one independent raw-reply refusal.
+    // oxlint-disable-next-line no-await-in-loop
+    const root = await makeRuntime('malformed');
+    runtimes.push(root);
+    // oxlint-disable-next-line no-await-in-loop
+    const desktop = await Desktop.create({ runtimeDir: root });
+    try {
+      // oxlint-disable-next-line no-await-in-loop
+      await assert.rejects(desktop[member](), (error) => {
+        assert.equal(error.message, 'Invalid private desktop reply.');
+        assert.doesNotMatch(String(error.stack), /SYNTHETIC_8738/u);
+        assert.equal(error.cause, undefined);
+        return true;
+      });
+      // oxlint-disable-next-line no-await-in-loop
+      assert.deepEqual(await readdir(path.join(root, 'runs')), []);
+    } finally {
+      // oxlint-disable-next-line no-await-in-loop
+      await desktop.stop();
+    }
+  }
+  console.log('PASS verify, seal and viewer malformed replies reveal no raw guest data or parser cause');
   const bad = await makeRuntime('startup');
   runtimes.push(bad);
   await assert.rejects(Desktop.create({ runtimeDir: bad }), /did not start/u);

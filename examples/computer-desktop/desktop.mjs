@@ -272,7 +272,12 @@ export class Desktop {
         screenshot ? screenshotLimit : replyLimit,
         { signal },
       );
-      const result = JSON.parse(raw);
+      let result;
+      try {
+        result = JSON.parse(raw);
+      } catch {
+        throw new Error('Invalid private desktop reply.');
+      }
       if (!result || typeof result.ok !== 'boolean') {
         throw new Error('Invalid private desktop reply.');
       }
