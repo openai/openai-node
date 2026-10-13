@@ -2717,6 +2717,109 @@ describe('runner admission and resume boundaries', () => {
       expect(h.bodies).toHaveLength(1);
     },
   );
+  test.each(['turn', 'eager', 'input', 'resume'] as const)(
+    'refuses native output IDs reused after a prior turn: %s',
+    async (mode) => {
+      const original = wireCall('record', {}, 'old');
+      if (original.id === undefined) {
+        throw new Error('Expected native item ID');
+      }
+      const reused = { ...wireCall('record', {}, 'new'), id: original.id };
+      const execute = vi.fn(() => 'recorded');
+      const runner = new ResponsesToolRunner({
+        functions: [{ tool: { type: 'function', name: 'record', parameters: {}, strict: false }, execute }],
+      });
+      const saved = recording();
+      let resumeFrom: ResponsesRunnerCheckpoint | undefined;
+      if (mode === 'resume') {
+        const initial = harness([{ output: [original] }, { output: [message] }]);
+        await runner.run(initial.client, input, { maxSteps: 4, ledger: saved.ledger });
+        resumeFrom = saved.writes.find(
+          (value) => value.phase === 'boundary' && value.returned_call_ids.length > 0,
+        );
+        if (!resumeFrom) {
+          throw new Error('Expected the completed first turn');
+        }
+      }
+      const h = harness([
+        ...(mode === 'turn' || mode === 'eager' ? [{ output: [original] }] : []),
+        { output: [reused] },
+        { output: [message] },
+      ]);
+      const initialInput: ResponseInputItem[] = [
+        original,
+        { type: 'function_call_output', call_id: original.call_id, output: 'recorded' },
+      ];
+      const next = recording();
+      await expect(
+        runner.run(
+          h.client,
+          { ...input, input: mode === 'input' ? initialInput : 'continue' },
+          {
+            maxSteps: 4,
+            stream: mode === 'eager',
+            eager: mode === 'eager',
+            ...(resumeFrom ? { ledger: { ...next.ledger, resumeFrom } } : {}),
+          },
+        ),
+      ).rejects.toThrow('item ID');
+      expect(execute).toHaveBeenCalledTimes(mode === 'input' ? 0 : 1);
+      expect(h.bodies).toHaveLength(mode === 'turn' || mode === 'eager' ? 2 : 1);
+    },
+  );
+  test('keeps empty optional function IDs unassigned across turns', async () => {
+    const execute = vi.fn(() => 'ok');
+    const runner = new ResponsesToolRunner({
+      functions: [{ tool: { type: 'function', name: 'record', parameters: {}, strict: false }, execute }],
+    });
+    const h = harness([
+      { output: [{ ...wireCall('record', {}, 'first'), id: '' }] },
+      { output: [{ ...wireCall('record', {}, 'second'), id: '' }] },
+      { output: [message] },
+    ]);
+    await expect(runner.run(h.client, input)).resolves.toHaveProperty('output_text', 'done');
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(h.bodies).toHaveLength(3);
+  });
+  test.each([
+    { id: 'ref_fixture', type: 'item_reference' as const },
+    { id: 'ref_fixture' },
+    { id: 'ref_fixture', type: null },
+  ])('preserves a native reference and consumes a budgeted trigger once: %j', async (reference) => {
+    const original: ResponseInputItem[] = [
+      wireCall('record', {}, 'old'),
+      { type: 'function_call_output', call_id: 'call_old', output: 'x'.repeat(4000) },
+      reference,
+      { type: 'compaction_trigger' },
+    ];
+    const frozen = structuredClone(original);
+    const h = harness([{ output: [wireCall('record', {}, 'new')] }, { output: [message] }]);
+    const compact = vi.fn(({ eligibleCallIds }) => ({ dropCallIds: eligibleCallIds }));
+    const execute = vi.fn(() => 'new');
+    const runner = new ResponsesToolRunner({
+      functions: [{ tool: { type: 'function', name: 'record', parameters: {}, strict: false }, execute }],
+    });
+    await expect(
+      runner.run(
+        h.client,
+        { ...input, input: original },
+        { contextBudget: { maxInputBytes: 1200, maxInputImages: 0, compact } },
+      ),
+    ).resolves.toHaveProperty('output_text', 'done');
+    const sent = h.bodies.map((body) => body['input']);
+    if (!Array.isArray(sent[0])) {
+      throw new TypeError('Expected native request input');
+    }
+    expect(sent[0]).toContainEqual(reference);
+    // The supported ES2020 library does not provide Array.prototype.at.
+    // oxlint-disable-next-line unicorn/prefer-at
+    expect(sent[0][sent[0].length - 1]).toEqual({ type: 'compaction_trigger' });
+    expect(sent[1]).toContainEqual(reference);
+    expect(sent[1]).not.toContainEqual({ type: 'compaction_trigger' });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(compact).toHaveBeenCalled();
+    expect(original).toEqual(frozen);
+  });
 });
 
 test('ledger omits MCP credentials while requests and resume use the current credentials', async () => {
@@ -5008,7 +5111,10 @@ describe('mixed server tools', () => {
     'MCP approval %s waits for inspection and uses its actual ID',
     async (approved) => {
       const approveMcp = vi.fn(() => approved);
-      const env = harness([{ output: [approval, message] }, { output: [message] }]);
+      const env = harness([
+        { output: [approval, { ...message, id: 'msg_before_approval' }] },
+        { output: [message] },
+      ]);
       const saved = recording();
       const runner = new ResponsesToolRunner({});
       const iterator = runner.iterate(
@@ -7904,7 +8010,7 @@ describe('ResponsesToolRunner effect ledger', () => {
     const proposed = [
       wireCall('browser_click', { target: 'one', tab_id: null }),
       wireCall('record', {}),
-      { ...message, phase: 'commentary' as const },
+      { ...message, id: 'msg_commentary', phase: 'commentary' as const },
     ];
     const h = harness([{ output: proposed }, { output: [message] }]);
     const writes: ResponsesRunnerCheckpoint[] = [];

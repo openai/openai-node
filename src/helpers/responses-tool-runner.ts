@@ -1904,14 +1904,34 @@ export class ResponsesToolRunner {
   }
 
   // oxlint-disable-next-line complexity -- Validate the complete replay sequence before storage or transport.
-  private validateHistory(history: ResponseInputItem[], tools: Tool[]): Set<string> {
+  private validateHistory(history: ResponseInputItem[], tools: Tool[], budgetOnly = false): Set<string> {
     const calls = new Map<string, string>();
     const returned = new Set<string>();
     const requests = new Map<string, ResponseInputItem.McpApprovalRequest | null>();
     const approved = new Map<string, ResponseInputItem.McpApprovalRequest>();
-    for (const item of history) {
+    for (const [index, item] of history.entries()) {
       if (!isObj(item)) {
         throw new TypeError('Ledger history must contain native input items.');
+      }
+      if (budgetOnly) {
+        if (item.type === 'compaction_trigger') {
+          if (index !== history.length - 1) {
+            throw new TypeError('A compaction trigger must be the final input item.');
+          }
+          continue;
+        }
+        if (
+          item.type === 'item_reference' ||
+          ((item.type === undefined || item.type === null) &&
+            !hasOwn(item, 'role') &&
+            !hasOwn(item, 'content') &&
+            hasOwn(item, 'id'))
+        ) {
+          if (!('id' in item) || typeof item.id !== 'string') {
+            throw new TypeError('Item references require a native string ID.');
+          }
+          continue;
+        }
       }
       if (!hasOwn(item, 'type')) {
         if (!isNativeResponseMessageInput(item)) {
@@ -2230,8 +2250,8 @@ export class ResponsesToolRunner {
       if (!contextBudget) {
         return input;
       }
-      this.validateHistory(input, tools);
-      return this.budgetedInput(input, tools, contextBudget, parameters, signal);
+      this.validateHistory(input, tools, true);
+      return this.budgetedInput(input, tools, contextBudget, parameters, true, signal);
     }
     if (step >= maxSteps) {
       throw new RunnerValidationError('ResponsesToolRunner reached maxSteps.');
@@ -2239,7 +2259,7 @@ export class ResponsesToolRunner {
     ledger.phase = 'boundary';
     this.validateBoundary(ledger, tools);
     const history = contextBudget
-      ? await this.budgetedInput(ledger.history, tools, contextBudget, parameters, signal)
+      ? await this.budgetedInput(ledger.history, tools, contextBudget, parameters, false, signal)
       : ledger.history;
     ledger.consumed_requests = step + 1;
     if (tools.some((tool) => allowedServerTypes.has(tool.type))) {
@@ -2298,6 +2318,7 @@ export class ResponsesToolRunner {
     tools: Tool[],
     budget: ResponsesContextBudget,
     parameters: ResponseCreateParamsNonStreaming,
+    budgetOnly: boolean,
     signal?: AbortSignal,
   ): Promise<ResponseInputItem[]> {
     parameters.truncation = 'disabled';
@@ -2317,7 +2338,7 @@ export class ResponsesToolRunner {
     });
     signal?.throwIfAborted();
     const projected = ResponsesToolRunner.compactHistory(history, eligibleCallIds, supplied);
-    this.validateHistory(projected, tools);
+    this.validateHistory(projected, tools, budgetOnly);
     const measured = ResponsesToolRunner.measureInput(projected);
     if (measured.inputBytes > budget.maxInputBytes || measured.inputImages > budget.maxInputImages) {
       throw new RunnerValidationError('Responses input still exceeds the context budget.');
@@ -2457,17 +2478,12 @@ export class ResponsesToolRunner {
     // Non-eager calls must all be admissible before any effect, including IDs
     // retained in ledger history from caller-provided input.
     const seen = eager ? new Set<string>() : ResponsesToolRunner.seenCallIds(history, attempted);
-    const nativeIds = new Set<string>();
+    const nativeIds = ResponsesToolRunner.seenOutputIds(history);
     const approved = approvedMcpRequests(history);
     for (const item of output) {
       try {
         this.validateItem(item, tools);
-        if (hasOwn(item, 'id') && typeof item.id === 'string') {
-          if (nativeIds.has(item.id)) {
-            throw new RunnerValidationError('Response output item IDs must be unique within a turn.');
-          }
-          nativeIds.add(item.id);
-        }
+        ResponsesToolRunner.checkOutputId(item, nativeIds);
         if (item.type === 'mcp_call') {
           validateMcpCall(item, approved);
         }
@@ -2491,6 +2507,25 @@ export class ResponsesToolRunner {
         }
         seen.add(id);
       }
+    }
+  }
+
+  private static seenOutputIds(history: readonly ResponseInputItem[]): Set<string> {
+    const ids = new Set<string>();
+    for (const item of history) {
+      if ('id' in item && hasOwn(item, 'id') && typeof item.id === 'string' && item.id !== '') {
+        ids.add(item.id);
+      }
+    }
+    return ids;
+  }
+
+  private static checkOutputId(item: ResponseOutputItem, seen: Set<string>): void {
+    if (hasOwn(item, 'id') && typeof item.id === 'string') {
+      if (seen.has(item.id)) {
+        throw new RunnerValidationError('Response output item IDs must be unique across the run.');
+      }
+      seen.add(item.id);
     }
   }
 
@@ -2820,7 +2855,11 @@ export class ResponsesToolRunner {
         );
         if ((ledger?.consumed_requests ?? 0) < maxSteps && importedMcp.length > 0) {
           if (!ledger) {
-            this.validateHistory(contextBudget ? initialHistory : importedMcp, declarations);
+            this.validateHistory(
+              contextBudget ? initialHistory : importedMcp,
+              declarations,
+              Boolean(contextBudget),
+            );
           }
           const selection = ResponsesToolRunner.localSelection(
             hasOwn(parameters, 'tool_choice') ? parameters.tool_choice : undefined,
@@ -2882,6 +2921,9 @@ export class ResponsesToolRunner {
           const seen = eager
             ? ResponsesToolRunner.seenCallIds(ledger?.history ?? input, attempted)
             : new Set<string>();
+          const streamNativeIds = eager
+            ? ResponsesToolRunner.seenOutputIds(ledger?.history ?? input)
+            : new Set<string>();
           const dispatch = async (item: ResponseOutputItem, target = turn) => {
             ResponsesToolRunner.validateSelection(item, selection, requestTools);
             if (ResponsesToolRunner.ledgerContains(item, ledger)) {
@@ -2928,6 +2970,7 @@ export class ResponsesToolRunner {
               deferred = true;
             }
             ResponsesToolRunner.validateSelection(item, selection, requestTools);
+            ResponsesToolRunner.checkOutputId(item, streamNativeIds);
             this.validateEarlyCall(item, requestTools, seen, step, maxSteps, ledger);
             this.prepareFunction(item, turn, options.onDiagnostic, signal);
             if (item.type === 'mcp_approval_request') {
@@ -3108,6 +3151,11 @@ export class ResponsesToolRunner {
             // oxlint-disable-next-line no-await-in-loop
             await record?.();
           } else {
+            // The supported ES2020 library does not provide Array.prototype.at.
+            // oxlint-disable-next-line unicorn/prefer-at
+            if (contextBudget && input[input.length - 1]?.type === 'compaction_trigger') {
+              input.pop();
+            }
             for (const item of [...toResponseInputItems(pending), ...outputs, ...userText]) {
               input.push(item);
             }

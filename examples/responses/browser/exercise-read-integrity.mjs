@@ -56,7 +56,7 @@ try {
       await fixture.close();
     }
   }
-  for (const member of ['read_page', 'find', 'click']) {
+  for (const member of ['state', 'read_page', 'find', 'click']) {
     const fixture = await browser.newContext();
     const borrowed = createBrowserDriver(fixture);
     const sentinel = await browser.newPage();
@@ -68,7 +68,19 @@ try {
       const [{ id: selected }] = state.tabs;
       const prior = await borrowed.read_page({ tab_id: selected, filter: 'all' });
       const [{ ref }] = prior.elements;
-      await target.evaluate(() => {
+      await target.evaluate((operation) => {
+        if (operation === 'state') {
+          Object.defineProperty(document, 'title', {
+            get() {
+              const until = performance.now() + 8000;
+              while (performance.now() < until) {
+                // A finite, caller-owned renderer task.
+              }
+              return 'Fixture title';
+            },
+          });
+          return;
+        }
         const { matches: nativeMatches } = Element.prototype;
         let first = true;
         // oxlint-disable-next-line eslint/no-extend-native -- Finite page-owned method exercises a stalled renderer.
@@ -82,9 +94,11 @@ try {
           }
           return nativeMatches.call(this, selector);
         };
-      });
+      }, member);
       const started = performance.now();
-      if (member === 'read_page') {
+      if (member === 'state') {
+        await assert.rejects(borrowed.state(), /timed out/u);
+      } else if (member === 'read_page') {
         await assert.rejects(borrowed.read_page({ tab_id: selected, filter: 'all' }), /timed out/u);
       } else if (member === 'find') {
         await assert.rejects(borrowed.find({ tab_id: selected, query: 'Current choice' }), /timed out/u);

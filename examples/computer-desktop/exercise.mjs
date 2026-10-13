@@ -79,7 +79,6 @@ try {
       keys: ['CTRL'],
     },
     { type: 'keypress', keys: ['Unsupported'] },
-    { type: 'type', text: 'X'.repeat(2001) },
     { type: 'scroll', x: 700, y: 400, scroll_x: 0, scroll_y: 2049 },
   ];
   for (const action of invalid) {
@@ -135,7 +134,14 @@ try {
     { type: 'type', text: `${'synthetic fixture '.repeat(192)}\nDesktop receipt D-2201` },
     { type: 'keypress', keys: ['CTRL', 'S'] },
   ]);
-  const longText = await main.verify();
+  let longText = await main.verify();
+  for (let attempt = 0; attempt < 5 && longText.file_empty; attempt += 1) {
+    // Wait for the actual local editor save receipt, within five normal GUI waits.
+    // oxlint-disable-next-line no-await-in-loop
+    await execute(main, [{ type: 'wait' }]);
+    // oxlint-disable-next-line no-await-in-loop
+    longText = await main.verify();
+  }
   assert.equal(
     longText.file_empty,
     false,

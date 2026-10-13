@@ -175,6 +175,35 @@ async function checkQuestion({ question, target, expected }) {
   }
 }
 
+const stoppedReader = await openReader({ documents });
+try {
+  const controller = new AbortController();
+  let requests = 0;
+  let transportAborted = false;
+  const client = new OpenAI({
+    apiKey: 'synthetic-local-reader',
+    maxRetries: 0,
+    fetch: async (input, init) => {
+      const request = new Request(input, init);
+      requests += 1;
+      controller.abort();
+      transportAborted = request.signal.aborted;
+      throw new Error('Synthetic interrupted transport');
+    },
+  });
+  await assert.rejects(
+    answerQuestion(client, stoppedReader, {
+      model: 'local-reader-check',
+      question: 'When is the museum closed?',
+      signal: controller.signal,
+    }),
+  );
+  assert.equal(requests, 1);
+  assert.equal(transportAborted, true, 'Stop must abort the actual Responses transport');
+} finally {
+  await stoppedReader.close();
+}
+
 await checkQuestion({
   question: 'When is the museum closed?',
   target: '/hours',
