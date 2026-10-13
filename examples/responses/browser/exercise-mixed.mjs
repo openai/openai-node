@@ -17,6 +17,7 @@ class SimulatedDesktop {
   active = false;
   uncertainEffects = false;
   saved = false;
+  sealed = false;
   typed = null;
   computer = new ComputerToolset({
     click: () => null,
@@ -37,6 +38,7 @@ class SimulatedDesktop {
   });
   async withComputer(work) {
     this.controller.signal.throwIfAborted();
+    assert.equal(this.sealed, false, 'a sealed desktop cannot admit more actions');
     assert.equal(this.active, false);
     this.active = true;
     try {
@@ -54,6 +56,12 @@ class SimulatedDesktop {
       browser_matches: false,
       browser_effects: 0,
     };
+  }
+  async seal(options) {
+    options?.signal?.throwIfAborted();
+    const proof = await this.verify();
+    this.sealed = true;
+    return proof;
   }
   async stop() {
     this.controller.abort();
@@ -169,6 +177,12 @@ function scripted(fixture, test) {
         }
         case 'editor': {
           assert.equal(last.output, receiptText, 'only verified fixed text reaches the model');
+          if (test === 'complete') {
+            const repeated = await fetch(fixture.resultURL());
+            assert.equal(repeated.status, 409, 'Receipt capability cannot be replayed after delivery');
+            assert.equal(await repeated.text(), '');
+            assert.deepEqual(fixture.proof(), { routes: 1, resultRequests: 1, browserRouted: true });
+          }
           output = {
             id,
             call_id: `call_${id}`,
@@ -359,7 +373,7 @@ if (!values['runtime-dir']) {
         signal: stopped.signal,
       });
       assert.equal(proof.status, 'stopped', stage);
-      assert.equal(proof.verified, true, 'Keep the settled business observation separate from Stop');
+      assert.equal(proof.verified, false, 'Stop before phase verification must not report a current success');
       assert.deepEqual(proof.host, { routes: 1, resultRequests: 1, browserRouted: true });
       console.log('PASS Stop during mixed verification', stage);
     } finally {

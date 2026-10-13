@@ -99,7 +99,7 @@ export async function createMixedFixture({ result = receiptBytes, partial = fals
         return;
       }
       if (resultRequest) {
-        if (routes !== 1 || admission !== 'completed') {
+        if (routes !== 1 || admission !== 'completed' || resultRequests !== 0) {
           response.writeHead(409).end();
           return;
         }

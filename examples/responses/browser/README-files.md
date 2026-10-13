@@ -8,6 +8,10 @@ The default browser tools do not include either file member. Only a random
 `grant_id` goes to a tool. The application owns the paths, source, expected content,
 approval callback, and cleanup.
 
+Uploads require the OS file-open flags `O_NOFOLLOW` and `O_NONBLOCK`. Upload
+owner creation rejects unsupported platforms, including Windows, before it
+creates a staging directory. This requirement applies only to the upload example.
+
 Use Node.js 22 or later and a source archive from the latest SDK release.
 The npm package supplies the SDK, not the example files. From the extracted archive:
 

@@ -194,9 +194,9 @@ try {
       complete: explained && correct && receipt.rules_read && state.signed && saves.length === 4,
     };
   };
-  const read = async (args) => {
+  const read = async (args, options) => {
     const readTab = args.tab_id ?? base.currentOwnedView().tabId;
-    const report = await base.read_page(args);
+    const report = await base.read_page(args, options);
     const view = base.currentOwnedView();
     observed = {
       report,

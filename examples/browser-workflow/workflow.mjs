@@ -127,6 +127,7 @@ export async function serve(fixtureFile) {
     res.writeHead(200, {
       'Content-Type': `${asset[1]}; charset=utf-8`,
       'Cache-Control': 'no-store',
+      'Cross-Origin-Resource-Policy': 'same-origin',
     });
     res.end(asset[0]);
   });
@@ -304,11 +305,11 @@ export async function openWorkflow(
       );
       return JSON.parse(output.output[0].text);
     };
-    const stored = async () => {
-      stopped.signal.throwIfAborted();
+    const stored = async ({ signal = stopped.signal } = {}) => {
+      signal.throwIfAborted();
       const finished = new AbortController();
       try {
-        const interrupted = once(stopped.signal, 'abort', { signal: finished.signal });
+        const interrupted = once(signal, 'abort', { signal: finished.signal });
         const result = await Promise.race([
           page.evaluate(
             (id) =>
@@ -320,7 +321,7 @@ export async function openWorkflow(
           ),
           interrupted,
         ]);
-        stopped.signal.throwIfAborted();
+        signal.throwIfAborted();
         return JSON.parse(result);
       } finally {
         finished.abort();
@@ -535,8 +536,15 @@ export async function main(args) {
       record.requests = workflow.metrics.requests;
       record.calls = workflow.metrics.calls;
       record.runnerError = workflow.metrics.runnerError;
-      if (workflow.stopped.signal.aborted) {
-        record.stored = workflow.verifiedRecords;
+      if (
+        workflow.stopped.signal.aborted &&
+        !(workflow.stopped.signal.reason instanceof WorkflowBrowserClosedError)
+      ) {
+        try {
+          record.stored = await workflow.stored({ signal: AbortSignal.timeout(5000) });
+        } catch {
+          record.stored = null;
+        }
       } else if (!(workflow.stopped.signal.reason instanceof WorkflowBrowserClosedError)) {
         record.stored = await workflow.stored();
       }

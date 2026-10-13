@@ -370,16 +370,18 @@ async function interruptedActions() {
         }
       })();
       await entered.promise;
+      const closed = page.waitForEvent('close', { timeout: 0 });
       stop.abort();
       const result = await Promise.race([outcome, delay(1500, 'blocked')]);
       assert.notEqual(result, 'blocked', action);
       assert.match(result.message, /outcome is unknown/u);
       assert.equal(driver.hasUncertainEffects(), true, action);
-      assert.ok(page.isClosed());
       await assert.rejects(driver.state(), /retired/u);
       release.resolve();
       await drained.promise;
       await outcome;
+      assert.notEqual(await Promise.race([closed, delay(1500, 'blocked')]), 'blocked', action);
+      assert.ok(page.isClosed());
       await assert.rejects(driver.state(), /retired/u);
     } finally {
       release.resolve();

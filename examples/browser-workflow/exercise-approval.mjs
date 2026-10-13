@@ -33,7 +33,10 @@ try {
     assert.ok(asked.at(-1).includes('Reserve R2 Garden'));
     assert.ok(!asked.at(-1).includes(booking.ref), 'opaque refs do not convey the intended effect');
     assert.equal(workflow.stopped.signal.aborted, true);
-    assert.deepEqual(await workflow.stored(), { bookings: {}, correspondence: {} });
+    assert.deepEqual(await workflow.stored({ signal: AbortSignal.timeout(5000) }), {
+      bookings: {},
+      correspondence: {},
+    });
   } finally {
     await workflow.close();
   }

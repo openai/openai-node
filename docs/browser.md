@@ -206,12 +206,12 @@ These four methods also stay off by default. Select each one in `members` and
 provide `confirm`, including for diagnostic reads. A driver's implementation alone
 does not expose them to the model.
 
-| Method             | Required arguments               | Result                           |
-| ------------------ | -------------------------------- | -------------------------------- |
-| `read_diagnostics` | `tab_id`, `source`, `limit`      | `BrowserTextReadV1`             |
-| `run_script`       | `tab_id`, `source`, `timeout_ms` | Text                             |
-| `upload_file`      | `grant_id`                       | `BrowserFileOutcome`             |
-| `download_file`    | `grant_id`                       | `BrowserFileOutcome`             |
+| Method             | Required arguments               | Result               |
+| ------------------ | -------------------------------- | -------------------- |
+| `read_diagnostics` | `tab_id`, `source`, `limit`      | `BrowserTextReadV1`  |
+| `run_script`       | `tab_id`, `source`, `timeout_ms` | Text                 |
+| `upload_file`      | `grant_id`                       | `BrowserFileOutcome` |
+| `download_file`    | `grant_id`                       | `BrowserFileOutcome` |
 
 For `read_diagnostics`, choose `console` or `network` as the source and a limit
 from 1 through 100. Return a structured read with an empty `elements` array.

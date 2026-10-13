@@ -170,11 +170,19 @@ const areaParent = tmpdir();
 const earlierAreas = new Set(await readdir(areaParent));
 let guestStops = 0;
 let busyGuest = true;
+let holdGuest = false;
+const guestFrame = Promise.withResolvers();
+const guestEntered = Promise.withResolvers();
 Desktop.create = async () => ({
   id: 'controlled-guest-stop',
   uncertainEffects: false,
-  captureFrame: async () =>
-    busyGuest ? null : { frame: Buffer.from('controlled pixels'), width: 1024, height: 768 },
+  captureFrame: async () => {
+    if (holdGuest) {
+      guestEntered.resolve(true);
+      return guestFrame.promise;
+    }
+    return busyGuest ? null : { frame: Buffer.from('controlled pixels'), width: 1024, height: 768 };
+  },
   verify: async () => ({ file_matches: false, file_empty: true, browser_matches: false, browser_effects: 0 }),
   withComputer: (work, { signal }) => work(computer, signal),
   async stop() {
@@ -206,6 +214,29 @@ try {
   await session.refreshView();
   assert.ok(session.matches(session.viewBinding), 'A later guest frame has the new binding.');
   assert.equal(run.liveView.frame.toString(), 'controlled pixels');
+  holdGuest = true;
+  const obsolete = session.refreshView();
+  const selected = session.selectView('host');
+  // Attach handlers before triggering the late frame failure.
+  const views = Promise.allSettled([obsolete, selected]);
+  assert.equal(
+    await Promise.race([guestEntered.promise, delay(2000, false)]),
+    true,
+    'Guest capture must enter',
+  );
+  guestFrame.reject(new Error('Controlled failure from superseded Guest capture'));
+  assert.deepEqual(
+    await views,
+    [
+      { status: 'fulfilled', value: undefined },
+      { status: 'fulfilled', value: undefined },
+    ],
+    'obsolete failure is discarded and the healthy new view finishes',
+  );
+  assert.equal(run.owner, 'agent');
+  assert.equal(session.binding().view, 'host');
+  assert.ok(session.matches(session.viewBinding));
+  holdGuest = false;
   console.log(
     'PASS switching to a busy Guest revokes Host pixels, retains the run and admits only a fresh Guest frame',
   );

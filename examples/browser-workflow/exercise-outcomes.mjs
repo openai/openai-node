@@ -157,6 +157,9 @@ if (mode === 'identifiers') {
     await main({ values: { mode: 'run', fixture: 'A', api: 'responses', receipt } });
     const saved = JSON.parse(await readFile(receipt, 'utf-8'));
     assert.equal(saved.status, mode === 'browser-loss' ? 'failed' : 'stopped');
+    if (mode === 'operator-stop') {
+      assert.deepEqual(saved.stored, { bookings: {}, correspondence: {} });
+    }
     assert.equal(saved.cleanup, true);
     assert.equal(requests, 1);
     console.log(`PASS ${mode} has the correct CLI receipt and cleanup`);

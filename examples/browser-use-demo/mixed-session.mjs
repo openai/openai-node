@@ -90,6 +90,10 @@ export async function createFieldworkMixed({ runtimeDir, run }) {
           };
           session.viewBinding = binding;
         } catch (error) {
+          const current = session.binding();
+          if (current && current.ownerVersion === binding.ownerVersion && !session.matches(binding)) {
+            return;
+          }
           if (execution?.poll && signal?.aborted) {
             return;
           }

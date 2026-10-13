@@ -26,6 +26,11 @@ export async function newUploadOwner(
     // No read-boundary hook unless the exercise supplies one.
   },
 ) {
+  if (!constants.O_NOFOLLOW || !constants.O_NONBLOCK) {
+    throw new Error(
+      'Uploads are not supported on this platform: non-following, nonblocking file opens are required.',
+    );
+  }
   const allowed = configuration?.allowUpload === true;
   const { record, control, recordId } = configuration ?? {};
   const expectedURL = page.url();
@@ -258,8 +263,7 @@ export async function newUploadOwner(
             !rootStat.isDirectory() ||
             pre.isSymbolicLink() ||
             !pre.isFile() ||
-            pre.size > cap ||
-            !constants.O_NOFOLLOW
+            pre.size > cap
           ) {
             throw new Error('File preparation refused.');
           }
