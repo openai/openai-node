@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SDK browser fixture</title>
+  </head>
+  <body>
+    <h1>Greeting</h1>
+    <form id="greeting">
+      <label for="name">Name</label><input id="name" aria-label="Name" placeholder="Name" />
+      <label for="color">Color</label>
+      <select id="color" aria-label="Color">
+        <option>Red</option>
+        <option>Blue</option>
+        <option>Green</option>
+      </select>
+      <button type="submit">Greet</button>
+    </form>
+    <p id="result" aria-live="polite"></p>
+    <script>
+      document.querySelector('#greeting').addEventListener('submit', (event) => {
+        event.preventDefault();
+        document.querySelector('#result').textContent =
+          'Hello, ' +
+          document.querySelector('#name').value +
+          '! Color: ' +
+          document.querySelector('#color').value;
+      });
+    </script>
+  </body>
+</html>
