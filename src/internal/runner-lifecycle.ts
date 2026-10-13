@@ -17,6 +17,9 @@ export function overlayRequestOptions(
   const deleted = new Set<PropertyKey>();
   return new Proxy(shadow, {
     ownKeys(target) {
+      if (!Reflect.isExtensible(target)) {
+        return Reflect.ownKeys(target);
+      }
       const virtual = [...Reflect.ownKeys(original), ...Reflect.ownKeys(changes)].filter(
         (key) => !deleted.has(key),
       );
@@ -24,7 +27,7 @@ export function overlayRequestOptions(
     },
     getOwnPropertyDescriptor(target, key) {
       const local = Object.getOwnPropertyDescriptor(target, key);
-      if (local || deleted.has(key)) {
+      if (local || deleted.has(key) || !Reflect.isExtensible(target)) {
         return local;
       }
       const descriptor = Object.getOwnPropertyDescriptor(hasOwn(changes, key) ? changes : original, key);
@@ -35,7 +38,7 @@ export function overlayRequestOptions(
         // oxlint-disable-next-line anti-slop/no-reflect-get -- Wrapper-owned getters must see the complete request view.
         return Reflect.get(target, key, receiver);
       }
-      if (deleted.has(key)) {
+      if (deleted.has(key) || !Reflect.isExtensible(target)) {
         // oxlint-disable-next-line anti-slop/no-reflect-get -- A removed own field can still expose an inherited native getter.
         return Reflect.get(target, key, original);
       }
@@ -63,8 +66,46 @@ export function overlayRequestOptions(
     has(target, key) {
       return (
         Reflect.has(target, key) ||
-        (!deleted.has(key) && (hasOwn(changes, key) || Reflect.has(original, key)))
+        (Reflect.isExtensible(target) &&
+          !deleted.has(key) &&
+          (hasOwn(changes, key) || Reflect.has(original, key)))
       );
+    },
+    preventExtensions(target) {
+      if (!Reflect.isExtensible(target)) {
+        return true;
+      }
+      const keys = new Set([...Reflect.ownKeys(original), ...Reflect.ownKeys(changes)]);
+      for (const key of keys) {
+        if (deleted.has(key) || hasOwn(target, key)) {
+          continue;
+        }
+        const source = hasOwn(changes, key) ? changes : original;
+        const descriptor = Object.getOwnPropertyDescriptor(source, key);
+        if (!descriptor) {
+          continue;
+        }
+        if ('value' in descriptor) {
+          Object.defineProperty(target, key, { ...descriptor, configurable: true });
+        } else {
+          const getter = descriptor.get;
+          let replaced = false;
+          let replacement: unknown;
+          const bound: PropertyDescriptor = { ...descriptor, configurable: true };
+          if (getter) {
+            bound.get = () => (replaced ? replacement : getter.call(source));
+          }
+          // Wrapper writes remain local even when the source has an accessor setter.
+          if (descriptor.set) {
+            bound.set = (value) => {
+              replaced = true;
+              replacement = value;
+            };
+          }
+          Object.defineProperty(target, key, bound);
+        }
+      }
+      return Reflect.preventExtensions(target);
     },
   });
 }

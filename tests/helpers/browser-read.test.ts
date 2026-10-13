@@ -78,6 +78,49 @@ const reads = [
   ['browser_find', { tab_id: null, query: 'Seat' }],
 ] as const;
 
+test.each([
+  ['a'.repeat(1025), 'a'.repeat(1024), true, false],
+  ['é'.repeat(513), 'é'.repeat(512), true, false],
+  ['😀'.repeat(257), '😀'.repeat(256), true, false],
+  ['é'.repeat(512), 'é'.repeat(512), false, false],
+  ['Short', 'Short', true, true],
+] as const)(
+  'projects long observed titles without rejecting the page',
+  async (title, expected, truncated, alreadyTruncated) => {
+    const observation = {
+      version: 1 as const,
+      sequence: 0,
+      dropped_changes: 0,
+      title_truncated: alreadyTruncated,
+      changes: [],
+    };
+    const browser = new BrowserToolset(
+      runtimeDriver('Visible text', () => ({
+        tabs: [{ id: 'task', title, url: 'https://fixture.invalid/', active: true }],
+        observation,
+      })),
+    );
+    const result = payload(await browser.execute(call('browser_read_page', { tab_id: null, filter: 'all' })));
+    expect(result.state.tabs[0].title).toBe(expected);
+    expect(result.state.observation.title_truncated).toBe(truncated);
+    expect(observation.title_truncated).toBe(alreadyTruncated);
+  },
+);
+
+test('rejects invalid Unicode beyond the projected title', async () => {
+  const browser = new BrowserToolset(
+    runtimeDriver('Visible text', () => ({
+      tabs: [
+        { id: 'task', title: `${'a'.repeat(2048)}\uD800`, url: 'https://fixture.invalid/', active: true },
+      ],
+      observation: { version: 1, sequence: 0, dropped_changes: 0, title_truncated: false, changes: [] },
+    })),
+  );
+  await expect(browser.execute(call('browser_read_page', { tab_id: null, filter: 'all' }))).rejects.toThrow(
+    'Browser state report failed.',
+  );
+});
+
 describe('Browser bounded reads', () => {
   test.each([101, 1000])(
     'driver-selected collection sizes %i retain elements, options and scopes',

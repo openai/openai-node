@@ -56,8 +56,9 @@ each continuation receives a fresh key and HTTP retries keep that request's key.
 This also applies if an approval adds a key to the captured request headers
 after the first response. Other current headers, including removals, are kept.
 Ordinary native `requestOptions` are trusted application configuration. They can
-override the request body, path, base URL, or fetch settings after the helper
-validates its inputs. The application owns those changes.
+change the path, base URL, or fetch settings after the helper validates its inputs.
+The application owns those changes. The helper rejects `requestOptions.body`
+because it would replace the validated computer request.
 The helper passes the original options object through when no override is needed.
 For a signal or continuation override, it passes a view without changing your object.
 Custom hooks should read option values rather than depend on object identity.
@@ -72,6 +73,10 @@ effective signal: `approveSafetyChecks(call, { signal })` and
 the helper uses `requestOptions.signal`. Callbacks that do not use the extra
 argument work as before. An interactive approval can listen for abort and
 settle promptly; the helper stays busy until the callback actually settles.
+Approval covers the action's fixed arguments. It does not freeze the screen or
+focus while a person decides. If consent must apply to a particular target, the
+driver must bind the action to that target or reject it after a state change.
+Run computer actions in an isolated environment with limited network access.
 Each `beforeAction` callback receives a fresh, mutable copy of the full call,
 including every action and safety check. For modern batches the helper copies
 `call.actions` and `call.pending_safety_checks` only when that callback reads

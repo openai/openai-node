@@ -1,5 +1,6 @@
 import { runInNewContext } from 'node:vm';
-import { configuredOption } from 'openai/internal/runner-lifecycle';
+import { configuredOption, overlayRequestOptions } from 'openai/internal/runner-lifecycle';
+import type { RequestOptions } from 'openai/internal/request-options';
 import { isObj } from 'openai/internal/utils/values';
 import { expect, test } from 'vitest';
 
@@ -10,6 +11,34 @@ function foreign(source: string) {
   }
   return value;
 }
+
+test('repeated freezing retains the overlay keys captured before source changes', () => {
+  const source: RequestOptions = { timeout: 1000 };
+  const view = overlayRequestOptions(source, { signal: new AbortController().signal });
+  Object.preventExtensions(view);
+  source.maxRetries = 0;
+  expect(() => Object.freeze(view)).not.toThrow();
+  expect(Object.keys(view)).toEqual(['timeout', 'signal']);
+  expect('maxRetries' in view).toBe(false);
+});
+
+test('frozen overlays keep accessor writes separate from the caller', () => {
+  let timeout = 1000;
+  const source: RequestOptions = {
+    get timeout() {
+      return timeout;
+    },
+    set timeout(value) {
+      timeout = value ?? 0;
+    },
+  };
+  Object.freeze(source);
+  const view = overlayRequestOptions(source, { signal: new AbortController().signal });
+  Object.freeze(view);
+  view.timeout = 2000;
+  expect(view.timeout).toBe(2000);
+  expect(source.timeout).toBe(1000);
+});
 
 test('configuration excludes the native base prototype in another realm', () => {
   const value = foreign('({})');
