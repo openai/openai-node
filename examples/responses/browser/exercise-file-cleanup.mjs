@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { access, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { createServer } from 'node:http';
+import { once } from 'node:events';
 import { setImmediate, setTimeout as delay } from 'node:timers/promises';
 import { mock } from 'node:test';
 import { newUploadOwner } from './file-upload.mjs';
@@ -67,6 +69,67 @@ function fixture({ failInit = false, hold = false, failOnce = false, heldRead = 
 }
 
 /* oxlint-disable eslint/no-await-in-loop -- Each owner must release its private staging before the next case. */
+const resultBytes = Buffer.from('Granted fixture result');
+let requests = 0;
+const resultServer = createServer((_request, response) => {
+  requests += 1;
+  response.writeHead(200, {
+    'content-type': 'application/octet-stream',
+    'content-length': resultBytes.length,
+  });
+  response.end(resultBytes);
+});
+resultServer.listen(0, '127.0.0.1');
+await once(resultServer, 'listening');
+try {
+  const source = {
+    url: `http://127.0.0.1:${resultServer.address().port}/result`,
+    count: resultBytes.length,
+    sha256: digest(resultBytes),
+  };
+  for (const reason of ['expiry', 'session']) {
+    for (const boundary of ['issue', 'transfer']) {
+      const probe = fixture();
+      let agreed = false;
+      const owner = await newDownloadOwner(probe.page, probe.configuration, async () => agreed);
+      const clock = { now: Date.now() };
+      const now = mock.method(Date, 'now', () => clock.now);
+      const before = requests;
+      try {
+        const first = owner.issue(source, clock.now + 10_000);
+        assert.throws(() => owner.issue(source, clock.now + 20_000));
+        if (reason === 'expiry') {
+          clock.now += 10_001;
+        } else {
+          owner.changeSession();
+        }
+        if (boundary === 'transfer') {
+          const old = await owner.download_file({ grant_id: first.grant_id });
+          assert.equal(old.status, 'refused');
+        }
+        const second = owner.issue(source, clock.now + 20_000);
+        const old = await owner.download_file({ grant_id: first.grant_id });
+        assert.equal(old.status, 'refused');
+        const declined = await owner.download_file({ grant_id: second.grant_id });
+        assert.equal(declined.status, 'refused');
+        assert.equal(requests, before);
+        agreed = true;
+        const accepted = await owner.download_file({ grant_id: second.grant_id });
+        assert.equal(accepted.status, 'completed');
+        assert.equal(owner.receipt().sha256, source.sha256);
+        assert.equal(requests, before + 1);
+        assert.throws(() => owner.issue(source, clock.now + 20_000));
+        checks += 1;
+      } finally {
+        now.mock.restore();
+        await owner.stop();
+      }
+    }
+  }
+} finally {
+  resultServer.close();
+  await once(resultServer, 'close');
+}
 for (const reason of ['expiry', 'session']) {
   for (const boundary of ['prepare', 'transfer']) {
     const probe = fixture();
@@ -211,6 +274,15 @@ for (const [direction, heldRead] of [
   }
   const transfer = subject[`${direction}_file`]({ grant_id: grant.grant_id });
   await probe.readEntered;
+  if (direction === 'download') {
+    subject.changeSession();
+    assert.throws(() =>
+      subject.issue(
+        { url: 'http://127.0.0.1:1/unused', count: bytes.length, sha256: digest(bytes) },
+        Date.now() + 20_000,
+      ),
+    );
+  }
   const stop = subject.stop();
   // Observe both immediately, including a legitimate bounded Stop rejection.
   const completed = Promise.allSettled([transfer, stop]);

@@ -280,7 +280,12 @@ export async function newDownloadOwner(page, configuration, approve) {
         };
       } catch {
         last = admitted ? unknown() : refused();
-        if (!admitted && (abort.signal.aborted || signal?.aborted) && grant === chosen) {
+        if (
+          !admitted &&
+          chosen &&
+          grant === chosen &&
+          (abort.signal.aborted || signal?.aborted || expired() || chosen.session !== session)
+        ) {
           grant = null;
         }
       } finally {
@@ -339,6 +344,9 @@ export async function newDownloadOwner(page, configuration, approve) {
     },
     // oxlint-disable-next-line eslint/complexity -- Validate one grant's trusted source, original permission and one-use lifetime together before storing it.
     issue(source, expiresAt) {
+      if (!work && grant && (grant.expiresAt <= Date.now() || grant.session !== session)) {
+        grant = null;
+      }
       const metadata = source && typeof source === 'object' ? { ...source } : {};
       let url;
       try {
