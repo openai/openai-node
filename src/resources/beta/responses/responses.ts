@@ -6138,11 +6138,6 @@ export namespace BetaResponseInputItem {
     background?: 'transparent' | 'opaque' | 'auto' | null;
 
     /**
-     * Details of a moderation failure, when available.
-     */
-    error?: ImageGenerationCall.Error;
-
-    /**
      * The output format used for generation.
      */
     output_format?: 'png' | 'webp' | 'jpeg' | null;
@@ -6173,53 +6168,6 @@ export namespace BetaResponseInputItem {
        * The canonical name of the agent that produced this item.
        */
       agent_name: string;
-    }
-
-    /**
-     * Details of a moderation failure, when available.
-     */
-    export interface Error {
-      /**
-       * The error code.
-       */
-      code: string | null;
-
-      /**
-       * A description of the error.
-       */
-      message: string;
-
-      /**
-       * The related request parameter.
-       */
-      param: string | null;
-
-      /**
-       * The error type.
-       */
-      type: string;
-
-      /**
-       * Public details for a `moderation_blocked` error, when available.
-       */
-      moderation_details?: Error.ModerationDetails;
-    }
-
-    export namespace Error {
-      /**
-       * Public details for a `moderation_blocked` error, when available.
-       */
-      export interface ModerationDetails {
-        /**
-         * Public moderation categories. New category values may be added over time.
-         */
-        categories: Array<string>;
-
-        /**
-         * The stage where moderation blocked the image generation call.
-         */
-        moderation_stage: 'input' | 'output' | 'unknown';
-      }
     }
   }
 
@@ -7699,11 +7647,6 @@ export namespace BetaResponseItem {
     background?: 'transparent' | 'opaque' | 'auto' | null;
 
     /**
-     * Details of a moderation failure, when available.
-     */
-    error?: ImageGenerationCall.Error;
-
-    /**
      * The output format used for generation.
      */
     output_format?: 'png' | 'webp' | 'jpeg' | null;
@@ -7734,53 +7677,6 @@ export namespace BetaResponseItem {
        * The canonical name of the agent that produced this item.
        */
       agent_name: string;
-    }
-
-    /**
-     * Details of a moderation failure, when available.
-     */
-    export interface Error {
-      /**
-       * The error code.
-       */
-      code: string | null;
-
-      /**
-       * A description of the error.
-       */
-      message: string;
-
-      /**
-       * The related request parameter.
-       */
-      param: string | null;
-
-      /**
-       * The error type.
-       */
-      type: string;
-
-      /**
-       * Public details for a `moderation_blocked` error, when available.
-       */
-      moderation_details?: Error.ModerationDetails;
-    }
-
-    export namespace Error {
-      /**
-       * Public details for a `moderation_blocked` error, when available.
-       */
-      export interface ModerationDetails {
-        /**
-         * Public moderation categories. New category values may be added over time.
-         */
-        categories: Array<string>;
-
-        /**
-         * The stage where moderation blocked the image generation call.
-         */
-        moderation_stage: 'input' | 'output' | 'unknown';
-      }
     }
   }
 
@@ -8986,11 +8882,6 @@ export namespace BetaResponseOutputItem {
     background?: 'transparent' | 'opaque' | 'auto' | null;
 
     /**
-     * Details of a moderation failure, when available.
-     */
-    error?: ImageGenerationCall.Error;
-
-    /**
      * The output format used for generation.
      */
     output_format?: 'png' | 'webp' | 'jpeg' | null;
@@ -9021,53 +8912,6 @@ export namespace BetaResponseOutputItem {
        * The canonical name of the agent that produced this item.
        */
       agent_name: string;
-    }
-
-    /**
-     * Details of a moderation failure, when available.
-     */
-    export interface Error {
-      /**
-       * The error code.
-       */
-      code: string | null;
-
-      /**
-       * A description of the error.
-       */
-      message: string;
-
-      /**
-       * The related request parameter.
-       */
-      param: string | null;
-
-      /**
-       * The error type.
-       */
-      type: string;
-
-      /**
-       * Public details for a `moderation_blocked` error, when available.
-       */
-      moderation_details?: Error.ModerationDetails;
-    }
-
-    export namespace Error {
-      /**
-       * Public details for a `moderation_blocked` error, when available.
-       */
-      export interface ModerationDetails {
-        /**
-         * Public moderation categories. New category values may be added over time.
-         */
-        categories: Array<string>;
-
-        /**
-         * The stage where moderation blocked the image generation call.
-         */
-        moderation_stage: 'input' | 'output' | 'unknown';
-      }
     }
   }
 
