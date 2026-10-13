@@ -885,6 +885,53 @@ describe('.stream()', () => {
     );
   });
 
+  it.each([
+    { type: 'response.created', output: 'missing', id: 'changed' },
+    { type: 'response.queued', output: 'null', id: 'changed' },
+    { type: 'response.in_progress', output: 'supplied', id: 'changed' },
+    { type: 'response.failed', output: 'null', id: 'null' },
+    { type: 'response.incomplete', output: 'missing', id: 'missing' },
+    { type: 'response.completed', output: 'missing', id: 'changed' },
+    { type: 'response.completed', output: 'null', id: 'changed' },
+    { type: 'response.completed', output: 'supplied', id: 'changed' },
+  ] as const)(
+    'refuses a foreign response at $type with $output output and $id id',
+    async ({ type, output, id }) => {
+      const item = {
+        id: 'fc_identity',
+        type: 'function_call',
+        call_id: 'call_identity',
+        name: 'lookup',
+        arguments: '{}',
+        status: 'completed',
+      } as const;
+      const replacement = makeResponse({ id: 'resp_other', status: 'completed', output: [item] });
+      if (output === 'missing') {
+        Reflect.deleteProperty(replacement, 'output');
+      }
+      if (output === 'null') {
+        Reflect.set(replacement, 'output', null);
+      }
+      if (id === 'missing') {
+        Reflect.deleteProperty(replacement, 'id');
+      }
+      if (id === 'null') {
+        Reflect.set(replacement, 'id', null);
+      }
+      const events: ResponseStreamEvent[] = [
+        { type: 'response.created', sequence_number: 0, response: makeResponse() },
+        { type: 'response.output_item.added', sequence_number: 1, output_index: 3, item },
+        { type: 'response.output_item.done', sequence_number: 2, output_index: 3, item },
+        { type, sequence_number: 3, response: replacement },
+      ];
+      const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      const emitted: ResponseStreamEvent[] = [];
+      stream.on('event', (event) => emitted.push(event));
+      await expect(stream.finalResponse()).rejects.toThrow('Lifecycle response identity changed');
+      expect(emitted.map((event) => event.sequence_number)).toEqual([0, 1, 2]);
+    },
+  );
+
   it.each([0, 2])('forwards %i compaction progress events over SSE', async (count) => {
     const item = { id: 'cmp_123', type: 'compaction', encrypted_content: '' } as const;
     const completed = { ...item, encrypted_content: 'encrypted-test-summary' };
