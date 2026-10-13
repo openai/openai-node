@@ -133,7 +133,19 @@ describe('.stream()', () => {
           content: [],
         },
       },
-      { type: 'response.completed', sequence_number: 2, response },
+      {
+        type: 'response.output_item.done',
+        sequence_number: 2,
+        output_index: 0,
+        item: {
+          id: 'msg_1',
+          type: 'message',
+          role: 'assistant',
+          status: 'completed',
+          content: [],
+        },
+      },
+      { type: 'response.completed', sequence_number: 3, response },
     ];
     const openai = new OpenAI({
       apiKey: 'My API Key',
@@ -160,7 +172,7 @@ describe('.stream()', () => {
     const final = await stream.finalResponse();
 
     expect(requests).toEqual(['https://api.openai.com/v1/responses/resp_123?stream=true']);
-    expect(emittedEvents).toEqual([1, 2]);
+    expect(emittedEvents).toEqual([1, 2, 3]);
     expect(final.id).toBe('resp_123');
   });
 
