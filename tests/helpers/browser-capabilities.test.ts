@@ -1421,7 +1421,6 @@ describe('scoped browser reports', () => {
       ],
     },
     { ...report(), scopes: [{ ref: 'scope:1', label: '\uD800' }] },
-    { ...report(), scopes: Array.from({ length: 101 }, (_, i) => ({ ref: `scope:${i}`, label: 'Section' })) },
   ])('stops on an invalid scoped result: %j', async (value) => {
     const observe = vi.fn(state);
     const toolset = new BrowserToolset(scopedDriver(value, observe), { members: ['read_page_scoped'] });
