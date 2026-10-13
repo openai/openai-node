@@ -1,7 +1,13 @@
 import { BrowserToolset } from 'openai/helpers/browser';
-import type { BrowserDriver, BrowserMember, BrowserReadV1 } from 'openai/helpers/browser';
+import type {
+  BrowserDriver,
+  BrowserMember,
+  BrowserReadV1,
+  BrowserResult,
+  BrowserTextReadV1,
+} from 'openai/helpers/browser';
 import type { ResponseFunctionToolCall, ResponseInputItem } from 'openai/resources/responses/responses';
-import { expect, test, vi } from 'vitest';
+import { expect, expectTypeOf, test, vi } from 'vitest';
 
 const state = () => ({ tabs: [] });
 const diagnostic = { tab_id: null, source: 'console', limit: 10 };
@@ -29,7 +35,7 @@ function driver(value: unknown, observe: BrowserDriver['state'] = state): Browse
   // SAFETY: Test untyped custom-driver results at the public boundary.
   return {
     state: observe,
-    read_diagnostics: () => value as BrowserReadV1,
+    read_diagnostics: () => value as BrowserTextReadV1,
     run_script: () => value as string,
   };
 }
@@ -56,6 +62,7 @@ test.each(members)('%s requires and honors per-call consent', async (member) => 
 });
 
 test('diagnostic result is a detached text-only report before final state', async () => {
+  expectTypeOf<BrowserReadV1>().not.toExtend<BrowserResult<'read_diagnostics'>>();
   const value = structuredClone(report);
   let observed = 0;
   const tools = new BrowserToolset(

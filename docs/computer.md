@@ -55,6 +55,8 @@ auto mode. A supplied idempotency key applies to the first logical request;
 each continuation receives a fresh key and HTTP retries keep that request's key.
 This also applies if an approval adds a key to the captured request headers
 after the first response. Other current headers, including removals, are kept.
+Each continuation captures headers and the idempotency key together, even when
+no key is present. Other native request options remain live until dispatch.
 Ordinary native `requestOptions` are trusted application configuration. They can
 change the path, base URL, or fetch settings after the helper validates its inputs.
 The application owns those changes. The helper rejects `requestOptions.body`
