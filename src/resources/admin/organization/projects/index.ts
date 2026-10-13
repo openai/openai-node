@@ -5,6 +5,7 @@ export {
   type ProjectAPIKey,
   type APIKeyDeleteResponse,
   type APIKeyRetrieveParams,
+  type APIKeyUpdateParams,
   type APIKeyListParams,
   type APIKeyDeleteParams,
   type ProjectAPIKeysPage,
