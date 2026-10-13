@@ -185,8 +185,23 @@ export function continuationRequestOptions(
   const effectiveHeaders = buildHeaders([client['_options'].defaultHeaders, headers]);
   const idempotencyKey = options && configuredOption(options, 'idempotencyKey');
   if (!idempotencyKey && !effectiveHeaders.values.has('idempotency-key')) {
-    const requestSignal = options && configuredOption(options, 'signal');
-    return (requestSignal ?? undefined) === signal ? options : overlayRequestOptions(options, { signal });
+    if (options === undefined && signal === undefined) {
+      return;
+    }
+    const captured = { signal };
+    // Preserve the fields that native create would omit when spreading the caller's options.
+    for (const [key, value] of [
+      ['headers', headers],
+      ['idempotencyKey', idempotencyKey],
+    ] as const) {
+      Object.defineProperty(captured, key, {
+        value,
+        writable: true,
+        configurable: true,
+        enumerable: options ? Boolean(Object.getOwnPropertyDescriptor(options, key)?.enumerable) : false,
+      });
+    }
+    return overlayRequestOptions(options, captured);
   }
   const key = `stainless-node-retry-${uuid4()}`;
   return overlayRequestOptions(options, {

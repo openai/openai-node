@@ -212,6 +212,9 @@ export class ResponseStream<ParsedT = null>
         throw new OpenAIError('Lifecycle events require a response object.');
       }
       let response = structuredClone(wireResponse);
+      if (this.#currentResponseSnapshot && response.id !== this.#currentResponseSnapshot.id) {
+        throw new OpenAIError('Lifecycle response identity changed.');
+      }
       if (!hasOwn(response, 'output') || response.output == null) {
         let output: Response['output'];
         if (event.type === 'response.completed') {

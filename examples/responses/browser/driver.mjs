@@ -1846,15 +1846,16 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
     }
   };
 
-  const observation = async (work, signal, mayHaveEffects = false) => {
+  const observation = async (work, signal, mayHaveEffects = false, timeoutMs = null) => {
     signal?.throwIfAborted();
-    if (!signal) {
+    if (!signal && timeoutMs === null) {
       return await work();
     }
     let onAbort;
+    let timer;
     // oxlint-disable-next-line promise/avoid-new -- Bridge AbortSignal to the pending renderer race.
     const stopped = new Promise((_resolve, reject) => {
-      onAbort = () => {
+      const retire = (reason) => {
         // Retire before close. Only an owned fixture delegates context disposal.
         interruptedRead = !mayHaveEffects;
         unusable = true;
@@ -1864,16 +1865,21 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
         } else {
           retireBorrowedReferences();
         }
-        reject(signal.reason);
+        reject(reason);
       };
-      signal.addEventListener('abort', onAbort, { once: true });
+      onAbort = () => retire(signal.reason);
+      signal?.addEventListener('abort', onAbort, { once: true });
+      if (timeoutMs !== null) {
+        timer = setTimeout(() => retire(new BrowserError('Browser observation timed out.')), timeoutMs);
+      }
     });
     try {
       // Promise.race observes late renderer rejection, even after Stop wins.
       return await Promise.race([work(), stopped]);
     } finally {
-      signal.removeEventListener('abort', onAbort);
-      if (signal.aborted && ownedURLs) {
+      signal?.removeEventListener('abort', onAbort);
+      clearTimeout(timer);
+      if (signal?.aborted && ownedURLs) {
         // Stop has already retired admission. Observe teardown without holding
         // cancellation on a browser process that may no longer respond.
         retirement ??= context.close();
@@ -1898,7 +1904,7 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
   };
   const targetFor = (page, ref, signal, work) =>
     referenceAction(async () => {
-      const handle = await observation(() => checkedTarget(page, ref), signal);
+      const handle = await observation(() => checkedTarget(page, ref), signal, false, 5000);
       return await work(handle);
     });
   const ownedAction = (page, ref, action, signal) =>
@@ -2412,14 +2418,19 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
           signal,
         );
       }
-      return await observation(() => readBorrowed(page, { full: filter === 'all' }), signal);
+      return await observation(() => readBorrowed(page, { full: filter === 'all' }), signal, false, 5000);
     },
     async get_page_text({ tab_id }, { signal } = {}) {
       const page = pageFor(tab_id);
       if (ownedURLs) {
         return await observation(() => readOwned(page, { full: true, textOnly: true, query: '' }), signal);
       }
-      const report = await observation(() => readBorrowed(page, { full: true, textOnly: true }), signal);
+      const report = await observation(
+        () => readBorrowed(page, { full: true, textOnly: true }),
+        signal,
+        false,
+        5000,
+      );
       return report.text;
     },
     async find({ tab_id, query }, { signal } = {}) {
@@ -2443,6 +2454,8 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
             finding: true,
           }),
         signal,
+        false,
+        5000,
       );
     },
     async click({ tab_id, target }, { signal } = {}) {

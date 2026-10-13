@@ -1503,6 +1503,62 @@ describe('ComputerToolset', () => {
     expect(JSON.stringify(history)).not.toContain('not an image field');
   });
 
+  test.each(['headers', 'header value', 'idempotencyKey'] as const)(
+    'captures an absent continuation key from a changing %s accessor',
+    async (kind) => {
+      const h = harness([]);
+      const keys: (string | null)[] = [];
+      let continuation = false;
+      let reads = 0;
+      const nextKey = () => {
+        if (!continuation) {
+          return 'initial-key';
+        }
+        reads += 1;
+        return reads === 1 ? undefined : 'initial-key';
+      };
+      const requestOptions: OpenAI.RequestOptions = {};
+      if (kind === 'headers') {
+        Object.defineProperty(requestOptions, 'headers', {
+          enumerable: true,
+          get: () => ({ 'Idempotency-Key': nextKey() }),
+        });
+      } else if (kind === 'header value') {
+        requestOptions.headers = {
+          get 'Idempotency-Key'() {
+            return nextKey();
+          },
+        };
+      } else {
+        Object.defineProperty(requestOptions, 'idempotencyKey', {
+          enumerable: true,
+          get: nextKey,
+        });
+      }
+      class Client extends OpenAI {
+        protected override idempotencyHeader = 'Idempotency-Key';
+      }
+      const client = new Client({
+        apiKey: 'synthetic-test-key',
+        fetch: async (url, init) => {
+          keys.push(new Request(url, init).headers.get('idempotency-key'));
+          continuation = true;
+          return Response.json({
+            id: `resp_${keys.length}`,
+            object: 'response',
+            status: 'completed',
+            output: keys.length === 1 ? [call([{ type: 'wait' }])] : [message],
+          });
+        },
+      });
+      await h.toolset.run(client, { input: 'fixture' }, { requestOptions });
+      expect(keys).toHaveLength(2);
+      expect(keys[0]).toBe('initial-key');
+      expect(keys[1]).not.toBe('initial-key');
+      expect(reads).toBe(1);
+    },
+  );
+
   test('uses a different caller-supplied idempotency header for every response', async () => {
     const h = harness([
       [call([{ type: 'wait' }])],
@@ -1818,8 +1874,8 @@ describe('ComputerToolset', () => {
         { timeout: 10_002, maxRetries: 2, cache: 'reload' },
       ]);
       expect(headers[0]?.get('x-revision')).toBe('1');
-      // Header replacement on a continuation is evaluated before create to rotate the admitted key.
-      expect(headers[1]?.get('x-revision')).toBe(rotate ? '1' : '2');
+      // Continuations capture headers before create, including an absent idempotency key.
+      expect(headers[1]?.get('x-revision')).toBe('1');
       const keys = headers.map((value) => value.get('idempotency-key'));
       if (rotate) {
         expect(keys[0]).toBe('first');
