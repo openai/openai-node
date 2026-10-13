@@ -7,6 +7,7 @@ import {
   APIKeyDeleteResponse,
   APIKeyListParams,
   APIKeyRetrieveParams,
+  APIKeyUpdateParams,
   APIKeys,
   ProjectAPIKey,
   ProjectAPIKeysPage,
@@ -632,6 +633,7 @@ export declare namespace Projects {
     type APIKeyDeleteResponse as APIKeyDeleteResponse,
     type ProjectAPIKeysPage as ProjectAPIKeysPage,
     type APIKeyRetrieveParams as APIKeyRetrieveParams,
+    type APIKeyUpdateParams as APIKeyUpdateParams,
     type APIKeyListParams as APIKeyListParams,
     type APIKeyDeleteParams as APIKeyDeleteParams,
   };

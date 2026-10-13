@@ -1453,6 +1453,7 @@ Types:
 Methods:
 
 - <code title="get /organization/projects/{project_id}/api_keys/{api_key_id}">client.admin.organization.projects.apiKeys.<a href="./src/resources/admin/organization/projects/api-keys.ts">retrieve</a>(apiKeyID, { ...params }) -> ProjectAPIKey</code>
+- <code title="post /organization/projects/{project_id}/api_keys/{api_key_id}">client.admin.organization.projects.apiKeys.<a href="./src/resources/admin/organization/projects/api-keys.ts">update</a>(apiKeyID, { ...params }) -> ProjectAPIKey</code>
 - <code title="get /organization/projects/{project_id}/api_keys">client.admin.organization.projects.apiKeys.<a href="./src/resources/admin/organization/projects/api-keys.ts">list</a>(projectID, { ...params }) -> ProjectAPIKeysPage</code>
 - <code title="delete /organization/projects/{project_id}/api_keys/{api_key_id}">client.admin.organization.projects.apiKeys.<a href="./src/resources/admin/organization/projects/api-keys.ts">delete</a>(apiKeyID, { ...params }) -> APIKeyDeleteResponse</code>
 
