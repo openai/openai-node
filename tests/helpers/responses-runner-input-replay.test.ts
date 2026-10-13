@@ -186,7 +186,7 @@ test.each(replayCases.flatMap((entry) => ['fresh', 'resume'].map((mode) => ({ ..
           id: 'resp_fixture',
           object: 'response',
           status: 'completed',
-          output: [message],
+          output: [{ ...message, id: 'msg_next_response' }],
         });
       },
     });
