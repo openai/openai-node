@@ -216,17 +216,17 @@ export async function fromStartedDesktop(
       try {
         hasScreenshot = false;
         await checkDisplay(signal);
-        const shot = await provider(() => computerUse.screenshot.takeFullScreen());
-        if (typeof shot.screenshot !== 'string') {
+        const { screenshot } = await provider(() => computerUse.screenshot.takeFullScreen());
+        if (typeof screenshot !== 'string') {
           throw new TypeError('Daytona returned no screenshot.');
         }
-        const padding = Number(shot.screenshot.endsWith('=')) + Number(shot.screenshot.endsWith('=='));
-        if (Math.ceil(shot.screenshot.length / 4) * 3 - padding > byteLimit) {
+        const padding = Number(screenshot.endsWith('=')) + Number(screenshot.endsWith('=='));
+        if (Math.ceil(screenshot.length / 4) * 3 - padding > byteLimit) {
           throw new Error('Image exceeds the encoded screenshot byte budget.');
         }
-        const data = Buffer.from(shot.screenshot, 'base64');
+        const data = Buffer.from(screenshot, 'base64');
         if (
-          data.toString('base64') !== shot.screenshot ||
+          data.toString('base64') !== screenshot ||
           data.length < 33 ||
           !data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
           !data.subarray(8, 16).equals(Buffer.from([0, 0, 0, 13, 73, 72, 68, 82])) ||
@@ -239,7 +239,7 @@ export async function fromStartedDesktop(
         PNG.sync.read(data);
         await checkDisplay(signal);
         hasScreenshot = true;
-        return { type: 'computer_screenshot', image_url: `data:image/png;base64,${shot.screenshot}` };
+        return { type: 'computer_screenshot', image_url: `data:image/png;base64,${screenshot}` };
       } catch (error) {
         checkCancelled(signal);
         throw error;

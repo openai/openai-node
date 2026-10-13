@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { access, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { setImmediate, setTimeout as delay } from 'node:timers/promises';
+import { mock } from 'node:test';
 import { newUploadOwner } from './file-upload.mjs';
 import { newDownloadOwner, digest } from './file-download.mjs';
 
@@ -66,6 +67,73 @@ function fixture({ failInit = false, hold = false, failOnce = false, heldRead = 
 }
 
 /* oxlint-disable eslint/no-await-in-loop -- Each owner must release its private staging before the next case. */
+for (const reason of ['expiry', 'session']) {
+  for (const boundary of ['prepare', 'transfer']) {
+    const probe = fixture();
+    const owner = await newUploadOwner(probe.page, probe.configuration, async () => true);
+    const clock = { now: Date.now() };
+    const now = mock.method(Date, 'now', () => clock.now);
+    try {
+      const name = owner.generatedName();
+      await writeFile(path.join(owner.uploadRoot, name), 'First');
+      const first = await owner.prepare(owner.uploadRoot, name, clock.now + 10_000);
+      await assert.rejects(owner.prepare(owner.uploadRoot, name, clock.now + 20_000));
+      if (reason === 'expiry') {
+        clock.now += 10_001;
+      } else {
+        owner.changeSession();
+      }
+      if (boundary === 'transfer') {
+        const refused = await owner.upload_file({ grant_id: first.grant_id });
+        assert.equal(refused.status, 'refused');
+      }
+      await writeFile(path.join(owner.uploadRoot, name), 'Second');
+      const second = await owner.prepare(owner.uploadRoot, name, clock.now + 20_000);
+      const previous = await owner.upload_file({ grant_id: first.grant_id });
+      assert.equal(previous.status, 'refused');
+      assert.equal(probe.assignments(), 0);
+      const completed = await owner.upload_file({ grant_id: second.grant_id });
+      assert.equal(completed.status, 'completed');
+      assert.equal(owner.receipt().sha256, digest(Buffer.from('Second')));
+      assert.equal(probe.assignments(), 1);
+      checks += 1;
+    } finally {
+      now.mock.restore();
+      await owner.stop();
+    }
+  }
+}
+{
+  const probe = fixture();
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  const owner = await newUploadOwner(
+    probe.page,
+    probe.configuration,
+    async () => true,
+    async () => {
+      entered.resolve();
+      await release.promise;
+    },
+  );
+  try {
+    const name = owner.generatedName();
+    await writeFile(path.join(owner.uploadRoot, name), 'Session fixture');
+    const prepared = assert.rejects(owner.prepare(owner.uploadRoot, name, Date.now() + 20_000));
+    await entered.promise;
+    owner.changeSession();
+    release.resolve();
+    await prepared;
+    const fresh = await owner.prepare(owner.uploadRoot, name, Date.now() + 20_000);
+    const completed = await owner.upload_file({ grant_id: fresh.grant_id });
+    assert.equal(completed.status, 'completed');
+    assert.equal(probe.assignments(), 1);
+    checks += 1;
+  } finally {
+    release.resolve();
+    await owner.stop();
+  }
+}
 for (const make of [newUploadOwner, newDownloadOwner]) {
   const normal = fixture();
   const owner = await make(normal.page, normal.configuration, async () => false);

@@ -181,7 +181,15 @@ export async function newUploadOwner(
         }
       } catch {
         last = admitted ? unknown() : refusal();
-        if (!admitted && (abort.signal.aborted || signal?.aborted) && grant === chosen) {
+        if (
+          !admitted &&
+          chosen &&
+          grant === chosen &&
+          (abort.signal.aborted ||
+            signal?.aborted ||
+            chosen.expiresAt <= Date.now() ||
+            chosen.session !== activeSession)
+        ) {
           chosen?.bytes.fill(0);
           grant = null;
         }
@@ -233,6 +241,10 @@ export async function newUploadOwner(
       activeSession = randomBytes(16).toString('hex');
     },
     async prepare(root, name, expiresAt) {
+      if (!work && grant && (grant.expiresAt <= Date.now() || grant.session !== activeSession)) {
+        grant.bytes.fill(0);
+        grant = null;
+      }
       if (
         !allowed ||
         revoked ||
@@ -248,6 +260,7 @@ export async function newUploadOwner(
         state.prepare('refused');
         throw new Error('File preparation refused.');
       }
+      const preparedSession = activeSession;
       // Bind the existing owner slot before any IO or caller hook can reenter.
       // oxlint-disable-next-line promise/prefer-await-to-then, eslint/complexity -- Register ownership or rejection handling before a held operation can reenter. Keep this single owned transfer or fixture response transaction in order.
       work = Promise.resolve().then(async () => {
@@ -297,13 +310,13 @@ export async function newUploadOwner(
         }
         // Closing the descriptor also awaits. Never publish a grant if Stop,
         // expiry or a session change happened during that last owned operation.
-        if (revoked || abort.signal.aborted || session !== activeSession || expiresAt <= Date.now()) {
+        if (revoked || abort.signal.aborted || preparedSession !== activeSession || expiresAt <= Date.now()) {
           frozen.fill(0);
           throw new Error('File preparation refused.');
         }
         grant = {
           id: randomBytes(24).toString('hex'),
-          session,
+          session: preparedSession,
           bytes: frozen,
           count: frozen.length,
           sha256: digest(frozen),

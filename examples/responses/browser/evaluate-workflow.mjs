@@ -441,6 +441,14 @@ try {
       choice: `click_${controls.indexOf(element)}`,
     };
   };
+  let requestStarted = 0;
+  const onDiagnostic = (event) => {
+    if (event.api === config.api && event.stage === 'request' && event.reason === 'completed') {
+      const request = receipt.requests.at(-1);
+      request.usage = event.usage;
+      request.body_ms = Math.round(performance.now() - requestStarted);
+    }
+  };
   const client = new OpenAI({
     apiKey: config.mode === 'rehearsal' ? 'no-credential-rehearsal' : process.env.OPENAI_API_KEY,
     baseURL: 'https://api.openai.com/v1',
@@ -465,6 +473,7 @@ try {
         return { input: payload.input, questions: payload.questions };
       });
       const tick = performance.now();
+      requestStarted = tick;
       let response;
       if (config.mode === 'live') {
         const target = new URL(url);
@@ -543,20 +552,6 @@ try {
       }
       request.headers_ms = Math.round(performance.now() - tick);
       request.status = response.status;
-      if (response.ok) {
-        const data = await response.clone().json();
-        request.usage = data.usage ?? null;
-        captureDecision(request, 'decision_answers', () =>
-          (data.answers ?? []).map((answer) =>
-            Object.fromEntries(
-              ['name', 'type', 'choice', 'confidence', 'probabilities']
-                .filter((key) => Object.hasOwn(answer, key))
-                .map((key) => [key, answer[key]]),
-            ),
-          ),
-        );
-        request.body_ms = Math.round(performance.now() - tick);
-      }
       return response;
     },
   });
@@ -789,14 +784,27 @@ try {
           candidates,
           verify,
         });
-        await runner.run(
+        const firstRequest = receipt.requests.length;
+        const result = await runner.run(
           client,
           { model, input: instruction },
           {
             maxSteps: 64 - receipt.requests.length,
             signal: controller.signal,
+            onDiagnostic,
           },
         );
+        for (const [index, decision] of result.decisions.entries()) {
+          captureDecision(receipt.requests[firstRequest + index], 'decision_answers', () =>
+            decision.answers.map((answer) =>
+              Object.fromEntries(
+                ['name', 'type', 'choice', 'confidence', 'probabilities']
+                  .filter((key) => Object.hasOwn(answer, key))
+                  .map((key) => [key, answer[key]]),
+              ),
+            ),
+          );
+        }
       } else {
         const runner = new ResponsesToolRunner({ browser: tools });
         await runner.run(
@@ -806,7 +814,7 @@ try {
             store: false,
             input: [{ role: 'user', content: [{ type: 'input_text', text: instruction }, ...initial] }],
           },
-          { maxSteps: 64 - receipt.requests.length, signal: controller.signal, stream: false },
+          { maxSteps: 64 - receipt.requests.length, signal: controller.signal, stream: false, onDiagnostic },
         );
       }
       receipt.phases.push({ phase, status: 'returned' });
