@@ -10,7 +10,9 @@ import { Desktop } from './desktop.mjs';
 import { writeTestReceipt } from './test-runtime.mjs';
 
 if (process.argv.includes('--with-browser')) {
-  throw new Error('--with-browser requires the final browser demo layer. Run this exercise without that flag.');
+  throw new Error(
+    '--with-browser requires the final browser demo layer. Run this exercise without that flag.',
+  );
 }
 
 function call() {
