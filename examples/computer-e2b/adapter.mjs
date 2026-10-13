@@ -287,6 +287,7 @@ export class E2BComputer {
         await this.#sandbox.commands.run(`scrot --pointer ${path}`, {
           timeoutMs: 5000,
           requestTimeoutMs: 2500,
+          ...(signal ? { signal } : {}),
         });
         await this.#check();
         signal?.throwIfAborted();

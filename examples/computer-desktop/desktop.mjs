@@ -127,10 +127,7 @@ export class Desktop {
   }
 
   async seal({ signal } = {}) {
-    return this.#admit(
-      (phaseSignal) => this.#request({ type: 'seal' }, undefined, false, phaseSignal),
-      signal,
-    );
+    return this.#admit((phaseSignal) => this.#request({ type: 'seal' }, 15_000, false, phaseSignal), signal);
   }
 
   async #admit(operation, signal) {

@@ -41,6 +41,8 @@ export type ComputerCallInput =
  * Implement these methods against an isolated browser or virtual computer.
  * Arguments use the existing computer action wire shape, including snake_case fields.
  * Driver methods run once, in order; the helper never retries them.
+ * Approval covers action arguments, not a frozen screen. If target-specific consent
+ * is required, the driver must bind the target or reject the action after a state change.
  */
 export interface ComputerDriver {
   /** Click the given coordinates and button, preserving held keys. */
@@ -89,6 +91,7 @@ export interface ComputerExecutionOptions {
    * Authorize each action immediately before execution, including the final screenshot.
    * When set, only an explicit true allows the action. Throw or return false to stop.
    * context.signal is the same effective signal passed to the driver.
+   * This approves the fixed arguments; it does not freeze the screen or focus.
    */
   beforeAction?: (
     action: ComputerAction,
@@ -651,13 +654,13 @@ export class ComputerToolset {
       const replay = JSON.parse(JSON.stringify(projected)) as ResponseInputItem[];
       protectRunnerJSON(replay);
       for (const item of replay) {
-        input.push(item);
+        body.input.push(item);
       }
       for (const call of calls) {
         // Calls share one environment and must run in server order.
         // oxlint-disable-next-line no-await-in-loop
         const observation = await this.executeOwned(call, executionOptions);
-        input.push(observation);
+        body.input.push(observation);
       }
       const choice = configuredOption(body, 'tool_choice');
       if (choice !== undefined && choice !== null) {

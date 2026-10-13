@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import OpenAI from 'openai';
+import { chromium } from 'playwright';
 import { answerQuestion, openReader } from './read-only.mjs';
 
 const documents = JSON.parse(await readFile(new URL('reader-site.json', import.meta.url), 'utf-8'));
@@ -20,6 +21,50 @@ const payload = (output) =>
       : output.output.find((part) => part.type === 'input_text').text,
   );
 const textResult = (output) => payload(output).result;
+
+// Only wrap pages belonging to these local reader exercises. Do not expose a test hook in openReader.
+const { launch: originalLaunch } = chromium;
+chromium.launch = async function launch(options) {
+  const browser = await originalLaunch.call(this, options);
+  const { newContext: originalContext } = browser;
+  browser.newContext = async function newContext(contextOptions) {
+    const context = await originalContext.call(this, contextOptions);
+    context.on('page', (page) => {
+      const { goto: originalGoto } = page;
+      page.goto = async function goto(url, gotoOptions) {
+        const response = await originalGoto.call(this, url, gotoOptions);
+        if (url === 'http://reader.invalid/hours') {
+          assert.equal(this.url(), url);
+          throw new Error('Local fixture failed after navigation commit');
+        }
+        return response;
+      };
+    });
+    return context;
+  };
+  return browser;
+};
+try {
+  // oxlint-disable no-await-in-loop -- Separate owned readers for absent and present per-call signals.
+  for (const options of [undefined, { signal: new AbortController().signal }]) {
+    const reader = await openReader({ documents });
+    try {
+      await assert.rejects(
+        reader.tools.execute(call('navigate', { tab_id: null, url: 'http://reader.invalid/hours' }), options),
+        /Browser state report failed/u,
+      );
+      await assert.rejects(
+        reader.tools.execute(call('get_page_text', { tab_id: null }), options),
+        /Browser state report failed/u,
+      );
+    } finally {
+      await reader.close();
+    }
+  }
+  // oxlint-enable no-await-in-loop
+} finally {
+  chromium.launch = originalLaunch;
+}
 
 const boundary = `/${'a'.repeat(16_384 - Buffer.byteLength('http://reader.invalid/'))}`;
 let opened;

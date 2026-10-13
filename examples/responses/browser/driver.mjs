@@ -273,7 +273,31 @@ function borrowedRead({ nonce, nextRef, full, textOnly, checkedNode, finding = f
   };
   const targets = { __proto__: null, length: 0 };
   const targetLimit = finding || checkedNode ? 2000 : 100;
-  const encoder = new TextEncoder();
+  // Count UTF-8 bytes without calling a page-owned encoder or string iterator.
+  // oxlint-disable-next-line consistent-function-scoping -- Serialized into the page with borrowedRead.
+  const byteLength = (value) => {
+    let bytes = 0;
+    for (let index = 0; index < value.length; index += 1) {
+      const unit = value[index];
+      if (unit <= '\u007F') {
+        bytes += 1;
+      } else if (unit <= '\u07FF') {
+        bytes += 2;
+      } else if (
+        unit >= '\uD800' &&
+        unit <= '\uDBFF' &&
+        index + 1 < value.length &&
+        value[index + 1] >= '\uDC00' &&
+        value[index + 1] <= '\uDFFF'
+      ) {
+        bytes += 4;
+        index += 1;
+      } else {
+        bytes += 3;
+      }
+    }
+    return bytes;
+  };
   let visited = 0;
   let textBytes = 0;
   const omit = (reason) => {
@@ -322,14 +346,7 @@ function borrowedRead({ nonce, nextRef, full, textOnly, checkedNode, finding = f
         }
         normalized = ' ';
       }
-      let size = 3;
-      if (normalized.length === 2) {
-        size = 4;
-      } else if (normalized <= '\u007F') {
-        size = 1;
-      } else if (normalized <= '\u07FF') {
-        size = 2;
-      }
+      const size = byteLength(normalized);
       if (bytes + size > limit) {
         omit(reason);
         break;
@@ -345,13 +362,13 @@ function borrowedRead({ nonce, nextRef, full, textOnly, checkedNode, finding = f
       const fragment = bounded(node.data, Math.max(0, 16_384 - textBytes), 'text_limit');
       const addition = bounded(` ${fragment}`, Math.max(0, 16_384 - textBytes), 'text_limit');
       report.text += addition;
-      textBytes += encoder.encode(addition).length;
+      textBytes += byteLength(addition);
     }
     if (owner && !owner.named && owner.labelBytes < 256) {
       const fragment = bounded(node.data, 256 - owner.labelBytes, 'name_limit');
       const addition = bounded(` ${fragment}`, 256 - owner.labelBytes, 'name_limit');
       owner.item.label += addition;
-      owner.labelBytes += encoder.encode(addition).length;
+      owner.labelBytes += byteLength(addition);
     }
   };
   // Serialized into the page with borrowedRead.
@@ -400,7 +417,10 @@ function borrowedRead({ nonce, nextRef, full, textOnly, checkedNode, finding = f
     }
     if (tag === 'select') {
       item.options = { __proto__: null, length: 0 };
-      for (const option of node.options) {
+      const { options } = node;
+      const count = options.length;
+      for (let index = 0; index < count; index += 1) {
+        const option = options[index];
         if (visited >= 2000 || item.options.length >= 32) {
           omit('work_limit');
           break;
@@ -433,7 +453,7 @@ function borrowedRead({ nonce, nextRef, full, textOnly, checkedNode, finding = f
       node,
       item,
       named: Boolean(label),
-      labelBytes: encoder.encode(label).length,
+      labelBytes: byteLength(label),
     };
     targets[targets.length] = target;
     targets.length += 1;
@@ -576,7 +596,7 @@ function borrowedRead({ nonce, nextRef, full, textOnly, checkedNode, finding = f
     report.elements[report.elements.length] = target.item;
     report.elements.length += 1;
     const encoded = borrowedReport(report);
-    if (encoded === null || encoder.encode(encoded).length > 65_536) {
+    if (encoded === null || byteLength(encoded) > 65_536) {
       report.elements.length -= 1;
       omit('report_limit');
       break;

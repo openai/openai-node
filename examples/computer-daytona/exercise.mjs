@@ -14,6 +14,7 @@ const png = pixels.toString('base64');
 const calls = [];
 let value = png;
 let failedPointer;
+let failedRead;
 let cancellation;
 let changeDuringScreenshot = false;
 let displayGate;
@@ -35,6 +36,9 @@ const capture = (kind) => async (body) => {
 };
 const api = {
   async getDisplayInfo() {
+    if (failedRead === 'display') {
+      throw new Error('SYNTHETIC_PROVIDER_DETAIL');
+    }
     if (displayGate) {
       const gate = displayGate;
       displayGate = undefined;
@@ -45,6 +49,9 @@ const api = {
   },
   async takeScreenshot() {
     calls.push(['screenshot', {}]);
+    if (failedRead === 'screenshot') {
+      throw new Error('SYNTHETIC_PROVIDER_DETAIL');
+    }
     if (cancellation?.kind === 'screenshot') {
       cancellation.controller.abort(new Error('Synthetic cancellation during capture'));
     }
@@ -99,6 +106,33 @@ if (process.argv.includes('--keys')) {
   process.exit(0);
 }
 const pointer = { type: 'click', x: 1023, y: 767, button: 'left' };
+// oxlint-disable no-await-in-loop -- Independent local transport failure at each adapter boundary.
+for (const boundary of ['initial', 'display', 'screenshot', 'click']) {
+  failedRead = undefined;
+  failedPointer = undefined;
+  driver = await fromStartedDesktop(computer);
+  tool = new ComputerToolset(driver);
+  await tool.execute(call({ type: 'screenshot' }), yes);
+  failedRead = boundary === 'initial' ? 'display' : boundary;
+  failedPointer = boundary === 'click' ? 'click' : undefined;
+  await assert.rejects(
+    boundary === 'initial'
+      ? fromStartedDesktop(computer)
+      : tool.execute(call(boundary === 'click' ? pointer : { type: 'screenshot' }), yes),
+    (error) => {
+      assert.match(String(error), /Daytona provider operation failed/u);
+      assert.doesNotMatch(String(error.stack), /SYNTHETIC_PROVIDER_DETAIL|Uncertain pointer effect/u);
+      assert.equal(error.cause, undefined);
+      return true;
+    },
+  );
+  passed.push(`sanitized:${boundary}`);
+}
+// oxlint-enable no-await-in-loop
+failedRead = undefined;
+failedPointer = undefined;
+driver = await fromStartedDesktop(computer);
+tool = new ComputerToolset(driver);
 await checkRefusal('display:initial-screenshot-required', pointer);
 await tool.execute(call({ type: 'screenshot' }), yes);
 const cases = [

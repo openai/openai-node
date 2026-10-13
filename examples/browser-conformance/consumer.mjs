@@ -267,7 +267,8 @@ async function main() {
         t.driver.state = () => value;
         if (text.valid) {
           const result = body(await t.browser.execute(call('list_tabs', {})));
-          assert.equal(result.state.tabs[0][text.field], text.value);
+          assert.equal(result.state.tabs[0][text.field], text.expected ?? text.value);
+          assert.equal(result.state.observation.title_truncated, text.title_truncated ?? false);
         } else {
           await assert.rejects(t.browser.execute(call('list_tabs', {})), /Browser state report failed/u);
         }

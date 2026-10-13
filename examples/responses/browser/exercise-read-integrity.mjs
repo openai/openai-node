@@ -19,6 +19,44 @@ await once(server, 'listening');
 const url = `http://127.0.0.1:${server.address().port}/fixture`;
 const second = `http://127.0.0.1:${server.address().port}/second`;
 try {
+  /* eslint-disable no-await-in-loop -- Close each caller-owned fixture before the next bounded override. */
+  for (const replaced of ['options', 'encoder']) {
+    const fixture = await browser.newContext();
+    const borrowed = createBrowserDriver(fixture);
+    try {
+      const target = await fixture.newPage();
+      await target.setContent(
+        '<p>Å漢😀 shipment</p><select aria-label="Current choice"><option value="one">Å漢😀 one</option><option value="two">Two</option></select>',
+      );
+      const initial = await borrowed.state();
+      const selected = initial.tabs[0].id;
+      await target.evaluate((kind) => {
+        if (kind === 'options') {
+          Object.defineProperty(document.querySelector('select').options, Symbol.iterator, {
+            value() {
+              throw new Error('fixture called page option iterator');
+            },
+          });
+        } else {
+          // oxlint-disable-next-line consistent-function-scoping -- This finite sentinel runs only inside the page.
+          window.TextEncoder = function TextEncoder() {
+            throw new Error('fixture called page encoder');
+          };
+        }
+      }, replaced);
+      const result = await borrowed.read_page({ tab_id: selected, filter: 'all' });
+      assert.equal(result.elements.find((item) => item.label === 'Current choice').options[0].value, 'one');
+      assert.match(result.text, /Å漢😀 shipment/u);
+      const found = await borrowed.find({ tab_id: selected, query: 'Current choice' });
+      assert.equal(found.elements[0].label, 'Current choice');
+      assert.match(await borrowed.get_page_text({ tab_id: selected }), /Å漢😀 shipment/u);
+      assert.equal(target.isClosed(), false);
+      checks += 3;
+    } finally {
+      await fixture.close();
+    }
+  }
+  /* eslint-enable no-await-in-loop */
   const context = await browser.newContext();
   await context.route('**/*', (route) => route.fulfill({ contentType: 'text/html', body: html }));
   const driver = createBrowserDriver(context);

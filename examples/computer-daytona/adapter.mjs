@@ -28,6 +28,14 @@ function noHeldKeys(action) {
   }
 }
 
+async function provider(work) {
+  try {
+    return await work();
+  } catch {
+    throw new Error('Daytona provider operation failed.');
+  }
+}
+
 /**
  * Adapt an already-started, caller-owned desktop. Requires a fresh screenshot before pointer input.
  * @param {import('@daytona/sdk').ComputerUse} computerUse The caller's started desktop.
@@ -44,7 +52,7 @@ export async function fromStartedDesktop(
   if (maxScreenshotBytes !== null) {
     screenshotLimit(maxScreenshotBytes, 'maxScreenshotBytes');
   }
-  const info = await computerUse.display.getInfo();
+  const info = await provider(() => computerUse.display.getInfo());
   if (!Array.isArray(info.displays) || info.displays.length !== 1) {
     throw new Error('Exactly one active display is required.');
   }
@@ -80,7 +88,7 @@ export async function fromStartedDesktop(
     if (retired) {
       throw new Error('The display changed. Create a new adapter and take a fresh screenshot.');
     }
-    const currentInfo = await computerUse.display.getInfo();
+    const currentInfo = await provider(() => computerUse.display.getInfo());
     checkCancelled(signal);
     const current = currentInfo.displays;
     if (
@@ -110,7 +118,7 @@ export async function fromStartedDesktop(
     try {
       await checkDisplay(signal);
       dispatched = true;
-      const result = await work();
+      const result = await provider(work);
       try {
         await checkDisplay(signal);
       } catch {
@@ -208,7 +216,7 @@ export async function fromStartedDesktop(
       try {
         hasScreenshot = false;
         await checkDisplay(signal);
-        const shot = await computerUse.screenshot.takeFullScreen();
+        const shot = await provider(() => computerUse.screenshot.takeFullScreen());
         if (typeof shot.screenshot !== 'string') {
           throw new TypeError('Daytona returned no screenshot.');
         }
@@ -232,6 +240,9 @@ export async function fromStartedDesktop(
         await checkDisplay(signal);
         hasScreenshot = true;
         return { type: 'computer_screenshot', image_url: `data:image/png;base64,${shot.screenshot}` };
+      } catch (error) {
+        checkCancelled(signal);
+        throw error;
       } finally {
         busy = false;
       }

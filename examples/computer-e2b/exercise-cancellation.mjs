@@ -82,6 +82,42 @@ function fixture() {
 }
 
 let checks = 0;
+{
+  const f = fixture();
+  const adapter = await E2BComputer.fromStartedDesktop(f.sandbox);
+  const controller = new AbortController();
+  const capture = f.sandbox.commands.run;
+  let received;
+  f.sandbox.commands.run = async (command, options) => {
+    await capture(command);
+    received = options.signal;
+    f.entered.release();
+    await f.gate.promise;
+  };
+  const outcome = (async () => {
+    try {
+      await adapter.screenshot({ signal: controller.signal });
+      return 'completed';
+    } catch (error) {
+      return error;
+    }
+  })();
+  try {
+    await f.entered.promise;
+    assert.equal(received, controller.signal, 'The provider capture must receive the caller signal');
+    controller.abort(new Error('fixture Stop during capture'));
+  } finally {
+    f.gate.release();
+    const error = await outcome;
+    await adapter.close();
+    assert.equal(f.files.size, 0, 'The capture path is removed even after interruption');
+    if (controller.signal.aborted) {
+      assert.ok(error instanceof Error && /cancel|stop/iu.test(error.message));
+      await assert.rejects(adapter.screenshot());
+    }
+  }
+  checks += 1;
+}
 const actions = [
   { held: 'move', action: { type: 'click', x: 1, y: 2, button: 'left' }, expected: ['move'] },
   { held: 'move', action: { type: 'double_click', x: 1, y: 2 }, expected: ['move'] },

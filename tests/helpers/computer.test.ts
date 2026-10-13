@@ -1574,6 +1574,99 @@ describe('ComputerToolset', () => {
     },
   );
 
+  test.each(['freeze', 'seal', 'preventExtensions'] as const)(
+    'native create wrappers can %s request-option overlays without reading getters early',
+    async (method) => {
+      const h = harness([[call([{ type: 'wait' }])], [message]]);
+      let reads = 0;
+      const source: OpenAI.RequestOptions = {
+        get headers() {
+          reads += 1;
+          return { 'x-supplied': 'kept', 'idempotency-key': 'first' };
+        },
+        timeout: 12_000,
+      };
+      Object.freeze(source);
+      const create = h.client.responses.create.bind(h.client.responses);
+      let requests = 0;
+      vi.spyOn(h.client.responses, 'create').mockImplementation((params, options) => {
+        if (!options) {
+          throw new Error('Expected request options');
+        }
+        const before = reads;
+        if (method === 'freeze') {
+          Object.freeze(options);
+        } else if (method === 'seal') {
+          Object.seal(options);
+        } else {
+          Object.preventExtensions(options);
+        }
+        expect(reads).toBe(before);
+        expect(Object.isExtensible(options)).toBe(false);
+        expect(Object.keys(options)).toContain('headers');
+        expect(Reflect.set(options, 'newOption', true)).toBe(false);
+        if (method === 'freeze') {
+          expect(Reflect.set(options, 'timeout', 1)).toBe(false);
+          expect(Reflect.deleteProperty(options, 'timeout')).toBe(false);
+        }
+        requests += 1;
+        return create(params, options);
+      });
+      await h.toolset.run(
+        h.client,
+        { input: 'begin' },
+        {
+          requestOptions: source,
+          signal: new AbortController().signal,
+        },
+      );
+      expect(requests).toBe(2);
+      expect(h.headers.map((value) => value.get('x-supplied'))).toEqual(['kept', 'kept']);
+      expect(h.performed).toEqual([{ type: 'wait' }, { type: 'screenshot' }]);
+      expect(source.timeout).toBe(12_000);
+    },
+  );
+
+  test('continuation includes computer results after a native hook replaces input', async () => {
+    const h = harness([]);
+    const sent: { input: unknown[] }[] = [];
+    class FixtureClient extends OpenAI {
+      prepares = 0;
+
+      protected override async prepareOptions(options: FinalRequestOptions): Promise<void> {
+        this.prepares += 1;
+        if (this.prepares === 1 && isObj(options.body) && Array.isArray(options.body['input'])) {
+          options.body['input'] = [...options.body['input'], { role: 'user', content: 'prepared input' }];
+        }
+      }
+    }
+    const client = new FixtureClient({
+      apiKey: 'synthetic-test-key',
+      maxRetries: 0,
+      fetch: async (url, init) => {
+        const body: unknown = await new Request(url, init).json();
+        if (!isObj(body) || !Array.isArray(body['input'])) {
+          throw new Error('Expected request input');
+        }
+        sent.push({ input: body['input'] });
+        return Response.json({
+          id: 'resp_test',
+          object: 'response',
+          status: 'completed',
+          output: sent.length === 1 ? [call([{ type: 'wait' }])] : [message],
+        });
+      },
+    });
+    await h.toolset.run(client, { input: 'begin' });
+    expect(sent[1]?.input).toEqual([
+      { role: 'user', content: 'begin' },
+      { role: 'user', content: 'prepared input' },
+      expect.objectContaining({ type: 'computer_call' }),
+      expect.objectContaining({ type: 'computer_call_output' }),
+    ]);
+    expect(h.performed).toEqual([{ type: 'wait' }, { type: 'screenshot' }]);
+  });
+
   test('FR trusted prepareOptions can assign its own body serializer on each request', async () => {
     const h = harness([]);
     const sent: unknown[] = [];

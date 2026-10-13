@@ -1063,10 +1063,22 @@ async function readState(
       ) {
         throw new TypeError('Invalid browser state.');
       }
-      if (observation && (!boundedStateText(id, 128, false) || !boundedStateText(title, 1024, true))) {
+      if (
+        observation &&
+        (!boundedStateText(id, 128, false) || !boundedStateText(title, Number.POSITIVE_INFINITY, true))
+      ) {
         throw new TypeError('Invalid browser state.');
       }
-      return { id, title, url: observation ? stateOrigin(url) : legacyStateURL(url), active };
+      let projectedTitle = title;
+      if (observation) {
+        // SAFETY: The native encoder reports how many complete UTF-16 units it read.
+        const { read } = new TextEncoder().encodeInto(title, new Uint8Array(1024)) as { read: number };
+        if (read < title.length) {
+          projectedTitle = title.slice(0, read);
+          observation.title_truncated = true;
+        }
+      }
+      return { id, title: projectedTitle, url: observation ? stateOrigin(url) : legacyStateURL(url), active };
     });
     if (
       new Set(tabs.map((tab) => tab.id)).size !== tabs.length ||

@@ -126,28 +126,35 @@ export async function openReader({ documents } = {}) {
     const page = await context.newPage();
     await page.goto(home);
     let retired = false;
-    const observe = async (work, signal) => {
+    const observe = async (work, signal, navigation = false) => {
       if (retired) {
         throw new BrowserError('Reader was stopped. Open a new reader.');
       }
       signal?.throwIfAborted();
-      if (!signal) {
-        return await work();
-      }
       let onAbort;
-      // oxlint-disable-next-line promise/avoid-new -- Bridge the call's Stop to its owned read.
-      const stopped = new Promise((_resolve, reject) => {
-        onAbort = () => {
-          retired = true;
-          reject(signal.reason);
-        };
-        signal.addEventListener('abort', onAbort, { once: true });
-      });
       try {
+        if (!signal) {
+          return await work();
+        }
+        // oxlint-disable-next-line promise/avoid-new -- Bridge the call's Stop to its owned read.
+        const stopped = new Promise((_resolve, reject) => {
+          onAbort = () => {
+            retired = true;
+            reject(signal.reason);
+          };
+          signal.addEventListener('abort', onAbort, { once: true });
+        });
         return await Promise.race([work(), stopped]);
+      } catch (error) {
+        if (navigation) {
+          retired = true;
+        }
+        throw error;
       } finally {
-        signal.removeEventListener('abort', onAbort);
-        if (signal.aborted) {
+        if (onAbort) {
+          signal.removeEventListener('abort', onAbort);
+        }
+        if (retired) {
           // The owner retains this close for explicit cleanup; Stop need not wait for its handshake.
           // oxlint-disable-next-line promise/prefer-await-to-then -- Observe without delaying Stop.
           void close().catch(() => {
@@ -183,7 +190,7 @@ export async function openReader({ documents } = {}) {
         if (!pages.has(url)) {
           throw new Error('Choose one of the three local guide pages.');
         }
-        await observe(() => page.goto(url), signal);
+        await observe(() => page.goto(url), signal, true);
       },
       async get_page_text({ tab_id }, { signal } = {}) {
         checkTab(tab_id);
