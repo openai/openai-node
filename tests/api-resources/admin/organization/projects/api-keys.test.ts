@@ -28,6 +28,27 @@ describe('resource apiKeys', () => {
     });
   });
 
+  test('update: only required params', async () => {
+    const responsePromise = client.admin.organization.projects.apiKeys.update('api_key_id', {
+      project_id: 'project_id',
+      expires_in_seconds: 1,
+    });
+    const rawResponse = await responsePromise.asResponse();
+    expect(rawResponse).toBeInstanceOf(Response);
+    const response = await responsePromise;
+    expect(response).not.toBeInstanceOf(Response);
+    const dataAndResponse = await responsePromise.withResponse();
+    expect(dataAndResponse.data).toBe(response);
+    expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('update: required and optional params', async () => {
+    await client.admin.organization.projects.apiKeys.update('api_key_id', {
+      project_id: 'project_id',
+      expires_in_seconds: 1,
+    });
+  });
+
   test('list', async () => {
     const responsePromise = client.admin.organization.projects.apiKeys.list('project_id');
     const rawResponse = await responsePromise.asResponse();
