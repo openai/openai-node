@@ -32,6 +32,14 @@ export async function recordRequest(run, send, signal) {
           durationMs: null,
         })
       : null;
+  const finish = (phase) => {
+    if (receipt && receipt.durationMs === null) {
+      if (phase) {
+        receipt.phase = phase;
+      }
+      receipt.durationMs = performance.now() - started;
+    }
+  };
   try {
     const response = await send();
     const headersMs = performance.now() - started;
@@ -41,16 +49,66 @@ export async function recordRequest(run, send, signal) {
       receipt.headersMs = headersMs;
       run.requestHeadersMs += headersMs;
     }
-    return { response, headersMs };
+    if (!receipt || !response.body) {
+      finish();
+      return { response, headersMs };
+    }
+    const reader = response.body.getReader();
+    let cancelling = false;
+    const body = new ReadableStream(
+      {
+        async pull(controller) {
+          try {
+            const { done, value } = await reader.read();
+            // Cancelling the source also resolves pending reads as EOF. Only the
+            // cancel path can finalize their timing and release the reader.
+            if (cancelling) {
+              return;
+            }
+            if (done) {
+              finish();
+              reader.releaseLock();
+              controller.close();
+            } else {
+              controller.enqueue(value);
+            }
+          } catch (error) {
+            if (!cancelling) {
+              finish(signal?.aborted ? 'cancelled' : 'failed');
+              reader.releaseLock();
+              controller.error(error);
+            }
+          }
+        },
+        async cancel(reason) {
+          cancelling = true;
+          try {
+            await reader.cancel(reason);
+            finish('cancelled');
+          } catch (error) {
+            finish(signal?.aborted ? 'cancelled' : 'failed');
+            throw error;
+          } finally {
+            reader.releaseLock();
+          }
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const recorded = new Response(body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+    Object.defineProperties(recorded, {
+      url: { value: response.url },
+      type: { value: response.type },
+      redirected: { value: response.redirected },
+    });
+    return { response: recorded, headersMs };
   } catch (error) {
-    if (receipt) {
-      receipt.phase = signal?.aborted ? 'cancelled' : 'failed';
-    }
+    finish(signal?.aborted ? 'cancelled' : 'failed');
     throw error;
-  } finally {
-    if (receipt) {
-      receipt.durationMs = performance.now() - started;
-    }
   }
 }
 

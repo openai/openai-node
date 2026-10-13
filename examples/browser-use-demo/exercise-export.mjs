@@ -2,7 +2,174 @@ import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { createDemoServer } from './server.mjs';
-import { exportRun, recordReceipt } from './run-receipt.mjs';
+import { exportRun, recordReceipt, recordRequest } from './run-receipt.mjs';
+
+for (const outcome of ['complete', 'failed', 'cancelled', 'closed']) {
+  const run = { mode: 'live', started: performance.now(), requests: 1, requestHeadersMs: 0 };
+  const input = Promise.withResolvers();
+  let readCount = 0;
+  let closeCount = 0;
+  const response = new Response(
+    new ReadableStream(
+      {
+        async pull(controller) {
+          readCount += 1;
+          if (readCount === 1) {
+            controller.enqueue(new TextEncoder().encode('data: first\n\n'));
+          } else {
+            await input.promise;
+            if (outcome === 'failed') {
+              throw new Error('Controlled body read failed');
+            }
+            controller.enqueue(new TextEncoder().encode('data: last\n\n'));
+            controller.close();
+          }
+        },
+        cancel() {
+          closeCount += 1;
+        },
+      },
+      { highWaterMark: 0 },
+    ),
+    {
+      status: 201,
+      statusText: 'Created',
+      headers: { 'content-type': 'text/event-stream', 'x-request-id': 'fixture' },
+    },
+  );
+  Object.defineProperties(response, {
+    url: { value: 'https://example.test/redirected' },
+    type: { value: 'basic' },
+    redirected: { value: true },
+  });
+  const controller = new AbortController();
+  // Sequential bounded streams: one ordinary response owns each receipt.
+  // oxlint-disable-next-line no-await-in-loop
+  const received = await recordRequest(run, async () => response, controller.signal);
+  const [receipt] = run.receipts;
+  assert.equal(receipt.durationMs, null, outcome);
+  assert.equal(receipt.phase, 'headers');
+  assert.equal(received.response.status, 201);
+  assert.equal(received.response.statusText, 'Created');
+  assert.equal(received.response.headers.get('x-request-id'), 'fixture');
+  assert.equal(received.response.url, response.url);
+  assert.equal(received.response.type, response.type);
+  assert.equal(received.response.redirected, response.redirected);
+  assert.equal(readCount, 0, 'Receipt observation must not read the body in advance');
+  const reader = received.response.body.getReader();
+  // oxlint-disable-next-line no-await-in-loop
+  const first = await reader.read();
+  assert.equal(new TextDecoder().decode(first.value), 'data: first\n\n');
+  assert.equal(receipt.durationMs, null, 'First chunk cannot finalize a still-open response');
+  if (outcome === 'closed' || outcome === 'cancelled') {
+    if (outcome === 'cancelled') {
+      controller.abort();
+    }
+    // oxlint-disable-next-line no-await-in-loop
+    await reader.cancel();
+    assert.equal(closeCount, 1);
+    assert.equal(receipt.phase, 'cancelled');
+  } else {
+    const last = reader.read();
+    assert.equal(receipt.durationMs, null);
+    input.resolve();
+    if (outcome === 'failed') {
+      // oxlint-disable-next-line no-await-in-loop
+      await assert.rejects(last, /Controlled body read failed/u);
+      assert.equal(receipt.phase, 'failed');
+    } else {
+      // oxlint-disable-next-line no-await-in-loop
+      const next = await last;
+      assert.equal(new TextDecoder().decode(next.value), 'data: last\n\n');
+      // oxlint-disable-next-line no-await-in-loop
+      const eof = await reader.read();
+      assert.equal(eof.done, true);
+      assert.equal(receipt.phase, 'headers');
+    }
+  }
+  assert.ok(receipt.durationMs >= receipt.headersMs);
+  const duration = receipt.durationMs;
+  input.resolve();
+  // oxlint-disable-next-line no-await-in-loop
+  await delay(3);
+  // Failed streams keep their original error when subsequently cancelled.
+  // oxlint-disable-next-line no-await-in-loop
+  await reader.cancel().catch((error) => {
+    assert.equal(outcome, 'failed');
+    assert.match(error.message, /Controlled body read failed/u);
+  });
+  assert.equal(receipt.durationMs, duration, 'A later close must not change finalized duration');
+  assert.equal(response.body.locked, false, 'The source reader must release ownership');
+  console.log('PASS streaming request duration', outcome);
+}
+{
+  const run = { mode: 'live', started: performance.now(), requests: 1, requestHeadersMs: 0 };
+  const readStarted = Promise.withResolvers();
+  const releaseRead = Promise.withResolvers();
+  const cancelStarted = Promise.withResolvers();
+  const releaseCancel = Promise.withResolvers();
+  let reads = 0;
+  let cancels = 0;
+  const original = new Response(
+    new ReadableStream(
+      {
+        async pull() {
+          reads += 1;
+          readStarted.resolve();
+          await releaseRead.promise;
+        },
+        async cancel() {
+          cancels += 1;
+          cancelStarted.resolve();
+          await releaseCancel.promise;
+        },
+      },
+      { highWaterMark: 0 },
+    ),
+  );
+  const { response } = await recordRequest(run, async () => original);
+  const reader = response.body.getReader();
+  const reading = reader.read();
+  await readStarted.promise;
+  const cancelling = reader.cancel('controlled stop');
+  await cancelStarted.promise;
+  const stopped = await reading;
+  assert.equal(stopped.done, true);
+  // Source cancellation resolves the in-flight read as EOF even though cleanup has not yet finished.
+  assert.equal(
+    run.receipts[0].durationMs,
+    null,
+    'Pending cancellation must own timing until cleanup settles',
+  );
+  releaseCancel.resolve();
+  await cancelling;
+  assert.equal(run.receipts[0].phase, 'cancelled');
+  const duration = run.receipts[0].durationMs;
+  assert.ok(duration >= run.receipts[0].headersMs);
+  assert.equal(original.body.locked, false);
+  releaseRead.resolve();
+  await delay(3);
+  assert.deepEqual(
+    { reads, cancels, duration: run.receipts[0].durationMs },
+    { reads: 1, cancels: 1, duration },
+  );
+  console.log('PASS pending read cancellation owns final timing and releases exactly once');
+}
+{
+  const run = { mode: 'live', started: performance.now(), requests: 1, requestHeadersMs: 0 };
+  const empty = await recordRequest(run, async () => new Response(null, { status: 204 }));
+  assert.equal(empty.response.body, null);
+  assert.ok(run.receipts[0].durationMs >= run.receipts[0].headersMs);
+  const failure = await recordRequest(run, async () =>
+    Response.json({ error: { code: 'fixture' } }, { status: 403 }),
+  );
+  const cloned = failure.response.clone();
+  assert.equal(cloned.status, 403);
+  assert.equal(cloned.headers.get('content-type'), 'application/json');
+  assert.deepEqual(await cloned.json(), { error: { code: 'fixture' } });
+  assert.deepEqual(await failure.response.json(), { error: { code: 'fixture' } });
+  assert.ok(run.receipts[1].durationMs >= run.receipts[1].headersMs);
+}
 
 const marker = 'PRIVATE_EXPORT_MARKER_53b2';
 const model = 'synthetic-export-check';
