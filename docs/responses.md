@@ -233,4 +233,5 @@ calls, and connection handling.
 - [Streaming responses](streaming.md)
 - [Structured outputs](structured-outputs.md)
 - [Function calling and tools](tools.md)
+- [Responses and Decisions tool runners](browser.md)
 - [Realtime API](realtime.md)

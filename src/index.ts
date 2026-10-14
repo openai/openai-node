@@ -4,6 +4,7 @@ export { type Uploadable, toFile, toStreamingFile } from './core/uploads';
 export { APIPromise } from './core/api-promise';
 export { OpenAI, type ClientOptions, type DataResidency } from './client';
 export { PagePromise } from './core/pagination';
+export { ComputerToolset, type ComputerDriver } from './helpers/computer';
 export {
   OpenAIError,
   APIError,
