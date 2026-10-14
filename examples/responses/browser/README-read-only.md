@@ -8,11 +8,14 @@ Responses chooses which pages to read. The driver exposes only page text, tabs
 and navigation to those three pages. It cannot submit a form or change a record.
 Playwright serves the pages from memory and blocks every other browser request.
 
-From the `examples` directory of a Node SDK source archive, install the SDK and
-browser dependency:
+Use Node.js 22 or later and the pnpm version in the root `package.json`. From
+the Node SDK checkout or source archive root, build and install this source:
 
 ```sh
-npm install --no-save openai@latest playwright@1.63.0
+pnpm install --frozen-lockfile
+pnpm build
+cd examples
+npm install --no-save ../dist playwright@1.63.0
 npx playwright install chromium
 ```
 

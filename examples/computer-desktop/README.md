@@ -1,26 +1,43 @@
 # A disposable desktop for ComputerToolset
 
-This optional example uses one private Linux VM for a fixed computer task. It
+This optional example uses a private VM or local container for a fixed task. It
 opens a real browser with a local ticket and a text editor. ComputerToolset
 sends native computer actions to that desktop. A fixed check verifies the
-browser event and saved receipt. The npm package supplies the SDK, not these
-examples. Use a source archive from the latest SDK release.
+browser event and saved receipt. Run it from the Node SDK checkout or source
+archive, with the SDK built from that source.
 
 ## Setup and no-key exercise
 
-Use an Apple-silicon Mac with virtualization enabled, Python 3.10 or later,
-and trusted vfkit and xorriso executables on PATH. See the
-[guest prerequisites](guest/README.md#before-the-first-run) for tool versions
-and upstream installation instructions. From the SDK source root, run:
+Use Node.js 22 or later and the pnpm version in the root `package.json`.
+From the SDK checkout or source archive root, build and install this source:
 
 ```sh
-python3 examples/computer-desktop/guest/setup.py --runtime-dir /private/tmp/desktop-$UID
+pnpm install --frozen-lockfile
+pnpm build
+cd examples
+npm install --no-save ../dist pngjs@7.0.0
+cd ..
 ```
 
-Setup downloads and verifies the fixed Debian media, then builds the private
-guest. It exits without changing a runtime it already completed. The
-[guest instructions](guest/README.md) also cover offline media and executable
-overrides.
+For the VM, use an Apple-silicon Mac with virtualization enabled, Python 3.10
+or later, and trusted vfkit and xorriso executables on PATH. See the
+[guest prerequisites](guest/README.md#before-the-first-run) for tool versions
+and upstream installation instructions. From the SDK root, run:
+
+```sh
+python3 examples/computer-desktop/guest/setup.py --runtime-dir "/tmp/desktop-$(id -u)"
+```
+
+For a local container on x86-64 Linux, select that backend explicitly:
+
+```sh
+python3 examples/computer-desktop/guest/setup.py --backend container --runtime-dir "/tmp/desktop-$(id -u)"
+```
+
+See [guest instructions](guest/README.md#optional-local-linux-fixture) for
+Docker prerequisites. Setup verifies and records the selected runtime, and
+reuses a matching one. The VM instructions also cover offline media and
+executable overrides.
 
 Use a short absolute path, such as `/private/tmp/desktop-$UID`. The runtime
 and its `runs` directory must belong to you and have mode 0700. Paths cannot
@@ -40,13 +57,10 @@ Normal Stop still removes the private run directory. After a forced SDK exit
 or host reboot, run directories can remain; remove them manually only after
 all owners using that runtime have stopped.
 
-Use Node.js 22 or later. From the extracted SDK source archive, install the
-published package and run from `examples/`:
+Run the no-key exercise from the SDK root:
 
 ```sh
-cd examples
-npm install --no-save openai@latest pngjs@7.0.0
-node computer-desktop/exercise.mjs --runtime-dir /private/tmp/desktop-$UID
+node examples/computer-desktop/exercise.mjs --runtime-dir "/tmp/desktop-$(id -u)"
 ```
 
 The exercise makes no API calls and needs no credentials. It uses the public
@@ -58,7 +72,7 @@ unchanged desktop. It exits with an error if any check fails.
 Also run the offline lifecycle regression check:
 
 ```sh
-node computer-desktop/exercise-lifecycle.mjs
+node examples/computer-desktop/exercise-lifecycle.mjs
 ```
 
 This check uses only Node built-ins and a temporary simulated process and
@@ -90,7 +104,7 @@ After the no-key exercise passes, set OPENAI_API_KEY and OPENAI_MODEL in the
 host environment. Then run:
 
 ```sh
-node computer-desktop/run.mjs --live --runtime-dir /private/tmp/desktop-$UID
+node examples/computer-desktop/run.mjs --live --runtime-dir "/tmp/desktop-$(id -u)"
 ```
 
 This command can spend API credits. It asks you to authorize the fixed local
@@ -110,11 +124,13 @@ The last frame captured before shutdown stays available for reference.
 Use the returned records to verify the final result. Further input is refused.
 Start a new desktop for any more work. Stop still removes the sealed guest.
 
-Each Desktop starts its own VM with a fresh private socket and EFI store. It
-accepts no existing guest ID, PID or socket. The guest has no network device
-or host directory shares. Its disk is read-only, with small temporary guest
-filesystems. The browser's sandbox stays enabled. No host browser profile,
-screen, API key or environment enters the guest.
+On macOS, each Desktop starts its own VM with a fresh private socket and EFI
+store. It accepts no existing guest ID, PID or socket. The VM has no network
+device or host directory shares. Its disk is read-only, with small temporary
+guest filesystems. On Linux, the local container uses the isolation settings
+described in the [guest instructions](guest/README.md#optional-local-linux-fixture).
+Both keep the browser sandbox enabled. No host browser profile, screen or API
+key enters the guest.
 
 Stop blocks new work and waits up to five seconds for the complete SDK call.
 It then terminates and reaps that exact guest before removing its private run
