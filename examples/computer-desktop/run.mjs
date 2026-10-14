@@ -26,6 +26,7 @@ const onInterrupt = () => {
   interruption.abort(new Error('Desktop startup interrupted.'));
 };
 process.on('SIGINT', onInterrupt);
+process.on('SIGTERM', onInterrupt);
 try {
   if (
     !(await approve(
@@ -77,6 +78,7 @@ try {
     await desktop?.stop();
   } finally {
     process.removeListener('SIGINT', onInterrupt);
+    process.removeListener('SIGTERM', onInterrupt);
     input.close();
   }
 }

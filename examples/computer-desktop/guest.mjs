@@ -66,6 +66,13 @@ async function containerCommand(root, operation, id, input, timeout = 30_000, li
       signal.throwIfAborted();
     }
     return stdout.trim();
+  } catch (error) {
+    // An unsuccessful startup may retain a recovery record. Its cleanup error
+    // must not be replaced with a signal that implies no guest remains.
+    if (operation !== 'start') {
+      signal?.throwIfAborted();
+    }
+    throw error;
   } finally {
     signal?.removeEventListener('abort', cancelStartup);
   }
