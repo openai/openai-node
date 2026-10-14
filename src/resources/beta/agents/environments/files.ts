@@ -16,8 +16,9 @@ function resolveResourceRequestOptions(
 
 export class Files extends APIResource {
   /**
-   * Copies inline bytes or a Files API file into a connected execution environment.
-   * See
+   * Copies inline bytes or a Files API file into a connected execution environment,
+   * replacing an existing regular file at the same path. Upload between turns and
+   * wait for success before starting the next turn. See
    * [environment files](https://developers.openai.com/api/docs/guides/agents-api/environments/files).
    *
    * @example
