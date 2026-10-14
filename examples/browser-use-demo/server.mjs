@@ -625,6 +625,7 @@ export async function createDemoServer({ apiKey, models = {}, port = 0 } = {}) {
       return;
     }
     run.status = 'paused';
+    run.result = null;
     run.setOwner('human');
     expireHumanSession(run);
     run.addEvent('control', 'Agent work drained. You control the browser.');

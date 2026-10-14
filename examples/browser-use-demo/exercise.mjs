@@ -43,6 +43,44 @@ const bind = (run) => ({
   tabId: run.browser?.tabId ?? null,
   sequence: run.browser?.sequence ?? null,
 });
+const originalLaunch = chromium.launch;
+const held = Promise.withResolvers();
+const release = Promise.withResolvers();
+let holdFinal = false;
+let observing = false;
+let fixturePage;
+chromium.launch = async function launch(options) {
+  const opened = await originalLaunch.call(this, options);
+  const newContext = opened.newContext.bind(opened);
+  opened.newContext = async (contextOptions) => {
+    const context = await newContext(contextOptions);
+    const newPage = context.newPage.bind(context);
+    context.newPage = async () => {
+      const current = await newPage();
+      const screenshot = current.screenshot.bind(current);
+      current.screenshot = async (screenshotOptions) => {
+        if (holdFinal && !observing) {
+          observing = true;
+          try {
+            const { body } = await call('/api/state');
+            if (body.run?.owner === 'agent' && body.run.result === 'verified') {
+              holdFinal = false;
+              fixturePage = current;
+              held.resolve(body.run);
+              await release.promise;
+            }
+          } finally {
+            observing = false;
+          }
+        }
+        return screenshot(screenshotOptions);
+      };
+      return current;
+    };
+    return context;
+  };
+  return opened;
+};
 try {
   assert.equal(await responseStatus(fetch(`${app.origin}/api/state`)), 403);
   assert.equal(
@@ -115,9 +153,61 @@ try {
   run = await until((value) => value?.owner === 'stopped' && !value.closing);
   assert.equal(run.result, 'unverified');
   assert.deepEqual(errors, []);
+  holdFinal = true;
+  assert.equal(
+    await responseStatus(call('/api/start', { taskId: 'reservation', api: 'decisions', mode: 'rehearsal' })),
+    200,
+  );
+  run = await until((value) => Boolean(value?.approval));
+  assert.equal(
+    await responseStatus(
+      call('/api/approval', { ...bind(run), approvalId: run.approval.id, approved: true }),
+    ),
+    200,
+  );
+  run = await Promise.race([
+    held.promise,
+    delay(8000).then(() => {
+      throw new Error('Final verified capture was never reached');
+    }),
+  ]);
+  assert.equal(run.result, 'verified');
+  assert.equal(await responseStatus(call('/api/take-control', bind(run))), 200);
+  release.resolve();
+  run = await until((value) => value?.owner === 'human' && !value.humanInputBusy);
+  const bounds = await fixturePage.getByLabel('Guest name').boundingBox();
+  assert.ok(bounds);
+  assert.equal(
+    await responseStatus(
+      call('/api/input', {
+        ...bind(run),
+        action: 'click',
+        x: bounds.x + bounds.width / 2,
+        y: bounds.y + bounds.height / 2,
+      }),
+    ),
+    200,
+  );
+  run = await until((value) => value?.owner === 'human' && !value.humanInputBusy);
+  assert.equal(
+    await responseStatus(call('/api/input', { ...bind(run), action: 'type', text: ' changed' })),
+    200,
+  );
+  run = await until((value) => value?.owner === 'human' && !value.humanInputBusy);
+  assert.equal(run.fixture.verified, false, JSON.stringify(run.fixture));
+  assert.equal(await responseStatus(call('/api/stop', { runId: run.id })), 200);
+  run = await until((value) => value?.owner === 'stopped' && !value.closing);
+  assert.equal(
+    run.result,
+    'unverified',
+    'A verified agent result cannot survive later human editing and Stop',
+  );
   console.log(
     'PASS Fieldwork auth, single task, default API/rehearsal, live frames, approval, stale control, Take/Return, checked result, Stop and cleanup.',
   );
 } finally {
+  holdFinal = false;
+  release.resolve();
+  chromium.launch = originalLaunch;
   await Promise.all([app.close(), browser.close()]);
 }
