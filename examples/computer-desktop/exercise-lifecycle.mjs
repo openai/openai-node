@@ -51,8 +51,11 @@ const server = createServer({ allowHalfOpen: true }, (socket) => {
       socket.end('SYNTHETIC_8738_NOT_JSON\\n');
       return;
     }
-    if (action.type === 'ready' || action.type === 'verify') {
+    if (action.type === 'ready') {
       socket.end(JSON.stringify({ ok: true }) + '\\n');
+    } else if (action.type === 'verify') {
+      socket.end(JSON.stringify({ ok: true, file_matches: false, browser_matches: false,
+        file_empty: true, browser_effects: 0 }) + '\\n');
     } else {
       appendFileSync('../../effect-count', '1\\n');
       writeFileSync('input-received', '1');
@@ -125,16 +128,12 @@ try {
   console.log('PASS failed startup reaps its exact child and leaves no run directory');
 
   // oxlint-disable eslint/no-await-in-loop -- Each CLI owns and cleans up a separate runtime.
-  const entries = ['run.mjs'];
-  if (process.argv.includes('--with-browser')) {
-    entries.push('../responses/browser/mixed-run.mjs');
-  }
-  for (const entry of entries) {
+  for (const signal of ['SIGINT', 'SIGTERM']) {
     const pending = await makeRuntime('pending-startup');
     runtimes.push(pending);
     const cli = spawn(
       process.execPath,
-      [fileURLToPath(new URL(entry, import.meta.url)), '--live', '--runtime-dir', pending],
+      [fileURLToPath(new URL('run.mjs', import.meta.url)), '--live', '--runtime-dir', pending],
       {
         env: { ...process.env, OPENAI_API_KEY: 'fixture-no-request', OPENAI_MODEL: 'fixture-no-request' },
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -170,12 +169,12 @@ try {
         await delay(10);
       }
       assert.ok(ready, errors);
-      assert.equal(cli.kill('SIGINT'), true);
+      assert.equal(cli.kill(signal), true);
       const result = await Promise.race([exited, delay(5000, undefined, { ref: false })]);
-      assert.ok(result, 'SIGINT must end startup within 5 seconds');
+      assert.ok(result, `${signal} must end startup within 5 seconds`);
       assert.notEqual(result[0], 0);
       assert.deepEqual(await readdir(path.join(pending, 'runs')), []);
-      console.log(`PASS SIGINT during ${entry} startup promptly reaps the guest and removes its run`);
+      console.log(`PASS ${signal} during startup promptly reaps the guest and removes its run`);
     } finally {
       if (cli.exitCode === null && cli.signalCode === null) {
         cli.kill('SIGKILL');

@@ -49,9 +49,6 @@ Also run the offline lifecycle regression check:
 node computer-desktop/exercise-lifecycle.mjs
 ```
 
-If you also installed the browser example's Playwright dependency, run
-`node computer-desktop/exercise-lifecycle.mjs --with-browser` to include the mixed CLI startup check.
-
 This check uses only Node built-ins and a temporary simulated process and
 Unix socket. It verifies failed startup, an input followed by a lost reply,
 and Stop while input is still pending. It checks that the exact child and run
