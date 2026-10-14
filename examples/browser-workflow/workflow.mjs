@@ -171,9 +171,11 @@ export async function openWorkflow(
   }
   const fixture = server.fixtures[variant];
   const pageRoutes = ['/inbox', '/schedule', '/dispatch'];
-  const pageUrls = pageRoutes.map(
-    (route) => `${server.origin}${route}?fixture=${encodeURIComponent(variant)}`,
+  const encoded = encodeURIComponent(variant).replaceAll(
+    /[!'()*]/gu,
+    (character) => `%${character.codePointAt(0).toString(16).toUpperCase()}`,
   );
+  const pageUrls = pageRoutes.map((route) => `${server.origin}${route}?fixture=${encoded}`);
   const urls = [
     ...pageUrls,
     ...Object.keys(files)
@@ -487,9 +489,11 @@ export async function main(args) {
   const server = await serve(values.data);
   const { mode } = values;
   if (mode === 'serve') {
-    console.log(
-      `Open ${server.origin}/inbox?fixture=${encodeURIComponent(values.fixture)}. Press Ctrl+C to stop.`,
+    const encoded = encodeURIComponent(values.fixture).replaceAll(
+      /[!'()*]/gu,
+      (character) => `%${character.codePointAt(0).toString(16).toUpperCase()}`,
     );
+    console.log(`Open ${server.origin}/inbox?fixture=${encoded}. Press Ctrl+C to stop.`);
     process.once('SIGINT', () => server.close());
     return;
   }

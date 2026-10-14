@@ -46,7 +46,7 @@ if (mode === 'identifiers') {
       assert.match(error.message, /^Fixture IDs must be nonempty strings/u);
     }
     const fixture = structuredClone(original);
-    const variant = 'C\0\r " & Ω 🌕';
+    const variant = 'C\u0000\r " & Ω 🌕 !\'()* /';
     const requestId = 'REQ " & Ω 🌕\nline';
     const slotId = 'ROOM " & Ω 🌕\nline';
     fixture.requestId = requestId;

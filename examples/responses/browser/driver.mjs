@@ -525,10 +525,27 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
     }
   };
 
-  const observation = async (work, signal, mayHaveEffects = false, timeoutMs = null) => {
+  const observation = async (
+    work,
+    signal,
+    mayHaveEffects = false,
+    timeoutMs = null,
+    sanitizeBorrowed = false,
+  ) => {
     signal?.throwIfAborted();
+    const observe = async () => {
+      try {
+        return await work();
+      } catch (error) {
+        if (sanitizeBorrowed && !ownedURLs && !(error instanceof BrowserError)) {
+          usable();
+          throw new BrowserError('Browser observation failed. Read the page again.');
+        }
+        throw error;
+      }
+    };
     if (!signal && timeoutMs === null) {
-      return await work();
+      return await observe();
     }
     let onAbort;
     let timer;
@@ -554,7 +571,7 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
     });
     try {
       // Promise.race observes late renderer rejection, even after Stop wins.
-      return await Promise.race([work(), stopped]);
+      return await Promise.race([observe(), stopped]);
     } finally {
       signal?.removeEventListener('abort', onAbort);
       clearTimeout(timer);
@@ -988,7 +1005,7 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
 
   const driver = {
     async state({ signal } = {}) {
-      return await observation(observeState, signal, false, ownedURLs ? null : 5000);
+      return await observation(observeState, signal, false, ownedURLs ? null : 5000, !ownedURLs);
     },
     async new_tab({ url }, { signal } = {}) {
       usable();
@@ -1097,7 +1114,13 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
           signal,
         );
       }
-      return await observation(() => readBorrowed(page, { full: filter === 'all' }), signal, false, 5000);
+      return await observation(
+        () => readBorrowed(page, { full: filter === 'all' }),
+        signal,
+        false,
+        5000,
+        true,
+      );
     },
     async get_page_text({ tab_id }, { signal } = {}) {
       const page = pageFor(tab_id);
@@ -1109,6 +1132,7 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
         signal,
         false,
         5000,
+        true,
       );
       return report.text;
     },
@@ -1135,6 +1159,7 @@ export function createBrowserDriver(context, { ownedFixture } = {}) {
         signal,
         false,
         5000,
+        true,
       );
     },
     async click({ tab_id, target }, { signal } = {}) {
