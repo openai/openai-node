@@ -4,7 +4,14 @@ import { ResponsesToolRunner } from 'openai/helpers/responses-tool-runner';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
-import { exampleBrowserChannel } from './driver.mjs';
+
+function exampleBrowserChannel() {
+  const channel = process.env['OPENAI_EXAMPLE_BROWSER_CHANNEL'];
+  if (channel !== undefined && channel !== 'chrome') {
+    throw new TypeError('OPENAI_EXAMPLE_BROWSER_CHANNEL must be unset or chrome.');
+  }
+  return channel;
+}
 
 const home = 'http://reader.invalid/';
 const escape = (text) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');

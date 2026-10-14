@@ -39,6 +39,9 @@ Responses parameters and returns the completed final response. It does not
 combine other local tools, streams, background runs, server-side conversations,
 or `previous_response_id`. Instead, it replays its full input history, requesting encrypted reasoning for stateless and zero data retention runs.
 
+Computer-only runs also accept Responses `context_management` compaction. The helper replays the
+opaque compaction item before continuing. This differs from the mixed runner's local `contextBudget` option.
+
 `maxSteps` is a positive integer that caps calls to `responses.create`, including
 the final answer. Its default is 20. The last allowed call cannot trigger further
 actions. The client's normal HTTP retries can add network attempts. Pass normal
@@ -105,11 +108,7 @@ through policy checks without taking redundant captures.
 Approval callbacks keep the native call type and receive an empty array for a
 legitimately omitted modern checklist. That copy does not add a field to history.
 
-Run the credential-free driver example from the SDK repository:
-
-```sh
-pnpm tsn -T examples/responses/computer.ts
-```
+For a local native desktop, use the [standalone desktop setup](../examples/computer-desktop/README.md).
 
 Browser control uses this computer driver and screenshot contract. A separate
 DOM/browser protocol is not part of this helper.
