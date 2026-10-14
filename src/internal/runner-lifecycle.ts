@@ -181,9 +181,14 @@ export function continuationRequestOptions(
   options: RequestOptions | undefined,
   signal: AbortSignal | undefined,
 ) {
-  const headers = buildHeaders([options && configuredOption(options, 'headers')]);
+  const headers = buildHeaders([
+    options && Object.getOwnPropertyDescriptor(options, 'headers')?.enumerable ? options.headers : undefined,
+  ]);
   const effectiveHeaders = buildHeaders([client['_options'].defaultHeaders, headers]);
-  const idempotencyKey = options && configuredOption(options, 'idempotencyKey');
+  const idempotencyKey =
+    options && Object.getOwnPropertyDescriptor(options, 'idempotencyKey')?.enumerable
+      ? options.idempotencyKey
+      : undefined;
   if (!idempotencyKey && !effectiveHeaders.values.has('idempotency-key')) {
     if (options === undefined && signal === undefined) {
       return;

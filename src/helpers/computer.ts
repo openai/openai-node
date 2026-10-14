@@ -590,23 +590,12 @@ export class ComputerToolset {
     protectRunnerJSON(body);
     const policy = snapshotComputerPolicy(options);
     let supplied = configuredOption(options, 'requestOptions');
-    let owner: object | null = supplied ?? null;
-    let descriptor: PropertyDescriptor | undefined;
-    while (owner !== null && !isObjectPrototype(owner)) {
-      descriptor = Object.getOwnPropertyDescriptor(owner, 'signal');
-      if (descriptor) {
-        break;
-      }
-      // SAFETY: A request option's prototype is another object or null.
-      owner = Object.getPrototypeOf(owner) as object | null;
-    }
-    const hasSignalAccessor = supplied && descriptor && !('value' in descriptor);
-    if (hasSignalAccessor || policy.signal) {
-      // Read an accessor once while preserving the caller's live headers reference.
-      const requestSignal = policy.signal ?? (hasSignalAccessor ? supplied?.signal : undefined);
-      supplied = overlayRequestOptions(supplied, { signal: policy.signal ?? requestSignal });
-    }
+    const ownSignal = supplied && Object.getOwnPropertyDescriptor(supplied, 'signal');
     const signal = policy.signal ?? (supplied && configuredOption(supplied, 'signal')) ?? undefined;
+    if (policy.signal || (ownSignal && !('value' in ownSignal)) || (signal && !ownSignal?.enumerable)) {
+      // Capture accessors once and expose hidden signals to the native request spread.
+      supplied = overlayRequestOptions(supplied, { signal });
+    }
     const executionOptions = { ...policy, signal };
     const earlierIdentities = new Set<string>();
     const earlierCallIds = new Set<string>();
