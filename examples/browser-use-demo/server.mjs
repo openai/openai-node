@@ -415,6 +415,7 @@ async function humanInput(run, body) {
         throw new Error('Unknown browser input.');
       }
     }
+    run.session.invalidateReferences();
     await run.session.refreshView();
     await run.session.capture();
     run.addEvent('human', `Human ${body.action} completed; browser state captured.`);

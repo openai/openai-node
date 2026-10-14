@@ -5,11 +5,30 @@ The agent fills a synthetic booking, then asks before submitting. The app verifi
 
 ## Setup
 
-Download the release source matching the installed SDK. From its `examples` directory:
+Use Node.js 22 or later and the pnpm version in the root `package.json`. From
+the Node SDK checkout or source archive root, build and install this source:
 
 ```sh
-npm install --no-save openai@latest playwright@1.63.0
+pnpm install --frozen-lockfile
+pnpm build
+cd examples
+npm install --no-save ../dist playwright@1.63.0
 npx playwright install chromium
+```
+
+On Linux, if bundled Chromium cannot start with its sandbox enabled, use a
+locally installed Chrome. Set this before starting the server or local checks:
+
+```sh
+export OPENAI_EXAMPLE_BROWSER_CHANNEL=chrome
+```
+
+Leave the variable unset to use Playwright's bundled Chromium. Both choices
+keep the browser sandbox enabled.
+
+Start the server in the same shell:
+
+```sh
 node browser-use-demo/server.mjs
 ```
 

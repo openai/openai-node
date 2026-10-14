@@ -307,11 +307,18 @@ try {
     200,
   );
   run = await until((value) => value?.owner === 'human' && !value.humanInputBusy);
+  const beforeHumanType = bind(run);
   assert.equal(
     await responseStatus(call('/api/input', { ...bind(run), action: 'type', text: ' changed' })),
     200,
   );
   run = await until((value) => value?.owner === 'human' && !value.humanInputBusy);
+  assert.equal(
+    await responseStatus(call('/api/input', { ...beforeHumanType, action: 'type', text: ' stale' })),
+    409,
+    'An older displayed frame must not admit a second input after editing',
+  );
+  assert.ok(run.browser.sequence > beforeHumanType.sequence);
   assert.equal(run.fixture.verified, false, JSON.stringify(run.fixture));
   assert.equal(await responseStatus(call('/api/stop', { runId: run.id })), 200);
   run = await until((value) => value?.owner === 'stopped' && !value.closing);
