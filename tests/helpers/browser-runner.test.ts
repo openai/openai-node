@@ -750,7 +750,7 @@ describe('runner registration and stream compatibility', () => {
           encrypted_content: 'terminal-ciphertext',
         });
       } else {
-        await expect(result).rejects.toThrow('differs');
+        await expect(result).rejects.toThrow(change === 'id' ? 'ResponsesToolRunner stopped' : 'differs');
         expect(effect).not.toHaveBeenCalled();
         expect(h.bodies).toHaveLength(1);
       }
