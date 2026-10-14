@@ -294,9 +294,10 @@ export class ResponseStream<ParsedT = null>
     const finalItems = new Map((response.output ?? []).map((item) => [outputIdentity(item), item]));
     for (const item of this.#completedOutput.values()) {
       const replacement = finalItems.get(outputIdentity(item));
-      if (replacement) {
-        validateResponseOutputItemIdentity(item, replacement, 'response.completed');
+      if (!replacement) {
+        throw new OpenAIError('Completed response output identity changed.');
       }
+      validateResponseOutputItemIdentity(item, replacement, 'response.completed');
     }
     for (const [wireIndex, identity] of this.#unfinishedOutput) {
       const replacement = finalItems.get(identity);
