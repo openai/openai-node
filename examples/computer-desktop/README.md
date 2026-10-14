@@ -116,8 +116,11 @@ contains only the verifier result and the uncertainty flag.
 
 ## Ownership and limits
 
-`verify()` observes the current fixed records and leaves the desktop usable.
-Before reporting a matching result as final, call `seal()` and check its
+`verify()` observes the current fixed records. When both records match,
+the example refuses further input; verification and screenshots remain available.
+Seal the result or start a new desktop. This protects already completed records;
+it does not acknowledge GUI work queued before they first matched.
+Before reporting the result as final, call `seal()` and check its
 returned records again: a save may have changed them since the earlier check.
 Sealing stops the guest browser and editor and drains the fixture writer.
 The last frame captured before shutdown stays available for reference.
