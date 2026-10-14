@@ -127,6 +127,33 @@ try {
   assert.deepEqual(await readdir(path.join(bad, 'runs')), []);
   console.log('PASS failed startup reaps its exact child and leaves no run directory');
 
+  const interrupted = await makeRuntime('pending-startup');
+  runtimes.push(interrupted);
+  const controller = new AbortController();
+  const reason = new Error('Caller stopped readiness');
+  const creating = Desktop.create({ runtimeDir: interrupted, signal: controller.signal });
+  // oxlint-disable-next-line promise/prefer-await-to-callbacks -- assert.rejects must check the original error object, not only its fields.
+  const checked = assert.rejects(creating, (error) => error === reason);
+  const readinessEnd = performance.now() + 5000;
+  while (performance.now() < readinessEnd) {
+    try {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- Wait for this guest's readiness request.
+      await lstat(path.join(interrupted, 'ready-entered'));
+      break;
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+    // oxlint-disable-next-line eslint/no-await-in-loop -- Readiness must begin before cancellation.
+    await delay(10);
+  }
+  assert.ok(performance.now() < readinessEnd, 'Guest never reached readiness');
+  controller.abort(reason);
+  await checked;
+  assert.deepEqual(await readdir(path.join(interrupted, 'runs')), []);
+  console.log('PASS startup cancellation retains caller reason after removing its owned guest');
+
   // oxlint-disable eslint/no-await-in-loop -- Each CLI owns and cleans up a separate runtime.
   for (const signal of ['SIGINT', 'SIGTERM']) {
     const pending = await makeRuntime('pending-startup');
