@@ -2220,32 +2220,67 @@ describe('ComputerToolset', () => {
     },
   );
 
-  test('an inherited signal getter reaches the real native transport', async () => {
-    const stopped = new AbortController();
-    const reason = new Error('synthetic cancellation');
-    const h = harness([]);
-    let observed = false;
-    class NativeOptions {
-      #signal = stopped.signal;
-      get signal() {
-        return this.#signal;
+  test.each(['inherited accessor', 'inherited data', 'nonenumerable data'] as const)(
+    '%s request signal reaches the real native transport',
+    async (kind) => {
+      const stopped = new AbortController();
+      const reason = new Error('synthetic cancellation');
+      const h = harness([]);
+      let observed = false;
+      class NativeOptions {
+        #signal = stopped.signal;
+        get signal() {
+          return this.#signal;
+        }
       }
-    }
-    const client = new OpenAI({
-      apiKey: 'synthetic-test-key',
-      maxRetries: 0,
-      fetch: (_url, init) => {
-        stopped.abort(reason);
-        observed = init?.signal?.aborted === true;
-        return Promise.resolve(Response.json({ id: 'resp_test', status: 'completed', output: [message] }));
-      },
-    });
-    await expect(
-      h.toolset.run(client, { input: 'fixture' }, { requestOptions: new NativeOptions() }),
-    ).rejects.toBe(reason);
-    expect(observed).toBe(true);
-    expect(h.performed).toEqual([]);
-  });
+      const client = new OpenAI({
+        apiKey: 'synthetic-test-key',
+        maxRetries: 0,
+        fetch: (_url, init) => {
+          stopped.abort(reason);
+          observed = init?.signal?.aborted === true;
+          return Promise.resolve(Response.json({ id: 'resp_test', status: 'completed', output: [message] }));
+        },
+      });
+      let requestOptions: OpenAI.RequestOptions = new NativeOptions();
+      if (kind !== 'inherited accessor') {
+        requestOptions = {};
+        if (kind === 'inherited data') {
+          Object.setPrototypeOf(requestOptions, { signal: stopped.signal });
+        } else {
+          Object.defineProperty(requestOptions, 'signal', { value: stopped.signal });
+        }
+      }
+      await expect(h.toolset.run(client, { input: 'fixture' }, { requestOptions })).rejects.toBe(reason);
+      expect(observed).toBe(true);
+      expect(h.performed).toEqual([]);
+    },
+  );
+
+  test.each(['enumerable', 'nonenumerable', 'inherited'] as const)(
+    'continuation key rotation preserves native %s header visibility',
+    async (kind) => {
+      const h = harness([[call([{ type: 'wait' }])], [message]]);
+      const headers = { 'x-fixture': 'kept', cookie: 'synthetic-cookie' };
+      const requestOptions: OpenAI.RequestOptions = { idempotencyKey: 'first' };
+      if (kind === 'inherited') {
+        Object.setPrototypeOf(requestOptions, { headers });
+      } else {
+        Object.defineProperty(requestOptions, 'headers', {
+          value: headers,
+          enumerable: kind === 'enumerable',
+        });
+      }
+      await h.toolset.run(h.client, { input: 'fixture' }, { requestOptions });
+      expect(h.performed).toEqual([{ type: 'wait' }, { type: 'screenshot' }]);
+      expect(h.headers.map((header) => header.get('x-fixture'))).toEqual(
+        kind === 'enumerable' ? ['kept', 'kept'] : [null, null],
+      );
+      expect(h.headers.map((header) => header.get('cookie'))).toEqual(
+        kind === 'enumerable' ? ['synthetic-cookie', 'synthetic-cookie'] : [null, null],
+      );
+    },
+  );
 
   test('large native replay history avoids the engine argument limit', async () => {
     const items = Array.from({ length: 130_000 }, (_, index) => ({
