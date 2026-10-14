@@ -635,7 +635,7 @@ export async function createDemoServer({ apiKey, models = {}, port = 0 } = {}) {
     if (!sameOwner(run, 'draining-to-human', version)) {
       return;
     }
-    if (run.session?.closed || !run.session?.page || run.session.page.isClosed()) {
+    if (!run.session?.browser()) {
       stopRun(run, 'handoff_unavailable');
       return;
     }
@@ -643,7 +643,7 @@ export async function createDemoServer({ apiKey, models = {}, port = 0 } = {}) {
     if (!sameOwner(run, 'draining-to-human', version)) {
       return;
     }
-    if (run.session.closed || !run.session.page || run.session.page.isClosed()) {
+    if (!run.session.browser()) {
       stopRun(run, 'handoff_unavailable');
       return;
     }

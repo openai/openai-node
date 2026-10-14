@@ -82,6 +82,9 @@ const held = Promise.withResolvers();
 const release = Promise.withResolvers();
 const viewEntered = Promise.withResolvers();
 const viewRelease = Promise.withResolvers();
+const inputEntered = Promise.withResolvers();
+const inputRelease = Promise.withResolvers();
+let holdInput = false;
 let holdView = false;
 let holdFinal = false;
 let observing = false;
@@ -102,6 +105,20 @@ chromium.launch = async function launch(options) {
           await viewRelease.promise;
         }
         return start(settings);
+      };
+      const getByLabel = current.getByLabel.bind(current);
+      current.getByLabel = (...args) => {
+        const locator = getByLabel(...args);
+        const fill = locator.fill.bind(locator);
+        locator.fill = async (...settings) => {
+          await fill(...settings);
+          if (holdInput && args[0] === 'Guest name') {
+            holdInput = false;
+            inputEntered.resolve();
+            await inputRelease.promise;
+          }
+        };
+        return locator;
       };
       const screenshot = current.screenshot.bind(current);
       current.screenshot = async (screenshotOptions) => {
@@ -303,6 +320,24 @@ try {
     'unverified',
     'A verified agent result cannot survive later human editing and Stop',
   );
+  holdInput = true;
+  assert.equal(
+    await responseStatus(call('/api/start', { taskId: 'reservation', api: 'decisions', mode: 'rehearsal' })),
+    200,
+  );
+  await Promise.race([
+    inputEntered.promise,
+    delay(6000).then(() => assert.fail('Booking input did not start')),
+  ]);
+  const pendingInput = await call('/api/state');
+  ({ run } = pendingInput.body);
+  assert.equal(run.owner, 'agent');
+  assert.equal(await responseStatus(call('/api/take-control', bind(run))), 200);
+  inputRelease.resolve();
+  run = await until((value) => value?.owner === 'human' || (value?.owner === 'stopped' && !value.closing));
+  assert.equal(run.owner, 'stopped', 'An uncertain booking action must not be handed to the human');
+  assert.equal(run.status, 'handoff_unavailable');
+  assert.equal(run.uncertainEffects, true);
   console.log(
     'PASS Fieldwork auth, single task, default API/rehearsal, live frames, approval, stale control, Take/Return, checked result, Stop and cleanup.',
   );
@@ -310,6 +345,7 @@ try {
   holdFinal = false;
   release.resolve();
   viewRelease.resolve();
+  inputRelease.resolve();
   chromium.launch = originalLaunch;
   await Promise.all([app.close(), browser.close()]);
 }
