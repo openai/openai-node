@@ -207,6 +207,10 @@ function createRun(body) {
     elapsedMs: 0,
     setOwner(owner) {
       if (this.owner !== owner) {
+        if (this.owner === 'human') {
+          clearTimeout(this.expiryTimer);
+          this.sessionExpiresAt = null;
+        }
         this.owner = owner;
         this.ownerVersion += 1;
         this.addEvent('control', owner);
@@ -662,8 +666,6 @@ export async function createDemoServer({ apiKey, models = {}, port = 0 } = {}) {
     if (!samePhase(run, 'draining-to-agent', version)) {
       return;
     }
-    clearTimeout(run.expiryTimer);
-    run.sessionExpiresAt = null;
     run.controller = new AbortController();
     run.status = 'running';
     run.result = null;
