@@ -12,7 +12,7 @@ const cases = {
     'PASS Stop aborts the in-run prompt, drains policy, then cleans up its guest',
   ],
   active: ['REQUEST_ACTIVE', 'PASS Stop aborts the active operation, drains work, then cleans up its guest'],
-  verify: ['VERIFY_ACTIVE', 'PASS Stop prevents publishing a cancelled final verification'],
+  verify: ['SEAL_ACTIVE', 'PASS Stop prevents publishing a cancelled final verification'],
 };
 const preload = `
 import { once } from 'node:events';
@@ -39,11 +39,11 @@ Desktop.create = async () => ({
     } finally { finish(); process.stdout.write('POLICY_DRAINED\\n'); }
   },
   async stop() { await drained; process.stdout.write('DESKTOP_STOPPED\\n'); },
-  async verify({ signal } = {}) {
-    process.stdout.write('VERIFY_ACTIVE\\n');
+  async seal({ signal } = {}) {
+    process.stdout.write('SEAL_ACTIVE\\n');
     if (signal) {
       await once(signal, 'abort', { signal: AbortSignal.timeout(2500) });
-      process.stdout.write('VERIFY_CANCELLED\\n');
+      process.stdout.write('SEAL_CANCELLED\\n');
       signal.throwIfAborted();
     }
     return { file_matches: true, browser_matches: true };
@@ -95,7 +95,7 @@ try {
     assert.match(output, /REQUEST_CANCELLED[\s\S]*POLICY_DRAINED/u);
   }
   if (mode === 'verify') {
-    assert.match(output, /VERIFY_CANCELLED[\s\S]*DESKTOP_STOPPED/u);
+    assert.match(output, /SEAL_CANCELLED[\s\S]*DESKTOP_STOPPED/u);
   }
   assert.match(output, /POLICY_DRAINED[\s\S]*DESKTOP_STOPPED/u);
   console.log(cases[mode][1]);

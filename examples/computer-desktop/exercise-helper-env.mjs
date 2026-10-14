@@ -12,6 +12,7 @@ import fs, {
   writeFile,
 } from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
+import { setTimeout as delay } from 'node:timers/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -112,6 +113,37 @@ print('fixture_owned_id')
   await rm(path.join(runtime, 'setup.json'));
   await assert.rejects(start(runtime));
   await verify(false);
+  await writeFile(
+    path.join(program, 'guest', 'setup.py'),
+    `import os, pathlib, sys, time
+root = pathlib.Path(sys.argv[sys.argv.index('--runtime-dir') + 1])
+(root / 'verifier-pid').write_text(str(os.getpid()))
+time.sleep(60)
+`,
+  );
+  const controller = new AbortController();
+  const reason = new Error('caller stopped receipt verification');
+  const verification = start(runtime, { signal: controller.signal });
+  // oxlint-disable-next-line promise/prefer-await-to-callbacks -- assert.rejects requires a predicate for exact error identity.
+  const rejected = assert.rejects(verification, (error) => error === reason);
+  let verifierPid;
+  for (let attempt = 0; attempt < 200 && !verifierPid; attempt += 1) {
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- Wait for the controlled child to report its actual PID.
+      verifierPid = Number(await readFile(path.join(runtime, 'verifier-pid'), 'utf-8'));
+    } catch (error) {
+      assert.equal(error.code, 'ENOENT');
+      // oxlint-disable-next-line no-await-in-loop -- Bound receipt-helper startup.
+      await delay(10);
+    }
+  }
+  assert.ok(verifierPid, 'The verifier did not start');
+  controller.abort(reason);
+  await rejected;
+  assert.throws(() => process.kill(verifierPid, 0), { code: 'ESRCH' });
+  assert.deepEqual(await readdir(path.join(runtime, 'runs')), []);
+  await rm(path.join(runtime, 'verifier-pid'));
+  checks += 1;
   // A controlled executable stands in for vfkit; the actual owner must preserve its exit status.
   await copyFile(new URL('guest/vm_owner.py', import.meta.url), path.join(program, 'guest', 'vm_owner.py'));
   // Accept only this temporary runtime.

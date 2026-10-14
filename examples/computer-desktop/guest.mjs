@@ -105,6 +105,7 @@ async function isContainer(root) {
   return false;
 }
 
+// oxlint-disable-next-line complexity -- Keep verifier reaping before VM launch in the same ownership boundary.
 export async function start(runtimeDir, { signal } = {}) {
   signal?.throwIfAborted();
   if (typeof runtimeDir !== 'string' || !path.isAbsolute(runtimeDir)) {
@@ -133,7 +134,7 @@ export async function start(runtimeDir, { signal } = {}) {
   if (Buffer.byteLength(socket) >= 104 || /[% ,]/u.test(socket)) {
     throw new Error('Invalid owned socket path');
   }
-  await promisify(execFile)(
+  const verification = promisify(execFile)(
     'python3',
     [
       '-I',
@@ -145,6 +146,24 @@ export async function start(runtimeDir, { signal } = {}) {
     ],
     { timeout: 30_000, maxBuffer: 65_536, signal, env: helperEnv(root) },
   );
+  // execFile can reject on abort before the verifier is reaped.
+  // oxlint-disable-next-line promise/avoid-new -- Child close is the ownership boundary after execFile abort.
+  const verifierClosed = new Promise((resolve) => {
+    verification.child.once('close', resolve);
+  });
+  try {
+    await verification;
+  } catch (error) {
+    const timeout = Symbol('deadline');
+    if ((await Promise.race([verifierClosed, delay(5000, timeout, { ref: false })])) === timeout) {
+      verification.child.kill('SIGKILL');
+      if ((await Promise.race([verifierClosed, delay(5000, timeout, { ref: false })])) === timeout) {
+        throw new Error('VM receipt verifier could not be reaped.', { cause: error });
+      }
+    }
+    signal?.throwIfAborted();
+    throw error;
+  }
   signal?.throwIfAborted();
   await mkdir(dir, { mode: 0o700 });
   const st = await lstat(dir);
