@@ -689,6 +689,12 @@ const packedPackagePath = require('node:path');
       path.join(temporaryDirectory, 'responses-ws-module-formats.cjs'),
     );
     run(process.execPath, ['--test', 'responses-ws-module-formats.cjs']);
+    fs.copyFileSync(
+      path.join(root, 'scripts/fixtures/computer-use-smoke.mjs'),
+      path.join(temporaryDirectory, 'computer-use-smoke.mjs'),
+    );
+    run(process.execPath, ['computer-use-smoke.mjs', 'cjs']);
+    run(process.execPath, ['computer-use-smoke.mjs', 'esm']);
     fs.symlinkSync(path.join(root, 'node_modules/undici'), optionalUndici, 'dir');
     for (const [inputType, consumer] of [
       [

@@ -185,7 +185,7 @@ function getOutput(snapshot: ResponseOutputSnapshot, outputIndex: number): Respo
   return output;
 }
 
-function hasRoutedOutputCallIdentity(
+export function hasRoutedOutputCallIdentity(
   output: Response['output'][number],
 ): output is Extract<
   Response['output'][number],
@@ -210,7 +210,7 @@ function getOutputItemIdentityKeys(output: Response['output'][number], eventType
 
   if (hasOwn(output, 'id')) {
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
-    if (typeof output.id !== 'string' || output.id.length === 0) {
+    if (typeof output.id !== 'string' || (output.id.length === 0 && output.type !== 'computer_call')) {
       throw new OpenAIError(`expected a non-empty output item id for ${eventType}`);
     }
     identities.push(`id:${output.id}`);
@@ -219,8 +219,12 @@ function getOutputItemIdentityKeys(output: Response['output'][number], eventType
   }
 
   if (hasRoutedOutputCallIdentity(output)) {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed item identifiers and discriminators before mutating the response snapshot.
-    if (!hasOwn(output, 'call_id') || typeof output.call_id !== 'string' || output.call_id.length === 0) {
+    if (
+      !hasOwn(output, 'call_id') ||
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Validate untrusted streamed call identifiers before mutating the response snapshot.
+      typeof output.call_id !== 'string' ||
+      (output.call_id.length === 0 && output.type !== 'function_call')
+    ) {
       throw new OpenAIError(`expected a non-empty output item call_id for ${eventType}`);
     }
     identities.push(`call:${output.type}:${output.call_id}`);
@@ -350,14 +354,13 @@ function getExpectedOutputItemType(event: ResponseItemScopedEvent): Response['ou
   return expectedOutputItemTypes[event.type];
 }
 
-function validateCompletedOutputItemIdentity(
-  event: Extract<ResponseOutputItemEvent, { type: 'response.output_item.done' }>,
-  snapshot: ResponseOutputSnapshot,
+export function validateResponseOutputItemIdentity(
+  output: Response['output'][number],
+  replacement: Response['output'][number],
+  eventType: string,
 ): void {
-  const output = getOutput(snapshot, event.output_index);
-  const replacement = event.item;
-  getOutputItemIdentityKeys(output, event.type);
-  getOutputItemIdentityKeys(replacement, event.type);
+  getOutputItemIdentityKeys(output, eventType);
+  getOutputItemIdentityKeys(replacement, eventType);
 
   if (!hasOwn(replacement, 'type') || output.type !== replacement.type) {
     throw new OpenAIError(`expected output item type '${output.type}', got '${replacement.type}'`);
@@ -365,7 +368,9 @@ function validateCompletedOutputItemIdentity(
 
   const outputID = hasOwn(output, 'id') ? output.id : undefined;
   const replacementID = hasOwn(replacement, 'id') ? replacement.id : undefined;
-  if (outputID !== replacementID) {
+  const addsOptionalID =
+    outputID === undefined && (output.type === 'function_call' || output.type === 'custom_tool_call');
+  if (outputID !== replacementID && !addsOptionalID) {
     throw new OpenAIError(`expected output item id '${outputID}', got '${replacementID}'`);
   }
 
@@ -384,7 +389,7 @@ function validateOutputItemIdentity(
   rejectInvalidShellTargets: boolean,
 ): void {
   if (event.type === 'response.output_item.done') {
-    validateCompletedOutputItemIdentity(event, snapshot);
+    // Item identity is validated at the shared replacement owner before any update.
     return;
   }
 
@@ -538,7 +543,7 @@ function assertNever(_value: never): never {
   throw new OpenAIError('Unhandled response stream event: unknown');
 }
 
-const responseEventRoutingFields = [
+export const responseEventRoutingFields = [
   'item_id',
   'output_index',
   'content_index',
@@ -599,7 +604,7 @@ function sanitizeResponseEvent(
         stableValues.set(field, routingDescriptor ? event[field] : undefined);
       }
 
-      if (type === 'response.output_item.done') {
+      if (type === 'response.output_item.added' || type === 'response.output_item.done') {
         stableValues.set('item', structuredClone(event.item));
       } else if (type === 'response.content_part.added' || type === 'response.content_part.done') {
         stableValues.set('part', structuredClone(event.part));
@@ -618,6 +623,36 @@ function sanitizeResponseEvent(
   });
 }
 
+/** Replace one existing native item, preserving its routing identity and aggregate-text index. */
+export function replaceResponseOutputItem(
+  context: ResponseAccumulatorContext,
+  snapshot: ResponseOutputSnapshot,
+  outputIndex: number,
+  replacement: Response['output'][number],
+  updateText = true,
+): void {
+  const output = getOutput(snapshot, outputIndex);
+  validateResponseOutputItemIdentity(output, replacement, 'response.output_item.done');
+  if (!hasOwn(output, 'id') && hasOwn(replacement, 'id')) {
+    const { identities } = getResponseOutputIdentityIndex(context, snapshot);
+    addOutputItemIdentities(identities, [`id:${replacement.id}`]);
+  }
+  if (!updateText) {
+    snapshot.output[outputIndex] = replacement;
+    return;
+  }
+  const previousText = getOutputText(context, output);
+  if (output.type === 'message' || replacement.type === 'message') {
+    ensureCanonicalOutputText(context, snapshot);
+  }
+  snapshot.output[outputIndex] = replacement;
+  const nextText = getOutputText(context, replacement);
+  if (context.canonicalSnapshot === snapshot) {
+    context.outputTextIndex.update(outputIndex, nextText.length);
+  }
+  updateOutputText(context, snapshot, outputIndex, previousText, nextText);
+}
+
 function accumulateOutputItemEvent(
   event: ResponseAccumulatorEvent,
   snapshot: ResponseOutputSnapshot,
@@ -627,7 +662,7 @@ function accumulateOutputItemEvent(
     case 'response.output_item.added': {
       validateArrayAppend(snapshot.output, event.output_index, 'output');
       const identityIndex = getResponseOutputIdentityIndex(context, snapshot);
-      const output = structuredClone(event.item);
+      const output = event.item;
       const identities = getOutputItemIdentityKeys(output, event.type);
       assertOutputItemIdentitiesAvailable(identityIndex.identities, identities);
       if (output.type === 'message') {
@@ -650,18 +685,7 @@ function accumulateOutputItemEvent(
       return true;
     }
     case 'response.output_item.done': {
-      const output = getOutput(snapshot, event.output_index);
-      const previousText = getOutputText(context, output);
-      const replacement = event.item;
-      if (output.type === 'message' || replacement.type === 'message') {
-        ensureCanonicalOutputText(context, snapshot);
-      }
-      snapshot.output[event.output_index] = replacement;
-      const nextText = getOutputText(context, replacement);
-      if (context.canonicalSnapshot === snapshot) {
-        context.outputTextIndex.update(event.output_index, nextText.length);
-      }
-      updateOutputText(context, snapshot, event.output_index, previousText, nextText);
+      replaceResponseOutputItem(context, snapshot, event.output_index, event.item);
       return true;
     }
     default: {
@@ -1336,11 +1360,18 @@ export function accumulateResponseWithContext(
   snapshot: Response | undefined,
   context: ResponseAccumulatorContext,
   rejectInvalidShellTargets = false,
-  onSanitizedEvent?: (event: ResponseStreamEvent) => void,
+  prepareSanitizedEvent?: (event: ResponseStreamEvent) => ResponseStreamEvent | null,
 ): Response {
-  const dispatchEvent = sanitizeResponseEvent(event);
-  if (onSanitizedEvent && dispatchEvent.type !== 'keepalive') {
-    onSanitizedEvent(dispatchEvent);
+  let dispatchEvent = sanitizeResponseEvent(event);
+  if (prepareSanitizedEvent && dispatchEvent.type !== 'keepalive') {
+    const prepared = prepareSanitizedEvent(dispatchEvent);
+    if (prepared === null) {
+      if (!snapshot) {
+        throw new OpenAIError('Cannot ignore a response event before response.created.');
+      }
+      return snapshot;
+    }
+    dispatchEvent = prepared;
   }
 
   if (!snapshot) {
