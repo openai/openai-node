@@ -110,25 +110,6 @@ try {
   ]);
   await empty(main);
   console.log('PASS repeated position and same/changed nonzero scroll; no fixture changes');
-  const seen = [];
-  await execute(
-    main,
-    [ticket],
-    {
-      beforeAction: (action) => {
-        seen.push(action.type);
-        return true;
-      },
-      approveSafetyChecks: () => true,
-    },
-    [{ id: 'check_fixture', code: 'confirm_local_change' }],
-  );
-  assert.deepEqual(seen, ['click', 'screenshot']);
-  const postTicket = await main.verify();
-  assert.equal(postTicket.browser_matches, true);
-  assert.equal(postTicket.browser_effects, 1);
-  assert.equal(postTicket.file_empty, true);
-
   await execute(main, [
     { type: 'click', button: 'left', x: 700, y: 180 },
     { type: 'type', text: `${'synthetic fixture '.repeat(192)}\nDesktop receipt D-2201` },
@@ -148,7 +129,7 @@ try {
     'A type action longer than 2,000 characters must reach the editor.',
   );
   assert.equal(longText.file_matches, false);
-  assert.equal(longText.browser_effects, 1);
+  assert.equal(longText.browser_effects, 0);
   // Remove the first line using only editor actions. The exact receipt began after character 2,000.
   await execute(main, [
     { type: 'keypress', keys: ['HOME'] },
@@ -171,9 +152,9 @@ try {
   assert.notEqual(edited, initial, 'X11 pixels must change after real work');
   const done = await main.verify();
   assert.equal(done.file_matches, true);
-  assert.equal(done.browser_matches, true);
+  assert.equal(done.browser_matches, false);
   await empty(sentinel);
-  console.log('PASS actual X11/browser/editor and exact fixed file oracle; isolated sentinel unchanged');
+  console.log('PASS actual X11/editor and exact fixed file oracle; isolated sentinel unchanged');
 
   for (const separator of ['\n', '\r\n']) {
     // Joining the two lines must produce the fixed receipt; dropped line breaks produce a different file.
@@ -189,9 +170,31 @@ try {
     // oxlint-disable-next-line no-await-in-loop
     const multiline = await main.verify();
     assert.equal(multiline.file_matches, true, 'Native typing must preserve a line break.');
-    assert.equal(multiline.browser_effects, 1);
+    assert.equal(multiline.browser_effects, 0);
   }
   console.log('PASS LF and CRLF native typing against the exact fixed file oracle');
+  // Finish the browser ticket last: a workspace with both records complete refuses further input.
+  const seen = [];
+  await execute(
+    main,
+    [ticket],
+    {
+      beforeAction: (action) => {
+        seen.push(action.type);
+        return true;
+      },
+      approveSafetyChecks: () => true,
+    },
+    [{ id: 'check_fixture', code: 'confirm_local_change' }],
+  );
+  assert.deepEqual(seen, ['click', 'screenshot']);
+  const postTicket = await main.verify();
+  assert.equal(postTicket.browser_matches, true);
+  assert.equal(postTicket.browser_effects, 1);
+  assert.equal(postTicket.file_matches, true);
+  await assert.rejects(execute(main, [{ type: 'type', text: 'Late edit' }]));
+  assert.deepEqual(await main.verify(), postTicket);
+  assert.equal(main.uncertainEffects, false);
   const sealed = await main.seal();
   assert.equal(sealed.file_matches, true);
   assert.equal(sealed.browser_matches, true);
