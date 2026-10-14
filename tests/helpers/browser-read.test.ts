@@ -78,6 +78,153 @@ const reads = [
   ['browser_find', { tab_id: null, query: 'Seat' }],
 ] as const;
 
+const validObservation = { version: 1, sequence: 0, dropped_changes: 0, title_truncated: false, changes: [] };
+test.each([
+  ['null', null],
+  ['wrong_version', { ...validObservation, version: 2 }],
+  ['bool_version', { ...validObservation, version: true }],
+  ['negative_sequence', { ...validObservation, sequence: -1 }],
+  ['bool_sequence', { ...validObservation, sequence: false }],
+  [
+    'unsafe_sequence',
+    { ...validObservation, sequence: 9_007_199_254_740_992, dropped_changes: 9_007_199_254_740_992 },
+  ],
+  ['negative_dropped', { ...validObservation, dropped_changes: -1 }],
+  ['bool_dropped', { ...validObservation, dropped_changes: false }],
+  ['numeric_truncation', { ...validObservation, title_truncated: 1 }],
+  ['fraction_sequence', { ...validObservation, sequence: 0.5 }],
+  ['not_a_list', { ...validObservation, changes: {} }],
+  [
+    'late_event_gap',
+    {
+      ...validObservation,
+      sequence: 33,
+      changes: Array.from({ length: 33 }, (_, i) => ({
+        type: 'navigation',
+        tab_id: 'one',
+        sequence: Math.min(i + 1, 32),
+      })),
+    },
+  ],
+  [
+    'counter_gap',
+    { ...validObservation, sequence: 2, changes: [{ type: 'navigation', tab_id: 'one', sequence: 2 }] },
+  ],
+  [
+    'event_gap',
+    { ...validObservation, sequence: 1, changes: [{ type: 'navigation', tab_id: 'one', sequence: 2 }] },
+  ],
+  [
+    'event_bool',
+    { ...validObservation, sequence: 1, changes: [{ type: 'navigation', tab_id: 'one', sequence: true }] },
+  ],
+  [
+    'unknown_event',
+    { ...validObservation, sequence: 1, changes: [{ type: 'login', tab_id: 'one', sequence: 1 }] },
+  ],
+  [
+    'null_required_tab',
+    { ...validObservation, sequence: 1, changes: [{ type: 'navigation', tab_id: null, sequence: 1 }] },
+  ],
+  [
+    'bad_reason',
+    {
+      ...validObservation,
+      sequence: 1,
+      changes: [{ type: 'navigation_refused', tab_id: null, reason: 'SYNTHETIC_PRIVATE', sequence: 1 }],
+    },
+  ],
+  [
+    'bad_dialog',
+    {
+      ...validObservation,
+      sequence: 1,
+      changes: [{ type: 'dialog_dismissed', tab_id: 'one', kind: 'SYNTHETIC_PRIVATE', sequence: 1 }],
+    },
+  ],
+  [
+    'bad_download',
+    {
+      ...validObservation,
+      sequence: 1,
+      changes: [{ type: 'download', tab_id: null, status: 'SYNTHETIC_PRIVATE', sequence: 1 }],
+    },
+  ],
+  [
+    'blank_tab',
+    { ...validObservation, sequence: 1, changes: [{ type: 'tab_closed', tab_id: '', sequence: 1 }] },
+  ],
+  [
+    'long_event_id',
+    {
+      ...validObservation,
+      sequence: 1,
+      changes: [{ type: 'navigation', tab_id: `${'𐍈'.repeat(32)}x`, sequence: 1 }],
+    },
+  ],
+  ...Object.keys(validObservation).map((key): [string, unknown] => [
+    `missing_${key}`,
+    Object.fromEntries(Object.entries(validObservation).filter(([field]) => field !== key)),
+  ]),
+])('refuses malformed observation metadata: %s', async (_name, observation) => {
+  const read = vi.fn(() => 'not reached');
+  const browser = new BrowserToolset(
+    {
+      // SAFETY: A customer driver can return untyped malformed state at runtime.
+      state: () => ({ ...state(), observation }) as BrowserState,
+      read_page: read,
+    },
+    { members: ['read_page'] },
+  );
+  await expect(browser.execute(call('browser_read_page', { tab_id: null, filter: 'all' }))).rejects.toThrow(
+    'Browser state report failed.',
+  );
+  expect(read).not.toHaveBeenCalled();
+});
+
+test.each(['sequence', 'dropped_changes'])(
+  'refuses decreasing %s in an otherwise valid final observation',
+  async (field) => {
+    let calls = 0;
+
+    const before =
+      field === 'sequence'
+        ? {
+            ...validObservation,
+            sequence: 2,
+            changes: [
+              { type: 'navigation', tab_id: 'task', sequence: 1 },
+              { type: 'navigation', tab_id: 'task', sequence: 2 },
+            ],
+          }
+        : { ...validObservation, sequence: 2, dropped_changes: 2 };
+    const after =
+      field === 'sequence'
+        ? { ...validObservation, sequence: 1, changes: [{ type: 'navigation', tab_id: 'task', sequence: 1 }] }
+        : {
+            ...validObservation,
+            sequence: 3,
+            dropped_changes: 1,
+            changes: [
+              { type: 'navigation', tab_id: 'task', sequence: 2 },
+              { type: 'navigation', tab_id: 'task', sequence: 3 },
+            ],
+          };
+    const browser = new BrowserToolset(
+      runtimeDriver('read', () => {
+        calls += 1;
+        // SAFETY: Exercise the public state boundary before and after a real read.
+        return { ...state(), observation: calls === 1 ? before : after } as BrowserState;
+      }),
+      { members: ['read_page'] },
+    );
+    await expect(browser.execute(call('browser_read_page', { tab_id: null, filter: 'all' }))).rejects.toThrow(
+      'Browser state',
+    );
+    expect(calls).toBe(2);
+  },
+);
+
 test.each([
   ['a'.repeat(1025), 'a'.repeat(1024), true, false],
   ['é'.repeat(513), 'é'.repeat(512), true, false],

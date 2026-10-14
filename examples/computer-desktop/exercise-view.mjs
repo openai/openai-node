@@ -42,8 +42,18 @@ net.createServer({allowHalfOpen:true}, connection => {
       fs.writeFileSync('../../ready-entered', '1');
       return;
     }
+    if ((action.type === 'verify' || action.type === 'seal') && mode.startsWith('proof-')) {
+      const proof = {ok:true,file_matches:false,browser_matches:false,file_empty:true,browser_effects:0};
+      if (mode === 'proof-strings') Object.assign(proof, {file_matches:'false',browser_matches:'false'});
+      if (mode === 'proof-missing') delete proof.file_empty;
+      if (mode === 'proof-bool-count') proof.browser_effects = true;
+      if (mode === 'proof-negative') proof.browser_effects = -1;
+      if (mode === 'proof-oversize') proof.browser_effects = null;
+      connection.end(JSON.stringify(proof) + '\\n');
+      return;
+    }
     if (action.type === 'ready' || action.type === 'verify') {
-      connection.end(JSON.stringify({ok:true}) + '\\n');
+      connection.end(JSON.stringify({ok:true,file_matches:false,browser_matches:false,file_empty:true,browser_effects:0}) + '\\n');
       return;
     }
     const capture = action.type === 'screenshot';
@@ -199,9 +209,11 @@ async function checkStartup() {
   const rejected = assert.rejects(creating, DesktopStartupError);
   try {
     await entered(root, 'ready-entered');
+    const stopped = performance.now();
     phase.abort();
     await rejected;
     await gone(root);
+    assert.ok(performance.now() - stopped < 1500, 'Stopped readiness must not wait for its network timeout');
     assert.equal(await exists(path.join(root, 'effects')), false);
     console.log('PASS startup cancellation reaps the exact child before any input or published desktop');
   } finally {
@@ -213,6 +225,34 @@ async function checkStartup() {
     await rm(root, { recursive: true });
   }
 }
+
+/* oxlint-disable no-await-in-loop -- Each owned test guest must be reaped before creating the next. */
+async function checkProofs() {
+  for (const mode of ['strings', 'missing', 'bool-count', 'negative', 'oversize']) {
+    for (const operation of ['verify', 'seal']) {
+      const root = await runtime(`proof-${mode}`);
+      let desktop;
+      try {
+        desktop = await Desktop.create({ runtimeDir: root });
+        if (mode === 'oversize') {
+          const proof = await desktop[operation]();
+          assert.equal(proof.browser_effects, null);
+          assert.equal(proof.file_matches, false);
+          assert.equal(desktop.uncertainEffects, false);
+        } else {
+          await assert.rejects(desktop[operation](), /Invalid private desktop reply/u);
+          await gone(root);
+          await assert.rejects(desktop.verify(), /stopped|retired/u);
+        }
+      } finally {
+        await desktop?.stop();
+        await rm(root, { recursive: true });
+      }
+    }
+  }
+  console.log('PASS verify/seal proof fields reject malformed values; null count remains a failed proof');
+}
+/* oxlint-enable no-await-in-loop */
 
 async function checkFailure(mode) {
   const root = await runtime(mode);
@@ -363,6 +403,7 @@ if (process.argv.includes('--method-cancellation')) {
   await checkActiveCancellation('frame', true);
   await checkScreenshotBudget();
 } else {
+  await checkProofs();
   await checkPhase(false);
   await checkStopDuringView();
   await checkPhase(true);

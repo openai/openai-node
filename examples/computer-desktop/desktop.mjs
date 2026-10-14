@@ -79,28 +79,35 @@ export class Desktop {
     const desktop = new Desktop(guest, createdHere);
     try {
       const end = performance.now() + 90_000;
+      const deadline = AbortSignal.timeout(90_000);
+      const startup = signal ? AbortSignal.any([signal, deadline]) : deadline;
       while (performance.now() < end) {
-        signal?.throwIfAborted();
+        startup.throwIfAborted();
         // Readiness waits for this owned guest; concurrent retries could race Stop.
         // oxlint-disable-next-line no-await-in-loop
-        if (!(await healthy(guest, { signal }))) {
+        if (!(await healthy(guest, { signal: startup }))) {
           throw new Error('Guest stopped during startup.');
         }
         let state;
         try {
           // Only readiness is retried while this exact guest starts.
           // oxlint-disable-next-line no-await-in-loop
-          state = await desktop.#request({ type: 'ready' }, Math.min(3000, end - performance.now()));
+          state = await desktop.#request(
+            { type: 'ready' },
+            Math.min(3000, end - performance.now()),
+            false,
+            startup,
+          );
         } catch {
           // No effects are sent before readiness; allow the guest to start its fixed socket.
           state = { ok: false };
         }
-        signal?.throwIfAborted();
+        startup.throwIfAborted();
         if (state.ok === true) {
           return desktop;
         }
         // oxlint-disable-next-line no-await-in-loop
-        await delay(200, undefined, { signal });
+        await delay(200, undefined, { signal: startup });
       }
       throw new Error('Desktop startup timed out.');
     } catch {
@@ -280,6 +287,25 @@ export class Desktop {
       }
       if (!result || typeof result.ok !== 'boolean') {
         throw new Error('Invalid private desktop reply.');
+      }
+      if ((action.type === 'verify' || action.type === 'seal') && result.ok) {
+        if (
+          !['file_matches', 'browser_matches', 'file_empty'].every(
+            (name) => Object.hasOwn(result, name) && typeof result[name] === 'boolean',
+          ) ||
+          !Object.hasOwn(result, 'browser_effects') ||
+          (result.browser_effects !== null &&
+            (!Number.isSafeInteger(result.browser_effects) || result.browser_effects < 0))
+        ) {
+          throw new Error('Invalid private desktop reply.');
+        }
+        return {
+          ok: true,
+          file_matches: result.file_matches,
+          browser_matches: result.browser_matches,
+          file_empty: result.file_empty,
+          browser_effects: result.browser_effects,
+        };
       }
       if (input && !result.ok && result.uncertain !== false) {
         this.uncertainEffects = true;
