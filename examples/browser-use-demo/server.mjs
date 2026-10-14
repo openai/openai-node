@@ -8,20 +8,11 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 import { tasks } from './tasks.mjs';
-import { MixedHostInputRefusedError } from '../responses/browser/mixed-session.mjs';
 import { createDemoSession, executeDemo } from './runner.mjs';
-import { createBusinessState } from './business-state.mjs';
-import { exportRun, recordReceipt } from './run-receipt.mjs';
-import { createDesktopSession, desktopInput, executeDesktop } from './desktop-session.mjs';
-import { createFieldworkMixed, executeFieldworkMixed } from './mixed-session.mjs';
-import { createDiagnosticCapture, RunDiagnostics } from './diagnostics.mjs';
-import { waitForDecision } from '../responses/browser/file-state.mjs';
-import { exampleBrowserChannel } from '../responses/browser/driver.mjs';
+import { exampleBrowserChannel, waitForDecision } from './booking.mjs';
 
 const templates = await Promise.all(
-  ['index.html', 'fixture.html', 'notes.html', 'traces.html'].map((name) =>
-    readFile(new URL(name, import.meta.url), 'utf-8'),
-  ),
+  ['index.html', 'fixture.html'].map((name) => readFile(new URL(name, import.meta.url), 'utf-8')),
 );
 
 async function readKey(path) {
@@ -52,16 +43,6 @@ function json(response, status, value) {
 }
 
 function matchesImage(url, binding) {
-  if (binding?.desktopId) {
-    return (
-      url.searchParams.get('desktopId') === binding.desktopId &&
-      url.searchParams.get('ownerVersion') === String(binding.ownerVersion) &&
-      (!binding.view ||
-        (url.searchParams.get('view') === binding.view &&
-          url.searchParams.get('tabId') === binding.tabId &&
-          url.searchParams.get('sequence') === String(binding.sequence)))
-    );
-  }
   return Boolean(
     binding &&
     url.searchParams.get('tabId') === binding.tabId &&
@@ -95,9 +76,7 @@ function currentView(run) {
 
 async function refreshPolledView(run) {
   try {
-    await run?.session?.refreshView(
-      run.environment === 'browser' ? undefined : { signal: run.pollController.signal, poll: true },
-    );
+    await run?.session?.refreshView();
   } catch {
     // A failed view stays unavailable. The next authenticated poll can try again.
   }
@@ -121,13 +100,8 @@ function snapshot(run) {
     owner: run.owner,
     ownerVersion: run.ownerVersion,
     browser,
-    desktop: run.environment === 'browser' ? null : (run.session?.binding() ?? null),
-    mixedDisclosed:
-      run.environment === 'mixed' &&
-      run.session?.permits({ type: 'type', text: 'Desktop receipt D-2201' }) === true,
     screenshotBinding: run.screenshotBinding ?? null,
     humanInputBusy: Boolean(run.humanPromise || run.transferActive),
-    scrollTarget: run.scrollTarget ? { x: run.scrollTarget.x, y: run.scrollTarget.y } : null,
     uncertainEffects: Boolean(run.uncertainEffects),
     closing: run.owner === 'stopped' && runBusy(run),
     sessionExpiresAt: run.sessionExpiresAt ?? null,
@@ -136,26 +110,15 @@ function snapshot(run) {
     result: run.result,
     requests: run.requests,
     requestHeadersMs: Math.round(run.requestHeadersMs),
-    diagnostics: run.diagnostics.summary(run.requests),
     elapsedMs: Math.round(
       run.owner === 'stopped' && !run.agentActive ? run.elapsedMs : performance.now() - run.started,
     ),
     screenshotAt: run.screenshotAt,
-    history: {
-      dropped: run.checkpointDropped,
-      checkpoints: run.checkpoints.map(({ sequence, at, atMs, owner, role }) => ({
-        sequence,
-        at,
-        atMs,
-        owner,
-        role,
-      })),
-    },
     view: currentView(run),
     events: run.events,
     eventsDropped: run.eventsDropped,
     approval: run.approval,
-    fixture: run.business ? run.business.snapshot() : run.fixture,
+    fixture: run.fixture,
     finalText: run.finalText ?? null,
     // The runner retains only safe API status fields; never expose its client, headers or key.
     apiFailure: failure
@@ -176,55 +139,18 @@ async function readBody(request) {
   return JSON.parse(body || '{}');
 }
 
-const dashboardPages = new Map([
-  ['/', templates[0]],
-  ['/traces', templates[3]],
-]);
-
-function servePage(pathname, response, current) {
-  if (pathname.startsWith('/fixture/')) {
-    const [taskId, notes, section, ...rest] = pathname.slice('/fixture/'.length).split('/');
-    if (
-      !Object.hasOwn(tasks, taskId) ||
-      (['stock', 'service', 'files'].includes(taskId) &&
-        (current?.taskId !== taskId || current.owner === 'stopped')) ||
-      rest.length ||
-      (notes && (notes !== 'notes' || !['brief', 'rules'].includes(section)))
-    ) {
-      json(response, 404, { error: 'Unknown task.' });
-      return true;
-    }
-    const { items, ...task } = tasks[taskId];
-    const visibleTask = {
-      ...task,
-      kind: taskId,
-      ...(['stock', 'service', 'files'].includes(taskId)
-        ? {
-            effectURL: `/fixture/${taskId}/effect?run=${current.id}${taskId === 'files' ? '&case=INTAKE-501' : ''}`,
-          }
-        : {}),
-      ...(items ? { items: items.map(({ expected: _expected, ...item }) => item) } : {}),
-    };
+function servePage(pathname, response) {
+  if (pathname === '/fixture/reservation') {
     response.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',
-      'Content-Security-Policy': `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; ${['stock', 'service', 'files'].includes(taskId) ? "connect-src 'self'; " : ''}form-action 'none'; frame-ancestors 'none'`,
+      'Content-Security-Policy':
+        "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action 'none'; frame-ancestors 'none'",
     });
-    response.end(
-      notes
-        ? templates[2].replace(
-            '__NOTES__',
-            JSON.stringify({
-              title: task.title,
-              section: section === 'brief' ? 'Brief' : 'Rules',
-              text: section === 'brief' ? task.summary : task.instruction,
-            }),
-          )
-        : templates[1].replace('__TASK__', JSON.stringify(visibleTask)),
-    );
+    response.end(templates[1].replace('__TASK__', JSON.stringify(tasks.reservation)));
     return true;
   }
-  if (dashboardPages.has(pathname)) {
+  if (pathname === '/') {
     const nonce = randomBytes(18).toString('hex');
     response.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
@@ -232,17 +158,16 @@ function servePage(pathname, response, current) {
       'Referrer-Policy': 'no-referrer',
       'Content-Security-Policy': `default-src 'self'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'`,
     });
-    response.end(dashboardPages.get(pathname).replace('__NONCE__', nonce));
+    response.end(templates[0].replace('__NONCE__', nonce));
     return true;
   }
   return false;
 }
 
-function createRun(body, diagnosticCapture) {
+function createRun(body) {
   let settle;
   return {
     id: randomUUID(),
-    workspaceToken: randomBytes(24).toString('hex'),
     taskId: body.taskId,
     api: body.api,
     mode: body.mode,
@@ -254,27 +179,17 @@ function createRun(body, diagnosticCapture) {
     result: null,
     requests: 0,
     turns: 0,
-    stepLimit: ['desktop', 'mixed'].includes(body.environment) || body.api === 'decisions' ? 20 : 24,
+    stepLimit: body.api === 'decisions' ? 20 : 24,
     requestHeadersMs: 0,
-    diagnostics: new RunDiagnostics(diagnosticCapture, body.mode),
-    checkpoints: [],
-    checkpointSequence: 0,
-    checkpointDropped: 0,
-    checkpointBytes: 0,
     events: [],
     eventsDropped: 0,
     controller: new AbortController(),
-    pollController: new AbortController(),
     started: performance.now(),
     elapsedMs: 0,
     setOwner(owner) {
       if (this.owner !== owner) {
-        this.pollController.abort();
-        this.pollController = new AbortController();
         this.owner = owner;
         this.ownerVersion += 1;
-        this.scrollTarget = null;
-        recordReceipt(this, { kind: 'control', owner });
         this.addEvent('control', owner);
       }
     },
@@ -285,12 +200,11 @@ function createRun(body, diagnosticCapture) {
         this.eventsDropped += 1;
       }
     },
-    settleApproval(value, outcome = value ? 'approved' : 'cancelled') {
+    settleApproval(value) {
       if (settle) {
         const resolve = settle;
         settle = undefined;
         this.approval = null;
-        recordReceipt(this, { kind: 'approval', outcome });
         resolve(value);
       }
     },
@@ -301,7 +215,6 @@ function createRun(body, diagnosticCapture) {
       const pending = Promise.withResolvers();
       settle = pending.resolve;
       this.approval = { id: randomUUID(), label, ...(expiresAt === undefined ? {} : { expiresAt }) };
-      recordReceipt(this, { kind: 'approval', outcome: 'offered' });
       this.addEvent('approval', `Waiting for approval: ${label}`);
       const timeout = setTimeout(
         () => {
@@ -310,11 +223,9 @@ function createRun(body, diagnosticCapture) {
         },
         expiresAt === undefined ? 120_000 : Math.max(0, expiresAt - Date.now()),
       );
-      const started = performance.now();
       try {
         return await pending.promise;
       } finally {
-        this.diagnostics.measure('approvalMs', performance.now() - started);
         clearTimeout(timeout);
       }
     },
@@ -329,12 +240,7 @@ function finishCleanup(run) {
     !run.humanPromise &&
     !run.transferActive
   ) {
-    if (run.cleanup === 'pending') {
-      run.cleanup = 'completed';
-      recordReceipt(run, { kind: 'cleanup', outcome: 'completed' });
-    }
-    run.diagnostics.record('run', { status: run.status, result: run.result, cleanup: run.cleanup });
-    run.diagnostics.close();
+    run.cleanup = run.cleanup === 'pending' ? 'completed' : run.cleanup;
   }
 }
 
@@ -344,7 +250,6 @@ function closeRun(run) {
   run.closePromise ??= (async () => {
     if (run.cleanup !== 'failed') {
       run.cleanup = 'pending';
-      recordReceipt(run, { kind: 'cleanup', outcome: 'pending' });
     }
     try {
       // Revoke a published context even when a later setup operation has not settled.
@@ -362,7 +267,6 @@ function closeRun(run) {
     } catch (error) {
       run.cleanup = 'failed';
       run.status = 'cleanup_failed';
-      recordReceipt(run, { kind: 'cleanup', outcome: 'failed' });
       throw error;
     } finally {
       run.sessionCloseSettled = true;
@@ -388,13 +292,7 @@ function stopRun(run, reason = 'stopped') {
   run.setOwner('stopped');
   run.controller.abort();
   run.transferController?.abort();
-  let approvalOutcome = 'cancelled';
-  if (reason === 'approval_expired') {
-    approvalOutcome = 'expired';
-  } else if (reason === 'refused') {
-    approvalOutcome = 'refused';
-  }
-  run.settleApproval(false, approvalOutcome);
+  run.settleApproval(false);
   if (previousOwner !== 'stopped' && (!run.agentActive || reason === 'handoff_unavailable')) {
     run.status = reason;
     run.result = run.result === 'verified' ? 'verified' : 'unverified';
@@ -413,9 +311,6 @@ function validateInput(body, page) {
     type: ['text'],
     key: ['key'],
     scroll: ['direction', 'amount'],
-    open_notes: [],
-    switch_tab: ['tab_id'],
-    close_notes: [],
   };
   if (
     !Object.hasOwn(fields, action) ||
@@ -459,12 +354,6 @@ function validateInput(body, page) {
       'ControlOrMeta+A',
     ].includes(body.key);
   }
-  if (action === 'open_notes' || action === 'close_notes') {
-    return true;
-  }
-  if (action === 'switch_tab') {
-    return typeof body.tab_id === 'string';
-  }
   return (
     ['up', 'down', 'left', 'right'].includes(body.direction) &&
     Number.isSafeInteger(body.amount) &&
@@ -499,23 +388,6 @@ async function humanInput(run, body) {
         await page.mouse.wheel(...delta[body.direction]);
         break;
       }
-      case 'open_notes': {
-        const { session } = run;
-        session.notesTabId = await session.base.new_tab({ url: `${session.notesURL}brief` });
-        session.page.once('close', () => {
-          session.notesTabId = null;
-        });
-        break;
-      }
-      case 'switch_tab': {
-        await run.session.base.switch_tab({ tab_id: body.tab_id });
-        break;
-      }
-      case 'close_notes': {
-        await run.session.base.close_tab({ tab_id: run.session.notesTabId });
-        run.session.notesTabId = null;
-        break;
-      }
       default: {
         throw new Error('Unknown browser input.');
       }
@@ -539,23 +411,11 @@ async function executeRun(options) {
   run.agentActive = true;
   try {
     if (!run.session) {
-      if (run.environment === 'mixed') {
-        run.initialization = createFieldworkMixed({ runtimeDir: options.desktopRuntime, run });
-      } else if (run.environment === 'desktop') {
-        run.initialization = createDesktopSession({ runtimeDir: options.desktopRuntime, run });
-      } else {
-        run.initialization = createDemoSession({ ...options, onClose: () => run.stop('browser_closed') });
-      }
+      run.initialization = createDemoSession({ ...options, onClose: () => run.stop('browser_closed') });
       await run.initialization;
     }
     run.controller.signal.throwIfAborted();
-    if (run.environment === 'mixed') {
-      await executeFieldworkMixed(options);
-    } else if (run.environment === 'desktop') {
-      await executeDesktop(options);
-    } else {
-      await executeDemo(options);
-    }
+    await executeDemo(options);
   } catch {
     run.status = 'failed';
     if (run.stopReason) {
@@ -595,13 +455,7 @@ async function executeRun(options) {
 }
 
 /** Local operator server. Neither the task browser nor another origin can control a run. */
-export async function createDemoServer({
-  apiKey,
-  models = {},
-  port = 0,
-  desktopRuntime,
-  diagnosticCapture,
-} = {}) {
+export async function createDemoServer({ apiKey, models = {}, port = 0 } = {}) {
   let launch;
   let browserClosing;
   let current;
@@ -673,7 +527,6 @@ export async function createDemoServer({
           } catch (error) {
             run.cleanup = 'failed';
             run.status = 'cleanup_failed';
-            recordReceipt(run, { kind: 'cleanup', outcome: 'failed' });
             throw error;
           }
         })();
@@ -756,31 +609,6 @@ export async function createDemoServer({
       }
       throw error;
     }
-    if (run.environment !== 'browser') {
-      if (!samePhase(run, 'draining-to-human', version) || !run.session?.binding()) {
-        return;
-      }
-      await run.session.invalidateReferences({ signal });
-      if (!samePhase(run, 'draining-to-human', version)) {
-        return;
-      }
-      run.status = 'paused';
-      run.setOwner('human');
-      const humanVersion = run.ownerVersion;
-      await run.session.capture({ signal });
-      signal.throwIfAborted();
-      if (!samePhase(run, 'human', humanVersion)) {
-        return;
-      }
-      expireHumanSession(run);
-      run.addEvent(
-        'control',
-        run.environment === 'mixed'
-          ? 'Agent work drained. You control this mixed task. Select Host browser or Guest editor.'
-          : 'Agent work drained. You control the isolated desktop.',
-      );
-      return;
-    }
     if (!sameOwner(run, 'draining-to-human', version)) {
       return;
     }
@@ -807,12 +635,8 @@ export async function createDemoServer({
     if (!samePhase(run, 'draining-to-agent', version)) {
       return;
     }
-    if (run.environment === 'browser') {
-      await waitForDecision(() => run.session.invalidateReferences(), signal);
-      await run.session.base.read_page({ tab_id: null, filter: 'all' }, { signal });
-    } else {
-      await run.session.invalidateReferences({ signal });
-    }
+    await waitForDecision(() => run.session.invalidateReferences(), signal);
+    await run.session.base.read_page({ tab_id: null, filter: 'all' }, { signal });
     await run.session.capture({ signal });
     signal.throwIfAborted();
     if (!samePhase(run, 'draining-to-agent', version)) {
@@ -825,7 +649,7 @@ export async function createDemoServer({
     run.result = null;
     run.setOwner('agent');
     run.addEvent('control', 'Fresh workspace state observed. Agent control resumed.');
-    run.promise = executeRun({ browser, origin, apiKey, models, desktopRuntime, run });
+    run.promise = executeRun({ browser, origin, apiKey, models, run });
   }
 
   function transferFailed(run, owner, version) {
@@ -846,17 +670,7 @@ export async function createDemoServer({
         ? takeControl(run, version, signal)
         : returnControl(run, version, origin, signal));
     } catch {
-      if (run.environment !== 'browser' && current === run && run.transferActive && run.owner !== 'stopped') {
-        stopRun(run, 'handoff_failed');
-        run.addEvent(
-          'control',
-          run.environment === 'mixed'
-            ? 'Mixed control transfer failed. Both workspaces will close; no automatic resume.'
-            : 'Desktop control transfer failed. No automatic resume.',
-        );
-      } else {
-        transferFailed(run, owner, version);
-      }
+      transferFailed(run, owner, version);
     } finally {
       clearTimeout(timeout);
       if (run.transferController === controller) {
@@ -865,28 +679,6 @@ export async function createDemoServer({
       run.transferActive = false;
       finishCleanup(run);
     }
-  }
-
-  function serveCheckpoint(url, response) {
-    const value = url.searchParams.get('checkpoint');
-    const sequence = Number(value);
-    const checkpoint =
-      current &&
-      url.searchParams.get('run') === current.id &&
-      Number.isSafeInteger(sequence) &&
-      sequence > 0 &&
-      String(sequence) === value &&
-      current.checkpoints.find((entry) => entry.sequence === sequence);
-    if (!checkpoint) {
-      json(response, 404, { error: 'Saved checkpoint unavailable.' });
-      return;
-    }
-    response.writeHead(200, {
-      'Content-Type': current.environment === 'browser' ? 'image/jpeg' : 'image/png',
-      'Cache-Control': 'no-store',
-      'Referrer-Policy': 'no-referrer',
-    });
-    response.end(checkpoint.pixels);
   }
 
   function serveLiveView(url, response) {
@@ -914,7 +706,7 @@ export async function createDemoServer({
       return;
     }
     response.writeHead(200, {
-      'Content-Type': current.environment === 'browser' ? 'image/jpeg' : 'image/png',
+      'Content-Type': 'image/jpeg',
       'Cache-Control': 'no-store',
       'Referrer-Policy': 'no-referrer',
     });
@@ -934,83 +726,20 @@ export async function createDemoServer({
       return;
     }
     response.writeHead(200, {
-      'Content-Type': current.environment === 'browser' ? 'image/jpeg' : 'image/png',
+      'Content-Type': 'image/jpeg',
       'Cache-Control': 'no-store',
       'Referrer-Policy': 'no-referrer',
     });
     response.end(current.screenshot);
   }
 
-  function serveTrace(url, response) {
-    if (!diagnosticCapture) {
-      json(response, 404, {
-        error: 'No capture selected. Start with --diagnostics or --diagnostics-reopen ID.',
-      });
-      return;
-    }
-    try {
-      if (url.pathname === '/api/traces') {
-        json(response, 200, { capture: diagnosticCapture.id, traces: diagnosticCapture.traces() });
-      } else if (url.pathname === '/api/trace') {
-        json(response, 200, diagnosticCapture.trace(url.searchParams.get('trace')));
-      } else {
-        const { pixels, mime } = diagnosticCapture.frame(
-          url.searchParams.get('trace'),
-          url.searchParams.get('frame'),
-        );
-        response.writeHead(200, {
-          'Content-Type': mime,
-          'Cache-Control': 'no-store',
-          'Referrer-Policy': 'no-referrer',
-        });
-        response.end(pixels);
-      }
-    } catch {
-      json(response, 404, { error: 'Saved trace or frame unavailable.' });
-    }
-  }
-
-  function serveInspector(url, response) {
-    if (
-      !current ||
-      url.searchParams.get('run') !== current.id ||
-      current.environment !== 'browser' ||
-      current.taskId === 'files' ||
-      !current.session?.toolset ||
-      current.owner !== 'human'
-    ) {
-      json(response, 409, { error: 'Take control of a browser task to inspect its tools.' });
-      return;
-    }
-    const helper = current.session.toolset('human');
-    json(response, 200, { tools: helper.tools() });
-    helper.close();
-  }
-
   function serveRead(url, response) {
-    if (['/api/traces', '/api/trace', '/api/trace-frame'].includes(url.pathname)) {
-      serveTrace(url, response);
-      return;
-    }
     if (url.pathname === '/api/state') {
       void refreshPolledView(current);
       json(response, 200, {
         liveAvailable: Boolean(apiKey && (models.decisions || models.responses)),
-        desktopAvailable: Boolean(desktopRuntime && apiKey && models.responses),
         run: snapshot(current),
       });
-      return;
-    }
-    if (url.pathname === '/api/inspector') {
-      serveInspector(url, response);
-      return;
-    }
-    if (url.pathname === '/api/export') {
-      if (!current || url.searchParams.get('run') !== current.id) {
-        json(response, 404, { error: 'No matching run receipt.' });
-        return;
-      }
-      json(response, 200, exportRun(current));
       return;
     }
     if (url.pathname === '/api/view') {
@@ -1021,28 +750,17 @@ export async function createDemoServer({
       serveScreenshot(url, response);
       return;
     }
-    if (url.pathname === '/api/checkpoint') {
-      serveCheckpoint(url, response);
-      return;
-    }
     json(response, 404, { error: 'Unknown route.' });
   }
 
   function startError(body) {
-    const desktop = ['desktop', 'mixed'].includes(body.environment);
     if (
-      ![undefined, 'browser', 'desktop', 'mixed'].includes(body.environment) ||
-      (desktop ? body.taskId !== body.environment : !Object.hasOwn(tasks, body.taskId)) ||
+      ![undefined, 'browser'].includes(body.environment) ||
+      body.taskId !== 'reservation' ||
       !['decisions', 'responses'].includes(body.api) ||
       !['live', 'rehearsal'].includes(body.mode)
     ) {
-      return 'Choose an available task, API, and run mode.';
-    }
-    if (desktop && (!desktopRuntime || body.api !== 'responses' || body.mode !== 'live')) {
-      return 'The isolated desktop needs a configured runtime and live Responses.';
-    }
-    if (body.taskId === 'files' && body.allowFileUpload !== true) {
-      return 'Opt in to the synthetic file upload before starting file intake.';
+      return 'Choose Book a table, an available API, and run mode.';
     }
     if (body.mode === 'rehearsal' && body.api !== 'decisions') {
       return 'Rehearsal uses Decisions. Choose Live API for Responses.';
@@ -1063,81 +781,22 @@ export async function createDemoServer({
       json(response, 400, { error });
       return;
     }
-    const desktop = ['desktop', 'mixed'].includes(body.environment);
-    current = createRun(body, diagnosticCapture);
-    current.diagnostics.record('run', { api: body.api, mode: body.mode, taskId: body.taskId });
-    if (['stock', 'service', 'files'].includes(body.taskId)) {
-      current.business = createBusinessState(tasks[body.taskId], current);
-    }
+    current = createRun(body);
     const currentRun = current;
     current.stop = (reason) => stopRun(currentRun, reason);
     current.close = () => closeRun(currentRun);
     current.addEvent(
       'start',
-      `${current.mode === 'live' ? 'Live API' : 'Scripted rehearsal'} · ${desktop ? 'Route and save a desktop receipt' : tasks[current.taskId].title}`,
+      `${current.mode === 'live' ? 'Live API' : 'Scripted rehearsal'} · ${tasks[current.taskId].title}`,
     );
-    current.promise = executeRun({ browser, origin, apiKey, models, desktopRuntime, run: current });
+    current.promise = executeRun({ browser, origin, apiKey, models, run: current });
     json(response, 200, snapshot(current));
   }
 
-  async function serveDesktopInput(run, body, response) {
-    if (run.owner !== 'human' || run.humanPromise || run.uncertainEffects) {
-      json(response, 409, { error: 'The desktop is not accepting input.' });
-      return;
-    }
-    const point = run.scrollTarget?.ownerVersion === run.ownerVersion ? run.scrollTarget : null;
-    let input = body;
-    if (run.environment === 'mixed') {
-      const { view: _view, tabId: _tabId, sequence: _sequence, ...rest } = body;
-      input = rest;
-    }
-    const action = desktopInput(input, point);
-    if (!action || (run.environment === 'mixed' && !run.session.permits(action))) {
-      json(response, 400, { error: 'Choose a valid bounded desktop input.' });
-      return;
-    }
-    const version = run.ownerVersion;
-    run.humanPromise = run.session.humanInput(action);
-    try {
-      await run.humanPromise;
-      if (action.type === 'click' && run.owner === 'human' && run.ownerVersion === version) {
-        run.scrollTarget = { x: action.x, y: action.y, ownerVersion: version };
-      }
-      run.addEvent('human', `Human ${body.action} completed; desktop state captured.`);
-      json(response, 200, { accepted: true });
-    } catch (error) {
-      if (error instanceof MixedHostInputRefusedError) {
-        json(response, 400, { error: error.message });
-        return;
-      }
-      run.uncertainEffects ||= run.session.hasUncertainEffects();
-      stopRun(run, run.uncertainEffects ? 'uncertain' : 'input_failed');
-      json(response, 409, {
-        error: 'The desktop input did not finish. Session closed; no automatic resume.',
-      });
-    } finally {
-      run.humanPromise = null;
-      finishCleanup(run);
-    }
-  }
-
   async function serveInput(run, body, response) {
-    if (run.environment !== 'browser') {
-      await serveDesktopInput(run, body, response);
-      return;
-    }
     if (run.owner === 'human' && !run.humanPromise && run.session?.page && !run.uncertainEffects) {
       if (!validateInput(body, run.session.page)) {
         json(response, 400, { error: 'Choose a valid bounded browser input.' });
-        return;
-      }
-      const selected = run.session.browser();
-      if (
-        (body.action === 'open_notes' && run.session.notesTabId) ||
-        (body.action === 'close_notes' && !run.session.notesTabId) ||
-        (body.action === 'switch_tab' && !selected.tabs.some((tab) => tab.id === body.tab_id))
-      ) {
-        json(response, 409, { error: 'Choose an available Task or Notes tab.' });
         return;
       }
       run.humanPromise = humanInput(run, body);
@@ -1157,12 +816,6 @@ export async function createDemoServer({
 
   // oxlint-disable-next-line eslint/complexity -- Bind all ownership and view transitions to the same run and control version before branching.
   async function serveOwnership(pathname, body, response, origin, run) {
-    if (run.taskId === 'files') {
-      json(response, 403, {
-        error: 'View and Stop are available. File selection is controlled by the approved fixture task.',
-      });
-      return;
-    }
     if (run.transferActive) {
       json(response, 409, { error: 'Wait for the current control transfer to finish.' });
       return;
@@ -1172,26 +825,12 @@ export async function createDemoServer({
       return;
     }
     const initialTake =
-      run.environment === 'browser' &&
       pathname === '/api/take-control' &&
       !run.session?.taskPage &&
       body.tabId === null &&
       body.sequence === null;
     if (!initialTake && !run.session?.matches(body)) {
       json(response, 409, { error: 'This browser page is no longer current.' });
-      return;
-    }
-    if (pathname === '/api/mixed-view' && run.environment === 'mixed') {
-      if (
-        run.humanPromise ||
-        !['agent', 'human'].includes(run.owner) ||
-        !['host', 'guest'].includes(body.selected)
-      ) {
-        json(response, 409, { error: 'Wait until this mixed workspace can change views.' });
-        return;
-      }
-      await run.session.selectView(body.selected);
-      json(response, 200, { accepted: true });
       return;
     }
     if (pathname === '/api/take-control' && run.owner === 'agent') {
@@ -1214,46 +853,6 @@ export async function createDemoServer({
       run.transferActive = true;
       run.transferPromise = finishTransfer(run, 'draining-to-agent', version, origin);
       json(response, 200, { accepted: true });
-      return;
-    }
-    if (pathname === '/api/inspect') {
-      if (
-        run.environment !== 'browser' ||
-        run.owner !== 'human' ||
-        run.humanPromise ||
-        run.uncertainEffects ||
-        !run.session?.toolset ||
-        body.consent !== true ||
-        typeof body.name !== 'string' ||
-        !body.args ||
-        typeof body.args !== 'object' ||
-        Array.isArray(body.args)
-      ) {
-        json(response, 409, { error: 'Take control and consent to one manual browser call.' });
-        return;
-      }
-      const helper = run.session.toolset('human');
-      const id = randomUUID();
-      run.humanPromise = helper.execute({
-        type: 'function_call',
-        status: 'completed',
-        id,
-        call_id: id,
-        name: body.name,
-        arguments: JSON.stringify(body.args),
-      });
-      try {
-        const output = await run.humanPromise;
-        json(response, 200, { output });
-      } catch {
-        json(response, 409, {
-          error: 'The tool did not finish. Read the current page and check its outcome.',
-        });
-      } finally {
-        helper.close();
-        run.humanPromise = null;
-        finishCleanup(run);
-      }
       return;
     }
     if (pathname === '/api/input') {
@@ -1279,11 +878,7 @@ export async function createDemoServer({
       json(response, 200, { stopped: true });
       return;
     }
-    if (
-      ['/api/take-control', '/api/return-control', '/api/input', '/api/mixed-view', '/api/inspect'].includes(
-        url.pathname,
-      )
-    ) {
+    if (['/api/take-control', '/api/return-control', '/api/input'].includes(url.pathname)) {
       await serveOwnership(url.pathname, body, response, origin, run);
       return;
     }
@@ -1315,20 +910,6 @@ export async function createDemoServer({
     json(response, 404, { error: 'Unknown route.' });
   }
 
-  function workspaceAllowed(pathname, cookieHeader) {
-    const task = pathname.startsWith('/fixture/') ? pathname.split('/')[2] : undefined;
-    if (!['stock', 'service', 'files'].includes(task)) {
-      return true;
-    }
-    return Boolean(
-      current?.business &&
-      current.taskId === task &&
-      (cookieHeader ?? '')
-        .split(';')
-        .some((cookie) => cookie.trim() === `fieldwork_workspace=${current.workspaceToken}`),
-    );
-  }
-
   // oxlint-disable-next-line complexity -- Keep admission before the existing page and effect routes.
   const server = createServer(async (request, response) => {
     try {
@@ -1342,32 +923,7 @@ export async function createDemoServer({
         return;
       }
       const url = new URL(request.url, origin);
-      if (!workspaceAllowed(url.pathname, request.headers.cookie)) {
-        json(response, 403, { error: 'An active workspace capability is required.' });
-        return;
-      }
-      if (request.method === 'GET' && servePage(url.pathname, response, current)) {
-        return;
-      }
-      if (
-        request.method === 'POST' &&
-        ['/fixture/stock/effect', '/fixture/service/effect', '/fixture/files/effect'].includes(url.pathname)
-      ) {
-        if (
-          request.headers.origin !== origin ||
-          !current?.business ||
-          url.pathname !== `/fixture/${current.taskId}/effect` ||
-          url.searchParams.get('run') !== current.id ||
-          (current.taskId === 'files' && url.search !== `?run=${current.id}&case=${tasks.files.job}`)
-        ) {
-          json(response, 403, { error: 'No active business workspace.' });
-          return;
-        }
-        const receipt =
-          current.taskId === 'files'
-            ? await current.business.receiveFile(request)
-            : await current.business.receive(await readBody(request));
-        json(response, receipt.status, receipt.result);
+      if (request.method === 'GET' && servePage(url.pathname, response)) {
         return;
       }
       if (request.headers['x-demo-token'] !== token) {
@@ -1417,22 +973,15 @@ export async function createDemoServer({
           if (results === expired) {
             if (run) {
               run.cleanup = 'failed';
-              recordReceipt(run, { kind: 'cleanup', outcome: 'failed' });
             }
-            throw new Error(
-              `Workspace cleanup did not finish. Private evidence retained: ${run?.session?.ledgerDirectory ?? run?.ledgerDirectory ?? 'no active checkpoint'}`,
-            );
+            throw new Error('Workspace cleanup did not finish.');
           }
         } finally {
           timer.abort();
         }
         const failed = results.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
         if (run?.cleanup === 'failed') {
-          failed.push(
-            new Error(
-              `Workspace cleanup failed. Private evidence retained: ${run.session?.ledgerDirectory ?? run.ledgerDirectory ?? 'no active checkpoint'}`,
-            ),
-          );
+          failed.push(new Error('Workspace cleanup failed.'));
         }
         if (failed.length) {
           throw new AggregateError(failed, 'Workspace cleanup failed.');
@@ -1450,24 +999,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     decisions: process.env['OPENAI_DECISIONS_MODEL'] ?? process.env['OPENAI_MODEL'],
     responses: process.env['OPENAI_RESPONSES_MODEL'] ?? process.env['OPENAI_MODEL'],
   };
-  const runtimeFlag = process.argv.indexOf('--desktop-runtime');
-  const desktopRuntime = runtimeFlag === -1 ? undefined : process.argv[runtimeFlag + 1];
-  const reopen = process.argv.indexOf('--diagnostics-reopen');
-  if (reopen !== -1 && (!process.argv[reopen + 1] || process.argv.includes('--diagnostics'))) {
-    throw new Error('Choose --diagnostics or --diagnostics-reopen ID.');
-  }
-  const diagnosticCapture =
-    process.argv.includes('--diagnostics') || reopen !== -1
-      ? createDiagnosticCapture({
-          secrets: [apiKey, ...Object.values(models)],
-          captureId: reopen === -1 ? undefined : process.argv[reopen + 1],
-        })
-      : undefined;
   const app = await createDemoServer({
     apiKey,
     models,
-    desktopRuntime,
-    diagnosticCapture,
     port: Number(process.env['DEMO_PORT'] ?? 0),
   });
   console.log(
@@ -1476,11 +1010,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       : `Browser-use example: ${app.origin}
 Private link unavailable in redirected output; relaunch in a terminal.`,
   );
-  if (diagnosticCapture) {
-    console.log(
-      `Private diagnostic files: ${diagnosticCapture.directory}. Reopen ID: ${diagnosticCapture.id}. Inspect them before sharing.`,
-    );
-  }
   const close = async () => {
     try {
       await app.close();

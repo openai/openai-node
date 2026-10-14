@@ -91,33 +91,6 @@ Stop waits for creation to settle (up to 90 seconds), then removes the guest
 before any API call. The final output
 contains only the verifier result and the uncertainty flag.
 
-## Dashboard control
-
-The [Browser and isolated desktop dashboard](../browser-use-demo/README.md)
-can use this same guest runtime. After the dashboard's optional Playwright
-setup, start its server from `examples/`:
-
-```sh
-node browser-use-demo/server.mjs --desktop-runtime /private/tmp/desktop-$UID
-```
-
-Set OPENAI_API_KEY and OPENAI_RESPONSES_MODEL (or OPENAI_MODEL) on the
-server. The runtime path must be the trusted private directory you built.
-It is never accepted from model output or a dashboard request. Choose
-**Isolated desktop** in the Workspace selector; this mode uses live
-Responses only and cannot run a Decisions rehearsal.
-
-The dashboard shows actual guest pixels. **Take control** waits for admitted
-work to settle and obtains a current frame before accepting your input.
-Click inside a pane before using Scroll. **Return to agent** finishes human
-input and starts from fresh guest pixels with the remaining request budget.
-Completed work is checked, and old pending calls are never replayed.
-The dashboard README describes saved views, safe export, private phase-ledger
-cleanup, and separate controlled and real-guest exercises.
-
-The CLI guest checks and controlled
-dashboard tests do not establish a complete native or live dashboard result.
-
 ## Ownership and limits
 
 `verify()` observes the current fixed records and leaves the desktop usable.

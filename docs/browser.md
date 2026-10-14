@@ -196,10 +196,6 @@ Scope refs can select a read root, but they cannot authorize an element mutation
 them with the same tab, document, generation and visibility changes as element refs. Element
 actions must reject scope refs. Keep field privacy and work limits in the driver.
 
-The [owned capability examples](../examples/responses/browser/README-capabilities.md) show
-the local scoped reader and guarded pointer factory, including their narrower frame and
-canvas support.
-
 ## Opt in to diagnostics, scripts, and file transfers
 
 These four methods also stay off by default. Select each one in `members` and
@@ -255,15 +251,9 @@ that response. Check the actual file and application state before retrying an
 unknown transfer. A file result does not prove that a later form submission or
 business action succeeded.
 
-The file examples use private temporary staging and original page/control handles.
-Downloads use a trusted source URL, expected size, and hash supplied by the app.
-The model receives only the grant. These examples do not collect arbitrary
-browser downloads. Keep the file owner's state separate from browser `state()`.
-
 `run_script`, `upload_file`, `download_file`, and diagnostic reads receive
-the same `{ signal }` options as other browser methods. See the
-[sensitive example](../examples/responses/browser/README-capabilities.md) and
-[file examples](../examples/responses/browser/README-files.md).
+the same `{ signal }` options as other browser methods. Applications own file
+staging, grants and cleanup; the booking example does not implement these methods.
 
 ## Return a structured page read
 
@@ -537,8 +527,6 @@ For a task with several steps, include the last completed action and bounded pag
 Capture that text from the same validated read used to create the action. Save it only after the
 tool reports success, and reset it for a new task. Keep browser handles inside the executor and
 use separate choice IDs. If a tool refuses or fails, stop the executor with an error.
-The [local workflow example](../examples/responses/browser/long-workflow.md) shows this pattern with two tabs,
-including a local rehearsal and an independent check of saved results.
 
 ```ts
 import OpenAI from 'openai';
@@ -610,33 +598,14 @@ Google Chrome through your system's approved package setup. Then set:
 export OPENAI_EXAMPLE_BROWSER_CHANNEL=chrome
 ```
 
-This selects the installed Google Chrome for the structured Browser example,
-read-only reader, inspector, evaluation, resource-desk workflow, and the
-Fieldwork dashboard (including its host browser in mixed mode). Each launch
-still uses a new disposable profile with the browser sandbox enabled.
-The setting accepts only `chrome`; unset it to return to bundled Chromium.
-Preflight checks the bundled executable by default. With `chrome`, it checks
-the channel selection and reports that availability and sandbox support will
-be checked at launch. It does not establish that Chrome is installed.
+This selects installed Chrome for the local reader and Fieldwork. Both use a fresh profile with the browser sandbox enabled. The setting accepts only `chrome`; unset it to use bundled Chromium.
 
-Download and unpack **Source code (zip)** from the
-[Node SDK release page](https://github.com/openai/openai-node/releases/latest). Open the unpacked
-`examples` directory and follow the [example setup](../examples/browser-use-demo/README.md#setup).
+Download the release source matching your installed SDK and follow the
+[Fieldwork setup](../examples/browser-use-demo/README.md#setup) or the
+[read-only reader](../examples/responses/browser/README-read-only.md).
 No Playwright installation is needed to import the SDK itself.
-
-Set `OPENAI_API_KEY` and `OPENAI_MODEL` in your shell, then run:
-
-```sh
-node responses/browser/run.mjs
-# Optional streaming:
-SDK_STREAM=1 node responses/browser/run.mjs
-```
-
-The example starts a local fixture server, blocks other browser requests, runs the model task and checks
-the actual form, recorded confirmation and two tabs. It closes the clean browser and server after the run.
-The SDK credentials remain in the Node process and are excluded from Chromium's environment.
 
 ## Hosted environments
 
 See [provider connections](browser-providers.md) for the browser and desktop
-adapters, ownership rules, and local connection checks.
+driver contracts and application ownership.

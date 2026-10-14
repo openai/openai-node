@@ -2,11 +2,8 @@ import { readFile } from 'node:fs/promises';
 
 export const tasks = JSON.parse(await readFile(new URL('tasks.json', import.meta.url), 'utf-8'));
 
-/** Verification reads browser outcomes and compares them with the synthetic task specification. */
-export async function inspectTask(page, taskId, business) {
-  if (business) {
-    return business.snapshot();
-  }
+/** Verify the visible confirmation and all four form values against the local brief. */
+export async function inspectTask(page) {
   const state = await page.locator('body').evaluate((body) => ({
     revision: Number(body.dataset.revision),
     finished: body.dataset.finished === 'true',
@@ -18,15 +15,8 @@ export async function inspectTask(page, taskId, business) {
       ]),
     ),
   }));
-  const task = tasks[taskId];
   state.verified =
-    taskId === 'reservation'
-      ? state.results.confirmation === 'TABLE-204' &&
-        Object.entries(task.fields).every(([name, value]) => state.fields[name] === value)
-      : state.results.length === task.items.length &&
-        task.items.every(
-          (item, index) =>
-            state.results[index]?.id === item.id && state.results[index]?.choice === item.expected,
-        );
+    state.results.confirmation === 'TABLE-204' &&
+    Object.entries(tasks.reservation.fields).every(([name, value]) => state.fields[name] === value);
   return state;
 }

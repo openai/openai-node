@@ -2,17 +2,9 @@ import OpenAI from 'openai';
 import { BrowserError, BrowserToolset } from 'openai/helpers/browser';
 import { DecisionsToolRunner } from 'openai/helpers/decisions-tool-runner';
 import { ResponsesToolRunner } from 'openai/helpers/responses-tool-runner';
-import { writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { once } from 'node:events';
-import { createBrowserDriver } from '../responses/browser/driver.mjs';
-import { newUploadOwner } from '../responses/browser/file-upload.mjs';
+import { createBrowserDriver, waitForDecision } from './booking.mjs';
 import { tasks, inspectTask } from './tasks.mjs';
 import { createLiveView } from './live-view.mjs';
-import { intakeNote, readServiceFields, shipmentLabel } from './business-state.mjs';
-import { waitForDecision } from '../responses/browser/file-state.mjs';
-import { recordRequest } from './run-receipt.mjs';
-import { diagnosticObservation } from './diagnostics.mjs';
 
 const done = {
   id: 'done',
@@ -21,19 +13,9 @@ const done = {
 };
 
 /** The rehearsal is a scripted HTTP response consumed by the real SDK, never a live model run. */
-function rehearsalDecision(task, state, candidates) {
+function rehearsalDecision(state, candidates) {
   if (state.finished) {
     return 'done';
-  }
-  if (task.items) {
-    const { expected } = task.items[state.results.length];
-    return candidates.find((candidate) => candidate.description === `Click ${expected}`).id;
-  }
-  if (task.stock) {
-    const order = task.orders[state.results.length];
-    const available = task.stock.find((stock) => stock.colour === order.colour);
-    const label = shipmentLabel(order.id, available.sku);
-    return candidates.find((candidate) => candidate.description === `Click ${label}`).id;
   }
   return candidates.find((candidate) => candidate.id !== 'done').id;
 }
@@ -86,7 +68,6 @@ async function runInBrowser({ origin, apiKey, models, run }) {
   let choiceForRehearsal;
   let observedRevision = 0;
   let observedView;
-  let businessBindings;
   const ensureCurrent = async (
     revision = observedRevision,
     view = observedView,
@@ -100,7 +81,7 @@ async function runInBrowser({ origin, apiKey, models, run }) {
     if (run.owner !== owner || run.ownerVersion !== version) {
       throw new Error('The agent no longer controls this session.');
     }
-    const state = await waitForDecision(() => inspectTask(page, run.taskId, run.business), execution?.signal);
+    const state = await waitForDecision(() => inspectTask(page), execution?.signal);
     if (page.url() !== fixtureURL || state.revision !== revision || !run.session.matches(view)) {
       throw new BrowserError('The workspace changed. Read the current page again.');
     }
@@ -116,38 +97,17 @@ async function runInBrowser({ origin, apiKey, models, run }) {
     version = run.ownerVersion,
     execution = phaseExecution,
   ) => {
-    run.session.checkTarget(args, member === 'switch_tab');
+    run.session.checkTarget(args);
     const before = await ensureCurrent(revision, observedView, owner, version, execution);
-    const operation = member === 'click' ? businessBindings?.get(args.target) : null;
-    if (member === 'click' && run.business && !operation) {
-      throw new BrowserError('Read an unambiguous business control and its current fields before approval.');
-    }
-    if (member === 'click' && (operation || ['Reserve table', 'Approve'].includes(label))) {
-      const approvalLabel =
-        operation?.operation === 'schedule'
-          ? `${label} · ${operation.date} · ${operation.technician} · ${operation.note}`
-          : label;
-      if (!(await run.askApproval(approvalLabel, undefined, owner))) {
+    if (member === 'click' && label === 'Reserve table') {
+      if (!(await run.askApproval(label, undefined, owner))) {
         throw new Error('The operator refused the action.');
       }
       await ensureCurrent(revision, observedView, owner, version, execution);
     }
     run.addEvent('action', label || member);
-    const permit = operation ? run.business.authorize(operation) : null;
-    const started = performance.now();
-    try {
-      await base[member](args, execution);
-      if (permit) {
-        await run.business.finish(permit, page);
-      }
-    } finally {
-      run.diagnostics.measure('actionMs', performance.now() - started);
-      if (permit) {
-        run.business.revoke(permit);
-      }
-    }
-    const state = await waitForDecision(() => inspectTask(page, run.taskId, run.business), execution?.signal);
-    run.diagnostics.record('effect', { member, state });
+    await base[member](args, execution);
+    const state = await waitForDecision(() => inspectTask(page), execution?.signal);
     observedRevision = state.revision;
     if (JSON.stringify(before.results) !== JSON.stringify(state.results)) {
       observedView = undefined;
@@ -158,19 +118,14 @@ async function runInBrowser({ origin, apiKey, models, run }) {
     run.session.checkTarget(args);
     const browser = run.session.browser();
     const result = await base.read_page(args, execution);
-    const bindings =
-      run.business && browser.tabId === run.session.taskTabId
-        ? await waitForDecision(() => run.business.bindRead(page, result.elements), execution?.signal)
-        : null;
     if (!run.session.matches(browser)) {
       throw new BrowserError('The page changed during observation. Read the current page again.');
     }
-    const state = await waitForDecision(() => inspectTask(page, run.taskId, run.business), execution?.signal);
+    const state = await waitForDecision(() => inspectTask(page), execution?.signal);
     await capture(execution);
     if (!run.session.matches(browser) || !run.session.matches(run.screenshotBinding)) {
       throw new BrowserError('The page changed during observation. Read the current page again.');
     }
-    businessBindings = bindings;
     observation = { ...result, tabs: browser.tabs, active_tab_id: browser.tabId };
     observedView = browser;
     observedRevision = state.revision;
@@ -182,52 +137,19 @@ async function runInBrowser({ origin, apiKey, models, run }) {
       { type: 'input_text', text: JSON.stringify(observation) },
       { type: 'input_image', image_url: `data:image/jpeg;base64,${run.screenshot.toString('base64')}` },
     ];
-    if (run.api === 'decisions') {
-      run.diagnostics.record('observation', diagnosticObservation(result));
-    }
     return result;
   };
   const candidates = async () => {
-    const state = await waitForDecision(
-      () => inspectTask(page, run.taskId, run.business),
-      phaseExecution.signal,
-    );
+    const state = await waitForDecision(() => inspectTask(page), phaseExecution.signal);
     if (state.finished) {
       return [done];
     }
-    if (observedView.tabId !== run.session.taskTabId) {
-      const action = {
-        id: 'switch_to_task',
-        description: 'Switch to the Task tab',
-        execute: () => act('switch_tab', { tab_id: run.session.taskTabId }, 'Switch to Task', state.revision),
-      };
-      if (run.mode === 'rehearsal') {
-        choiceForRehearsal = action.id;
-      }
-      return [action, done];
-    }
-    if (run.taskId === 'files') {
-      const action = {
-        id: 'attach_intake_note',
-        description: 'Attach Approved fixture document to INTAKE-501; operator approval required',
-        execute: () => run.session.attachFile(),
-      };
-      if (run.mode === 'rehearsal') {
-        choiceForRehearsal = action.id;
-      }
-      return [action, done];
-    }
     const { revision } = state;
-    const fields = run.taskId === 'service' ? readServiceFields(observation.elements) : state.fields;
+    const { fields } = state;
     const actions = [];
     for (const element of observation.elements) {
       if (element.role === 'button') {
-        if (
-          task.fields &&
-          (run.taskId === 'service'
-            ? !businessBindings?.has(element.ref)
-            : !Object.entries(task.fields).every(([name, value]) => fields[name] === value))
-        ) {
+        if (!Object.entries(task.fields).every(([name, value]) => fields[name] === value)) {
           continue;
         }
         const args = { tab_id: null, target: element.ref };
@@ -257,7 +179,7 @@ async function runInBrowser({ origin, apiKey, models, run }) {
     }
     const result = [...actions, done];
     if (run.mode === 'rehearsal') {
-      choiceForRehearsal = rehearsalDecision(task, state, result);
+      choiceForRehearsal = rehearsalDecision(state, result);
     }
     return result;
   };
@@ -273,12 +195,13 @@ async function runInBrowser({ origin, apiKey, models, run }) {
       if (run.mode === 'live') {
         run.requests += 1;
       }
-      const { response, headersMs } = await recordRequest(
-        run,
-        () =>
-          run.mode === 'rehearsal' ? Response.json(decisionReply(choiceForRehearsal)) : fetch(url, options),
-        options?.signal,
-      );
+      const started = performance.now();
+      const response =
+        run.mode === 'rehearsal'
+          ? Response.json(decisionReply(choiceForRehearsal))
+          : await fetch(url, options);
+      const headersMs = performance.now() - started;
+      run.requestHeadersMs += headersMs;
       run.addEvent(
         'request',
         run.mode === 'rehearsal'
@@ -316,16 +239,6 @@ async function runInBrowser({ origin, apiKey, models, run }) {
         run.session.checkTarget(args);
         return base.get_page_text(args, execution);
       },
-      ...(['reservation', 'service', 'files'].includes(run.taskId)
-        ? {}
-        : {
-            screenshot(args, execution) {
-              run.session.checkTarget(args);
-              return base.screenshot(args, execution);
-            },
-          }),
-      switch_tab: (args, execution) =>
-        act('switch_tab', args, 'Switch tab', observedRevision, owner, version, execution),
       click: (args, execution) =>
         act(
           'click',
@@ -356,10 +269,7 @@ async function runInBrowser({ origin, apiKey, models, run }) {
     if (run.owner !== 'agent' || run.ownerVersion !== phaseOwnerVersion) {
       return;
     }
-    const initialState = await waitForDecision(
-      () => inspectTask(page, run.taskId, run.business),
-      phase.signal,
-    );
+    const initialState = await waitForDecision(() => inspectTask(page), phase.signal);
     if (initialState.finished) {
       run.result = initialState.verified ? 'verified' : 'unverified';
     }
@@ -379,24 +289,9 @@ async function runInBrowser({ origin, apiKey, models, run }) {
     if (run.api === 'decisions') {
       const runner = new DecisionsToolRunner({
         observe,
-        candidates: async (current) => {
-          const choices = await candidates(current);
-          run.diagnostics.record(
-            'choices',
-            choices.map(({ id, description, done: finished }) => ({
-              id,
-              description,
-              done: finished === true,
-            })),
-          );
-          return choices;
-        },
+        candidates,
         verify: async () => {
-          const state = await waitForDecision(
-            () => inspectTask(page, run.taskId, run.business),
-            phase.signal,
-          );
-          run.diagnostics.record('verification', state);
+          const state = await waitForDecision(() => inspectTask(page), phase.signal);
           return state.verified;
         },
       });
@@ -406,40 +301,15 @@ async function runInBrowser({ origin, apiKey, models, run }) {
         {
           maxSteps: remainingSteps,
           signal: run.controller.signal,
-          onDiagnostic: (event) => run.diagnostics.event(event),
         },
       );
-      run.result =
-        result.status === 'verified' || run.business?.snapshot().verified ? 'verified' : 'unverified';
+      run.result = result.status === 'verified' ? 'verified' : 'unverified';
       if (result.status === 'refused') {
         run.status = 'refused';
       }
     } else {
       const toolset = run.session.toolset();
-      const runner = new ResponsesToolRunner({
-        browser: toolset,
-        functions:
-          run.taskId === 'files'
-            ? [
-                {
-                  tool: {
-                    type: 'function',
-                    name: 'attach_intake_note',
-                    strict: true,
-                    description:
-                      'Attach the approved fixture document to INTAKE-501. Requires operator approval; a consumed or expired grant cannot be renewed.',
-                    parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
-                  },
-                  execute: async (args) => {
-                    if (Object.keys(args).length) {
-                      throw new Error('This fixed file task accepts no arguments.');
-                    }
-                    return run.session.attachFile();
-                  },
-                },
-              ]
-            : [],
-      });
+      const runner = new ResponsesToolRunner({ browser: toolset });
       const initialObservation = await observe();
       const response = await runner.run(
         client,
@@ -463,7 +333,6 @@ async function runInBrowser({ origin, apiKey, models, run }) {
           maxSteps: remainingSteps,
           signal: run.controller.signal,
           stream: true,
-          onDiagnostic: (event) => run.diagnostics.event(event),
           onEvent(event) {
             if (
               event.type === 'response.created' &&
@@ -476,7 +345,7 @@ async function runInBrowser({ origin, apiKey, models, run }) {
         },
       );
       run.finalText = publicAPIText(response.output_text, apiKey, models);
-      const state = await waitForDecision(() => inspectTask(page, run.taskId, run.business), phase.signal);
+      const state = await waitForDecision(() => inspectTask(page), phase.signal);
       run.result = state.verified ? 'verified' : 'unverified';
     }
     run.controller.signal.throwIfAborted();
@@ -497,7 +366,7 @@ async function runInBrowser({ origin, apiKey, models, run }) {
     } else if (run.controller.signal.aborted) {
       run.status = 'stopped';
     }
-    run.result = run.result === 'verified' || run.business?.snapshot().verified ? 'verified' : 'unverified';
+    run.result = run.result === 'verified' ? 'verified' : 'unverified';
     run.addEvent(
       'result',
       run.apiStatus
@@ -531,33 +400,17 @@ export async function createDemoSession({ browser, origin, run, onClose }) {
   let closePromise;
   let refreshPromise;
   const viewLifetime = new AbortController();
-  let fileOwner;
-  let filePreparation;
-  let fileExpiresAt;
-  let filePermit;
-  const fixtureURL = `${origin}/fixture/${run.taskId}`;
-  const notesURL = `${fixtureURL}/notes/`;
-  const publicViewports = [fixtureURL, `${notesURL}brief`, `${notesURL}rules`];
-  let publicValues = [];
-  if (run.taskId === 'reservation') {
-    publicValues = ['guest_name', 'party_size', 'time', 'seating'].map((field) => [
-      fixtureURL,
-      'TABLE-204',
-      field,
-    ]);
-  } else if (run.taskId === 'service') {
-    publicValues = ['visit_date', 'technician', 'note'].map((field) => [fixtureURL, 'SERVICE-401', field]);
-  }
+  const fixtureURL = `${origin}/fixture/reservation`;
+  const publicValues = ['guest_name', 'party_size', 'time', 'seating'].map((field) => [
+    fixtureURL,
+    'TABLE-204',
+    field,
+  ]);
   const base = createBrowserDriver(context, {
     ownedFixture: {
-      urls: [
-        ...publicViewports,
-        ...(run.business
-          ? [`${fixtureURL}/effect?run=${run.id}${run.taskId === 'files' ? '&case=INTAKE-501' : ''}`]
-          : []),
-      ],
+      urls: [fixtureURL],
       publicValues,
-      publicViewports,
+      publicViewports: [fixtureURL],
     },
   });
   const session = {
@@ -567,48 +420,7 @@ export async function createDemoSession({ browser, origin, run, onClose }) {
     hasUncertainEffects: base.hasUncertainEffects.bind(base),
     taskPage: null,
     taskTabId: null,
-    notesTabId: null,
-    notesURL,
     viewBinding: null,
-    fileState() {
-      return fileOwner?.state() ?? null;
-    },
-    async attachFile() {
-      session.checkTarget({ tab_id: session.taskTabId });
-      run.controller.signal.throwIfAborted();
-      if (
-        !fileOwner ||
-        run.owner !== 'agent' ||
-        filePermit ||
-        session.browser()?.tabId !== session.taskTabId
-      ) {
-        throw new Error('No active file task.');
-      }
-      filePreparation ??= (async () => {
-        const name = fileOwner.generatedName();
-        await writeFile(path.join(fileOwner.uploadRoot, name), intakeNote, { flag: 'wx', mode: 0o600 });
-        run.controller.signal.throwIfAborted();
-        fileExpiresAt = Date.now() + 30_000;
-        return fileOwner.prepare(fileOwner.uploadRoot, name, fileExpiresAt);
-      })();
-      try {
-        const grant = await filePreparation;
-        const result = JSON.parse(await fileOwner.upload({ grant_id: grant.grant_id }));
-        if (!result.completed || !filePermit) {
-          throw new Error('File selection was refused or its outcome is unknown.');
-        }
-        run.addEvent('action', 'Selected locally · awaiting fixture receipt');
-        await run.business.finish(filePermit, session.taskPage);
-        run.addEvent('action', 'Received by fixture · INTAKE-501');
-        await session.capture();
-        return JSON.stringify(fileOwner.state());
-      } finally {
-        if (filePermit) {
-          run.business.revoke(filePermit);
-          filePermit = null;
-        }
-      }
-    },
     get page() {
       return session.taskPage ? base.currentOwnedView()?.page : null;
     },
@@ -621,9 +433,6 @@ export async function createDemoSession({ browser, origin, run, onClose }) {
         return null;
       }
       const tabs = [{ id: session.taskTabId, role: 'Task' }];
-      if (session.notesTabId) {
-        tabs.push({ id: session.notesTabId, role: 'Notes' });
-      }
       const role = tabs.find((tab) => tab.id === current.tabId)?.role;
       // new_tab has not yet committed its role during setup; do not expose the intermediate page.
       return role ? { tabId: current.tabId, sequence: current.sequence, role, tabs } : null;
@@ -634,14 +443,9 @@ export async function createDemoSession({ browser, origin, run, onClose }) {
         !!binding && !!current && binding.tabId === current.tabId && binding.sequence === current.sequence
       );
     },
-    checkTarget(args, switching = false) {
+    checkTarget(args) {
       const current = session.browser();
-      if (
-        !current ||
-        (args.tab_id !== null &&
-          args.tab_id !== undefined &&
-          (switching ? !current.tabs.some((tab) => tab.id === args.tab_id) : args.tab_id !== current.tabId))
-      ) {
+      if (!current || (args.tab_id !== null && args.tab_id !== undefined && args.tab_id !== current.tabId)) {
         throw new BrowserError('Select the target tab and read its current page first.');
       }
     },
@@ -694,10 +498,7 @@ export async function createDemoSession({ browser, origin, run, onClose }) {
         () => session.page.screenshot({ type: 'jpeg', quality: 80 }),
         execution?.signal,
       );
-      const fixture = await waitForDecision(
-        () => inspectTask(session.taskPage, run.taskId, run.business),
-        execution?.signal,
-      );
+      const fixture = await waitForDecision(() => inspectTask(session.taskPage), execution?.signal);
       // A completed input may start navigation which finishes after the screenshot.
       // Discard mismatched pixels; the authenticated poll will refresh the live view.
       if (!session.matches(binding)) {
@@ -708,59 +509,24 @@ export async function createDemoSession({ browser, origin, run, onClose }) {
       run.screenshotAt = at;
       run.screenshotBinding = binding;
       run.fixture = fixture;
-      run.checkpointSequence += 1;
-      run.diagnostics?.frame(
-        { sequence: run.checkpointSequence, owner: run.owner, role: binding.role, mime: 'image/jpeg' },
-        pixels,
-      );
-      if (pixels.length > 1024 * 1024) {
-        run.checkpointDropped += 1;
-        return;
-      }
-      run.checkpoints.push({
-        sequence: run.checkpointSequence,
-        at,
-        atMs: Math.round(performance.now() - run.started),
-        owner: run.owner,
-        role: binding.role,
-        pixels,
-      });
-      run.checkpointBytes += pixels.length;
-      while (run.checkpoints.length > 12 || run.checkpointBytes > 8 * 1024 * 1024) {
-        run.checkpointBytes -= run.checkpoints.shift().pixels.length;
-        run.checkpointDropped += 1;
-      }
     },
     close() {
       ownedCleanup = true;
       viewLifetime.abort();
       closePromise ??= (async () => {
         // Closing Chromium revokes input even if a model request ignores cancellation.
-        const resources = await Promise.allSettled([
-          context.close().catch((error) => {
-            // A disconnect may race this close. The context's own close event
-            // proves it was reaped; file cleanup still has its separate result.
-            if (!closed) {
-              throw error;
-            }
-          }),
-          fileOwner?.stop(),
-        ]);
-        try {
-          await filePreparation;
-        } catch {
-          // The original runner sees the preparation failure.
-        }
+        await context.close().catch((error) => {
+          // The context close event proves a concurrent disconnect was reaped.
+          if (!closed) {
+            throw error;
+          }
+        });
         closed = true;
         try {
           await refreshPromise;
           await run.liveView?.close();
         } catch {
           run.addEvent('view', 'Frame capture ended with the browser session.');
-        }
-        const failure = resources.find((result) => result.status === 'rejected');
-        if (failure) {
-          throw failure.reason;
         }
       })();
       return closePromise;
@@ -776,31 +542,6 @@ export async function createDemoSession({ browser, origin, run, onClose }) {
   });
   try {
     run.controller.signal.throwIfAborted();
-    if (run.business) {
-      const finished = new AbortController();
-      const interrupted = once(run.controller.signal, 'abort', { signal: finished.signal });
-      try {
-        await Promise.race([
-          context.addCookies([
-            {
-              name: 'fieldwork_workspace',
-              value: run.workspaceToken,
-              domain: '127.0.0.1',
-              path: `/fixture/${run.taskId}`,
-              httpOnly: true,
-              sameSite: 'Strict',
-            },
-          ]),
-          interrupted,
-        ]);
-      } finally {
-        finished.abort();
-      }
-      if (run.owner !== 'agent' || run.controller.signal.aborted) {
-        await session.close();
-        return null;
-      }
-    }
     session.taskTabId = await session.base.new_tab({ url: fixtureURL });
     session.taskPage = base.currentOwnedView().page;
     session.taskPage.once('close', () => {
@@ -808,45 +549,6 @@ export async function createDemoSession({ browser, origin, run, onClose }) {
         onClose();
       }
     });
-    if (run.taskId === 'files') {
-      const created = await newUploadOwner(
-        session.taskPage,
-        {
-          allowUpload: true,
-          record: await session.taskPage.locator('[data-record-id="transfer-case"]').elementHandle(),
-          control: await session.taskPage.locator('input[type=file]').elementHandle(),
-          recordId: 'transfer-case',
-        },
-        async (transfer) => {
-          const binding = session.browser();
-          const { revision } = run.business.snapshot();
-          if (
-            !binding ||
-            binding.tabId !== session.taskTabId ||
-            run.owner !== 'agent' ||
-            !(await run.askApproval('Attach Approved fixture document to INTAKE-501', fileExpiresAt)) ||
-            !session.matches(binding) ||
-            session.taskPage.url() !== fixtureURL ||
-            run.business.snapshot().revision !== revision ||
-            run.controller.signal.aborted
-          ) {
-            return false;
-          }
-          filePermit = run.business.authorize({
-            operation: 'attach',
-            job: tasks.files.job,
-            count: transfer.count,
-            sha256: transfer.sha256,
-          });
-          return true;
-        },
-      );
-      if (closed || run.owner !== 'agent' || run.controller.signal.aborted) {
-        await created.stop();
-        throw new Error('File task setup ended.');
-      }
-      fileOwner = created;
-    }
     try {
       await session.refreshView({ signal: run.controller.signal });
     } catch (error) {
