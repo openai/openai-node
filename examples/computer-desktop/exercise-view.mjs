@@ -312,18 +312,25 @@ async function checkActiveCancellation(mode, methodOnly = false) {
   try {
     desktop = await Desktop.create({ runtimeDir: root });
     const phase = new AbortController();
+    const reason = new Error('Synthetic action cancelled by its caller.');
     let running;
     if (methodOnly) {
       running = desktop.withComputer((computer) =>
         computer.execute(typeCall(), { signal: phase.signal, beforeAction: () => true }),
       );
     } else {
-      running = mode === 'seal' ? desktop.seal({ signal: phase.signal }) : type(desktop, phase.signal);
+      running =
+        mode === 'seal'
+          ? desktop.seal({ signal: phase.signal })
+          : desktop.withComputer((computer) => computer.execute(typeCall(), { beforeAction: () => true }), {
+              signal: phase.signal,
+            });
     }
-    const rejected = assert.rejects(running);
+    // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Check the actual caller-owned reason by identity.
+    const rejected = assert.rejects(running, (error) => error === reason);
     const boundary = { seal: 'seal-entered', input: 'input-entered', frame: 'capture-entered' };
     await entered(root, boundary[mode]);
-    phase.abort();
+    phase.abort(reason);
     try {
       // Both socket directions must stop before the finite fixture is released.
       await Promise.race([
@@ -482,7 +489,12 @@ async function checkPhaseAuthority(kind) {
   }
 }
 
-if (process.argv.includes('--queued-cancellation')) {
+if (process.argv.includes('--abort-reason')) {
+  await checkActiveCancellation('input');
+  await checkActiveCancellation('frame');
+  await checkActiveCancellation('input', true);
+  await checkActiveCancellation('frame', true);
+} else if (process.argv.includes('--queued-cancellation')) {
   await checkPhase(false);
   await checkPhase(true);
 } else if (process.argv.includes('--phase-authority')) {

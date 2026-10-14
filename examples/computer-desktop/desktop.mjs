@@ -207,16 +207,21 @@ export class Desktop {
     if (signal) {
       active.signals.push(signal);
     }
+    const current = signal ? AbortSignal.any([active.signal, signal]) : active.signal;
     let result;
     try {
-      const current = signal ? AbortSignal.any([active.signal, signal]) : active.signal;
       result = await this.#request(action, undefined, false, current);
-    } catch {
+    } catch (error) {
+      const cancelled = current.aborted && error === current.reason;
       if (!this.#closed) {
         this.#closed = true;
         this.#controller.abort();
         await this.#remove();
       }
+      if (cancelled) {
+        throw error;
+      }
+      // oxlint-disable-next-line preserve-caught-error -- Never expose raw guest diagnostics outside this owner.
       throw new Error('Desktop operation ended without a usable result.');
     } finally {
       if (signal) {
