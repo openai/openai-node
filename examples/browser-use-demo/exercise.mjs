@@ -137,6 +137,18 @@ try {
   assert.equal(run.result, 'verified');
   assert.equal(run.requests, 0);
   assert.deepEqual(run.fixture.results, { confirmation: 'TABLE-204' });
+  await page.getByRole('status').getByText('Verified', { exact: true }).waitFor({ timeout: 3000 });
+  let reportedStatus = 'failed';
+  await page.route('**/api/state', (route) =>
+    route.fulfill({
+      json: { liveAvailable: false, run: { ...run, status: reportedStatus, result: 'verified' } },
+    }),
+  );
+  await page.getByRole('status').getByText('failed', { exact: true }).waitFor({ timeout: 3000 });
+  reportedStatus = 'cleanup_failed';
+  await page.getByRole('status').getByText('cleanup_failed', { exact: true }).waitFor({ timeout: 3000 });
+  await page.unroute('**/api/state');
+  await page.getByRole('status').getByText('Verified', { exact: true }).waitFor({ timeout: 3000 });
   const end = run.screenshotBinding;
   assert.equal(
     await responseStatus(

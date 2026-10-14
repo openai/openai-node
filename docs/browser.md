@@ -222,12 +222,6 @@ Scripts run with the page's privileges. Use a fresh session without
 credentials, restrict its network access, and retire it if execution becomes
 uncertain. Stopping the local waiter does not prove that a page script stopped.
 
-The local sensitive-driver example uses an empty, owned context and an exact
-loopback fixture URL. It limits script results to 16384 UTF-8 bytes as an application policy.
-It reports only console levels and network status summaries.
-It closes the context after a script timeout or cancellation. This example does
-not claim to filter arbitrary scripts or make signed-in pages safe.
-
 File methods accept only a caller-issued `grant_id`: nonempty, valid Unicode,
 and at most 256 UTF-8 bytes. The grant identifies one approved, task-scoped file;
 it is not a path or URL. The file owner must get separate file approval. It must recheck expiry and
@@ -287,15 +281,11 @@ number of elements or options.
 Page text and the complete report have no SDK byte limit. Text must contain valid Unicode scalar values. Omission
 codes must be unique members of `BrowserReadV1['omitted']`; use them to report incomplete coverage.
 
-The driver owns visibility, field privacy and ref validity. These size checks do not make arbitrary
-page data safe. The owned Playwright example reads supported same-origin frames and open shadow roots,
-and provides read-only remote-frame summaries without action refs. It omits form values unless the
-launcher explicitly permits the exact owned field. Its work and frame limits can leave content unread.
-
-The borrowed Playwright driver reads at most 2000 document nodes and limits the complete report
-to 64 KiB. A normal read returns at most 100 controls. `find` applies the query before the
-100-result limit, so it can return a matching control later in the document. Work and report
-limits still apply; check `omitted` before treating a search as complete.
+The driver owns visibility, field privacy and ref validity. Size checks do not
+make arbitrary page data safe. Limit driver work to the document and fields
+your application permits, and report incomplete coverage in `omitted`.
+Fieldwork implements only its own fixed reservation page; it does not claim
+general browsing, arbitrary DOM filtering, or frame and shadow-root support.
 
 Throw `BrowserError` with text safe for the model when the driver detects a recoverable problem such
 as a stale element ref. Other errors become a generic failure message. The runner returns a matching
