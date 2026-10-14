@@ -2,6 +2,8 @@ import { expectTypeOf, vi } from 'vitest';
 import OpenAI, { APIError, APIUserAbortError, OpenAIError } from 'openai';
 import { ReadableStreamFrom } from 'openai/internal/shims';
 import { ResponseStream } from 'openai/lib/responses/ResponseStream';
+import * as responseAccumulator from 'openai/internal/responses/response-accumulator';
+import { ResponsesToolRunner } from 'openai/helpers/responses-tool-runner';
 import type {
   ParsedResponseStreamEvent,
   ResponseFunctionCallArgumentsDeltaEvent,
@@ -31,6 +33,905 @@ test('parsed response deltas retain their required snapshots', () => {
 });
 
 describe('.stream()', () => {
+  it.each(
+    (['readable', 'client'] as const).flatMap((entrypoint) =>
+      (['same', 'changed', 'enriched', 'dropped', 'replacement'] as const).map((identity) => ({
+        entrypoint,
+        identity,
+      })),
+    ),
+  )(
+    'validates retained completed call identity ($entrypoint, $identity)',
+    async ({ entrypoint, identity }) => {
+      const item: APIResponse['output'][number] = {
+        type: 'function_call',
+        call_id: 'call_original',
+        name: 'lookup',
+        arguments: '{}',
+        status: 'completed',
+        ...(identity === 'enriched' ? {} : { id: 'fc_original' }),
+      };
+      const finalItem = {
+        ...item,
+        id: identity === 'changed' || identity === 'enriched' ? 'fc_final' : 'fc_original',
+        call_id: identity === 'replacement' ? 'call_replacement' : item.call_id,
+      };
+      const output = identity === 'dropped' ? [] : [finalItem];
+      const events: ResponseStreamEvent[] = [
+        { type: 'response.created', sequence_number: 0, response: makeResponse() },
+        { type: 'response.output_item.added', sequence_number: 1, output_index: 7, item },
+        { type: 'response.output_item.done', sequence_number: 2, output_index: 7, item },
+        {
+          type: 'response.completed',
+          sequence_number: 3,
+          response: makeResponse({ status: 'completed', output }),
+        },
+      ];
+      const client = new OpenAI({
+        apiKey: 'local-test',
+        fetch: async () =>
+          new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
+            headers: { 'content-type': 'text/event-stream' },
+          }),
+      });
+      const stream =
+        entrypoint === 'client'
+          ? client.responses.stream({ model: '', input: 'read' })
+          : ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      await (identity === 'changed'
+        ? expect(stream.finalResponse()).rejects.toThrow(
+            "expected output item id 'fc_original', got 'fc_final'",
+          )
+        : expect(stream.finalResponse()).resolves.toMatchObject({ output }));
+    },
+  );
+
+  it.each(
+    (['readable', 'client'] as const).flatMap((entrypoint) =>
+      ([null, 'completed', 'failed', 'incomplete'] as const).flatMap((terminal) =>
+        (terminal ? [false, true] : [false]).map((explicitText) => ({ entrypoint, terminal, explicitText })),
+      ),
+    ),
+  )(
+    'orders sparse clean EOF output and preserves terminal order ($entrypoint, $terminal, $explicitText)',
+    async ({ entrypoint, terminal, explicitText }) => {
+      const first: APIResponse['output'][number] = {
+        id: 'msg_first',
+        type: 'message',
+        role: 'assistant',
+        status: 'completed',
+        content: [{ type: 'output_text', text: 'Alpha', annotations: [], logprobs: [] }],
+      };
+      const second: APIResponse['output'][number] = {
+        ...first,
+        id: 'msg_second',
+        content: [{ type: 'output_text', text: 'Beta', annotations: [], logprobs: [] }],
+      };
+      const events: ResponseStreamEvent[] = [
+        { type: 'response.created', sequence_number: 0, response: makeResponse() },
+        { type: 'response.output_item.added', sequence_number: 1, output_index: 7, item: second },
+        { type: 'response.output_item.added', sequence_number: 2, output_index: 3, item: first },
+        { type: 'response.output_item.done', sequence_number: 3, output_index: 7, item: second },
+        { type: 'response.output_item.done', sequence_number: 4, output_index: 3, item: first },
+      ];
+      if (terminal) {
+        const response = makeResponse({ status: terminal, output: [second, first] });
+        if (explicitText) {
+          response.output_text = 'supplied terminal text';
+        } else {
+          Reflect.deleteProperty(response, 'output_text');
+        }
+        events.push({ type: `response.${terminal}`, sequence_number: 5, response });
+      }
+      const client = new OpenAI({
+        apiKey: 'local-test',
+        fetch: async () =>
+          new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
+            headers: { 'content-type': 'text/event-stream' },
+          }),
+      });
+      const stream =
+        entrypoint === 'client'
+          ? client.responses.stream({ model: '', input: 'read' })
+          : ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      const final = await stream.finalResponse();
+      expect(final.output.map((item) => item.id)).toEqual(
+        terminal ? ['msg_second', 'msg_first'] : ['msg_first', 'msg_second'],
+      );
+      const derivedText = terminal ? 'BetaAlpha' : 'AlphaBeta';
+      expect(final.output_text).toBe(explicitText ? 'supplied terminal text' : derivedText);
+    },
+  );
+
+  it('shares one detached non-delta event across generic and typed listeners', async () => {
+    const events: ResponseStreamEvent[] = [
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      {
+        type: 'response.completed',
+        sequence_number: 1,
+        response: makeResponse({ status: 'completed', model: 'fixture' }),
+      },
+    ];
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+    const raw: ResponseStreamEvent[] = [];
+    const named: ResponseStreamEvent[] = [];
+    const annotations = new WeakMap<object, string>();
+    stream.on('event', (event) => {
+      raw.push(event);
+      annotations.set(event, 'observed');
+      if (event.type === 'response.completed') {
+        event.response.model = 'observer-value';
+      }
+    });
+    stream.on('response.completed', (event) => named.push(event));
+    const final = await stream.finalResponse();
+    expect(named[0]).toBe(raw[1]);
+    expect(named.map((event) => annotations.get(event))).toEqual(['observed']);
+    expect(named[0]).toMatchObject({ response: { model: 'observer-value' } });
+    expect(final.model).toBe('fixture');
+  });
+
+  it('AM emits admitted hidden image partial fields and ignores private hidden transport metadata', async () => {
+    const item: APIResponse['output'][number] = {
+      type: 'image_generation_call',
+      id: 'image_fixture',
+      status: 'in_progress',
+      result: null,
+    };
+    const partial: ResponseStreamEvent = {
+      type: 'response.image_generation_call.partial_image',
+      sequence_number: 2,
+      output_index: 0,
+      item_id: 'image_fixture',
+      partial_image_index: 0,
+      partial_image_b64: 'c3ludGhldGlj',
+    };
+    for (const key of ['partial_image_index', 'partial_image_b64'] as const) {
+      Object.defineProperty(partial, key, {
+        ...Object.getOwnPropertyDescriptor(partial, key),
+        enumerable: false,
+      });
+    }
+    Object.defineProperty(partial, 'hiddenTransportCallback', { value: () => 'internal' });
+    const internalTrace = vi.fn(() => ({ tag: 'transport metadata' }));
+    Object.defineProperty(partial, 'internalTrace', { get: internalTrace });
+    const events: ResponseStreamEvent[] = [
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      { type: 'response.output_item.added', sequence_number: 1, output_index: 0, item },
+      partial,
+      {
+        type: 'response.failed',
+        sequence_number: 3,
+        response: makeResponse({ status: 'failed', output: [] }),
+      },
+    ];
+    const client = new OpenAI({ apiKey: 'local-test' });
+    const transport = {
+      controller: new AbortController(),
+      async *[Symbol.asyncIterator]() {
+        yield* events;
+      },
+    };
+    vi.spyOn(client.responses, 'create').mockImplementation(
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The finite local iterator supplies only the native streaming overload this regression calls.
+      () => transport as unknown as ReturnType<OpenAI['responses']['create']>,
+    );
+    const raw: ResponseStreamEvent[] = [];
+    const named: ResponseStreamEvent[] = [];
+    const stream = client.responses.stream({ model: '', input: 'read' });
+    stream.on('event', (event) => raw.push(event));
+    stream.on('response.image_generation_call.partial_image', (event) => named.push(event));
+    await stream.finalResponse();
+    expect(raw[2]).toMatchObject({
+      output_index: 0,
+      partial_image_index: 0,
+      partial_image_b64: 'c3ludGhldGlj',
+    });
+    expect(named).toEqual([raw[2]]);
+    expect(raw[2]).not.toHaveProperty('hiddenTransportCallback');
+    expect(raw[2]).not.toHaveProperty('internalTrace');
+    expect(internalTrace).not.toHaveBeenCalled();
+  });
+
+  it('retains admitted hidden native payload fields for raw and named listeners', async () => {
+    const first: APIResponse['output'][number] = {
+      id: 'msg_payload',
+      type: 'message',
+      role: 'assistant',
+      status: 'in_progress',
+      content: [{ type: 'output_text', text: '', annotations: [], logprobs: [] }],
+    };
+    const second: APIResponse['output'][number] = {
+      id: 'call_payload',
+      type: 'function_call',
+      call_id: 'call_data',
+      name: 'record',
+      arguments: '',
+      status: 'in_progress',
+    };
+    const textDelta: ResponseStreamEvent = {
+      type: 'response.output_text.delta',
+      sequence_number: 3,
+      output_index: 3,
+      item_id: first.id,
+      content_index: 0,
+      delta: 'Alpha',
+      logprobs: [],
+    };
+    const textDone: ResponseStreamEvent = {
+      type: 'response.output_text.done',
+      sequence_number: 4,
+      output_index: 3,
+      item_id: first.id,
+      content_index: 0,
+      text: 'Alpha',
+      logprobs: [],
+    };
+    const callDelta: ResponseStreamEvent = {
+      type: 'response.function_call_arguments.delta',
+      sequence_number: 5,
+      output_index: 7,
+      item_id: 'call_payload',
+      delta: '{}',
+    };
+    for (const [event, fields] of [
+      [textDelta, ['delta', 'logprobs']],
+      [textDone, ['text', 'logprobs']],
+      [callDelta, ['delta']],
+    ] as const) {
+      for (const field of fields) {
+        const descriptor = Object.getOwnPropertyDescriptor(event, field);
+        Object.defineProperty(event, field, { ...descriptor, enumerable: false });
+      }
+      Object.defineProperty(event, 'hiddenTransportCallback', { value: () => 'internal' });
+    }
+    const events: ResponseStreamEvent[] = [
+      { type: 'response.created', sequence_number: 0, response: makeResponse() },
+      { type: 'response.output_item.added', sequence_number: 1, output_index: 3, item: first },
+      { type: 'response.output_item.added', sequence_number: 2, output_index: 7, item: second },
+      textDelta,
+      textDone,
+      callDelta,
+      {
+        type: 'response.failed',
+        sequence_number: 6,
+        response: makeResponse({ status: 'failed', output: [] }),
+      },
+    ];
+    const transport = {
+      controller: new AbortController(),
+      async *[Symbol.asyncIterator]() {
+        yield* events;
+      },
+    };
+    const client = new OpenAI({ apiKey: 'local-test' });
+    vi.spyOn(client.responses, 'create').mockImplementation(
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The local native transport only implements responses.create's stream iterator.
+      () => transport as unknown as ReturnType<OpenAI['responses']['create']>,
+    );
+    const raw: ResponseStreamEvent[] = [];
+    const namedText: ResponseTextDeltaEvent[] = [];
+    const namedCalls: ResponseFunctionCallArgumentsDeltaEvent[] = [];
+    const namedDone: ResponseStreamEvent[] = [];
+    const stream = client.responses.stream({ model: '', input: 'read' });
+    stream.on('event', (event) => raw.push(event));
+    stream.on('response.output_text.delta', (event) => namedText.push(event));
+    stream.on('response.function_call_arguments.delta', (event) => namedCalls.push(event));
+    stream.on('response.output_text.done', (event) => namedDone.push(event));
+    await stream.finalResponse();
+    expect(raw[3]).toMatchObject({ delta: 'Alpha', logprobs: [], output_index: 3, sequence_number: 3 });
+    expect(raw[4]).toMatchObject({ text: 'Alpha', logprobs: [], output_index: 3 });
+    expect(raw[5]).toMatchObject({ delta: '{}', output_index: 7 });
+    expect(namedText).toMatchObject([
+      { delta: 'Alpha', logprobs: [], snapshot: 'Alpha', sequence_number: 3 },
+    ]);
+    expect(namedDone).toMatchObject([{ text: 'Alpha', logprobs: [] }]);
+    expect(namedCalls).toMatchObject([{ delta: '{}', snapshot: '{}', sequence_number: 5 }]);
+    expect(namedText[0]?.logprobs).not.toBe(textDelta.logprobs);
+    expect(namedText[0]?.logprobs).not.toBe(
+      raw[3]?.type === 'response.output_text.delta' ? raw[3].logprobs : undefined,
+    );
+  });
+
+  it.each(
+    (['readable', 'client'] as const).flatMap((entrypoint) =>
+      (['failed', 'incomplete'] as const).map((terminal) => ({ entrypoint, terminal })),
+    ),
+  )(
+    'keeps established output order across partial lifecycle ($entrypoint, $terminal)',
+    async ({ entrypoint, terminal }) => {
+      const first: APIResponse['output'][number] = {
+        id: 'msg_order_a',
+        type: 'message',
+        role: 'assistant',
+        status: 'in_progress',
+        content: [{ type: 'output_text', text: 'A', annotations: [], logprobs: [] }],
+      };
+      const second: APIResponse['output'][number] = {
+        ...first,
+        id: 'msg_order_b',
+        content: [{ type: 'output_text', text: 'B', annotations: [], logprobs: [] }],
+      };
+      const finish = makeResponse({ status: terminal });
+      Reflect.set(finish, 'output', null);
+      const events: ResponseStreamEvent[] = [
+        { type: 'response.created', sequence_number: 0, response: makeResponse() },
+        { type: 'response.output_item.added', sequence_number: 1, output_index: 3, item: first },
+        { type: 'response.output_item.added', sequence_number: 2, output_index: 7, item: second },
+        {
+          type: 'response.in_progress',
+          sequence_number: 3,
+          response: makeResponse({ output: [second], output_text: 'B' }),
+        },
+        {
+          type: 'response.output_text.delta',
+          sequence_number: 4,
+          output_index: 3,
+          item_id: first.id,
+          content_index: 0,
+          delta: '+',
+          logprobs: [],
+        },
+        {
+          type: 'response.output_text.delta',
+          sequence_number: 5,
+          output_index: 7,
+          item_id: second.id,
+          content_index: 0,
+          delta: '!',
+          logprobs: [],
+        },
+        { type: `response.${terminal}`, sequence_number: 6, response: finish },
+      ];
+      const client = new OpenAI({
+        apiKey: 'local-test',
+        fetch: async () =>
+          new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
+            headers: { 'content-type': 'text/event-stream' },
+          }),
+      });
+      const stream =
+        entrypoint === 'client'
+          ? client.responses.stream({ model: '', input: 'read' })
+          : ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      const progress: string[][] = [];
+      const emitted: string[][] = [];
+      stream.on('response.in_progress', (event) =>
+        progress.push(event.response.output.map((item) => item.id ?? '')),
+      );
+      stream.on('event', (event) => {
+        if (event.type === `response.${terminal}` && 'response' in event) {
+          emitted.push(event.response.output.map((item) => item.id ?? ''));
+        }
+      });
+      const final = await stream.finalResponse();
+      expect(progress).toEqual([['msg_order_b']]);
+      expect(emitted).toEqual([['msg_order_a', 'msg_order_b']]);
+      expect(final.output.map((item) => item.id)).toEqual(['msg_order_a', 'msg_order_b']);
+      expect(final.output_text).toBe('A+B!');
+    },
+  );
+
+  it.each(['readable', 'client'] as const)(
+    'refreshes only supplied completed outputs over successive partial frames (%s)',
+    async (entrypoint) => {
+      const first: APIResponse['output'][number] = {
+        id: 'msg_first',
+        type: 'message',
+        role: 'assistant',
+        status: 'completed',
+        content: [{ type: 'output_text', text: 'A', annotations: [] }],
+      };
+      const second: APIResponse['output'][number] = {
+        id: 'call_second',
+        type: 'function_call',
+        call_id: 'call_fixture',
+        name: 'lookup',
+        arguments: '{"answer":1}',
+        status: 'completed',
+      };
+      const interim = makeResponse({ output: [{ ...second, arguments: '{"answer":2}' }] });
+      Reflect.deleteProperty(interim, 'output_text');
+      const next = makeResponse({ output: [{ ...second, arguments: '{"answer":3}' }] });
+      Reflect.set(next, 'output_text', null);
+      const finish = makeResponse({ status: 'completed' });
+      Reflect.set(finish, 'output', null);
+      const events: ResponseStreamEvent[] = [
+        { type: 'response.created', sequence_number: 0, response: makeResponse() },
+        { type: 'response.output_item.added', sequence_number: 1, output_index: 3, item: first },
+        { type: 'response.output_item.done', sequence_number: 2, output_index: 3, item: first },
+        { type: 'response.output_item.added', sequence_number: 3, output_index: 7, item: second },
+        { type: 'response.output_item.done', sequence_number: 4, output_index: 7, item: second },
+        { type: 'response.queued', sequence_number: 5, response: interim },
+        { type: 'response.in_progress', sequence_number: 6, response: next },
+        { type: 'response.completed', sequence_number: 7, response: finish },
+      ];
+      const client = new OpenAI({
+        apiKey: 'synthetic',
+        fetch: async () =>
+          new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
+            headers: { 'content-type': 'text/event-stream' },
+          }),
+      });
+      const stream =
+        entrypoint === 'client'
+          ? client.responses.stream({ model: '', input: 'read' })
+          : ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      const progress: string[][] = [];
+      stream.on('event', (event) => {
+        if (event.type === 'response.queued' || event.type === 'response.in_progress') {
+          progress.push(event.response.output.map((item) => item.id ?? ''));
+          event.response.output.length = 0;
+        }
+      });
+      const result = await stream.finalResponse();
+      expect(progress).toEqual([['call_second'], ['call_second']]);
+      expect(result.output).toMatchObject([first, { ...second, arguments: '{"answer":3}' }]);
+      expect(result.output_text).toBe('A');
+    },
+  );
+  it.each(
+    (['readable', 'client'] as const).flatMap((entrypoint) =>
+      (['missing', 'null', 'provided'] as const).map((text) => ({ entrypoint, text })),
+    ),
+  )(
+    'keeps aggregate consistent when a partial stream ends ($entrypoint, $text)',
+    async ({ entrypoint, text }) => {
+      const first: APIResponse['output'][number] = {
+        id: 'msg_order_a',
+        type: 'message',
+        role: 'assistant',
+        status: 'in_progress',
+        content: [{ type: 'output_text', text: 'A', annotations: [], logprobs: [] }],
+      };
+      const second: APIResponse['output'][number] = {
+        ...first,
+        id: 'msg_order_b',
+        content: [{ type: 'output_text', text: 'B', annotations: [], logprobs: [] }],
+      };
+      const progress = makeResponse({ output: [second], output_text: 'server text' });
+      if (text === 'missing') {
+        Reflect.deleteProperty(progress, 'output_text');
+      } else if (text === 'null') {
+        Reflect.set(progress, 'output_text', null);
+      }
+      const events: ResponseStreamEvent[] = [
+        { type: 'response.created', sequence_number: 0, response: makeResponse() },
+        { type: 'response.output_item.added', sequence_number: 1, output_index: 3, item: first },
+        { type: 'response.output_item.added', sequence_number: 2, output_index: 7, item: second },
+        { type: 'response.in_progress', sequence_number: 3, response: progress },
+      ];
+      const client = new OpenAI({
+        apiKey: 'local-test',
+        fetch: async () =>
+          new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
+            headers: { 'content-type': 'text/event-stream' },
+          }),
+      });
+      const stream =
+        entrypoint === 'client'
+          ? client.responses.stream({ model: '', input: 'read' })
+          : ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      const final = await stream.finalResponse();
+      expect(final.output.map((item) => item.id)).toEqual(['msg_order_a', 'msg_order_b']);
+      expect(final.output_text).toBe(text === 'provided' ? 'server text' : 'AB');
+    },
+  );
+
+  it.each(['readable', 'client'] as const)(
+    'recovers full text after explicit then omitted matched interim text (%s)',
+    async (entrypoint) => {
+      const first: APIResponse['output'][number] = {
+        id: 'msg_text_a',
+        type: 'message',
+        role: 'assistant',
+        status: 'in_progress',
+        content: [{ type: 'output_text', text: 'A', annotations: [], logprobs: [] }],
+      };
+      const second: APIResponse['output'][number] = {
+        ...first,
+        id: 'msg_text_b',
+        content: [{ type: 'output_text', text: 'B', annotations: [], logprobs: [] }],
+      };
+      const updated = {
+        ...second,
+        content: [{ type: 'output_text' as const, text: 'New B', annotations: [], logprobs: [] }],
+      };
+      const omitted = makeResponse({ output: [updated] });
+      Reflect.deleteProperty(omitted, 'output_text');
+      const events: ResponseStreamEvent[] = [
+        { type: 'response.created', sequence_number: 0, response: makeResponse() },
+        { type: 'response.output_item.added', sequence_number: 1, output_index: 7, item: second },
+        { type: 'response.output_item.added', sequence_number: 2, output_index: 3, item: first },
+        {
+          type: 'response.in_progress',
+          sequence_number: 3,
+          response: makeResponse({ output: [second], output_text: 'wire text one' }),
+        },
+        {
+          type: 'response.queued',
+          sequence_number: 4,
+          response: makeResponse({ output: [second], output_text: 'wire text two' }),
+        },
+        { type: 'response.in_progress', sequence_number: 5, response: omitted },
+        {
+          type: 'response.output_text.delta',
+          sequence_number: 6,
+          output_index: 3,
+          item_id: first.id,
+          content_index: 0,
+          delta: '+',
+          logprobs: [],
+        },
+      ];
+      const client = new OpenAI({
+        apiKey: 'synthetic',
+        fetch: async () =>
+          new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
+            headers: { 'content-type': 'text/event-stream' },
+          }),
+      });
+      const stream =
+        entrypoint === 'client'
+          ? client.responses.stream({ model: '', input: 'read' })
+          : ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      const emitted: (string | undefined)[] = [];
+      stream.on('event', (event) => {
+        if (event.type === 'response.queued' || event.type === 'response.in_progress') {
+          emitted.push(event.response.output_text);
+        }
+      });
+      const result = await stream.finalResponse();
+      expect(emitted).toEqual(['wire text one', 'wire text two', undefined]);
+      expect(result.output.map((item) => item.id)).toEqual([first.id, second.id]);
+      expect(result.output_text).toBe('A+New B');
+    },
+  );
+
+  it.each(
+    (['readable', 'client'] as const).flatMap((entrypoint) =>
+      (['completed', 'failed', 'incomplete'] as const).flatMap((terminal) =>
+        (['null', 'missing', 'empty'] as const).map((output) => ({ entrypoint, terminal, output })),
+      ),
+    ),
+  )(
+    'rebuilds text with recovered terminal output ($entrypoint, $terminal, $output)',
+    async ({ entrypoint, terminal, output }) => {
+      const first: APIResponse['output'][number] = {
+        id: 'message_0',
+        type: 'message',
+        role: 'assistant',
+        status: 'completed',
+        content: [{ type: 'output_text', text: 'Alpha', annotations: [], logprobs: [] }],
+      };
+      const second: APIResponse['output'][number] = {
+        ...first,
+        id: 'message_1',
+        content: [{ type: 'output_text', text: 'Beta', annotations: [], logprobs: [] }],
+      };
+      const finished = makeResponse({ status: terminal, output: [], output_text: '' });
+      if (output === 'null') {
+        Reflect.set(finished, 'output', null);
+      } else if (output === 'missing') {
+        Reflect.deleteProperty(finished, 'output');
+      }
+      const events: ResponseStreamEvent[] = [
+        { type: 'response.created', sequence_number: 0, response: makeResponse() },
+        { type: 'response.output_item.added', sequence_number: 1, output_index: 3, item: first },
+        { type: 'response.output_item.added', sequence_number: 2, output_index: 7, item: second },
+        { type: 'response.output_item.done', sequence_number: 3, output_index: 7, item: second },
+        { type: 'response.output_item.done', sequence_number: 4, output_index: 3, item: first },
+        { type: `response.${terminal}`, sequence_number: 5, response: finished },
+      ];
+      const client = new OpenAI({
+        apiKey: 'local-test',
+        fetch: async () =>
+          new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
+            headers: { 'content-type': 'text/event-stream' },
+          }),
+      });
+      const stream =
+        entrypoint === 'client'
+          ? client.responses.stream({ model: '', input: 'read' })
+          : ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      let terminalText: string | undefined;
+      stream.on('event', (event) => {
+        if (event.type === `response.${terminal}` && 'response' in event) {
+          terminalText = event.response.output_text;
+        }
+      });
+      const final = await stream.finalResponse();
+      const expected = output === 'empty' ? '' : 'AlphaBeta';
+      expect(final.output_text).toBe(expected);
+      expect(terminalText).toBe(expected);
+      expect(final.output.map((item) => item.id)).toEqual(
+        output === 'empty' ? [] : ['message_0', 'message_1'],
+      );
+    },
+  );
+
+  it.each(
+    (['readable', 'client'] as const).flatMap((entrypoint) =>
+      (['completed', 'failed', 'incomplete'] as const).map((terminal) => ({ entrypoint, terminal })),
+    ),
+  )(
+    'keeps native outputs indexed through empty lifecycle snapshots ($entrypoint, $terminal)',
+    async ({ entrypoint, terminal }) => {
+      const first: APIResponse['output'][number] = {
+        id: 'msg_first',
+        type: 'message',
+        role: 'assistant',
+        status: 'in_progress',
+        content: [{ type: 'output_text', text: 'first', annotations: [], logprobs: [] }],
+      };
+      const second: APIResponse['output'][number] = {
+        id: 'msg_second',
+        type: 'message',
+        role: 'assistant',
+        status: 'completed',
+        content: [{ type: 'output_text', text: 'second', annotations: [], logprobs: [] }],
+      };
+      const progress = makeResponse({ status: 'in_progress', metadata: { current: 'yes' } });
+      Reflect.deleteProperty(progress, 'output');
+      Reflect.deleteProperty(progress, 'output_text');
+      const finished = makeResponse({ status: terminal, output: [first, second] });
+      if (terminal !== 'completed') {
+        Reflect.deleteProperty(finished, 'output');
+        Reflect.deleteProperty(finished, 'output_text');
+      }
+      const events: ResponseStreamEvent[] = [
+        { type: 'response.created', sequence_number: 0, response: makeResponse() },
+        { type: 'response.output_item.added', sequence_number: 1, output_index: 3, item: first },
+        { type: 'response.output_item.added', sequence_number: 2, output_index: 7, item: second },
+        { type: 'response.in_progress', sequence_number: 3, response: progress },
+        {
+          type: 'response.queued',
+          sequence_number: 4,
+          response: { ...progress, status: 'queued', output: [] },
+        },
+        { type: 'response.created', sequence_number: 5, response: progress },
+        {
+          type: 'response.output_text.delta',
+          sequence_number: 6,
+          output_index: 3,
+          content_index: 0,
+          item_id: 'msg_first',
+          delta: '!',
+          logprobs: [],
+        },
+        { type: `response.${terminal}`, sequence_number: 7, response: finished },
+      ];
+      const retain = vi.fn();
+      const accumulate = responseAccumulator.accumulateResponseWithContext;
+      vi.spyOn(responseAccumulator, 'accumulateResponseWithContext').mockImplementation(
+        (event, snapshot, context, reject, prepare) => {
+          const result = accumulate(event, snapshot, context, reject, prepare);
+          if (event.sequence_number >= 3 && event.sequence_number <= 5) {
+            retain(result === snapshot, result.output, result.metadata);
+          }
+          return result;
+        },
+      );
+      const client = new OpenAI({
+        apiKey: 'local-test',
+        fetch: async () =>
+          new Response(
+            events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(''),
+            {
+              headers: { 'content-type': 'text/event-stream' },
+            },
+          ),
+      });
+      const stream =
+        entrypoint === 'client'
+          ? client.responses.stream({ model: '', input: 'read' })
+          : ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      const deltas: string[] = [];
+      stream.on('response.output_text.delta', (event) => deltas.push(event.snapshot));
+      stream.on('event', (event) => {
+        if (event.sequence_number >= 3 && event.sequence_number <= 5 && 'response' in event) {
+          expect(event.response.output).toEqual([]);
+          event.response.output.push(second);
+          event.response.metadata = { consumer: 'changed' };
+        }
+      });
+      try {
+        const final = await stream.finalResponse();
+        expect(final).toMatchObject({ status: terminal });
+        expect(final.output.map((item) => item.id)).toEqual(['msg_first', 'msg_second']);
+        if (terminal !== 'completed') {
+          expect(final.output_text).toBe('first!second');
+        }
+        expect(deltas).toEqual(['first!']);
+        expect(retain).toHaveBeenCalledTimes(3);
+        for (const [same, output, metadata] of retain.mock.calls) {
+          expect(same).toBe(true);
+          expect(output).toHaveLength(2);
+          expect(metadata).toEqual({ current: 'yes' });
+        }
+      } finally {
+        vi.restoreAllMocks();
+      }
+    },
+  );
+  it.each([false, true])(
+    'eager dispatch reads the item accumulated by a native stream (changed final=%s)',
+    async (changedFinal) => {
+      const original: APIResponse['output'][number] = {
+        type: 'function_call',
+        id: 'fc_one',
+        call_id: 'call_one',
+        name: 'record',
+        arguments: '{"value":"original"}',
+        status: 'completed',
+      };
+      const changed = { ...original, arguments: '{"value":"changed"}' };
+      const message: APIResponse['output'][number] = {
+        type: 'message',
+        id: 'msg_done',
+        role: 'assistant',
+        status: 'completed',
+        content: [{ type: 'output_text', text: 'done', annotations: [], logprobs: [] }],
+      };
+      const readItem = vi.fn(() => (readItem.mock.calls.length === 1 ? original : changed));
+      const readIndex = vi.fn(() => (readIndex.mock.calls.length === 1 ? 99 : 0));
+      const execute = vi.fn(() => 'recorded');
+      let request = 0;
+      const client = new OpenAI({ apiKey: 'test-key' });
+      const rawTransport = {
+        controller: new AbortController(),
+        async *[Symbol.asyncIterator]() {
+          const first = request++ === 0;
+          yield { type: 'response.created', sequence_number: 0, response: makeResponse() };
+          if (first) {
+            yield {
+              type: 'response.output_item.added',
+              sequence_number: 1,
+              output_index: 99,
+              item: original,
+            };
+            yield {
+              type: 'response.output_item.done',
+              sequence_number: 2,
+              get output_index() {
+                return readIndex();
+              },
+              get item() {
+                return readItem();
+              },
+            };
+          } else {
+            yield { type: 'response.output_item.added', sequence_number: 1, output_index: 0, item: message };
+            yield { type: 'response.output_item.done', sequence_number: 2, output_index: 0, item: message };
+          }
+          yield {
+            type: 'response.completed',
+            sequence_number: 3,
+            response: makeResponse({
+              status: 'completed',
+              output: first ? [changedFinal ? changed : original] : [message],
+            }),
+          };
+        },
+      };
+      vi.spyOn(client.responses, 'create').mockImplementation(
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: This native stream test implements the responses.create transport contract only.
+        () => rawTransport as unknown as ReturnType<OpenAI['responses']['create']>,
+      );
+      const runner = new ResponsesToolRunner({
+        functions: [{ tool: { type: 'function', name: 'record', parameters: {}, strict: false }, execute }],
+        earlyExecution: { functions: ['record'] },
+      });
+      const observed: { index: number; arguments: string }[] = [];
+      const run = runner.run(
+        client,
+        { model: '', input: 'record' },
+        {
+          stream: true,
+          eager: true,
+          onEvent: async (event) => {
+            await Promise.resolve();
+            if (event.type === 'response.output_item.done' && event.item.type === 'function_call') {
+              observed.push({ index: event.output_index, arguments: event.item.arguments });
+            }
+          },
+        },
+      );
+      if (changedFinal) {
+        await expect(run).rejects.toThrow();
+        expect(execute).not.toHaveBeenCalled();
+      } else {
+        await expect(run).resolves.toMatchObject({ status: 'completed' });
+        expect(execute).toHaveBeenCalledWith({ value: 'original' });
+        expect(execute).toHaveBeenCalledTimes(1);
+      }
+      expect(observed).toEqual([{ index: 99, arguments: '{"value":"original"}' }]);
+      expect(readItem).toHaveBeenCalledTimes(1);
+      expect(readIndex).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('uses one captured lifecycle response for completion validation and accumulation', async () => {
+    const item = { id: 'cmp_123', type: 'compaction', encrypted_content: '' } as const;
+    const full = makeResponse({ status: 'completed', output: [item] });
+    const readResponse = vi.fn(() => (readResponse.mock.calls.length === 1 ? full : makeResponse()));
+    const completion: ResponseStreamEvent = {
+      type: 'response.completed',
+      sequence_number: 2,
+      get response() {
+        return readResponse();
+      },
+    };
+    const transport = {
+      controller: new AbortController(),
+      async *[Symbol.asyncIterator]() {
+        yield { type: 'response.created', sequence_number: 0, response: makeResponse() };
+        yield { type: 'response.output_item.added', sequence_number: 1, output_index: 99, item };
+        yield completion;
+      },
+    };
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: Only responses.create is used by this controlled stream transport.
+    const client = { responses: { create: vi.fn(async () => transport) } } as unknown as OpenAI;
+    const stream = ResponseStream.createResponse(client, { model: '', input: 'read' });
+    const completed = vi.fn();
+    stream.on('response.completed', completed);
+    const final = await stream.finalResponse();
+    expect(readResponse).toHaveBeenCalledTimes(1);
+    expect(final.output).toEqual([item]);
+    expect(completed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        response: expect.objectContaining({ output: [item] }),
+      }),
+    );
+  });
+
+  it.each([
+    { type: 'response.created', output: 'missing', id: 'changed' },
+    { type: 'response.queued', output: 'null', id: 'changed' },
+    { type: 'response.in_progress', output: 'supplied', id: 'changed' },
+    { type: 'response.failed', output: 'null', id: 'null' },
+    { type: 'response.incomplete', output: 'missing', id: 'missing' },
+    { type: 'response.completed', output: 'missing', id: 'changed' },
+    { type: 'response.completed', output: 'null', id: 'changed' },
+    { type: 'response.completed', output: 'supplied', id: 'changed' },
+  ] as const)(
+    'refuses a foreign response at $type with $output output and $id id',
+    async ({ type, output, id }) => {
+      const item = {
+        id: 'fc_identity',
+        type: 'function_call',
+        call_id: 'call_identity',
+        name: 'lookup',
+        arguments: '{}',
+        status: 'completed',
+      } as const;
+      const replacement = makeResponse({ id: 'resp_other', status: 'completed', output: [item] });
+      if (output === 'missing') {
+        Reflect.deleteProperty(replacement, 'output');
+      }
+      if (output === 'null') {
+        Reflect.set(replacement, 'output', null);
+      }
+      if (id === 'missing') {
+        Reflect.deleteProperty(replacement, 'id');
+      }
+      if (id === 'null') {
+        Reflect.set(replacement, 'id', null);
+      }
+      const events: ResponseStreamEvent[] = [
+        { type: 'response.created', sequence_number: 0, response: makeResponse() },
+        { type: 'response.output_item.added', sequence_number: 1, output_index: 3, item },
+        { type: 'response.output_item.done', sequence_number: 2, output_index: 3, item },
+        { type, sequence_number: 3, response: replacement },
+      ];
+      const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      const emitted: ResponseStreamEvent[] = [];
+      stream.on('event', (event) => emitted.push(event));
+      await expect(stream.finalResponse()).rejects.toThrow('Lifecycle response identity changed');
+      expect(emitted.map((event) => event.sequence_number)).toEqual([0, 1, 2]);
+    },
+  );
+
   it.each([0, 2])('forwards %i compaction progress events over SSE', async (count) => {
     const item = { id: 'cmp_123', type: 'compaction', encrypted_content: '' } as const;
     const completed = { ...item, encrypted_content: 'encrypted-test-summary' };
@@ -133,10 +1034,23 @@ describe('.stream()', () => {
           content: [],
         },
       },
-      { type: 'response.completed', sequence_number: 2, response },
+      {
+        type: 'response.output_item.done',
+        sequence_number: 2,
+        output_index: 0,
+        item: {
+          id: 'msg_1',
+          type: 'message',
+          role: 'assistant',
+          status: 'completed',
+          content: [],
+        },
+      },
+      { type: 'response.completed', sequence_number: 3, response: { ...response, output: null } },
     ];
     const openai = new OpenAI({
       apiKey: 'My API Key',
+      baseURL: 'https://api.openai.com/v1',
       fetch: async (url) => {
         const requestURL = String(url);
         requests.push(requestURL);
@@ -160,7 +1074,7 @@ describe('.stream()', () => {
     const final = await stream.finalResponse();
 
     expect(requests).toEqual(['https://api.openai.com/v1/responses/resp_123?stream=true']);
-    expect(emittedEvents).toEqual([1, 2]);
+    expect(emittedEvents).toEqual([1, 2, 3]);
     expect(final.id).toBe('resp_123');
   });
 
@@ -371,61 +1285,78 @@ describe('.stream()', () => {
     );
   });
 
-  it('captures a custom-transport routing accessor exactly once for accumulation and dispatch', async () => {
-    const output: APIResponse['output'] = [
-      {
-        id: 'msg_first',
-        type: 'message',
-        role: 'assistant',
-        status: 'in_progress',
-        content: [{ type: 'output_text', annotations: [], text: 'first' }],
-      },
-      {
-        id: 'msg_other',
-        type: 'message',
-        role: 'assistant',
-        status: 'in_progress',
-        content: [{ type: 'output_text', annotations: [], text: 'foreign' }],
-      },
-    ];
-    const delta = {
-      type: 'response.output_text.delta' as const,
-      sequence_number: 1,
-      item_id: 'msg_first',
-      output_index: 0,
-      content_index: 0,
-      delta: '!',
-      logprobs: [],
-    };
-    const readIndex = vi.fn(() => (readIndex.mock.calls.length === 1 ? 0 : 1));
-    Object.defineProperty(delta, 'output_index', { configurable: true, enumerable: true, get: readIndex });
-    const events: ResponseStreamEvent[] = [
-      {
-        type: 'response.created',
-        sequence_number: 0,
-        response: makeResponse({ output, output_text: 'firstforeign' }),
-      },
-      delta,
-    ];
-    const transport = {
-      controller: new AbortController(),
-      async *[Symbol.asyncIterator]() {
-        yield* events;
-      },
-    };
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The test client implements only responses.create to supply the controlled transport.
-    const client = { responses: { create: vi.fn(async () => transport) } } as unknown as OpenAI;
-    const stream = ResponseStream.createResponse(client, { model: 'gpt-test', input: 'route safely' });
-    const emitted = vi.fn();
-    stream.on('response.output_text.delta', emitted);
+  it.each([true, false])(
+    'captures a custom-transport routing accessor once (enumerable=%s)',
+    async (enumerable) => {
+      const output: APIResponse['output'] = [
+        {
+          id: 'msg_first',
+          type: 'message',
+          role: 'assistant',
+          status: 'in_progress',
+          content: [{ type: 'output_text', annotations: [], text: 'first' }],
+        },
+        {
+          id: 'msg_other',
+          type: 'message',
+          role: 'assistant',
+          status: 'in_progress',
+          content: [{ type: 'output_text', annotations: [], text: 'foreign' }],
+        },
+      ];
+      const delta = {
+        type: 'response.output_text.delta' as const,
+        sequence_number: 1,
+        item_id: 'msg_first',
+        output_index: 0,
+        content_index: 0,
+        delta: '!',
+        logprobs: [],
+      };
+      const readIndex = vi.fn(() => (readIndex.mock.calls.length === 1 ? 0 : 1));
+      Object.defineProperties(delta, {
+        type: { configurable: true, value: delta.type, enumerable },
+        output_index: { configurable: true, enumerable, get: readIndex },
+        hiddenTransportCallback: { value: () => 'implementation detail' },
+      });
+      const events: ResponseStreamEvent[] = [
+        {
+          type: 'response.created',
+          sequence_number: 0,
+          response: makeResponse({ output, output_text: 'firstforeign' }),
+        },
+        delta,
+      ];
+      const transport = {
+        controller: new AbortController(),
+        async *[Symbol.asyncIterator]() {
+          yield* events;
+        },
+      };
+      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- SAFETY: The test client implements only responses.create to supply the controlled transport.
+      const client = { responses: { create: vi.fn(async () => transport) } } as unknown as OpenAI;
+      const stream = ResponseStream.createResponse(client, { model: 'gpt-test', input: 'route safely' });
+      const emitted = vi.fn();
+      const raw = vi.fn();
+      stream.on('response.output_text.delta', emitted);
+      stream.on('event', raw);
 
-    await expect(stream.finalResponse()).resolves.toBeDefined();
+      await expect(stream.finalResponse()).resolves.toBeDefined();
 
-    expect(readIndex).toHaveBeenCalledTimes(1);
-    expect(emitted).toHaveBeenCalledWith(
-      expect.objectContaining({ output_index: 0, content_index: 0, snapshot: 'first!' }),
-    );
-  });
+      expect(readIndex).toHaveBeenCalledTimes(1);
+      expect(raw).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'response.output_text.delta',
+          output_index: 0,
+          content_index: 0,
+          delta: '!',
+        }),
+      );
+      expect(emitted).toHaveBeenCalledWith(
+        expect.objectContaining({ output_index: 0, content_index: 0, snapshot: 'first!' }),
+      );
+    },
+  );
 
   describe.each(['SSE', 'serialized stream'])('%s shell output collections', (transport) => {
     function shellStream(commands: unknown, commandIndex: number, eventType: 'delta' | 'done') {
@@ -1014,6 +1945,36 @@ describe('.stream()', () => {
 
     await expect(stream[Symbol.asyncIterator]().next()).resolves.toEqual({ value: undefined, done: true });
   });
+
+  it.each([
+    'response.created',
+    'response.queued',
+    'response.in_progress',
+    'response.completed',
+    'response.failed',
+    'response.incomplete',
+  ] as const)('rejects a nonobject %s response instead of fabricating an empty one', async (type) => {
+    const events: ResponseStreamEvent[] = [];
+    if (type !== 'response.created') {
+      events.push({ type: 'response.created', sequence_number: 0, response: makeResponse() });
+    }
+    // @ts-expect-error Simulate malformed provider JSON at the public replay boundary.
+    events.push({ type, sequence_number: 1, response: null });
+    const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+    await expect(stream.finalResponse()).rejects.toBeInstanceOf(OpenAIError);
+  });
+
+  it.each([{ response: false }, { response: 42 }, { response: 'malformed' }, { response: [] }])(
+    'rejects nonrecord created response value $response',
+    async ({ response }) => {
+      const events: ResponseStreamEvent[] = [
+        // @ts-expect-error Simulate invalid scalar or array JSON at the public replay boundary.
+        { type: 'response.created', sequence_number: 0, response },
+      ];
+      const stream = ResponseStream.fromReadableStream(readableStreamFromEvents(events));
+      await expect(stream.finalResponse()).rejects.toBeInstanceOf(OpenAIError);
+    },
+  );
 
   it('preserves failed response snapshots when no separate error event is sent', async () => {
     const created = {

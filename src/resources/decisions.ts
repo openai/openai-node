@@ -13,17 +13,8 @@ function resolveResourceRequestOptions(
 
 export class Decisions extends APIResource {
   /**
-   * Use this endpoint to ask classification or scoring questions about the same
-   * input. You’ll get the answers back in the order you asked the questions.
-   *
-   * For text, you can pass a string. You can also send user messages containing
-   * `input_text` and `input_image` parts, with up to 128 images per request. Images
-   * can be base64 data URLs or publicly accessible HTTP(S) URLs. File IDs aren’t
-   * accepted. Other message roles, function calls, files, audio, and item references
-   * aren’t supported.
-   *
-   * Sometimes a question returns a refusal instead of an answer. The result has type
-   * `refusal` and includes the question’s name, or `null` if you didn’t give it one.
+   * Use this endpoint to quickly answer classification or scoring questions about
+   * some input. You can ask multiple questions in one request.
    */
   create(body: DecisionCreateParams, options?: RequestOptions): APIPromise<Decision> {
     return this._client.post(
@@ -38,6 +29,11 @@ export class Decisions extends APIResource {
 }
 
 export interface Decision {
+  /**
+   * Answers in question order. Any question can return a refusal instead of an
+   * answer; other questions can still receive answers. A refusal has
+   * `type: "refusal"` and the question's `name`, or `null` if it was unnamed.
+   */
   answers: Array<
     | Decision.AnswerResourcePredicate
     | Decision.AnswerResourceChoice
@@ -45,8 +41,14 @@ export interface Decision {
     | Decision.AnswerResourceRefusal
   >;
 
+  /**
+   * The model used.
+   */
   model: string;
 
+  /**
+   * Token usage for the request.
+   */
   usage: Decision.Usage;
 }
 
@@ -129,6 +131,9 @@ export namespace Decision {
     type: 'refusal';
   }
 
+  /**
+   * Token usage for the request.
+   */
   export interface Usage {
     input_tokens: number;
 
@@ -208,8 +213,15 @@ export interface DecisionCreateParams {
    */
   input: string | Array<DecisionInputMessage>;
 
+  /**
+   * The model to use. Only `gpt-6-luna` is supported.
+   */
   model: string;
 
+  /**
+   * Ask 1–200 questions about the input. Each question can be a predicate, choice,
+   * or score. Answers come back in the same order.
+   */
   questions: Array<
     | DecisionCreateParams.QuestionParamPredicate
     | DecisionCreateParams.QuestionParamChoice

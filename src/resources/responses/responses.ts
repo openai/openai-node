@@ -4903,6 +4903,11 @@ export namespace ResponseInputItem {
     background?: 'transparent' | 'opaque' | 'auto' | null;
 
     /**
+     * Details of a moderation failure, when available.
+     */
+    error?: ImageGenerationCall.Error;
+
+    /**
      * The output format used for generation.
      */
     output_format?: 'png' | 'webp' | 'jpeg' | null;
@@ -4922,6 +4927,55 @@ export namespace ResponseInputItem {
      * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
      */
     size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
+  }
+
+  export namespace ImageGenerationCall {
+    /**
+     * Details of a moderation failure, when available.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string | null;
+
+      /**
+       * A description of the error.
+       */
+      message: string;
+
+      /**
+       * The related request parameter.
+       */
+      param: string | null;
+
+      /**
+       * The error type.
+       */
+      type: string;
+
+      /**
+       * Public details for a `moderation_blocked` error, when available.
+       */
+      moderation_details?: Error.ModerationDetails;
+    }
+
+    export namespace Error {
+      /**
+       * Public details for a `moderation_blocked` error, when available.
+       */
+      export interface ModerationDetails {
+        /**
+         * Public moderation categories. New category values may be added over time.
+         */
+        categories: Array<string>;
+
+        /**
+         * The stage where moderation blocked the image generation call.
+         */
+        moderation_stage: 'input' | 'output' | 'unknown';
+      }
+    }
   }
 
   /**
@@ -5840,6 +5894,11 @@ export namespace ResponseItem {
     background?: 'transparent' | 'opaque' | 'auto' | null;
 
     /**
+     * Details of a moderation failure, when available.
+     */
+    error?: ImageGenerationCall.Error;
+
+    /**
      * The output format used for generation.
      */
     output_format?: 'png' | 'webp' | 'jpeg' | null;
@@ -5859,6 +5918,55 @@ export namespace ResponseItem {
      * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
      */
     size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
+  }
+
+  export namespace ImageGenerationCall {
+    /**
+     * Details of a moderation failure, when available.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string | null;
+
+      /**
+       * A description of the error.
+       */
+      message: string;
+
+      /**
+       * The related request parameter.
+       */
+      param: string | null;
+
+      /**
+       * The error type.
+       */
+      type: string;
+
+      /**
+       * Public details for a `moderation_blocked` error, when available.
+       */
+      moderation_details?: Error.ModerationDetails;
+    }
+
+    export namespace Error {
+      /**
+       * Public details for a `moderation_blocked` error, when available.
+       */
+      export interface ModerationDetails {
+        /**
+         * Public moderation categories. New category values may be added over time.
+         */
+        categories: Array<string>;
+
+        /**
+         * The stage where moderation blocked the image generation call.
+         */
+        moderation_stage: 'input' | 'output' | 'unknown';
+      }
+    }
   }
 
   /**
@@ -6512,6 +6620,11 @@ export namespace ResponseOutputItem {
     background?: 'transparent' | 'opaque' | 'auto' | null;
 
     /**
+     * Details of a moderation failure, when available.
+     */
+    error?: ImageGenerationCall.Error;
+
+    /**
      * The output format used for generation.
      */
     output_format?: 'png' | 'webp' | 'jpeg' | null;
@@ -6531,6 +6644,55 @@ export namespace ResponseOutputItem {
      * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
      */
     size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
+  }
+
+  export namespace ImageGenerationCall {
+    /**
+     * Details of a moderation failure, when available.
+     */
+    export interface Error {
+      /**
+       * The error code.
+       */
+      code: string | null;
+
+      /**
+       * A description of the error.
+       */
+      message: string;
+
+      /**
+       * The related request parameter.
+       */
+      param: string | null;
+
+      /**
+       * The error type.
+       */
+      type: string;
+
+      /**
+       * Public details for a `moderation_blocked` error, when available.
+       */
+      moderation_details?: Error.ModerationDetails;
+    }
+
+    export namespace Error {
+      /**
+       * Public details for a `moderation_blocked` error, when available.
+       */
+      export interface ModerationDetails {
+        /**
+         * Public moderation categories. New category values may be added over time.
+         */
+        categories: Array<string>;
+
+        /**
+         * The stage where moderation blocked the image generation call.
+         */
+        moderation_stage: 'input' | 'output' | 'unknown';
+      }
+    }
   }
 
   /**
