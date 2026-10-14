@@ -1,6 +1,7 @@
 // The real Guest launcher starts only a temporary stdlib receipt helper, never a VM or Docker.
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import fs, { lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -99,6 +100,59 @@ print('fixture_owned_id')
   await rm(path.join(runtime, 'setup.json'));
   await assert.rejects(start(runtime));
   await verify(false);
+  // A reaped VM and its one private run; only the filesystem boundary is interrupted.
+  for (const when of ['before-rename', 'post-rename', 'moved-lstat']) {
+    const publicDir = path.join(runtime, 'runs', when);
+    // oxlint-disable-next-line no-await-in-loop
+    await mkdir(publicDir, { mode: 0o700 });
+    // oxlint-disable-next-line no-await-in-loop
+    await writeFile(path.join(publicDir, 'owned'), 'owned original');
+    // oxlint-disable-next-line no-await-in-loop -- Each synthetic run is cleaned before the next one.
+    const originalState = await lstat(publicDir);
+    const reaped = {
+      backend: 'vm',
+      dir: publicDir,
+      st: originalState,
+      child: { exitCode: 0, signalCode: null },
+      gone: Promise.resolve({ code: 0 }),
+    };
+    const original = { rename: fs.rename, lstat: fs.lstat };
+    let injected = false;
+    fs.rename = async (...args) => {
+      if (String(args[0]) === publicDir && when === 'before-rename' && !injected) {
+        injected = true;
+        throw new Error('fixture rename interruption');
+      }
+      const result = await original.rename(...args);
+      if (String(args[0]) === publicDir && when === 'post-rename' && !injected) {
+        injected = true;
+        throw new Error('fixture rename interruption');
+      }
+      return result;
+    };
+    fs.lstat = async (...args) => {
+      const info = await original.lstat(...args);
+      if (!injected && when === 'moved-lstat' && String(args[0]).includes('/.cleanup-')) {
+        injected = true;
+        throw new Error('fixture lstat interruption');
+      }
+      return info;
+    };
+    syncBuiltinESMExports();
+    try {
+      // oxlint-disable-next-line no-await-in-loop
+      await assert.rejects(remove(reaped), /fixture .* interruption/u);
+      assert.ok(injected);
+      // oxlint-disable-next-line no-await-in-loop
+      await remove(reaped);
+      // oxlint-disable-next-line no-await-in-loop
+      assert.deepEqual(await readdir(path.join(runtime, 'runs')), []);
+      checks += 1;
+    } finally {
+      Object.assign(fs, original);
+      syncBuiltinESMExports();
+    }
+  }
   console.log(JSON.stringify({ checks, api_calls: 0, vendor_calls: 0, vm_starts: 0 }));
 } finally {
   for (const [key, value] of previous) {

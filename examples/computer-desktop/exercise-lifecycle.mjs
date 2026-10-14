@@ -353,12 +353,7 @@ try {
       } else if (change === 'before-move') {
         await assert.rejects(remove(guest), /Run root ownership changed/u);
         assert.ok(await lstat(saved));
-        const [quarantine] = await readdir(path.join(root, 'runs'));
-        assert.match(quarantine, /^\.cleanup-/u);
-        assert.equal(
-          await readFile(path.join(root, 'runs', quarantine, 'run', 'sentinel'), 'utf-8'),
-          'stranger',
-        );
+        assert.equal(await readFile(path.join(publicDir, 'sentinel'), 'utf-8'), 'stranger');
       } else if (change === 'after-move') {
         await remove(guest);
         assert.equal(injected, true);
