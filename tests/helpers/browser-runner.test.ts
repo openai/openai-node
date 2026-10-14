@@ -10511,3 +10511,161 @@ describe('fresh local and observation replay', () => {
     },
   );
 });
+
+describe.each(['input', 'resume', 'budget'] as const)('strict replay history via %s', (mode) => {
+  test.each([
+    ['duplicate native ids', false],
+    ['missing call status', false],
+    ['output id', false],
+    ['output status', false],
+    ['ack list', false],
+    ['ack id', false],
+    ['ack code', false],
+    ['ack message', false],
+    ['omitted optionals', true],
+    ['nullable optionals', true],
+    ['valid optional status and acks', true],
+    // oxlint-disable-next-line complexity -- One native replay fixture exercises field variants without duplicating runner setup.
+  ] as const)('%s', async (variant, valid) => {
+    const effect = vi.fn();
+    const runner = new ResponsesToolRunner({ computer: recordingComputer(effect) });
+    const saved = recording();
+    const original = harness([{ output: [message] }]);
+    let resumeFrom: ResponsesRunnerCheckpoint | undefined;
+    if (mode === 'resume') {
+      await runner.run(original.client, input, { ledger: saved.ledger });
+      resumeFrom = saved.writes.find((entry) => entry.phase === 'boundary');
+      expect(resumeFrom).toBeDefined();
+    }
+    const native: ResponseInputItem = {
+      type: 'computer_call',
+      id: 'native-one',
+      call_id: 'call-one',
+      status: 'completed',
+      pending_safety_checks: [],
+      actions: [{ type: 'wait' }],
+    };
+    const output: ResponseInputItem.ComputerCallOutput = {
+      type: 'computer_call_output',
+      call_id: 'call-one',
+      output: { type: 'computer_screenshot', file_id: 'file-fixture' },
+    };
+    const history: ResponseInputItem[] = [native, output];
+    switch (variant) {
+      case 'duplicate native ids': {
+        history.push(
+          { ...native, id: 'native-one', call_id: 'call-two' },
+          { ...output, call_id: 'call-two' },
+        );
+        break;
+      }
+      case 'missing call status': {
+        Reflect.deleteProperty(native, 'status');
+        break;
+      }
+      case 'output id': {
+        Reflect.set(output, 'id', 31);
+        break;
+      }
+      case 'output status': {
+        Reflect.set(output, 'status', 'failed');
+        break;
+      }
+      case 'ack list': {
+        Reflect.set(output, 'acknowledged_safety_checks', 'not-an-array');
+        break;
+      }
+      case 'ack id': {
+        Reflect.set(output, 'acknowledged_safety_checks', [{ id: 7 }]);
+        break;
+      }
+      case 'ack code': {
+        Reflect.set(output, 'acknowledged_safety_checks', [{ id: 'check', code: true }]);
+        break;
+      }
+      case 'ack message': {
+        Reflect.set(output, 'acknowledged_safety_checks', [{ id: 'check', message: [] }]);
+        break;
+      }
+      case 'nullable optionals': {
+        Object.assign(output, { id: null, status: null, acknowledged_safety_checks: null });
+        break;
+      }
+      case 'valid optional status and acks': {
+        Object.assign(output, {
+          id: 'output-one',
+          status: 'in_progress',
+          acknowledged_safety_checks: [
+            { id: 'check', code: null, message: 'reviewed', future_field: 'keep' },
+          ],
+        });
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+    const env = harness([{ output: [{ ...message, id: 'new-answer' }] }]);
+    const save = vi.fn();
+    if (resumeFrom) {
+      resumeFrom.history = history;
+    }
+    const promise = runner.run(
+      env.client,
+      { ...input, input: mode === 'resume' ? 'fresh task' : history },
+      mode === 'budget'
+        ? { contextBudget: { maxInputBytes: 30_000, maxInputImages: 4 } }
+        : { ledger: { runId: 'context', save, ...(resumeFrom ? { resumeFrom } : {}) } },
+    );
+    if (valid) {
+      await expect(promise).resolves.toHaveProperty('output_text', 'done');
+      expect(env.bodies).toHaveLength(1);
+      const posted = env.bodies[0]?.['input'];
+      expect(posted).toEqual(
+        mode === 'resume' ? [...history, { role: 'user', content: 'fresh task' }] : history,
+      );
+    } else {
+      await expect(promise).rejects.toBeInstanceOf(Error);
+      expect(env.bodies).toHaveLength(0);
+      expect(save).not.toHaveBeenCalled();
+    }
+    expect(effect).not.toHaveBeenCalled();
+  });
+});
+
+test.each(['duplicate definitions', 'repeated references'] as const)(
+  'ordinary prior native IDs: %s',
+  async (kind) => {
+    const effect = vi.fn(() => 'recorded');
+    const first = wireCall('record', {}, 'first');
+    const second = wireCall('record', {}, 'second');
+    Reflect.set(second, 'id', first.id);
+    const history: ResponseInputItem[] =
+      kind === 'duplicate definitions'
+        ? [
+            first,
+            { type: 'function_call_output', call_id: first.call_id, output: 'first' },
+            second,
+            { type: 'function_call_output', call_id: 'call_second', output: 'second' },
+          ]
+        : [
+            { type: 'item_reference', id: 'ref-one' },
+            { type: 'item_reference', id: 'ref-one' },
+          ];
+    const h = harness([{ output: [wireCall('record', {}, 'fresh')] }, { output: [message] }]);
+    const runner = new ResponsesToolRunner({
+      functions: [
+        { tool: { type: 'function', name: 'record', parameters: {}, strict: false }, execute: effect },
+      ],
+    });
+    const promise = runner.run(h.client, { ...input, input: history });
+    if (kind === 'duplicate definitions') {
+      await expect(promise).rejects.toBeInstanceOf(Error);
+      expect(effect).not.toHaveBeenCalled();
+      expect(h.bodies).toHaveLength(0);
+    } else {
+      await expect(promise).resolves.toHaveProperty('output_text', 'done');
+      expect(effect).toHaveBeenCalledTimes(1);
+    }
+  },
+);
