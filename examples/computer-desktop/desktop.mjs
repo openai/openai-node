@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { once } from 'node:events';
 import { ComputerToolset } from 'openai/helpers/computer';
 import { start, exchange, healthy, remove } from './guest.mjs';
 import { DesktopStartupError } from './startup-error.mjs';
@@ -238,18 +239,21 @@ export class Desktop {
       return { ok: false, uncertain: false };
     }
     if (this.#transport) {
-      if (viewer || this.#waitingRequest) {
+      if (viewer || this.#waitingRequest || signal?.aborted) {
         return { ok: false, uncertain: false };
       }
       this.#waitingRequest = true;
+      const waiting = new AbortController();
       try {
-        await this.#transport;
+        await Promise.race([this.#transport, once(signal, 'abort', { signal: waiting.signal })]);
       } finally {
+        waiting.abort();
         this.#waitingRequest = false;
       }
     }
     if (
       this.#closed ||
+      signal?.aborted ||
       (action.type !== 'ready' && !viewer && (!active || this.#active !== active || active.signal.aborted))
     ) {
       return { ok: false, uncertain: false };

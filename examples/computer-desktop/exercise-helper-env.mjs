@@ -1,12 +1,24 @@
 // The real Guest launcher starts only a temporary stdlib receipt helper, never a VM or Docker.
 import assert from 'node:assert/strict';
-import fs, { lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import fs, {
+  copyFile,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const root = await mkdtemp(path.join(tmpdir(), 'guest-env-'));
+const root = await realpath(
+  await mkdtemp(path.join(process.platform === 'darwin' ? '/private/tmp' : tmpdir(), 'ge-')),
+);
 const runtime = path.join(root, 'runtime');
 const program = path.join(root, 'source');
 const dockerKeys = [
@@ -100,6 +112,17 @@ print('fixture_owned_id')
   await rm(path.join(runtime, 'setup.json'));
   await assert.rejects(start(runtime));
   await verify(false);
+  // A controlled executable stands in for vfkit; the actual owner must preserve its exit status.
+  await copyFile(new URL('guest/vm_owner.py', import.meta.url), path.join(program, 'guest', 'vm_owner.py'));
+  // Accept only this temporary runtime.
+  await writeFile(path.join(program, 'guest', 'setup.py'), '');
+  await mkdir(path.join(runtime, 'bin'), { mode: 0o700 });
+  await writeFile(path.join(runtime, 'bin/vfkit'), '#!/bin/sh\nexit 7\n', { mode: 0o700 });
+  const controlled = await start(runtime);
+  assert.deepEqual(await controlled.gone, { code: 7, signal: null });
+  await remove(controlled);
+  assert.deepEqual(await readdir(path.join(runtime, 'runs')), []);
+  checks += 1;
   // A reaped VM and its one private run; only the filesystem boundary is interrupted.
   for (const when of ['before-rename', 'post-rename', 'moved-lstat']) {
     const publicDir = path.join(runtime, 'runs', when);

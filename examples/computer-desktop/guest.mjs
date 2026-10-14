@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { lstat, mkdir, mkdtemp, readFile, rename, rm, rmdir } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, realpath, rename, rm, rmdir } from 'node:fs/promises';
 import { createConnection } from 'node:net';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -110,7 +110,7 @@ export async function start(runtimeDir, { signal } = {}) {
   if (typeof runtimeDir !== 'string' || !path.isAbsolute(runtimeDir)) {
     throw new Error('Pass the absolute private runtime directory in trusted launcher setup.');
   }
-  const root = path.resolve(runtimeDir);
+  const root = await realpath(runtimeDir);
   const [runtime, runs] = await Promise.all([lstat(root), lstat(path.join(root, 'runs'))]);
   for (const directory of [runtime, runs]) {
     // File modes are native POSIX bitmasks; require private owner-only directories.
@@ -166,11 +166,22 @@ export async function start(runtimeDir, { signal } = {}) {
     '--device',
     `virtio-vsock,port=4050,socketURL=${socket},connect`,
   ];
-  const child = spawn(path.join(root, 'bin/vfkit'), args, {
-    cwd: dir,
-    env: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LANG: 'C', TMPDIR: dir },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const child = spawn(
+    'python3',
+    [
+      '-I',
+      '-S',
+      fileURLToPath(new URL('guest/vm_owner.py', import.meta.url)),
+      '--',
+      path.join(root, 'bin/vfkit'),
+      ...args,
+    ],
+    {
+      cwd: dir,
+      env: helperEnv(dir),
+      stdio: ['pipe', 'pipe', 'pipe'],
+    },
+  );
   const guest = { id, dir, socket, child, st, out: 0, err: 0, failure: null, gone: null };
   // A child process may emit error and then close; reap it on the close event in both cases.
   // oxlint-disable-next-line promise/avoid-new

@@ -189,6 +189,13 @@ async function checkPhase(timed) {
     } else {
       phase.abort();
     }
+    // Cancellation must settle before the independent viewer is released.
+    await Promise.race([
+      rejected,
+      delay(1000, undefined, { ref: false }).then(() => {
+        throw new Error('Queued input waited for an uncancelled viewer.');
+      }),
+    ]);
     await writeFile(path.join(root, 'release'), '1');
     const frame = await view;
     assert.equal(frame.width, 1024);
@@ -475,7 +482,10 @@ async function checkPhaseAuthority(kind) {
   }
 }
 
-if (process.argv.includes('--phase-authority')) {
+if (process.argv.includes('--queued-cancellation')) {
+  await checkPhase(false);
+  await checkPhase(true);
+} else if (process.argv.includes('--phase-authority')) {
   for (const kind of ['verify', 'seal', 'operation']) {
     // Each independent owner is reaped before creating the next.
     // oxlint-disable-next-line no-await-in-loop
