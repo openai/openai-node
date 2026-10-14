@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { chromium } from 'playwright';
 import { createDemoServer } from './server.mjs';
+import { inspectTask } from './tasks.mjs';
 import { exampleBrowserChannel } from './booking.mjs';
 
 const privateFiles = await mkdtemp(filePaths.join(tmpdir(), 'browser-demo-key-'));
@@ -164,6 +165,22 @@ try {
   }
   await until((value) => value?.owner === 'stopped' && !value.closing);
 
+  const receiptPage = await browser.newPage();
+  try {
+    await receiptPage.goto(`${app.origin}/fixture/reservation`);
+    await receiptPage.getByLabel('Guest name').fill('Grace');
+    await receiptPage.getByLabel('Party size').selectOption('2');
+    await receiptPage.getByLabel('Time').selectOption('18:00');
+    await receiptPage.getByLabel('Seating').selectOption('Indoor');
+    await receiptPage.getByRole('button', { name: 'Reserve table' }).click();
+    await receiptPage.getByLabel('Guest name').fill('Ada');
+    const receipt = await inspectTask(receiptPage);
+    assert.equal(receipt.verified, false, 'Editing a confirmed form cannot change the submitted booking');
+    assert.equal(receipt.results.fields['Guest name'], 'Grace');
+  } finally {
+    await receiptPage.close();
+  }
+
   const page = await browser.newPage({ viewport: { width: 1340, height: 980 } });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -202,16 +219,22 @@ try {
   assert.equal(run.status, 'complete', JSON.stringify(run));
   assert.equal(run.result, 'verified');
   assert.equal(run.requests, 0);
-  assert.deepEqual(run.fixture.results, { confirmation: 'TABLE-204' });
+  assert.deepEqual(run.fixture.results, {
+    confirmation: 'TABLE-204',
+    fields: { 'Guest name': 'Ada', 'Party size': '2', Time: '18:00', Seating: 'Indoor' },
+  });
   await page.getByRole('status').getByText('Verified', { exact: true }).waitFor({ timeout: 3000 });
-  let reportedStatus = 'failed';
+  let reported = { ...run, status: 'starting', owner: 'agent', browser: null };
   await page.route('**/api/state', (route) =>
     route.fulfill({
-      json: { liveAvailable: {}, run: { ...run, status: reportedStatus, result: 'verified' } },
+      json: { liveAvailable: {}, run: reported },
     }),
   );
+  await page.getByRole('status').getByText('starting', { exact: true }).waitFor({ timeout: 3000 });
+  assert.equal(await page.locator('#take-control').isDisabled(), true);
+  reported = { ...run, status: 'failed' };
   await page.getByRole('status').getByText('failed', { exact: true }).waitFor({ timeout: 3000 });
-  reportedStatus = 'cleanup_failed';
+  reported = { ...run, status: 'cleanup_failed' };
   await page.getByRole('status').getByText('cleanup_failed', { exact: true }).waitFor({ timeout: 3000 });
   await page.unroute('**/api/state');
   await page.getByRole('status').getByText('Verified', { exact: true }).waitFor({ timeout: 3000 });

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 export const tasks = JSON.parse(await readFile(new URL('tasks.json', import.meta.url), 'utf-8'));
 
-/** Verify the visible confirmation and all four form values against the local brief. */
+/** Verify the recorded submission and visible form values against the local brief. */
 export async function inspectTask(page) {
   const state = await page.locator('body').evaluate((body) => ({
     revision: Number(body.dataset.revision),
@@ -17,6 +17,8 @@ export async function inspectTask(page) {
   }));
   state.verified =
     state.results.confirmation === 'TABLE-204' &&
-    Object.entries(tasks.reservation.fields).every(([name, value]) => state.fields[name] === value);
+    Object.entries(tasks.reservation.fields).every(
+      ([name, value]) => state.results.fields?.[name] === value && state.fields[name] === value,
+    );
   return state;
 }
