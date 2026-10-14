@@ -26,6 +26,7 @@ import type {
   ResponseFunctionToolCall,
   ResponseCreateParamsNonStreaming,
   ResponseInputItem,
+  ResponseInputTextContent,
   ResponseOutputItem,
   Tool,
 } from 'openai/resources/responses/responses';
@@ -2393,6 +2394,41 @@ describe('reviewed native observations', () => {
     expect(h.bodies).toHaveLength(1);
   });
 });
+
+test.each(['text', 'shape'] as const)(
+  'snapshots function output before diagnostic %s mutation',
+  async (mutation) => {
+    const env = harness([{ output: [call('record', {})] }, { output: [message] }]);
+    const block = { type: 'input_text', text: 'captured' } satisfies ResponseInputTextContent;
+    const runner = new ResponsesToolRunner({
+      functions: [
+        {
+          tool: { type: 'function', name: 'record', parameters: {}, strict: false },
+          execute: () => [block],
+        },
+      ],
+    });
+    let observed = 0;
+    await runner.run(env.client, input, {
+      onDiagnostic(event) {
+        if (event.stage === 'action' && event.reason === 'completed') {
+          observed += 1;
+          if (mutation === 'text') {
+            block.text = 'changed';
+          } else {
+            Object.assign(block, { extra: true });
+          }
+        }
+      },
+    });
+    expect(observed).toBe(1);
+    expect(env.bodies[1]?.['input']).toContainEqual({
+      type: 'function_call_output',
+      call_id: 'call_record',
+      output: [{ type: 'input_text', text: 'captured' }],
+    });
+  },
+);
 
 test.each(['usage', 'diagnostic'] as const)(
   'owns Responses execution before %s metadata',

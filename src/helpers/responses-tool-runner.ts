@@ -1356,14 +1356,24 @@ export class ResponsesToolRunner {
     const diagnostic: Pick<RunnerDiagnostic, 'stage'> = { stage: 'action' };
     try {
       const result = await execute();
-      reportDiagnostic(
-        onDiagnostic,
-        { api: 'responses', stage: 'action', reason: 'completed', call_id: item.call_id, member: item.name },
-        started,
-      );
+      const actionStarted = started;
       diagnostic.stage = 'output';
       started = performance.now();
-      return { type: 'function_call_output', call_id: item.call_id, output: suppliedResult(result) };
+      try {
+        return { type: 'function_call_output', call_id: item.call_id, output: suppliedResult(result) };
+      } finally {
+        reportDiagnostic(
+          onDiagnostic,
+          {
+            api: 'responses',
+            stage: 'action',
+            reason: 'completed',
+            call_id: item.call_id,
+            member: item.name,
+          },
+          actionStarted,
+        );
+      }
     } catch (error) {
       reportDiagnostic(
         onDiagnostic,

@@ -4,6 +4,7 @@ import { EventEmitter, once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import { chromium } from 'playwright';
+import { BrowserError } from 'openai/helpers/browser';
 import { createBrowserDriver } from './driver.mjs';
 
 const browser = await chromium.launch();
@@ -44,6 +45,67 @@ try {
   assert.equal(closed, false);
   checks += 3;
   /* eslint-disable no-await-in-loop -- Close each caller-owned fixture before the next bounded override. */
+  const leaked = [];
+  for (const member of ['state', 'read_page', 'get_page_text', 'find']) {
+    const fixture = await browser.newContext();
+    const borrowed = createBrowserDriver(fixture);
+    try {
+      const target = await fixture.newPage();
+      await target.goto(url);
+      const state = await borrowed.state();
+      const selected = state.tabs[0].id;
+      await target.evaluate((operation) => {
+        if (operation === 'state') {
+          Object.defineProperty(document, 'title', {
+            get() {
+              throw new Error('SYNTHETIC_PAGE_OBSERVATION_4360');
+            },
+          });
+        } else if (operation === 'get_page_text') {
+          // oxlint-disable-next-line consistent-function-scoping -- Executed only in this synthetic page.
+          window.getComputedStyle = function getComputedStyle() {
+            throw new Error('SYNTHETIC_PAGE_OBSERVATION_4360');
+          };
+        } else {
+          // oxlint-disable-next-line eslint/no-extend-native, unicorn/consistent-function-scoping -- This fixture owns its page's methods.
+          Element.prototype.matches = function matches() {
+            throw new Error('SYNTHETIC_PAGE_OBSERVATION_4360');
+          };
+        }
+      }, member);
+      try {
+        if (member === 'state') {
+          await borrowed.state();
+        } else if (member === 'read_page') {
+          await borrowed.read_page({ tab_id: selected, filter: 'all' });
+        } else if (member === 'find') {
+          await borrowed.find({ tab_id: selected, query: 'Allowed' });
+        } else {
+          await borrowed.get_page_text({ tab_id: selected });
+        }
+        leaked.push(member);
+      } catch (error) {
+        if (
+          !(error instanceof BrowserError) ||
+          error.message !== 'Browser observation failed. Read the page again.' ||
+          error.cause !== undefined ||
+          String(error.stack).includes('SYNTHETIC_PAGE_OBSERVATION_4360')
+        ) {
+          leaked.push(member);
+        }
+      }
+      assert.equal(target.isClosed(), false);
+      await target.reload();
+      const freshState = await borrowed.state();
+      const freshRead = await borrowed.read_page({ tab_id: selected, filter: 'all' });
+      assert.equal(freshState.tabs[0].id, selected);
+      assert.ok(freshRead.elements.length);
+      checks += 3;
+    } finally {
+      await fixture.close();
+    }
+  }
+  assert.deepEqual(leaked, [], 'page-controlled observation error escaped the driver');
   for (const replaced of ['options', 'encoder']) {
     const fixture = await browser.newContext();
     const borrowed = createBrowserDriver(fixture);
