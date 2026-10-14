@@ -1174,6 +1174,11 @@ export namespace RealtimeResponseStatus {
     code?: string;
 
     /**
+     * A human-readable error message.
+     */
+    message?: string;
+
+    /**
      * The type of error.
      */
     type?: string;
