@@ -243,11 +243,25 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       'Set OPENAI_API_KEY and OPENAI_MODEL, then run: node read-only.mjs "Can a group of 14 visit Monday?"',
     );
   }
-  const reader = await openReader();
+  const interruption = new AbortController();
+  const stop = () => interruption.abort(new Error('Reader interrupted.'));
+  process.on('SIGINT', stop);
+  process.on('SIGTERM', stop);
   try {
-    const result = await answerQuestion(new OpenAI({ maxRetries: 0 }), reader, { model, question });
-    console.log(result.output_text);
+    const reader = await openReader();
+    try {
+      interruption.signal.throwIfAborted();
+      const result = await answerQuestion(new OpenAI({ maxRetries: 0 }), reader, {
+        model,
+        question,
+        signal: interruption.signal,
+      });
+      console.log(result.output_text);
+    } finally {
+      await reader.close();
+    }
   } finally {
-    await reader.close();
+    process.off('SIGINT', stop);
+    process.off('SIGTERM', stop);
   }
 }

@@ -112,6 +112,7 @@ export class Desktop {
       throw new Error('Desktop startup timed out.');
     } catch {
       await desktop.stop();
+      signal?.throwIfAborted();
       throw new DesktopStartupError();
     }
   }
