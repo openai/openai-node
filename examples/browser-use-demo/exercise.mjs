@@ -1,10 +1,33 @@
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
+import { execFile } from 'node:child_process';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import filePaths from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { chromium } from 'playwright';
 import { createDemoServer } from './server.mjs';
 import { exampleBrowserChannel } from './booking.mjs';
 
-const app = await createDemoServer();
+const privateFiles = await mkdtemp(filePaths.join(tmpdir(), 'browser-demo-key-'));
+try {
+  const key = filePaths.join(privateFiles, 'key');
+  await writeFile(key, 'x'.repeat(16 * 1024 + 1), { mode: 0o600 });
+  await assert.rejects(
+    promisify(execFile)(
+      process.execPath,
+      [fileURLToPath(new URL('server.mjs', import.meta.url)), '--key-file', key],
+      { timeout: 5000 },
+    ),
+    (error) => error.code === 1 && error.stderr.includes('at most 16 KiB'),
+  );
+} finally {
+  await rm(privateFiles, { recursive: true });
+}
+
+const models = {};
+const app = await createDemoServer({ apiKey: 'test-only', models });
 const browser = await chromium.launch({
   headless: true,
   chromiumSandbox: true,
@@ -37,6 +60,16 @@ async function until(predicate) {
   const latest = await call('/api/state');
   assert.fail(`Fieldwork did not reach expected state: ${JSON.stringify(latest.body)}`);
 }
+async function checkAvailability(page, api, other) {
+  models[api] = 'test-only';
+  models[other] = undefined;
+  const state = await call('/api/state');
+  assert.deepEqual(state.body.liveAvailable, { [api]: true, [other]: false });
+  await page.selectOption('#api', api);
+  await page.waitForFunction(() => !document.querySelector('#start').disabled);
+  await page.selectOption('#api', other);
+  await page.waitForFunction(() => document.querySelector('#start').disabled);
+}
 const bind = (run) => ({
   runId: run.id,
   ownerVersion: run.ownerVersion,
@@ -46,6 +79,9 @@ const bind = (run) => ({
 const originalLaunch = chromium.launch;
 const held = Promise.withResolvers();
 const release = Promise.withResolvers();
+const viewEntered = Promise.withResolvers();
+const viewRelease = Promise.withResolvers();
+let holdView = false;
 let holdFinal = false;
 let observing = false;
 let fixturePage;
@@ -57,6 +93,15 @@ chromium.launch = async function launch(options) {
     const newPage = context.newPage.bind(context);
     context.newPage = async () => {
       const current = await newPage();
+      const start = current.screencast.start.bind(current.screencast);
+      current.screencast.start = async (settings) => {
+        if (holdView) {
+          holdView = false;
+          viewEntered.resolve();
+          await viewRelease.promise;
+        }
+        return start(settings);
+      };
       const screenshot = current.screenshot.bind(current);
       current.screenshot = async (screenshotOptions) => {
         if (holdFinal && !observing) {
@@ -100,11 +145,32 @@ try {
   );
   assert.ok(removed.every((result) => result.status === 404));
 
+  holdView = true;
+  const starting = await call('/api/start', { taskId: 'reservation', api: 'decisions', mode: 'rehearsal' });
+  await Promise.race([viewEntered.promise, delay(5000).then(() => assert.fail('Capture did not start'))]);
+  const originalAny = AbortSignal.any;
+  let waiters = 0;
+  AbortSignal.any = function any(signals) {
+    waiters += 1;
+    return originalAny.call(this, signals);
+  };
+  try {
+    await Promise.all(Array.from({ length: 25 }, () => call('/api/state')));
+    assert.equal(waiters, 0, 'Polling must not add waiters to a pending frame capture');
+  } finally {
+    AbortSignal.any = originalAny;
+    await call('/api/stop', { runId: starting.body.id });
+    viewRelease.resolve();
+  }
+  await until((value) => value?.owner === 'stopped' && !value.closing);
+
   const page = await browser.newPage({ viewport: { width: 1340, height: 980 } });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(app.launchUrl);
   assert.equal(await page.locator('#api').inputValue(), 'responses');
+  await checkAvailability(page, 'responses', 'decisions');
+  await checkAvailability(page, 'decisions', 'responses');
   await page.selectOption('#mode', 'rehearsal');
   assert.equal(await page.locator('#api').inputValue(), 'decisions');
   await page.locator('#start').click();
@@ -141,7 +207,7 @@ try {
   let reportedStatus = 'failed';
   await page.route('**/api/state', (route) =>
     route.fulfill({
-      json: { liveAvailable: false, run: { ...run, status: reportedStatus, result: 'verified' } },
+      json: { liveAvailable: {}, run: { ...run, status: reportedStatus, result: 'verified' } },
     }),
   );
   await page.getByRole('status').getByText('failed', { exact: true }).waitFor({ timeout: 3000 });
@@ -220,6 +286,7 @@ try {
 } finally {
   holdFinal = false;
   release.resolve();
+  viewRelease.resolve();
   chromium.launch = originalLaunch;
   await Promise.all([app.close(), browser.close()]);
 }

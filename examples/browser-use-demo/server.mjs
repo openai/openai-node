@@ -30,8 +30,24 @@ async function readKey(path) {
     if (!stat.isFile() || stat.uid !== process.getuid() || permissions !== 0o600) {
       throw new Error('The key file must be an owner-only regular file (0600).');
     }
-    const value = await handle.readFile('utf-8');
-    return value.trim();
+    const limit = 16 * 1024;
+    if (stat.size > limit) {
+      throw new Error('The key file must be at most 16 KiB.');
+    }
+    const buffer = Buffer.alloc(limit + 1);
+    let size = 0;
+    while (size < buffer.length) {
+      // oxlint-disable-next-line no-await-in-loop -- Read one bounded descriptor through short reads and concurrent growth.
+      const { bytesRead } = await handle.read(buffer, size, buffer.length - size);
+      if (!bytesRead) {
+        break;
+      }
+      size += bytesRead;
+    }
+    if (size > limit) {
+      throw new Error('The key file must be at most 16 KiB.');
+    }
+    return buffer.toString('utf-8', 0, size).trim();
   } finally {
     await handle.close();
   }
@@ -75,8 +91,11 @@ function currentView(run) {
 }
 
 async function refreshPolledView(run) {
+  if (!run?.session || run.session.refreshing) {
+    return;
+  }
   try {
-    await run?.session?.refreshView();
+    await run.session.refreshView();
   } catch {
     // A failed view stays unavailable. The next authenticated poll can try again.
   }
@@ -738,7 +757,10 @@ export async function createDemoServer({ apiKey, models = {}, port = 0 } = {}) {
     if (url.pathname === '/api/state') {
       void refreshPolledView(current);
       json(response, 200, {
-        liveAvailable: Boolean(apiKey && (models.decisions || models.responses)),
+        liveAvailable: {
+          responses: Boolean(apiKey && models.responses),
+          decisions: Boolean(apiKey && models.decisions),
+        },
         run: snapshot(current),
       });
       return;

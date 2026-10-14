@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { lstat, mkdir, readFile, rm } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, rename, rm, rmdir } from 'node:fs/promises';
 import { createConnection } from 'node:net';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -253,6 +253,17 @@ export async function healthy(guest, { signal } = {}) {
   return !guest.failure && guest.child.exitCode === null && guest.child.signalCode === null;
 }
 
+function sameRunRoot(current, original) {
+  return (
+    current.isDirectory() &&
+    current.dev === original.dev &&
+    current.ino === original.ino &&
+    current.uid === process.getuid() &&
+    // oxlint-disable-next-line no-bitwise -- POSIX mode check for the private run directory.
+    (current.mode & 0o777) === 0o700
+  );
+}
+
 export async function remove(guest) {
   if (guest.backend === 'container') {
     await containerCommand(guest.root, 'remove', guest.id);
@@ -269,10 +280,38 @@ export async function remove(guest) {
       throw new Error('Private guest could not be reaped; owned run root retained.');
     }
   }
-  const now = await lstat(guest.dir);
-  if (now.ino !== guest.st.ino || now.uid !== process.getuid()) {
+  let current;
+  try {
+    current = await lstat(guest.dir);
+  } catch (error) {
+    if (guest.cleanupRoot && error.code === 'ENOENT') {
+      // The matched run was removed; retry only the nonrecursive removal of its private parent.
+      await rmdir(guest.cleanupRoot);
+      return;
+    }
+    throw error;
+  }
+  if (!sameRunRoot(current, guest.st)) {
     throw new Error('Run root ownership changed');
   }
-  // Reap only the retained child before removing this exact run directory.
+  if (!guest.cleanupRoot) {
+    const quarantine = await mkdtemp(path.join(path.dirname(guest.dir), '.cleanup-'));
+    const moved = path.join(quarantine, 'run');
+    try {
+      await rename(guest.dir, moved);
+    } catch (error) {
+      await rmdir(quarantine);
+      throw error;
+    }
+    if (!sameRunRoot(await lstat(moved), guest.st)) {
+      // Do not delete or restore a replacement. An automatic rename back could overwrite another directory.
+      throw new Error('Run root ownership changed; cleanup incomplete in private .cleanup- directory.');
+    }
+    // Retain the matched location so Stop can retry a failed recursive removal.
+    guest.dir = moved;
+    guest.cleanupRoot = quarantine;
+  }
+  // A replacement at the old public path is never the recursive removal target.
   await rm(guest.dir, { recursive: true });
+  await rmdir(guest.cleanupRoot);
 }
