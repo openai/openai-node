@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import OpenAI from 'openai';
 import { chromium } from 'playwright';
 import { answerQuestion, openReader } from './read-only.mjs';
@@ -24,6 +25,56 @@ const textResult = (output) => payload(output).result;
 
 // Only wrap pages belonging to these local reader exercises. Do not expose a test hook in openReader.
 const { launch: originalLaunch } = chromium;
+// oxlint-disable no-await-in-loop -- Each held startup owns a separate browser and signal.
+for (const phase of ['launch', 'context', 'navigation']) {
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  const closed = Promise.withResolvers();
+  let owned;
+  const hold = async (value, at) => {
+    if (phase === at) {
+      entered.resolve();
+      await release.promise;
+    }
+    return value;
+  };
+  chromium.launch = async function launch(options) {
+    const browser = await originalLaunch.call(this, options);
+    owned = browser;
+    browser.once('disconnected', () => closed.resolve());
+    const originalContext = browser.newContext.bind(browser);
+    browser.newContext = async function newContext(contextOptions) {
+      const context = await originalContext(contextOptions);
+      context.on('page', (page) => {
+        const originalGoto = page.goto.bind(page);
+        page.goto = async function goto(url, gotoOptions) {
+          return hold(await originalGoto(url, gotoOptions), 'navigation');
+        };
+      });
+      return hold(context, 'context');
+    };
+    return hold(browser, 'launch');
+  };
+  const controller = new AbortController();
+  const reason = new Error('Reader startup interrupted.');
+  const opening = openReader({ documents, signal: controller.signal });
+  // oxlint-disable-next-line promise/prefer-await-to-then, promise/prefer-await-to-callbacks -- Observe rejection before triggering the controlled cancellation.
+  const outcome = opening.catch((error) => error);
+  try {
+    await Promise.race([entered.promise, delay(5000).then(() => assert.fail('Startup did not enter'))]);
+    controller.abort(reason);
+    assert.equal(await Promise.race([outcome, delay(250, 'still waiting')]), reason);
+    release.resolve();
+    await Promise.race([closed.promise, delay(5000).then(() => assert.fail('Late browser was not closed'))]);
+  } finally {
+    release.resolve();
+    const result = await outcome;
+    await result?.close?.();
+    await owned?.close();
+    chromium.launch = originalLaunch;
+  }
+}
+// oxlint-enable no-await-in-loop
 chromium.launch = async function launch(options) {
   const browser = await originalLaunch.call(this, options);
   const { newContext: originalContext } = browser;

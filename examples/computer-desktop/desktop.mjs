@@ -47,7 +47,6 @@ export class Desktop {
   #inputPending = false;
   #removal;
   #controller = new AbortController();
-  #toolset;
   uncertainEffects = false;
 
   constructor(guest, authority) {
@@ -56,21 +55,6 @@ export class Desktop {
     }
     this.#guest = guest;
     this.#id = guest.id;
-    const driver = {
-      click: (action, options) => this.#action(action, options),
-      double_click: (action, options) => this.#action(action, options),
-      drag: (action, options) => this.#action(action, options),
-      keypress: (action, options) => this.#action(action, options),
-      move: (action, options) => this.#action(action, options),
-      scroll: (action, options) => this.#action(action, options),
-      type: (action, options) => this.#action(action, options),
-      wait: (action, options) => this.#action(action, options),
-      screenshot: async (options) => {
-        const result = await this.#action({ type: 'screenshot' }, options);
-        return { type: 'computer_screenshot', image_url: result.image_url };
-      },
-    };
-    this.#toolset = new ComputerToolset(driver);
   }
 
   static async create({ runtimeDir, signal } = {}) {
@@ -124,7 +108,23 @@ export class Desktop {
 
   /** The whole SDK call, including approval and final capture, is owned until it settles or is revoked. */
   async withComputer(operation, { signal } = {}) {
-    return this.#admit((phaseSignal) => operation(this.#toolset, phaseSignal), signal);
+    return this.#admit((phaseSignal, phase) => {
+      const driver = {
+        click: (action, options) => this.#action(phase, action, options),
+        double_click: (action, options) => this.#action(phase, action, options),
+        drag: (action, options) => this.#action(phase, action, options),
+        keypress: (action, options) => this.#action(phase, action, options),
+        move: (action, options) => this.#action(phase, action, options),
+        scroll: (action, options) => this.#action(phase, action, options),
+        type: (action, options) => this.#action(phase, action, options),
+        wait: (action, options) => this.#action(phase, action, options),
+        screenshot: async (options) => {
+          const result = await this.#action(phase, { type: 'screenshot' }, options);
+          return { type: 'computer_screenshot', image_url: result.image_url };
+        },
+      };
+      return operation(new ComputerToolset(driver), phaseSignal);
+    }, signal);
   }
 
   async verify({ signal } = {}) {
@@ -154,7 +154,7 @@ export class Desktop {
       // oxlint-disable-next-line promise/prefer-await-to-then
       promise: Promise.resolve().then(() => {
         phaseSignal.throwIfAborted();
-        return operation(phaseSignal);
+        return operation(phaseSignal, active);
       }),
     };
     this.#active = active;
@@ -168,7 +168,10 @@ export class Desktop {
     } finally {
       // Cancellation after dispatch invalidates this guest even if a reply later
       // confirmed the input. Do not mistake that confirmed receipt for uncertainty.
-      if (phaseSignal.aborted && active.dispatchedInput && !this.#closed) {
+      if (active.dispatchedInput && (phaseSignal.aborted || this.#inputPending) && !this.#closed) {
+        if (this.#inputPending) {
+          this.uncertainEffects = true;
+        }
         this.#closed = true;
         this.#controller.abort();
         await this.#remove();
@@ -196,11 +199,10 @@ export class Desktop {
     return { frame: result.frame, width: 1024, height: 768 };
   }
 
-  async #action(action, { signal } = {}) {
-    if (this.#closed || !this.#active) {
+  async #action(active, action, { signal } = {}) {
+    if (this.#closed || this.#active !== active) {
       throw new Error('Desktop no longer owns this action.');
     }
-    const active = this.#active;
     if (signal) {
       active.signals.push(signal);
     }
@@ -220,7 +222,7 @@ export class Desktop {
         active.signals.pop();
       }
     }
-    if (this.#closed) {
+    if (this.#closed || this.#active !== active) {
       throw new Error('Desktop stopped or retired before its result could be used.');
     }
     if (!result.ok) {

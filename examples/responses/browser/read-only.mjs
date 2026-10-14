@@ -76,7 +76,8 @@ function readDocument() {
 }
 
 /** Three local documents, fulfilled in memory. No browser request reaches the network. */
-export async function openReader({ documents } = {}) {
+export async function openReader({ documents, signal: startupSignal } = {}) {
+  startupSignal?.throwIfAborted();
   const channel = exampleBrowserChannel();
   const source =
     documents ?? JSON.parse(await readFile(new URL('reader-site.json', import.meta.url), 'utf-8'));
@@ -100,7 +101,8 @@ export async function openReader({ documents } = {}) {
       ];
     }),
   );
-  const browser = await chromium.launch({
+  startupSignal?.throwIfAborted();
+  const launching = chromium.launch({
     headless: true,
     channel,
     chromiumSandbox: true,
@@ -111,27 +113,49 @@ export async function openReader({ documents } = {}) {
     },
   });
   let closing;
-  const close = () => (closing ??= browser.close());
+  // A cancelled launch still owns any browser it eventually returns.
+  /* oxlint-disable promise/prefer-await-to-then -- Retain one close across an unresolved launch; a failed launch has no browser. */
+  const close = () =>
+    (closing ??= launching.then(
+      (browser) => browser.close(),
+      () => null,
+    ));
+  /* oxlint-enable promise/prefer-await-to-then */
+  const startupStopped = Promise.withResolvers();
+  const stop = () => {
+    startupStopped.reject(startupSignal.reason);
+    // oxlint-disable-next-line promise/prefer-await-to-then -- Report a late cleanup failure after startup has already rejected.
+    void close().catch(() => process.emitWarning('Reader startup cleanup failed.'));
+  };
+  const ready = (work) => (startupSignal ? Promise.race([work, startupStopped.promise]) : work);
+  startupSignal?.addEventListener('abort', stop, { once: true });
+  if (startupSignal?.aborted) {
+    stop();
+  }
   try {
-    const context = await browser.newContext({ serviceWorkers: 'block', acceptDownloads: false });
-    await context.route('**/*', async (route) => {
-      const body = pages.get(route.request().url());
-      if (body === undefined || route.request().method() !== 'GET') {
-        await route.abort();
-        return;
-      }
-      await route.fulfill({
-        status: 200,
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Security-Policy': "default-src 'none'; form-action 'none'; base-uri 'none'",
-        },
-        body,
-      });
-    });
-    await context.routeWebSocket('**/*', (route) => route.close());
-    const page = await context.newPage();
-    await page.goto(home);
+    const browser = await ready(launching);
+    const context = await ready(browser.newContext({ serviceWorkers: 'block', acceptDownloads: false }));
+    await ready(
+      context.route('**/*', async (route) => {
+        const body = pages.get(route.request().url());
+        if (body === undefined || route.request().method() !== 'GET') {
+          await route.abort();
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Content-Security-Policy': "default-src 'none'; form-action 'none'; base-uri 'none'",
+          },
+          body,
+        });
+      }),
+    );
+    await ready(context.routeWebSocket('**/*', (route) => route.close()));
+    const page = await ready(context.newPage());
+    await ready(page.goto(home));
+    startupSignal?.throwIfAborted();
     let retired = false;
     const observe = async (work, signal, navigation = false) => {
       if (retired) {
@@ -211,8 +235,13 @@ export async function openReader({ documents } = {}) {
     });
     return { tools, close };
   } catch (error) {
+    if (startupSignal?.aborted) {
+      throw startupSignal.reason;
+    }
     await close();
     throw error;
+  } finally {
+    startupSignal?.removeEventListener('abort', stop);
   }
 }
 
@@ -248,7 +277,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
   try {
-    const reader = await openReader();
+    const reader = await openReader({ signal: interruption.signal });
     try {
       interruption.signal.throwIfAborted();
       const result = await answerQuestion(new OpenAI({ maxRetries: 0 }), reader, {
