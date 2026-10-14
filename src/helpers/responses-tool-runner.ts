@@ -1915,6 +1915,7 @@ export class ResponsesToolRunner {
 
   // oxlint-disable-next-line complexity -- Validate the complete replay sequence before storage or transport.
   private validateHistory(history: ResponseInputItem[], tools: Tool[], budgetOnly = false): Set<string> {
+    ResponsesToolRunner.seenOutputIds(history);
     const calls = new Map<string, string>();
     const returned = new Set<string>();
     const requests = new Map<string, ResponseInputItem.McpApprovalRequest | null>();
@@ -2070,6 +2071,7 @@ export class ResponsesToolRunner {
     return isObj(value) && Number.isSafeInteger(value['x']) && Number.isSafeInteger(value['y']);
   }
 
+  // oxlint-disable-next-line complexity -- Input computer metadata is nullable; validate it alongside its required screenshot before replay.
   private static validateHistoricalOutput(
     item: Extract<ResponseInputItem, { type: 'function_call_output' | 'computer_call_output' }>,
   ): void {
@@ -2077,6 +2079,28 @@ export class ResponsesToolRunner {
     if (item.type === 'function_call_output') {
       suppliedResult(output);
       return;
+    }
+    const id = hasOwn(item, 'id') ? item.id : undefined;
+    const status = hasOwn(item, 'status') ? item.status : undefined;
+    const checks = hasOwn(item, 'acknowledged_safety_checks') ? item.acknowledged_safety_checks : undefined;
+    if (
+      (id !== undefined && id !== null && typeof id !== 'string') ||
+      (status !== undefined &&
+        status !== null &&
+        !['in_progress', 'completed', 'incomplete'].includes(status)) ||
+      (checks !== undefined &&
+        checks !== null &&
+        (!Array.isArray(checks) ||
+          checks.some(
+            (check) =>
+              !isObj(check) ||
+              !hasOwn(check, 'id') ||
+              typeof check.id !== 'string' ||
+              (check.code !== undefined && check.code !== null && typeof check.code !== 'string') ||
+              (check.message !== undefined && check.message !== null && typeof check.message !== 'string'),
+          )))
+    ) {
+      throw new TypeError('Ledger computer output has invalid native fields.');
     }
     if (!isObj(output) || !hasOwn(output, 'type') || output['type'] !== 'computer_screenshot') {
       throw new TypeError('Ledger computer history needs a screenshot with image_url or file_id.');
@@ -2522,9 +2546,29 @@ export class ResponsesToolRunner {
 
   private static seenOutputIds(history: readonly ResponseInputItem[]): Set<string> {
     const ids = new Set<string>();
+    const defined = new Set<string>();
     for (const item of history) {
-      if ('id' in item && hasOwn(item, 'id') && typeof item.id === 'string' && item.id !== '') {
+      if (
+        isObj(item) &&
+        'id' in item &&
+        hasOwn(item, 'id') &&
+        typeof item.id === 'string' &&
+        item.id !== ''
+      ) {
         ids.add(item.id);
+        // Repeated references reserve an ID without defining a second native item.
+        if (
+          item.type === 'item_reference' ||
+          ((item.type === undefined || item.type === null) &&
+            !hasOwn(item, 'role') &&
+            !hasOwn(item, 'content'))
+        ) {
+          continue;
+        }
+        if (defined.has(item.id)) {
+          throw new TypeError('Runner history contains repeated native item IDs.');
+        }
+        defined.add(item.id);
       }
     }
     return ids;
@@ -2931,9 +2975,7 @@ export class ResponsesToolRunner {
           const seen = eager
             ? ResponsesToolRunner.seenCallIds(ledger?.history ?? input, attempted)
             : new Set<string>();
-          const streamNativeIds = eager
-            ? ResponsesToolRunner.seenOutputIds(ledger?.history ?? input)
-            : new Set<string>();
+          const streamNativeIds = ResponsesToolRunner.seenOutputIds(ledger?.history ?? input);
           const dispatch = async (item: ResponseOutputItem, target = turn) => {
             ResponsesToolRunner.validateSelection(item, selection, requestTools);
             if (ResponsesToolRunner.ledgerContains(item, ledger)) {
