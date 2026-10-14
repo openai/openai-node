@@ -1,5 +1,32 @@
 # Changelog
 
+## [7.34.0](https://github.com/openai/openai-node/compare/v7.33.0...v7.34.0) (2026-10-14)
+
+
+### Features
+
+* **api:** add regional processing residency options ([#2942](https://github.com/openai/openai-node/issues/2942)) ([0f53768](https://github.com/openai/openai-node/commit/0f5376829c2f55195bdc5ff912857c8d37c62039))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump @cloudflare/workers-types from 5.20260927.1 to 5.20261005.1 in /ecosystem-tests/cloudflare-worker ([#2928](https://github.com/openai/openai-node/issues/2928)) ([d8b450e](https://github.com/openai/openai-node/commit/d8b450e577ed5d30f404a8e0b0ebf25c46de1138))
+* **deps-dev:** bump @types/node from 26.4.1 to 26.6.4 ([#2923](https://github.com/openai/openai-node/issues/2923)) ([55bfde2](https://github.com/openai/openai-node/commit/55bfde24d878bb5af91ea4e311e73daa72a68687))
+* **deps-dev:** bump @types/ws from 8.18.1 to 8.18.2 in /ecosystem-tests/node-ts-cjs ([#2931](https://github.com/openai/openai-node/issues/2931)) ([6f2c0ab](https://github.com/openai/openai-node/commit/6f2c0ab0d05f6383b50028cdddd8bc3080433941))
+* **deps-dev:** bump @types/ws from 8.18.1 to 8.18.2 in /ecosystem-tests/node-ts-cjs-auto ([#2932](https://github.com/openai/openai-node/issues/2932)) ([66c3d52](https://github.com/openai/openai-node/commit/66c3d529a42f21acb06930f46e212dd24fa41147))
+* **deps-dev:** bump @types/ws from 8.18.1 to 8.18.2 in /ecosystem-tests/node-ts4.5-jest28 ([#2933](https://github.com/openai/openai-node/issues/2933)) ([1abf914](https://github.com/openai/openai-node/commit/1abf91450863846132c2aa59dc40c12e7a5b2f08))
+* **deps-dev:** bump oxfmt from 0.70.0 to 0.72.0 ([#2924](https://github.com/openai/openai-node/issues/2924)) ([ca86f0a](https://github.com/openai/openai-node/commit/ca86f0adb1045f545e5c18109897042346eda343))
+* **deps-dev:** bump oxlint from 1.82.0 to 1.87.0 ([#2927](https://github.com/openai/openai-node/issues/2927)) ([76563b3](https://github.com/openai/openai-node/commit/76563b33dc6f66eff88056ad65c684bac6166af1))
+* **deps-dev:** bump vitest from 5.0.1 to 5.0.3 ([#2925](https://github.com/openai/openai-node/issues/2925)) ([475db88](https://github.com/openai/openai-node/commit/475db8898d7862c64674058c6b2efa092d86185e))
+* **deps-dev:** bump wrangler from 4.142.0 to 4.147.0 in /ecosystem-tests/cloudflare-worker ([#2929](https://github.com/openai/openai-node/issues/2929)) ([6886675](https://github.com/openai/openai-node/commit/68866753a693d5c736a4a113058b094c9a5ff48a))
+* **deps:** bump undici from 7.29.1 to 7.30.0 in /ecosystem-tests/node-ts-cjs ([#2930](https://github.com/openai/openai-node/issues/2930)) ([233e488](https://github.com/openai/openai-node/commit/233e488a4eb29c84b1656194b7c944001234baa1))
+* **deps:** bump undici from 8.10.2 to 8.11.2 ([#2926](https://github.com/openai/openai-node/issues/2926)) ([4c4aa8b](https://github.com/openai/openai-node/commit/4c4aa8b4339c15cb6a46d2152b61a9f2e00e8b84))
+
+
+### Chores
+
+* **api:** clarify Decisions request and response fields ([#2940](https://github.com/openai/openai-node/issues/2940)) ([9f07cfc](https://github.com/openai/openai-node/commit/9f07cfcfe53bfb55cc24d1ca398839f70c332495))
+
 ## [7.33.0](https://github.com/openai/openai-node/compare/v7.32.0...v7.33.0) (2026-10-14)
 
 
