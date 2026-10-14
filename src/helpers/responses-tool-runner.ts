@@ -1103,14 +1103,20 @@ export class ResponsesToolRunner {
       (id === undefined || typeof id === 'string') &&
       (asynchronous === undefined || typeof asynchronous === 'boolean') &&
       (namespace === undefined || typeof namespace === 'string') &&
-      (caller === undefined ||
-        caller === null ||
-        (isObj(caller) &&
-          hasOwn(caller, 'type') &&
-          (caller.type === 'direct' ||
-            (caller.type === 'program' &&
-              hasOwn(caller, 'caller_id') &&
-              typeof caller.caller_id === 'string'))))
+      ResponsesToolRunner.validFunctionCaller(caller)
+    );
+  }
+
+  private static validFunctionCaller(caller: unknown): boolean {
+    return (
+      caller === undefined ||
+      caller === null ||
+      (isObj(caller) &&
+        hasOwn(caller, 'type') &&
+        (caller['type'] === 'direct' ||
+          (caller['type'] === 'program' &&
+            hasOwn(caller, 'caller_id') &&
+            typeof caller['caller_id'] === 'string')))
     );
   }
 
@@ -1960,12 +1966,16 @@ export class ResponsesToolRunner {
         }
         calls.set(item.id, 'mcp_approval_request');
       } else if (item.type === 'mcp_approval_response') {
+        const id = hasOwn(item, 'id') ? item.id : undefined;
+        const reason = hasOwn(item, 'reason') ? item.reason : undefined;
         if (
           !hasOwn(item, 'approval_request_id') ||
           !hasOwn(item, 'approve') ||
           calls.get(item.approval_request_id) !== 'mcp_approval_request' ||
           returned.has(item.approval_request_id) ||
-          typeof item.approve !== 'boolean'
+          typeof item.approve !== 'boolean' ||
+          (id !== undefined && id !== null && typeof id !== 'string') ||
+          (reason !== undefined && reason !== null && typeof reason !== 'string')
         ) {
           throw new TypeError('Ledger MCP approval response has no matching request.');
         }
@@ -2071,34 +2081,48 @@ export class ResponsesToolRunner {
     return isObj(value) && Number.isSafeInteger(value['x']) && Number.isSafeInteger(value['y']);
   }
 
-  // oxlint-disable-next-line complexity -- Input computer metadata is nullable; validate it alongside its required screenshot before replay.
+  // oxlint-disable-next-line complexity -- Check nullable input metadata and the matching native result before replay.
   private static validateHistoricalOutput(
     item: Extract<ResponseInputItem, { type: 'function_call_output' | 'computer_call_output' }>,
   ): void {
     const output = hasOwn(item, 'output') ? item.output : undefined;
-    if (item.type === 'function_call_output') {
-      suppliedResult(output);
-      return;
-    }
     const id = hasOwn(item, 'id') ? item.id : undefined;
     const status = hasOwn(item, 'status') ? item.status : undefined;
-    const checks = hasOwn(item, 'acknowledged_safety_checks') ? item.acknowledged_safety_checks : undefined;
     if (
       (id !== undefined && id !== null && typeof id !== 'string') ||
       (status !== undefined &&
         status !== null &&
-        !['in_progress', 'completed', 'incomplete'].includes(status)) ||
-      (checks !== undefined &&
-        checks !== null &&
-        (!Array.isArray(checks) ||
-          checks.some(
-            (check) =>
-              !isObj(check) ||
-              !hasOwn(check, 'id') ||
-              typeof check.id !== 'string' ||
-              (check.code !== undefined && check.code !== null && typeof check.code !== 'string') ||
-              (check.message !== undefined && check.message !== null && typeof check.message !== 'string'),
-          )))
+        !['in_progress', 'completed', 'incomplete'].includes(status))
+    ) {
+      throw new TypeError('Ledger tool output has invalid native fields.');
+    }
+    if (item.type === 'function_call_output') {
+      const name = hasOwn(item, 'name') ? item.name : undefined;
+      const namespace = hasOwn(item, 'namespace') ? item.namespace : undefined;
+      const caller = hasOwn(item, 'caller') ? item.caller : undefined;
+      if (
+        (name !== undefined && name !== null && typeof name !== 'string') ||
+        (namespace !== undefined && namespace !== null && typeof namespace !== 'string') ||
+        !ResponsesToolRunner.validFunctionCaller(caller)
+      ) {
+        throw new TypeError('Ledger function output has invalid native fields.');
+      }
+      suppliedResult(output);
+      return;
+    }
+    const checks = hasOwn(item, 'acknowledged_safety_checks') ? item.acknowledged_safety_checks : undefined;
+    if (
+      checks !== undefined &&
+      checks !== null &&
+      (!Array.isArray(checks) ||
+        checks.some(
+          (check) =>
+            !isObj(check) ||
+            !hasOwn(check, 'id') ||
+            typeof check.id !== 'string' ||
+            (check.code !== undefined && check.code !== null && typeof check.code !== 'string') ||
+            (check.message !== undefined && check.message !== null && typeof check.message !== 'string'),
+        ))
     ) {
       throw new TypeError('Ledger computer output has invalid native fields.');
     }
