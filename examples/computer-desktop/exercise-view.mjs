@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { PNG } from 'pngjs';
 import { Desktop } from './desktop.mjs';
-import { DesktopStartupError } from './startup-error.mjs';
 import { writeTestReceipt } from './test-runtime.mjs';
 
 assert.equal(typeof globalThis.gc, 'function', 'Run this exercise with --expose-gc.');
@@ -206,7 +205,8 @@ async function checkStartup() {
   const root = await runtime('startup');
   const phase = new AbortController();
   const creating = Desktop.create({ runtimeDir: root, signal: phase.signal });
-  const rejected = assert.rejects(creating, DesktopStartupError);
+  // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Compare with the actual caller abort reason.
+  const rejected = assert.rejects(creating, (error) => error === phase.signal.reason);
   try {
     await entered(root, 'ready-entered');
     const stopped = performance.now();

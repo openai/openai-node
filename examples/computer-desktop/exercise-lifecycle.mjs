@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { lstat, mkdir, mkdtemp, open, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import fs, { lstat, mkdir, mkdtemp, open, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { syncBuiltinESMExports } from 'node:module';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { Desktop } from './desktop.mjs';
+import { remove, start } from './guest.mjs';
 import { writeTestReceipt } from './test-runtime.mjs';
 
 function call() {
@@ -56,6 +59,9 @@ const server = createServer({ allowHalfOpen: true }, (socket) => {
     } else if (action.type === 'verify') {
       socket.end(JSON.stringify({ ok: true, file_matches: false, browser_matches: false,
         file_empty: true, browser_effects: 0 }) + '\\n');
+    } else if (action.type === 'seal' && ${JSON.stringify(mode)} === 'final') {
+      socket.end(JSON.stringify({ ok: true, file_matches: true, browser_matches: true,
+        file_empty: false, browser_effects: 1 }) + '\\n');
     } else {
       appendFileSync('../../effect-count', '1\\n');
       writeFileSync('input-received', '1');
@@ -211,6 +217,68 @@ try {
   }
   // oxlint-enable eslint/no-await-in-loop
 
+  const finishing = await makeRuntime('final');
+  runtimes.push(finishing);
+  const api = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(
+      JSON.stringify({
+        id: 'resp_final',
+        object: 'response',
+        status: 'completed',
+        output: [
+          {
+            type: 'message',
+            id: 'msg_final',
+            role: 'assistant',
+            status: 'completed',
+            content: [{ type: 'output_text', text: 'Finished.', annotations: [] }],
+          },
+        ],
+      }),
+    );
+  });
+  api.listen(0, '127.0.0.1');
+  await once(api, 'listening');
+  try {
+    const address = api.address();
+    assert.ok(address && typeof address !== 'string');
+    const cli = spawn(
+      process.execPath,
+      [fileURLToPath(new URL('run.mjs', import.meta.url)), '--live', '--runtime-dir', finishing],
+      {
+        env: {
+          ...process.env,
+          OPENAI_API_KEY: 'fixture-only',
+          OPENAI_MODEL: 'fixture',
+          OPENAI_BASE_URL: `http://127.0.0.1:${address.port}/v1`,
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    );
+    let output = '';
+    let errors = '';
+    let prompted = false;
+    cli.stdout.on('data', (data) => {
+      output += data;
+      if (!prompted && output.includes('Type yes')) {
+        prompted = true;
+        cli.stdin.write('yes\n');
+      }
+    });
+    cli.stderr.on('data', (data) => {
+      errors += data;
+    });
+    const [code] = await once(cli, 'close');
+    assert.equal(code, 0, errors || output);
+    assert.match(output, /"verified":true/u);
+    assert.deepEqual(await readdir(path.join(finishing, 'runs')), []);
+    console.log('PASS final CLI uses the sealed result even when intermediate verification is incomplete');
+  } finally {
+    api.closeAllConnections();
+    api.close();
+  }
+
   const retry = await makeRuntime('hold');
   runtimes.push(retry);
   const retired = await Desktop.create({ runtimeDir: retry });
@@ -231,6 +299,92 @@ try {
   console.log(
     'PASS failed removal remains visible; Stop retries exact guest once, input and view stay closed',
   );
+
+  // Controlled changes at the filesystem boundary leave the actual guest reaping and removal in use.
+  // oxlint-disable eslint/no-await-in-loop -- Each small fixture owns a separate VM child and root.
+  for (const change of ['device', 'before-move', 'after-move', 'remove-retry']) {
+    const root = await makeRuntime('hold');
+    runtimes.push(root);
+    const guest = await start(root);
+    const publicDir = guest.dir;
+    const saved = path.join(root, 'saved');
+    const original = { lstat: fs.lstat, rm: fs.rm };
+    let injected = false;
+    let obstructed = false;
+    if (change === 'device') {
+      guest.st.dev += 1;
+    } else {
+      fs.lstat = async (...args) => {
+        const info = await original.lstat(...args);
+        const current = String(args[0]);
+        if (!injected && change === 'before-move' && current === publicDir) {
+          injected = true;
+          await rename(publicDir, saved);
+          await mkdir(publicDir, { mode: 0o700 });
+          await writeFile(path.join(publicDir, 'sentinel'), 'stranger');
+        }
+        if (!injected && change === 'after-move' && current.includes('/.cleanup-')) {
+          injected = true;
+          await mkdir(publicDir, { mode: 0o700 });
+          await writeFile(path.join(publicDir, 'sentinel'), 'stranger');
+        }
+        return info;
+      };
+      fs.rm = async (...args) => {
+        if (!injected && change === 'remove-retry') {
+          injected = true;
+          throw new Error('fixture removal failure');
+        }
+        const result = await original.rm(...args);
+        if (!obstructed && change === 'remove-retry') {
+          obstructed = true;
+          await writeFile(path.join(path.dirname(String(args[0])), 'sentinel'), 'stranger');
+        }
+        return result;
+      };
+      syncBuiltinESMExports();
+    }
+    try {
+      if (change === 'device') {
+        await assert.rejects(remove(guest), /Run root ownership changed/u);
+        assert.ok(await lstat(publicDir));
+        guest.st.dev -= 1;
+        await remove(guest);
+      } else if (change === 'before-move') {
+        await assert.rejects(remove(guest), /Run root ownership changed/u);
+        assert.ok(await lstat(saved));
+        const [quarantine] = await readdir(path.join(root, 'runs'));
+        assert.match(quarantine, /^\.cleanup-/u);
+        assert.equal(
+          await readFile(path.join(root, 'runs', quarantine, 'run', 'sentinel'), 'utf-8'),
+          'stranger',
+        );
+      } else if (change === 'after-move') {
+        await remove(guest);
+        assert.equal(injected, true);
+        assert.equal(await readFile(path.join(publicDir, 'sentinel'), 'utf-8'), 'stranger');
+      } else {
+        await assert.rejects(remove(guest), /fixture removal failure/u);
+        await assert.rejects(remove(guest), { code: 'ENOTEMPTY' });
+        const extra = path.join(guest.cleanupRoot, 'sentinel');
+        assert.equal(await readFile(extra, 'utf-8'), 'stranger');
+        await original.rm(extra);
+        await remove(guest);
+        assert.deepEqual(await readdir(path.join(root, 'runs')), []);
+      }
+      console.log(`PASS VM cleanup ${change}: owned child reaped, foreign data preserved, retry retained`);
+    } finally {
+      fs.lstat = original.lstat;
+      fs.rm = original.rm;
+      syncBuiltinESMExports();
+      // Test cleanup owns this entire synthetic root, including deliberate replacements.
+      if (guest.child.exitCode === null && guest.child.signalCode === null) {
+        guest.child.kill('SIGKILL');
+        await guest.gone;
+      }
+    }
+  }
+  // oxlint-enable eslint/no-await-in-loop
 
   const held = await makeRuntime('hold');
   runtimes.push(held);

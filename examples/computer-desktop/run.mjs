@@ -60,10 +60,7 @@ try {
       ),
     { signal: interruption.signal },
   );
-  let proof = await desktop.verify({ signal: interruption.signal });
-  if (proof.file_matches && proof.browser_matches) {
-    proof = await desktop.seal({ signal: interruption.signal });
-  }
+  const proof = await desktop.seal({ signal: interruption.signal });
   console.log(
     JSON.stringify({
       verified: proof.file_matches && proof.browser_matches,
