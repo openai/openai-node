@@ -78,15 +78,11 @@ describe('.stream()', () => {
         entrypoint === 'client'
           ? client.responses.stream({ model: '', input: 'read' })
           : ResponseStream.fromReadableStream(readableStreamFromEvents(events));
-      if (identity === 'changed') {
-        await expect(stream.finalResponse()).rejects.toThrow(
-          "expected output item id 'fc_original', got 'fc_final'",
-        );
-      } else if (identity === 'dropped' || identity === 'replacement') {
-        await expect(stream.finalResponse()).rejects.toThrow('Completed response output identity changed');
-      } else {
-        await expect(stream.finalResponse()).resolves.toMatchObject({ output });
-      }
+      await (identity === 'changed'
+        ? expect(stream.finalResponse()).rejects.toThrow(
+            "expected output item id 'fc_original', got 'fc_final'",
+          )
+        : expect(stream.finalResponse()).resolves.toMatchObject({ output }));
     },
   );
 
@@ -644,11 +640,6 @@ describe('.stream()', () => {
           terminalText = event.response.output_text;
         }
       });
-      if (terminal === 'completed' && output === 'empty') {
-        await expect(stream.finalResponse()).rejects.toThrow('Completed response output identity changed');
-        expect(terminalText).toBeUndefined();
-        return;
-      }
       const final = await stream.finalResponse();
       const expected = output === 'empty' ? '' : 'AlphaBeta';
       expect(final.output_text).toBe(expected);
