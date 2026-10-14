@@ -51,6 +51,16 @@ net.createServer({allowHalfOpen:true}, connection => {
       connection.end(JSON.stringify(proof) + '\\n');
       return;
     }
+    if ((action.type === 'verify' || action.type === 'seal') && mode === 'phase-' + action.type) {
+      fs.writeFileSync('../../phase-entered', '1');
+      const timer = setInterval(() => {
+        if (fs.existsSync('../../release')) {
+          clearInterval(timer);
+          connection.end(JSON.stringify({ok:true,file_matches:false,browser_matches:false,file_empty:true,browser_effects:0}) + '\\n');
+        }
+      }, 5);
+      return;
+    }
     if (action.type === 'ready' || action.type === 'verify') {
       connection.end(JSON.stringify({ok:true,file_matches:false,browser_matches:false,file_empty:true,browser_effects:0}) + '\\n');
       return;
@@ -390,7 +400,88 @@ async function checkStopDuringView() {
   }
 }
 
-if (process.argv.includes('--method-cancellation')) {
+async function checkPhaseAuthority(kind) {
+  const root = await runtime(`phase-${kind}`);
+  let desktop;
+  const consent = Promise.withResolvers();
+  const requested = Promise.withResolvers();
+  const enteredLater = Promise.withResolvers();
+  const releaseLater = Promise.withResolvers();
+  let escaped;
+  let escapedResult;
+  let later;
+  try {
+    desktop = await Desktop.create({ runtimeDir: root });
+    // Start an SDK call but return before its asynchronous approval settles.
+    await desktop.withComputer((computer) => {
+      escaped = computer;
+      escapedResult = computer.execute(typeCall(), {
+        beforeAction: () => {
+          requested.resolve();
+          return consent.promise;
+        },
+      });
+    });
+    await requested.promise;
+    // Observe a rejection immediately so a controlled failure cannot become unhandled.
+    const rejected = assert.rejects(escapedResult, /owns|own|active|stopped|cancelled|refused|result/u);
+    if (kind === 'operation') {
+      later = desktop.withComputer(async (current) => {
+        enteredLater.resolve();
+        await releaseLater.promise;
+        return current.execute(typeCall(), { beforeAction: () => true });
+      });
+      await enteredLater.promise;
+    } else {
+      later = desktop[kind]();
+      await entered(root, 'phase-entered');
+    }
+    consent.resolve(true);
+    // A stale call must reject independently of the current owner settling.
+    const timer = new AbortController();
+    try {
+      await Promise.race([
+        rejected,
+        delay(500, undefined, { signal: timer.signal }).then(() => {
+          throw new Error('An escaped toolset waited for or ran inside a later desktop phase.');
+        }),
+      ]);
+      assert.equal(await exists(path.join(root, 'effects')), false);
+      await assert.rejects(escaped.execute(typeCall(), { beforeAction: () => true }));
+    } finally {
+      timer.abort();
+      await writeFile(path.join(root, 'release'), '1');
+      releaseLater.resolve();
+    }
+    const result = await later;
+    if (kind === 'operation') {
+      assert.ok(result.output.image_url.startsWith('data:image/png;base64,'));
+      const effects = await readFile(path.join(root, 'effects'), 'utf-8');
+      assert.equal(effects.trim(), '1');
+    } else {
+      assert.equal(result.ok, true);
+    }
+    assert.equal(desktop.uncertainEffects, false);
+    await noCollision(root);
+    console.log(`PASS escaped computer refused during ${kind}, current phase remains usable`);
+  } finally {
+    consent.resolve(true);
+    releaseLater.resolve();
+    await writeFile(path.join(root, 'release'), '1');
+    await Promise.allSettled([escapedResult, later]);
+    await desktop?.stop();
+    await gone(root);
+    await rm(root, { recursive: true });
+  }
+}
+
+if (process.argv.includes('--phase-authority')) {
+  for (const kind of ['verify', 'seal', 'operation']) {
+    // Each independent owner is reaped before creating the next.
+    // oxlint-disable-next-line no-await-in-loop
+    await checkPhaseAuthority(kind);
+  }
+} else if (process.argv.includes('--method-cancellation')) {
   await checkActiveCancellation('input', true);
   await checkActiveCancellation('frame', true);
 } else if (process.argv.includes('--screenshot-budget')) {
