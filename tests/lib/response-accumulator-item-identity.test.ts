@@ -185,6 +185,27 @@ const itemScopedEvents: readonly (readonly [string, string, EventFields])[] = [
 ];
 
 describe('ResponseAccumulator output item identity', () => {
+  test('preserves an empty function call ID and rejects duplicate routing identity', () => {
+    const first: OutputItem = {
+      type: 'function_call',
+      id: 'first',
+      call_id: '',
+      name: 'fixture',
+      arguments: '{}',
+      status: 'completed',
+    };
+    const snapshot = createSnapshot(first);
+    expect(snapshot.output[0]).toMatchObject({ call_id: '' });
+    expect(() =>
+      applyEvent(snapshot, {
+        type: 'response.output_item.added',
+        output_index: 1,
+        item: { ...first, id: 'second' },
+      }),
+    ).toThrow("duplicate output item identity 'call:function_call:'");
+    expect(snapshot.output).toHaveLength(1);
+  });
+
   test.each(
     (
       [
@@ -975,22 +996,17 @@ describe('ResponseAccumulator output item identity', () => {
   );
 
   test.each(['function_call', 'custom_tool_call'] as const)(
-    'rejects %s completions that add an optional platform ID after creation',
+    'accepts %s completions that add an optional platform ID with the same call ID',
     (type) => {
       const item = makeOutput(type);
       Reflect.deleteProperty(item, 'id');
       const snapshot = createSnapshot(item);
-      const original = structuredClone(snapshot);
-
-      expect(() =>
-        applyEvent(snapshot, {
-          type: 'response.output_item.done',
-          output_index: 0,
-          item: { ...item, id: 'new_item' },
-        }),
-      ).toThrow("expected output item id 'undefined', got 'new_item'");
-
-      expect(snapshot).toEqual(original);
+      applyEvent(snapshot, {
+        type: 'response.output_item.done',
+        output_index: 0,
+        item: { ...item, id: 'new_item' },
+      });
+      expect(snapshot.output).toEqual([{ ...item, id: 'new_item' }]);
     },
   );
 
