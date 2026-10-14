@@ -61,6 +61,109 @@ async function until(predicate) {
   const latest = await call('/api/state');
   assert.fail(`Fieldwork did not reach expected state: ${JSON.stringify(latest.body)}`);
 }
+async function checkLive() {
+  const realFetch = globalThis.fetch;
+  try {
+    for (const api of ['responses', 'decisions']) {
+      models[api] = `local-${api}`;
+      for (const outcome of ['denied', 'cancelled']) {
+        const entered = Promise.withResolvers();
+        const cancelled = Promise.withResolvers();
+        const requests = [];
+        globalThis.fetch = (url, options) => {
+          if (new URL(url).origin === app.origin) {
+            return realFetch(url, options);
+          }
+          requests.push({ url: new URL(url), options });
+          if (outcome === 'cancelled') {
+            const body = new ReadableStream({
+              start(controller) {
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    api === 'responses' ? 'event: response.created\ndata: ' : '{"id":',
+                  ),
+                );
+                options.signal.addEventListener(
+                  'abort',
+                  () => {
+                    cancelled.resolve();
+                    controller.error(options.signal.reason);
+                  },
+                  { once: true },
+                );
+              },
+              pull() {
+                entered.resolve();
+              },
+              cancel() {
+                cancelled.resolve();
+              },
+            });
+            return Promise.resolve(
+              new Response(body, {
+                headers: { 'content-type': api === 'responses' ? 'text/event-stream' : 'application/json' },
+              }),
+            );
+          }
+          entered.resolve();
+          return Promise.resolve(
+            Response.json(
+              { error: { message: 'sk-local-marker test-only', type: 'authentication_error' } },
+              { status: 401, headers: { 'x-request-id': 'sk-local-marker' } },
+            ),
+          );
+        };
+        // oxlint-disable-next-line no-await-in-loop -- One owned demo session per transport outcome.
+        const started = await call('/api/start', { taskId: 'reservation', api, mode: 'live' });
+        assert.equal(started.status, 200);
+        // oxlint-disable-next-line no-await-in-loop -- Bound the actual first forwarded request.
+        await Promise.race([entered.promise, delay(10_000).then(() => assert.fail('No live API request'))]);
+        assert.equal(requests.length, 1);
+        const [{ url, options }] = requests;
+        const body = JSON.parse(options.body);
+        assert.equal(url.pathname, `/v1/${api}`);
+        assert.equal(options.method, 'POST');
+        assert.equal(new Headers(options.headers).get('authorization'), 'Bearer test-only');
+        assert.equal(body.model, `local-${api}`);
+        assert.ok(body.input);
+        if (api === 'responses') {
+          assert.equal(body.stream, true);
+          assert.ok(body.tools.length);
+        } else {
+          assert.ok(body.questions.length);
+        }
+        if (outcome === 'cancelled') {
+          // oxlint-disable-next-line no-await-in-loop -- Stop the same admitted request.
+          assert.equal(await responseStatus(call('/api/stop', { runId: started.body.id })), 200);
+          // oxlint-disable-next-line no-await-in-loop -- Stop must settle the already-open response body.
+          await Promise.race([
+            cancelled.promise,
+            delay(5000).then(() => assert.fail('Body was not cancelled')),
+          ]);
+        }
+        // oxlint-disable-next-line no-await-in-loop -- Finish cleanup before starting the next session.
+        const stopped = await until((run) => run?.owner === 'stopped' && !run.closing);
+        assert.equal(stopped.requests, 1);
+        assert.equal(requests.length, 1);
+        assert.equal(stopped.result, 'unverified');
+        assert.deepEqual(stopped.fixture.results, {});
+        assert.equal(stopped.uncertainEffects, false);
+        assert.ok(!JSON.stringify(stopped).includes('sk-local-marker'));
+        if (outcome === 'denied') {
+          assert.equal(stopped.status, 'failed');
+          assert.equal(stopped.apiFailure.status, 401);
+          assert.ok(!JSON.stringify(stopped.apiFailure).includes('test-only'));
+        } else {
+          assert.equal(stopped.status, 'stopped');
+          assert.equal(stopped.apiFailure, null);
+        }
+      }
+    }
+    console.log('PASS live Responses/Decisions: dispatch forwarding, safe denial and cancelled open body.');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
 async function checkAvailability(page, api, other) {
   models[api] = 'test-only';
   models[other] = undefined;
@@ -163,6 +266,7 @@ try {
   );
   assert.ok(removed.every((result) => result.status === 404));
 
+  await checkLive();
   holdView = true;
   const starting = await call('/api/start', { taskId: 'reservation', api: 'decisions', mode: 'rehearsal' });
   await Promise.race([viewEntered.promise, delay(5000).then(() => assert.fail('Capture did not start'))]);

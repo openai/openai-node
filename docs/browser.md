@@ -14,6 +14,16 @@ npm install openai playwright@1.63.0
 npx playwright install chromium
 ```
 
+On Linux, if bundled Chromium cannot start with its sandbox enabled, select
+a locally installed Chrome before running the quickstart:
+
+```sh
+export OPENAI_EXAMPLE_BROWSER_CHANNEL=chrome
+```
+
+Leave the variable unset to use Playwright's bundled Chromium. Both choices
+keep the browser sandbox enabled.
+
 Set `OPENAI_API_KEY` and `OPENAI_MODEL` in your shell. Use a model available to your project
 that supports Responses function tools. Save this as `reader.mjs`, then run `node reader.mjs`.
 
@@ -25,7 +35,15 @@ import { ResponsesToolRunner } from 'openai/helpers/responses-tool-runner';
 
 const model = process.env['OPENAI_MODEL'];
 if (!model) throw new Error('Set OPENAI_MODEL to a model that supports Responses function tools.');
-const session = await chromium.launch({ chromiumSandbox: true, env: { PATH: process.env['PATH'] ?? '' } });
+const channel = process.env['OPENAI_EXAMPLE_BROWSER_CHANNEL'];
+if (channel !== undefined && channel !== 'chrome') {
+  throw new Error('OPENAI_EXAMPLE_BROWSER_CHANNEL must be unset or chrome.');
+}
+const session = await chromium.launch({
+  channel,
+  chromiumSandbox: true,
+  env: { PATH: process.env['PATH'] ?? '' },
+});
 try {
   const page = await session.newPage();
   await page.setContent('<title>Cafe</title><p>Cafe hours: 08:00-16:00.</p>');
