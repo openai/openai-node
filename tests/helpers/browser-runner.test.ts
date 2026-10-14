@@ -10669,3 +10669,137 @@ test.each(['duplicate definitions', 'repeated references'] as const)(
     }
   },
 );
+
+describe.each(['input', 'resume', 'budget'] as const)('replay result metadata via %s', (mode) => {
+  test.each([
+    ['id', 7, false],
+    ['status', 'failed', false],
+    ['name', false, false],
+    ['namespace', {}, false],
+    ['caller', 'direct', false],
+    ['caller', { type: 'program', caller_id: 7 }, false],
+    ['nullable fields', null, true],
+    ['input status and program caller', null, true],
+  ] as const)('function output %s: %j', async (field, value, valid) => {
+    const effect = vi.fn(() => 'should not replay');
+    const runner = new ResponsesToolRunner({
+      functions: [{ tool: functionTool('record'), execute: effect }],
+    });
+    const saved = recording();
+    let resumeFrom: ResponsesRunnerCheckpoint | undefined;
+    if (mode === 'resume') {
+      await runner.run(harness([{ output: [message] }]).client, input, { ledger: saved.ledger });
+      resumeFrom = saved.writes.find((entry) => entry.phase === 'boundary');
+      expect(resumeFrom).toBeDefined();
+    }
+    const native = wireCall('record', {}, 'historic');
+    const output: ResponseInputItem.FunctionCallOutput = {
+      type: 'function_call_output',
+      call_id: native.call_id,
+      output: 'historic result',
+    };
+    if (field === 'nullable fields') {
+      Object.assign(output, { id: null, status: null, name: null, namespace: null, caller: null });
+    } else if (field === 'input status and program caller') {
+      Object.assign(output, {
+        id: 'native-result',
+        status: 'in_progress',
+        name: 'record',
+        namespace: 'fixture',
+        caller: { type: 'program', caller_id: 'program' },
+        async: 'unowned-extension',
+      });
+    } else {
+      Reflect.set(output, field, value);
+    }
+    const history: ResponseInputItem[] = [native, output];
+    if (resumeFrom) {
+      resumeFrom.history = history;
+    }
+    const env = harness([{ output: [{ ...message, id: 'new-answer' }] }]);
+    const save = vi.fn();
+    const promise = runner.run(
+      env.client,
+      { ...input, input: mode === 'resume' ? 'fresh task' : history },
+      mode === 'budget'
+        ? { contextBudget: { maxInputBytes: 30_000, maxInputImages: 4 } }
+        : { ledger: { runId: 'context', save, ...(resumeFrom ? { resumeFrom } : {}) } },
+    );
+    if (valid) {
+      await expect(promise).resolves.toHaveProperty('output_text', 'done');
+      expect(env.bodies[0]?.['input']).toContainEqual(output);
+    } else {
+      await expect(promise).rejects.toBeInstanceOf(Error);
+      expect(env.bodies).toHaveLength(0);
+      expect(save).not.toHaveBeenCalled();
+    }
+    expect(effect).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['id', 7, false],
+    ['reason', ['secret'], false],
+    ['nullable fields', null, true],
+    ['native fields', null, true],
+  ] as const)('MCP approval response %s: %j', async (field, value, valid) => {
+    const effect = vi.fn(() => 'should not replay');
+    const approveMcp = vi.fn(() => true);
+    const runner = new ResponsesToolRunner({
+      functions: [{ tool: functionTool('record'), execute: effect }],
+    });
+    const mcp: Tool = { type: 'mcp', server_label: 'owned', server_url: 'https://fixture.invalid/mcp' };
+    const approval: ResponseOutputItem.McpApprovalRequest = {
+      type: 'mcp_approval_request',
+      id: 'approval_actual',
+      name: 'read',
+      server_label: 'owned',
+      arguments: '{}',
+    };
+    const saved = recording();
+    let resumeFrom: ResponsesRunnerCheckpoint | undefined;
+    if (mode === 'resume') {
+      await runner.run(
+        harness([{ output: [approval] }, { output: [message] }]).client,
+        { ...input, tools: [mcp] },
+        { ledger: saved.ledger, approveMcp: () => false },
+      );
+      resumeFrom = saved.writes.find((entry) => entry.phase === 'boundary');
+      expect(resumeFrom).toBeDefined();
+    }
+    const output: ResponseInputItem.McpApprovalResponse = {
+      type: 'mcp_approval_response',
+      approval_request_id: 'approval_actual',
+      approve: false,
+    };
+    if (field === 'nullable fields') {
+      Object.assign(output, { id: null, reason: null });
+    } else if (field === 'native fields') {
+      Object.assign(output, { id: 'receipt', reason: 'operator declined', future: 'keep' });
+    } else {
+      Reflect.set(output, field, value);
+    }
+    const history: ResponseInputItem[] = [approval, output];
+    if (resumeFrom) {
+      resumeFrom.history = history;
+    }
+    const env = harness([{ output: [{ ...message, id: 'new-answer' }] }]);
+    const save = vi.fn();
+    const promise = runner.run(
+      env.client,
+      { ...input, tools: [mcp], input: mode === 'resume' ? 'fresh task' : history },
+      mode === 'budget'
+        ? { contextBudget: { maxInputBytes: 30_000, maxInputImages: 4 }, approveMcp }
+        : { ledger: { runId: 'context', save, ...(resumeFrom ? { resumeFrom } : {}) }, approveMcp },
+    );
+    if (valid) {
+      await expect(promise).resolves.toHaveProperty('output_text', 'done');
+      expect(env.bodies[0]?.['input']).toContainEqual(output);
+    } else {
+      await expect(promise).rejects.toBeInstanceOf(Error);
+      expect(env.bodies).toHaveLength(0);
+      expect(save).not.toHaveBeenCalled();
+    }
+    expect(approveMcp).not.toHaveBeenCalled();
+    expect(effect).not.toHaveBeenCalled();
+  });
+});
