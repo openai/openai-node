@@ -28,6 +28,18 @@ contain spaces, commas or percent signs. The launcher checks the path against
 macOS's Unix socket limit. The build instructions produce `bin/vfkit` and
 the owned read-only `build/desktop.raw`.
 
+VM setup and launch resolve the runtime to its canonical path. Each ancestor must
+belong to root or the current user and must not be writable by other users
+unless it is a sticky directory such as /private/tmp. The example trusts the
+current host user; it does not protect against that user's deliberate file
+replacement.
+
+The VM launcher keeps a parent-liveness pipe open. If the SDK process crashes
+or is killed, a small foreground owner stops and reaps its exact VM child.
+Normal Stop still removes the private run directory. After a forced SDK exit
+or host reboot, run directories can remain; remove them manually only after
+all owners using that runtime have stopped.
+
 Use Node.js 22 or later. From the extracted SDK source archive, install the
 published package and run from `examples/`:
 
