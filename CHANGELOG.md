@@ -1,5 +1,32 @@
 # Changelog
 
+## [7.33.0](https://github.com/openai/openai-node/compare/v7.32.0...v7.33.0) (2026-10-14)
+
+
+### Features
+
+* add browser and computer toolsets (1/4) ([#2936](https://github.com/openai/openai-node/issues/2936)) ([3811840](https://github.com/openai/openai-node/commit/381184072682659e85ff14fccf26ee1d2471fa45))
+* **api:** add beta session spending limits ([#2916](https://github.com/openai/openai-node/issues/2916)) ([f57c965](https://github.com/openai/openai-node/commit/f57c9651c8d22ae82cacca27317cfa7126491011))
+* **api:** add billing_not_active session error code ([#2911](https://github.com/openai/openai-node/issues/2911)) ([ee3f743](https://github.com/openai/openai-node/commit/ee3f743a0cc375bcb8b447e1095840987d6b3f42))
+* **api:** add OCI external-storage provider support ([#2917](https://github.com/openai/openai-node/issues/2917)) ([80e210e](https://github.com/openai/openai-node/commit/80e210e00c05be3c631baa01ab2113383fdc5268))
+* **api:** add organization Decisions usage reporting ([#2919](https://github.com/openai/openai-node/issues/2919)) ([3f8753e](https://github.com/openai/openai-node/commit/3f8753e0fc60f22c10c925b391810f45c3904af8))
+* **api:** add shida to named Live voices ([#2912](https://github.com/openai/openai-node/issues/2912)) ([d6d80a1](https://github.com/openai/openai-node/commit/d6d80a13b7482bab9c7b25d5ada73ec97eb684d6))
+* **api:** add vault updates and metadata filters ([#2906](https://github.com/openai/openai-node/issues/2906)) ([1bbc425](https://github.com/openai/openai-node/commit/1bbc425c836eca65222e7a3a2e79e53a6881ce9c))
+* **api:** align beta pagination limits and non-null parameters ([#2915](https://github.com/openai/openai-node/issues/2915)) ([4ae463a](https://github.com/openai/openai-node/commit/4ae463a70013ba7e2389b1615b7b3e13b19266f2))
+* **api:** expose image tool error and moderation details ([#2935](https://github.com/openai/openai-node/issues/2935)) ([0bf85e0](https://github.com/openai/openai-node/commit/0bf85e01f1fd8c7fc4360f602a54ffd11d854c69))
+* **api:** support image URLs and detailed safety alert explanations ([#2918](https://github.com/openai/openai-node/issues/2918)) ([8297332](https://github.com/openai/openai-node/commit/82973328ce8f3921a97ba42d66d6f4a1a81c5566))
+* **api:** support updating project API key expiry ([#2922](https://github.com/openai/openai-node/issues/2922)) ([467a082](https://github.com/openai/openai-node/commit/467a08203f87af9bdeffd20896ad3fec470f76b4))
+
+
+### Chores
+
+* **api:** clarify agent tool limits and environment pagination ([#2920](https://github.com/openai/openai-node/issues/2920)) ([05b8763](https://github.com/openai/openai-node/commit/05b8763e2dabd98758da17586a43315087d1af9f))
+* **api:** clarify decision creation documentation ([#2913](https://github.com/openai/openai-node/issues/2913)) ([1c380ea](https://github.com/openai/openai-node/commit/1c380ea1e538d37f80654dffe36b1a25e9e61011))
+* **api:** clarify Decisions question and answer descriptions ([#2910](https://github.com/openai/openai-node/issues/2910)) ([b5c7300](https://github.com/openai/openai-node/commit/b5c73007569ec7aa3654a35e6693e8725a40545a))
+* **api:** document 128-character safety identifiers ([#2909](https://github.com/openai/openai-node/issues/2909)) ([75a6810](https://github.com/openai/openai-node/commit/75a681079f07d0aaaffb88a79b637abf67b8db7a))
+* **api:** document decision choice constraints ([#2914](https://github.com/openai/openai-node/issues/2914)) ([3add470](https://github.com/openai/openai-node/commit/3add47071b68a05935b25d17044951a19f59c602))
+* **api:** document Files API rate-limit responses ([#2908](https://github.com/openai/openai-node/issues/2908)) ([250b6ac](https://github.com/openai/openai-node/commit/250b6ac955a14a068607aa896249781cf0f46637))
+
 ## [7.32.0](https://github.com/openai/openai-node/compare/v7.31.0...v7.32.0) (2026-10-09)
 
 
