@@ -90,6 +90,10 @@ function contentPart(value: unknown): boolean {
   );
 }
 
+function inputCacheBreakpoint(value: unknown): boolean {
+  return value === undefined || (isObj(value) && emitted(value, 'mode') === 'explicit');
+}
+
 // Validate native replay fields without discarding provider extension fields.
 // Runners impose any stronger completion rule at their own execution boundary.
 export function isNativeResponseMessage(value: unknown): boolean {
@@ -106,6 +110,80 @@ export function isNativeResponseMessage(value: unknown): boolean {
     (phase === undefined || phase === null || phase === 'commentary' || phase === 'final_answer') &&
     allEntries(emitted(value, 'content'), contentPart)
   );
+}
+
+// Message input also includes earlier assistant output, but assistant easy inputs remain valid.
+export function isNativeResponseMessageInput(value: unknown): boolean {
+  if (!isObj(value)) {
+    return false;
+  }
+  const role = emitted(value, 'role');
+  const content = emitted(value, 'content');
+  if (role !== 'user' && role !== 'assistant' && role !== 'system' && role !== 'developer') {
+    return false;
+  }
+  const phase = emitted(value, 'phase');
+  if (
+    (typeof content === 'string' || role === 'assistant') &&
+    phase !== undefined &&
+    phase !== null &&
+    phase !== 'commentary' &&
+    phase !== 'final_answer'
+  ) {
+    return false;
+  }
+  if (typeof content === 'string') {
+    return true;
+  }
+  if (
+    Array.isArray(content) &&
+    content.some(
+      (part) =>
+        isObj(part) && (emitted(part, 'type') === 'output_text' || emitted(part, 'type') === 'refusal'),
+    )
+  ) {
+    return isNativeResponseMessage(value);
+  }
+  return allEntries(content, (part) => {
+    if (!isObj(part)) {
+      return false;
+    }
+    switch (emitted(part, 'type')) {
+      case 'input_text': {
+        return (
+          typeof emitted(part, 'text') === 'string' &&
+          inputCacheBreakpoint(emitted(part, 'prompt_cache_breakpoint'))
+        );
+      }
+      case 'input_image': {
+        const detail = emitted(part, 'detail');
+        return (
+          (detail === 'auto' || detail === 'low' || detail === 'high' || detail === 'original') &&
+          ['image_url', 'file_id'].every((name) => {
+            const field = emitted(part, name);
+            return field === undefined || field === null || typeof field === 'string';
+          }) &&
+          inputCacheBreakpoint(emitted(part, 'prompt_cache_breakpoint'))
+        );
+      }
+      case 'input_file': {
+        const detail = emitted(part, 'detail');
+        const fileId = emitted(part, 'file_id');
+        return (
+          (detail === undefined || detail === 'auto' || detail === 'low' || detail === 'high') &&
+          (fileId === undefined || fileId === null || typeof fileId === 'string') &&
+          ['file_data', 'file_url', 'filename'].every((name) => {
+            const field = emitted(part, name);
+            return field === undefined || typeof field === 'string';
+          }) &&
+          inputCacheBreakpoint(emitted(part, 'prompt_cache_breakpoint'))
+        );
+      }
+      default: {
+        return false;
+      }
+    }
+  });
 }
 
 // Accept only native reasoning fields that can be replayed as Responses input.

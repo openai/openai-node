@@ -108,5 +108,7 @@ through policy checks without taking redundant captures.
 Approval callbacks keep the native call type and receive an empty array for a
 legitimately omitted modern checklist. That copy does not add a field to history.
 
+For a local native desktop, use the [standalone desktop setup](../examples/computer-desktop/README.md).
+
 Browser control uses this computer driver and screenshot contract. A separate
 DOM/browser protocol is not part of this helper.

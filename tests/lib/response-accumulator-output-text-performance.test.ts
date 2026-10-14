@@ -127,7 +127,21 @@ function measureWork(kind: 'text' | 'output') {
       return cloned;
     }
     if (kind === 'text' && 'type' in cloned && cloned.type === 'output_text') {
-      return instrument(cloned, (property) => property === 'text');
+      // SAFETY: The checked clone is a synthetic output_text part created by this test's text factory.
+      const snapshot = cloned as ResponseOutputText;
+      let current = snapshot.text;
+      Object.defineProperty(snapshot, 'text', {
+        configurable: true,
+        enumerable: true,
+        get() {
+          work.count += 1;
+          return current;
+        },
+        set(textValue: string) {
+          current = textValue;
+        },
+      });
+      return snapshot;
     }
     if (kind === 'output' && 'object' in cloned && cloned.object === 'response') {
       // SAFETY: The structuredClone spy receives the synthetic response and checks its discriminator above; instrument that cloned response's output collection.
@@ -263,19 +277,25 @@ describe('canonical streamed response output text', () => {
     expect(work.count).toBeLessThanOrEqual(events.length * 12);
   });
 
-  test('keeps 4,096 ordinary streamed token deltas linear', async () => {
-    const count = 4096;
-    const work = measureWork('text');
-    const events = [
-      created(),
-      outputFrame('added', 0, message(0)),
-      contentFrame('added', 0, 0, text('')),
-      ...Array.from({ length: count }, () => textFrame('delta', 0, 0, 'x')),
-    ];
-    const final = await stream(events);
-    expect(final.output_text).toBe('x'.repeat(count));
-    expect(work.count).toBeLessThanOrEqual(count * 8);
-  });
+  test.each(['native', 'instrumented'] as const)(
+    'keeps 4,096 ordinary streamed token deltas linear (%s)',
+    async (mode) => {
+      const count = 4096;
+      const work = mode === 'instrumented' ? measureWork('text') : undefined;
+      const events = [
+        created(),
+        outputFrame('added', 0, message(0)),
+        contentFrame('added', 0, 0, text('')),
+        ...Array.from({ length: count }, () => textFrame('delta', 0, 0, 'x')),
+      ];
+      const final = await stream(events);
+      expect(final.output_text).toBe('x'.repeat(count));
+      if (work) {
+        expect(work.count).toBeGreaterThanOrEqual(count);
+        expect(work.count).toBeLessThanOrEqual(count * 8);
+      }
+    },
+  );
 
   test('recounts long public snapshots without comparing the previous aggregate', () => {
     const count = 16_000;
