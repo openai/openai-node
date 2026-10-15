@@ -78215,7 +78215,7 @@ components:
       - $ref: '#/components/schemas/LiveInitialUserMessageItemParam'
       - $ref: '#/components/schemas/LiveInitialAssistantMessageItemParam'
     input:
-      description: Ordered text-only history supplied before startup. Supports developer, user, and assistant messages with one text part each; at most 128 messages and 8,192 rendered tokens in total.
+      description: Ordered text-only history supplied before startup. Supports developer, user, and assistant messages with one text part each; at most 128 messages and a configured rendered-token limit (8,192 by default).
       type: array
       items:
         $ref: '#/components/schemas/LiveInitialItem'
@@ -91891,7 +91891,7 @@ components:
             type: string
           - type: 'null'
         input:
-          description: Ordered text-only history supplied before startup. Supports developer, user, and assistant messages with one text part each; at most 128 messages and 8,192 rendered tokens in total.
+          description: Ordered text-only history supplied before startup. Supports developer, user, and assistant messages with one text part each; at most 128 messages and a configured rendered-token limit (8,192 by default).
           type: array
           items:
             $ref: '#/components/schemas/LiveInitialItem'
@@ -92391,7 +92391,7 @@ components:
             type: string
           - type: 'null'
         input:
-          description: Ordered text-only history supplied before startup. Supports developer, user, and assistant messages with one text part each; at most 128 messages and 8,192 rendered tokens in total.
+          description: Ordered text-only history supplied before startup. Supports developer, user, and assistant messages with one text part each; at most 128 messages and a configured rendered-token limit (8,192 by default).
           type: array
           items:
             $ref: '#/components/schemas/LiveInitialItem'
