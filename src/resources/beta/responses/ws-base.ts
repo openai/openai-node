@@ -1,6 +1,12 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { ResponsesEmitter, ResponsesStreamMessage, WebSocketError, buildURL } from './internal-base';
+import {
+  sendWebSocketEvent,
+  sendRawWebSocketData,
+  flushWebSocketSendQueue,
+  waitForWebSocketOpen,
+} from '../../../internal/ws-connection';
 import { InternalEventEmitter } from '../../../core/EventEmitter';
 import { sleep } from '../../../internal/utils/sleep';
 import { type WebSocketLike, ReadyState } from '../../../internal/ws-adapter';
@@ -10,7 +16,6 @@ import {
   recordWebSocketError,
   rawByteLength,
   type WebSocketStreamOptions,
-  flattenRawData,
   isRecoverableClose,
   type RawWebSocketData,
   type ReconnectingEvent,
@@ -128,47 +133,23 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
   private _cancelRefresh: (() => void) | undefined;
 
   send(event: ResponsesAPI.BetaResponsesClientEvent) {
-    if (!this.socket) {
-      throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
-    }
-
-    if (this._isReconnecting || this.socket.readyState === ReadyState.CONNECTING) {
-      if (!this._sendQueue.enqueue(event)) {
-        this._onError(null, 'send queue is full, message discarded', undefined);
-      }
-      return;
-    }
-    if (this.socket.readyState !== ReadyState.OPEN) {
-      this._onError(null, 'cannot send on a closed WebSocket', undefined);
-      return;
-    }
-    try {
-      this.socket.send(JSON.stringify(event));
-    } catch (err) {
-      this._onError(null, 'could not send data', err);
-    }
+    sendWebSocketEvent(
+      this,
+      event,
+      this._sendQueue,
+      () => this._isReconnecting,
+      (message, cause) => this._onError(null, message, cause),
+    );
   }
 
   sendRaw(data: RawWebSocketData) {
-    if (!this.socket) {
-      throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
-    }
-
-    if (this._isReconnecting || this.socket.readyState === ReadyState.CONNECTING) {
-      if (!this._sendQueue.enqueueRaw(data)) {
-        this._onError(null, 'send queue is full, message discarded', undefined);
-      }
-      return;
-    }
-    if (this.socket.readyState !== ReadyState.OPEN) {
-      this._onError(null, 'cannot send on a closed WebSocket', undefined);
-      return;
-    }
-    try {
-      this.socket.send(flattenRawData(data));
-    } catch (err) {
-      this._onError(null, 'could not send data', err);
-    }
+    sendRawWebSocketData(
+      this,
+      data,
+      this._sendQueue,
+      () => this._isReconnecting,
+      (message, cause) => this._onError(null, message, cause),
+    );
   }
 
   close(props?: { code: number; reason: string }) {
@@ -661,7 +642,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
           this.socket.once('close', resolve);
         });
 
-        await this._awaitOpen(this.socket);
+        await waitForWebSocketOpen(this.socket);
 
         this._internalEvents._emit('socketSwap', oldSocket, this.socket);
         this._isReconnecting = false;
@@ -698,44 +679,8 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     this._emitPermanentClose(closeCode, `reconnect failed after ${maxRetries} attempts`);
   }
 
-  /**
-   * Resolves once the socket is open, rejects if it errors or closes first
-   */
-  private _awaitOpen(socket: TSocket): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const cleanup = () => {
-        socket.off('open', onOpen);
-        socket.off('error', onError);
-        socket.off('close', onFail);
-      };
-      const onOpen = () => {
-        cleanup();
-        resolve();
-      };
-      const onError = (err: Error) => {
-        cleanup();
-        reject(err);
-      };
-      const onFail = () => {
-        cleanup();
-        reject(new Error('socket closed before open'));
-      };
-      socket.once('open', onOpen);
-      socket.once('error', onError);
-      socket.once('close', onFail);
-    });
-  }
-
   private _flushSendQueue(): void {
-    if (!this.socket) {
-      throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
-    }
-
-    try {
-      this._sendQueue.flush((data) => this.socket.send(flattenRawData(data)));
-    } catch (err) {
-      this._onError(null, 'could not send queued data', err);
-    }
+    flushWebSocketSendQueue(this, this._sendQueue, (message, cause) => this._onError(null, message, cause));
   }
 
   /**
