@@ -4,7 +4,7 @@
 
 The custom-code reporter measures the SDK's remaining customization of generated
 files. The budget gate checks that measurement against the repository's policy.
-See [CONTRIBUTING.md](../../.github/CONTRIBUTING.md#custom-code-budget) for budget changes
+See [CONTRIBUTING.md](../../CONTRIBUTING.md#custom-code-budget) for budget changes
 and human review, and [AGENTS.md](../../AGENTS.md#custom-code-budget) for agent rules.
 
 ## What is counted
@@ -59,8 +59,6 @@ or manifest edits cannot exempt a generated file. Generated workflow/action
 hashes are covered by the manifest even though the legacy patch counter and
 public snapshot publication continue to exclude those subtrees. Handwritten
 files and repository-owned governance remain outside generated ownership.
-Private checkpoints retain SDK-owned CI workflows and actions from their parent;
-the generated ownership inventory does not claim those inherited files.
 
 The existing required `Castiron / custom-code budget` status fails on any strict
 violation. Its trusted-main execution and merge-queue checks remain mandatory.

@@ -254,7 +254,7 @@ class BudgetTests(GitTestCase):
 
 
 class StrictTests(GitTestCase):
-    workflow = ".github/workflows/castiron-custom-code.yml"
+    workflow = ".github/workflows/generated.yml"
 
     def setUp(self) -> None:  # pyright: ignore[reportImplicitOverride]
         super().setUp()
@@ -482,31 +482,10 @@ class StrictTests(GitTestCase):
         with self.assertRaisesRegex(ValueError, "disagrees"):
             budget.generated_manifest(self.repo, self.commit())
 
-    def test_manifest_preserves_inherited_sdk_owned_github_files(self) -> None:
-        self.git("checkout", "--detach", "-q", self.generated)
-        inherited = (".github/workflows/ci.yml", ".github/actions/setup-go/action.yml")
-        for path in inherited:
-            self.write(path, "SDK-owned configuration\n")
-        generated = self.commit("checkpoint preserves protected parent subtrees")
-        manifest = budget.generated_manifest(self.repo, generated)
-        for path in inherited:
-            self.assertNotIn(path.encode(), manifest)
-            self.write(path, "SDK-owned configuration update\n")
-        head = self.commit("handwritten configuration remains outside generated ownership")
-        self.assertEqual(budget.verify_generated(self.repo, generated, head), [])
-
     def test_private_manifest_checks_excluded_workflows_and_actions(self) -> None:
-        self.assertIn(self.workflow.encode(), budget.GENERATED_GITHUB_PATHS)
         for path in (self.workflow, ".github/actions/generated/action.yml"):
             for mutation in ("omit", "content", "mode"):
-                with (
-                    self.subTest(path=path, mutation=mutation),
-                    mock.patch.object(
-                        budget,
-                        "GENERATED_GITHUB_PATHS",
-                        budget.GENERATED_GITHUB_PATHS | {path.encode()},
-                    ),
-                ):
+                with self.subTest(path=path, mutation=mutation):
                     self.git("checkout", "--detach", "-q", self.generated)
                     self.write(path, "generated workflow or action\n")
                     manifest = json.loads((self.repo / budget.MANIFEST.decode()).read_text())

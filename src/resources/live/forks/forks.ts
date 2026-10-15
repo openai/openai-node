@@ -17,6 +17,7 @@ export type ForkClientEvent =
   | LiveAPI.InputAudioAppendEvent
   | LiveAPI.InputAudioMuteEvent
   | LiveAPI.InputAudioUnmuteEvent
+  | LiveAPI.OutputAudioFixturePlayEvent
   | LiveAPI.InstructionsAppendEvent
   | LiveAPI.ThinkingAppendEvent
   | LiveAPI.CommentaryAppendEvent
@@ -36,6 +37,8 @@ export type ForkServerEvent =
   | LiveAPI.SessionUpdatedEvent
   | LiveAPI.InputAudioMutedEvent
   | LiveAPI.InputAudioUnmutedEvent
+  | LiveAPI.OutputAudioFixturePlayingEvent
+  | LiveAPI.OutputAudioFixturePlayedEvent
   | LiveAPI.InstructionsAppendedEvent
   | LiveAPI.ThinkingAppendedEvent
   | LiveAPI.CommentaryAppendedEvent

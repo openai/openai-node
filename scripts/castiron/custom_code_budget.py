@@ -83,14 +83,6 @@ def strict_policy(repo: Path, revision: str) -> bool:
 
 
 MANIFEST = b"scripts/castiron/generated-files.json"
-# Derived from the renderer's repository-file inventory, also used by checkpoint
-# publication to distinguish generated tooling from protected SDK-owned CI.
-GENERATED_GITHUB_PATHS = frozenset(
-    {
-        b".github/workflows/castiron-custom-code.yml",
-        b".github/workflows/castiron-custom-code-comment.yml",
-    }
-)
 
 
 def generated_manifest(repo: Path, generated: str) -> dict[bytes, dict[str, str]]:
@@ -133,15 +125,13 @@ def generated_manifest(repo: Path, generated: str) -> dict[bytes, dict[str, str]
         ):
             raise ValueError(f"invalid generated identity: {name}")
         files[path] = identity
-    # Checkpoints retain SDK-owned workflow/action subtrees from their parent.
-    # Those are outside generated ownership. Every other snapshot path, including
-    # renderer-owned GitHub files omitted from the legacy hash, must be listed.
-    # Public snapshots retain generated identities without the private blobs.
+    # Private snapshots must bind every generated file, including workflows and
+    # actions omitted from the legacy hash. Public snapshots retain these
+    # identities but deliberately omit their private blobs.
     snapshot_paths = set(entries) - {MANIFEST}
-    if any(
-        report.included(path) or path in GENERATED_GITHUB_PATHS
-        for path in snapshot_paths - files.keys()
-    ) or any(report.included(path) for path in files.keys() - snapshot_paths):
+    if snapshot_paths - files.keys() or any(
+        report.included(path) for path in files.keys() - snapshot_paths
+    ):
         raise ValueError("generated manifest does not cover the verified snapshot exactly")
     for path, identity in files.items():
         if path in entries:
