@@ -3271,6 +3271,16 @@ export interface ResponseError {
   message: string;
 
   misalignment?: ResponseError.Misalignment;
+
+  /**
+   * The request parameter associated with the error, or null if none was recorded.
+   */
+  param?: string | null;
+
+  /**
+   * The original error type, or null if it was not recorded.
+   */
+  type?: string | null;
 }
 
 export namespace ResponseError {
