@@ -171,6 +171,7 @@ export type ClientEvent =
   | InputAudioAppendEvent
   | InputAudioMuteEvent
   | InputAudioUnmuteEvent
+  | OutputAudioFixturePlayEvent
   | InstructionsAppendEvent
   | ThinkingAppendEvent
   | CommentaryAppendEvent
@@ -1111,6 +1112,73 @@ export interface OutputAudioDeltaEvent {
 }
 
 /**
+ * Play one complete audio fixture through the session output. Send this event over
+ * the primary WebSocket or a server sideband. Audio must be raw mono PCM16
+ * little-endian at 24 kHz, regardless of the session audio format, and at most 30
+ * seconds. The entire payload is validated before model speech is interrupted and
+ * input is muted. Only one fixture can be active. fixture.playing acknowledges
+ * acceptance and fixture.played reports server mixer drain. These notifications
+ * are not exact transport-media boundaries. Input arriving during playback is
+ * dropped and not replayed.
+ */
+export interface OutputAudioFixturePlayEvent {
+  /**
+   * Base64-encoded raw mono PCM16 audio, little-endian, at 24 kHz. Do not include a
+   * WAV or other container header.
+   */
+  audio: string;
+
+  type: 'session.output_audio.fixture.play';
+
+  /**
+   * Optional client identifier for correlating this command with a server event's
+   * client_event_id or error.client_event_id.
+   */
+  event_id?: string | null;
+}
+
+/**
+ * The complete audio fixture has drained from the server mixer and normal
+ * inference has resumed. Transport buffers may still contain audio; this event
+ * does not prove listener-side completion. The optional client_event_id echoes the
+ * play command. This event is not emitted for canceled or failed playback.
+ */
+export interface OutputAudioFixturePlayedEvent {
+  /**
+   * The unique ID of the Live server event.
+   */
+  event_id: string;
+
+  type: 'session.output_audio.fixture.played';
+
+  /**
+   * The event_id of the client command associated with this server event, when
+   * supplied.
+   */
+  client_event_id?: string;
+}
+
+/**
+ * The existing playback path has accepted the validated audio fixture. This
+ * acknowledgment does not identify when the listener receives the first sample.
+ * The optional client_event_id echoes the play command.
+ */
+export interface OutputAudioFixturePlayingEvent {
+  /**
+   * The unique ID of the Live server event.
+   */
+  event_id: string;
+
+  type: 'session.output_audio.fixture.playing';
+
+  /**
+   * The event_id of the client command associated with this server event, when
+   * supplied.
+   */
+  client_event_id?: string;
+}
+
+/**
  * A transcript fragment for assistant output audio in the Live session. Accumulate
  * fragments in delivery order; these events do not define complete turns or
  * include a transcript-done event.
@@ -1470,6 +1538,8 @@ export type ServerEvent =
   | SessionUpdatedEvent
   | InputAudioMutedEvent
   | InputAudioUnmutedEvent
+  | OutputAudioFixturePlayingEvent
+  | OutputAudioFixturePlayedEvent
   | InstructionsAppendedEvent
   | ThinkingAppendedEvent
   | CommentaryAppendedEvent
@@ -2271,6 +2341,9 @@ export declare namespace Live {
     type MediaSessionConfig as MediaSessionConfig,
     type MediaSessionForkConfig as MediaSessionForkConfig,
     type OutputAudioDeltaEvent as OutputAudioDeltaEvent,
+    type OutputAudioFixturePlayEvent as OutputAudioFixturePlayEvent,
+    type OutputAudioFixturePlayedEvent as OutputAudioFixturePlayedEvent,
+    type OutputAudioFixturePlayingEvent as OutputAudioFixturePlayingEvent,
     type OutputTranscriptDeltaEvent as OutputTranscriptDeltaEvent,
     type ResponseCreateEvent as ResponseCreateEvent,
     type ResponseEvent as ResponseEvent,

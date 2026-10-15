@@ -30,6 +30,9 @@ Types:
 - <code><a href="./src/resources/live/live.ts">MediaSessionConfig</a></code>
 - <code><a href="./src/resources/live/live.ts">MediaSessionForkConfig</a></code>
 - <code><a href="./src/resources/live/live.ts">OutputAudioDeltaEvent</a></code>
+- <code><a href="./src/resources/live/live.ts">OutputAudioFixturePlayEvent</a></code>
+- <code><a href="./src/resources/live/live.ts">OutputAudioFixturePlayedEvent</a></code>
+- <code><a href="./src/resources/live/live.ts">OutputAudioFixturePlayingEvent</a></code>
 - <code><a href="./src/resources/live/live.ts">OutputTranscriptDeltaEvent</a></code>
 - <code><a href="./src/resources/live/live.ts">ResponseCreateEvent</a></code>
 - <code><a href="./src/resources/live/live.ts">ResponseEvent</a></code>
