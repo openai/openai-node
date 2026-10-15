@@ -1,6 +1,6 @@
 /* oxlint-disable max-classes-per-file -- Both thin facades belong to the same public Live WebRTC entrypoint. */
 import type {
-  ConnectClientEvent as ClientEvent,
+  ConnectClientEvent,
   ConnectServerEvent as ServerEvent,
 } from '../../resources/live/sideband/sideband';
 import { WebRTCConnection } from '../webrtc/connection';
@@ -15,6 +15,9 @@ export type {
   WebRTCConfiguration,
   WebRTCState,
 } from '../webrtc/types';
+
+/** Fixture playback requires a primary WebSocket or server sideband. */
+type ClientEvent = Exclude<ConnectClientEvent, { type: 'session.output_audio.fixture.play' }>;
 
 /** Browser Live connection with application-owned SDP exchange and typed server-event subscriptions. */
 export class OpenAILiveWebRTC extends WebRTCConnection<ClientEvent, ServerEvent> {}

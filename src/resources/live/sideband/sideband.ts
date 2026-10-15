@@ -6,13 +6,14 @@ import * as LiveAPI from '../live';
 export class Sideband extends APIResource {}
 
 /**
- * Client events accepted by an attached Live sideband WebSocket. The session is
- * already started; send audio over the primary connection.
+ * Client events accepted by an attached Live sideband WebSocket. The session has
+ * already started. Send input audio over the primary connection.
  */
 export type ConnectClientEvent =
   | LiveAPI.SessionUpdateEvent
   | LiveAPI.InputAudioMuteEvent
   | LiveAPI.InputAudioUnmuteEvent
+  | LiveAPI.OutputAudioFixturePlayEvent
   | LiveAPI.InstructionsAppendEvent
   | LiveAPI.ThinkingAppendEvent
   | LiveAPI.CommentaryAppendEvent
@@ -29,6 +30,8 @@ export type ConnectServerEvent =
   | LiveAPI.SessionUpdatedEvent
   | LiveAPI.InputAudioMutedEvent
   | LiveAPI.InputAudioUnmutedEvent
+  | LiveAPI.OutputAudioFixturePlayingEvent
+  | LiveAPI.OutputAudioFixturePlayedEvent
   | LiveAPI.InstructionsAppendedEvent
   | LiveAPI.ThinkingAppendedEvent
   | LiveAPI.CommentaryAppendedEvent
