@@ -15,7 +15,6 @@ from unittest import mock
 import custom_code_report as report
 from custom_code_test_support import GitTestCase, source_run
 
-
 WORKFLOW = (
     Path(__file__).resolve().parents[2] / ".github/workflows/castiron-custom-code-comment.yml"
 )
@@ -321,9 +320,23 @@ class StatusPublisherTests(unittest.TestCase):
         fallback_pulls: list[dict[str, int]] | None = None,
         run_overrides: dict[str, Any] | None = None,
         previous_statuses: list[dict[str, Any]] | None = None,
+        branch: str = "main",
+        evaluated_branch: str | None = None,
+        policy_changed: bool = False,
+        queue_absent: bool = False,
+        queue_pages: list[dict[str, Any]] | None = None,
+        retarget_during_publication: bool = False,
     ) -> list[dict[str, Any]]:
         base, head = "a" * 40, "b" * 40
+        run = source_run(head, event_name)
+        if event_name == "merge_group":
+            run["head_branch"] = f"gh-readonly-queue/{branch}/pr-7-example"
         payload = {
+            "main_sha": "d" * 40
+            if policy_changed
+            else ("c" * 40 if branch == "main" and base_changed else base),
+            "queue_absent": queue_absent,
+            "queue_pages": queue_pages,
             "fallback_pulls": fallback_pulls,
             "previous_statuses": previous_statuses or [],
             "context": {
@@ -332,20 +345,23 @@ class StatusPublisherTests(unittest.TestCase):
                 "serverUrl": "https://github.com",
                 "runId": 123,
                 "payload": {
-                    "workflow_run": source_run(head, event_name),
+                    "workflow_run": run,
                 },
             },
-            "run": {**source_run(head, event_name), **(run_overrides or {})},
+            "run": {**run, **(run_overrides or {})},
             "current": {
+                "number": 3,
                 "state": "open",
                 "head": {"sha": "c" * 40 if head_changed else head},
                 "base": {
                     "sha": "c" * 40 if base_changed else base,
-                    "ref": "main",
+                    "ref": branch,
                     "repo": {"full_name": "openai/example"},
                 },
             },
             "env": {
+                "TARGET_BRANCH": "" if no_result else (evaluated_branch or branch),
+                "POLICY_SHA": "" if no_result else base,
                 "BASE_SHA": "" if no_result else base,
                 "HEAD_SHA": "" if no_result else head,
                 "ISOLATION_RESULT": "success",
@@ -353,6 +369,12 @@ class StatusPublisherTests(unittest.TestCase):
                 "PUBLISH_ATTEMPT": "1",
             },
         }
+        if retarget_during_publication:
+            current = payload["current"]
+            payload["current_sequence"] = [
+                current,
+                {**current, "base": {**current["base"], "ref": "other"}},
+            ]
         return run_publisher("Publish exact-head statuses after checking freshness", payload)
 
     def test_statuses_attach_to_candidate_not_main(self) -> None:
@@ -363,6 +385,47 @@ class StatusPublisherTests(unittest.TestCase):
                 self.assertTrue(
                     all(r["sha"] == "b" * 40 and r["state"] == "success" for r in results)
                 )
+
+    def test_next_statuses_bind_target_policy_and_queue_membership(self) -> None:
+        for event in ("pull_request", "merge_group"):
+            with self.subTest(event=event):
+                result = self.publish(event_name=event, branch="next")
+                self.assertEqual(len(result), 2)
+                self.assertTrue(all(r["state"] == "success" for r in result))
+                self.assertTrue(all("next" in r["description"] for r in result))
+                stale = self.publish(event_name=event, branch="next", evaluated_branch="main")
+                self.assertTrue(all(r["state"] == "failure" for r in stale))
+        for options in ({"base_changed": True}, {"policy_changed": True}, {"queue_absent": True}):
+            result = self.publish(event_name="merge_group", branch="next", **options)
+            self.assertEqual(len(result), 2)
+            self.assertTrue(all(r["state"] == "failure" for r in result))
+        self.assertEqual(self.publish(branch="next", retarget_during_publication=True), [])
+
+    def test_next_fork_and_unsupported_targets(self) -> None:
+        result = self.publish(
+            branch="next", run_overrides={"pull_requests": []}, fallback_pulls=[{"number": 3}]
+        )
+        self.assertEqual([r["state"] for r in result], ["success", "success"])
+        for event in ("pull_request", "merge_group"):
+            for branch in ("Next", "Main", "release", "next-other"):
+                with self.subTest(event=event, branch=branch):
+                    self.assertEqual(self.publish(event_name=event, branch=branch), [])
+
+    def test_next_queue_membership_paginates(self) -> None:
+        pages = [
+            {
+                "expected_cursor": None,
+                "nodes": [],
+                "pageInfo": {"hasNextPage": True, "endCursor": "page2"},
+            },
+            {
+                "expected_cursor": "page2",
+                "nodes": [{"headCommit": {"oid": "b" * 40}}],
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+            },
+        ]
+        result = self.publish(event_name="merge_group", branch="next", queue_pages=pages)
+        self.assertEqual([r["state"] for r in result], ["success", "success"])
 
     def test_fork_statuses_with_no_commit_association(self) -> None:
         options: dict[str, Any] = {
