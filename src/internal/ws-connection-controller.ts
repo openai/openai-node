@@ -284,6 +284,11 @@ export class WebSocketConnection<
     this._internalEvents.on('reconnecting', onReconnecting);
     this._internalEvents.on('reconnected', onReconnected);
 
+    // Overridden registration hooks may have terminated the iterator before setup finished.
+    if (done) {
+      cleanup();
+    }
+
     if (this._isReconnecting) {
       // A reconnect is already in flight. The socket may be CLOSED but the
       // instance is still alive. Emit 'reconnecting' so the iterator stays

@@ -17,7 +17,9 @@ describe.each(websocketVariants)('$name public stream buffering', ({ create, eve
       on: (name: 'event' | 'raw' | 'error', listener: (...args: unknown[]) => void) => void;
     } = connection;
     const originalOn = emitter.on.bind(emitter);
-    const off = vi.spyOn(connection, 'off');
+    const eventNames = ['event', 'raw', 'error'] as const;
+    const initialListeners = eventNames.map((name) => !!connection['_hasListener'](name));
+    const initialOpenListeners = connection.socket.platformSocket.listenerCount('open');
     const on = vi.spyOn(emitter, 'on').mockImplementation((name, listener) => {
       originalOn(name, listener);
       if (name === 'event') {
@@ -29,9 +31,9 @@ describe.each(websocketVariants)('$name public stream buffering', ({ create, eve
     try {
       const stream = connection.stream({ maxBufferedEvents: 1 });
       await expect(stream.next()).rejects.toThrow('maxBufferedEvents (1)');
-      expect(off.mock.calls.map(([name]) => name)).toEqual(['event', 'raw', 'error']);
+      expect(eventNames.map((name) => !!connection['_hasListener'](name))).toEqual(initialListeners);
+      expect(connection.socket.platformSocket.listenerCount('open')).toBe(initialOpenListeners);
       expect(connection.socket.readyState).toBe(1);
-      await stream.return?.();
     } finally {
       on.mockRestore();
       connection.close();
