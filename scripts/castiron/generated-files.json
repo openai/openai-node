@@ -283,7 +283,7 @@
     },
     "src/resources/audio/speech.ts": {
       "mode": "100644",
-      "sha256": "27a3b61cfcb6b92240feabb5c84b291b25ef5979145637b967a2374e7e399259"
+      "sha256": "8d058285fdb07c8be55bc5c7fc07fe2a7c863ad0646deca292c7c814dae7576e"
     },
     "src/resources/audio/transcriptions.ts": {
       "mode": "100644",
@@ -295,7 +295,7 @@
     },
     "src/resources/audio/voices.ts": {
       "mode": "100644",
-      "sha256": "302dac22aecc92d14c3b9c71bebb0ecba8ee91d8334a3e1a7d339e00d4b024d7"
+      "sha256": "b3d3d11c60d90db5e63531f07f2acfd7f7a22db625ca23752a59095189a7d244"
     },
     "src/resources/batches.ts": {
       "mode": "100644",
@@ -539,7 +539,7 @@
     },
     "src/resources/chat/completions/completions.ts": {
       "mode": "100644",
-      "sha256": "6914f8f155fa5404096f21a7b213edeb4b7fa9b5fa4f02a303c59c6771c72087"
+      "sha256": "5f421467fd61afbbf6ecf572be3ee4ef1a8f6601c799c356c4ebc1df178d4c5a"
     },
     "src/resources/chat/completions/index.ts": {
       "mode": "100644",
@@ -847,7 +847,7 @@
     },
     "src/resources/realtime/realtime.ts": {
       "mode": "100644",
-      "sha256": "5fea54d423662c4300a7a191a31127ccd9efd8219015523ea372d227926b1dff"
+      "sha256": "fbbe4b12d5f8e9eaa8763166ede9ac1fee58ab45e77a0fbb608563200716dd8a"
     },
     "src/resources/realtime/translations.ts": {
       "mode": "100644",
