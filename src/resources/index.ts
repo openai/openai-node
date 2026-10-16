@@ -46,6 +46,7 @@ export {
   type DecisionInputMessage,
   type DecisionInputPart,
   type DecisionInputText,
+  type DecisionPromptCacheBreakpoint,
   type DecisionCreateParams,
 } from './decisions';
 export {

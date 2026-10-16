@@ -81876,6 +81876,10 @@ components:
           type: string
           minLength: 0
           maxLength: 10485760
+        prompt_cache_breakpoint:
+          anyOf:
+          - $ref: '#/components/schemas/DecisionPromptCacheBreakpoint'
+          - type: 'null'
       required:
       - type
       - text
@@ -81908,6 +81912,10 @@ components:
           - input_image
           default: input_image
           x-stainless-const: true
+        prompt_cache_breakpoint:
+          anyOf:
+          - $ref: '#/components/schemas/DecisionPromptCacheBreakpoint'
+          - type: 'null'
       required:
       - image_url
       - type
@@ -82135,6 +82143,37 @@ components:
           minLength: 0
           maxLength: 128
           description: Opaque caller-provided end-user identifier, scoped by the verified org. Match Responses' limit; this is never the authenticated user identity.
+        prompt_cache_key:
+          type:
+          - string
+          - 'null'
+          minLength: 0
+          maxLength: 64
+          description: Partition prompt cache reuse by caller-provided key.
+        prompt_cache_options:
+          type:
+          - object
+          - 'null'
+          properties:
+            ttl:
+              type: string
+              enum:
+              - 30m
+              default: 30m
+              x-stainless-const: true
+              description: The minimum lifetime applied to every implicit and explicit cache breakpoint written by the request. Defaults to `30m`, which is currently the only supported value. The backend may retain cache entries for longer.
+            mode:
+              type:
+              - string
+              - 'null'
+              enum:
+              - implicit
+              - explicit
+              - null
+              description: Controls whether OpenAI automatically creates an implicit cache breakpoint. Defaults to `implicit`. With `implicit`, OpenAI creates one implicit breakpoint and writes up to the latest three explicit breakpoints in the request. With `explicit`, OpenAI does not create an implicit breakpoint and writes up to the latest four explicit breakpoints. If there are no explicit breakpoints, the request does not use prompt caching.
+          additionalProperties: false
+          title: Prompt cache options
+          description: Options for prompt caching. Supported for `gpt-5.6` and later models. By default, OpenAI automatically chooses one implicit cache breakpoint. You can add explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each request can write up to four breakpoints. For cache matching, OpenAI considers up to the latest 80 breakpoints in the conversation, without a content-block lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The `ttl` defaults to `30m`, which is currently the only supported value. See the [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching) for current details.
       required:
       - model
       - input
@@ -107031,6 +107070,21 @@ components:
           event_id: evt_item_deleted_1
           client_event_id: remove_browser_1
           item_id: msg_browser_1
+    DecisionPromptCacheBreakpoint:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+          - explicit
+          default: explicit
+          x-stainless-const: true
+          description: The breakpoint mode. Always `explicit`.
+      required:
+      - mode
+      additionalProperties: false
+      title: Prompt cache breakpoint
+      description: Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a token block.
     OAuthErrorCode:
       anyOf:
       - enum:
