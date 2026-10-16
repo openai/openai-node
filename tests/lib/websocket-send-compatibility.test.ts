@@ -8,6 +8,36 @@ afterEach(() => {
 });
 
 describe.each(websocketVariants)('$name send compatibility', ({ name, create }) => {
+  test.each(['abort', 'throw'] as const)(
+    'keeps the socket close code when a reconnect handler mutates its event then %s',
+    (action) => {
+      const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }), {
+        reconnect: {
+          onReconnecting: (event) => {
+            Object.defineProperty(event, 'closeCode', { value: 1000 });
+            if (action === 'throw') {
+              throw new Error('synthetic callback failure');
+            }
+            return { abort: true };
+          },
+        },
+      });
+      const close = vi.fn();
+      onWebSocketEvent(connection, 'close', close);
+      onWebSocketEvent(connection, 'error', vi.fn());
+      try {
+        connection.socket.platformSocket.emit('close', 1006, Buffer.from('synthetic interruption'));
+        expect(close).toHaveBeenCalledExactlyOnceWith(
+          1006,
+          action === 'throw' ? 'onReconnecting callback threw' : 'reconnect aborted by handler',
+          [],
+        );
+      } finally {
+        connection.close();
+      }
+    },
+  );
+
   test('queues a send when reading the public socket starts a reconnect', async () => {
     vi.useFakeTimers();
     const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }), {
