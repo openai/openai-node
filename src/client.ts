@@ -63,6 +63,7 @@ import {
   DecisionInputMessage,
   DecisionInputPart,
   DecisionInputText,
+  DecisionPromptCacheBreakpoint,
   Decisions,
 } from './resources/decisions';
 import {
@@ -1927,6 +1928,7 @@ export declare namespace OpenAI {
     type DecisionInputMessage as DecisionInputMessage,
     type DecisionInputPart as DecisionInputPart,
     type DecisionInputText as DecisionInputText,
+    type DecisionPromptCacheBreakpoint as DecisionPromptCacheBreakpoint,
     type DecisionCreateParams as DecisionCreateParams,
   };
 

@@ -35,6 +35,8 @@ describe('resource decisions', () => {
           name: 'name',
         },
       ],
+      prompt_cache_key: 'prompt_cache_key',
+      prompt_cache_options: { mode: 'implicit', ttl: '30m' },
       safety_identifier: 'safety_identifier',
     });
   });

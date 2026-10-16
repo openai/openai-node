@@ -11,7 +11,7 @@
     },
     "api.md": {
       "mode": "100644",
-      "sha256": "7d27ba13c6f5cc09dcfb817abdf6f4fa265c95b21611e36895e0614bc169086f"
+      "sha256": "ce9ffe20ba196cb59edaaf1ec9e6779eab676fb7ac8e11523e31a45b392cfb09"
     },
     "scripts/castiron/CUSTOM_CODE.md": {
       "mode": "100644",
@@ -59,7 +59,7 @@
     },
     "src/client.ts": {
       "mode": "100644",
-      "sha256": "5c32ff7b459d50f9285f2a54642b92538adfcc17f7d15b35bdf96919bacfc4ca"
+      "sha256": "49df0c12e4c3696e8ed69b5e779a1ec35343bc6ae3c5b75e9f0123b8db9ba599"
     },
     "src/internal/data-residency.ts": {
       "mode": "100644",
@@ -611,7 +611,7 @@
     },
     "src/resources/decisions.ts": {
       "mode": "100644",
-      "sha256": "16425bed03960a330484a1498d62559c2041d61fda0d5a14bb0402be37cbe9c6"
+      "sha256": "a70d2d1d18a7ab6289165d456b20293a9a5b063d147ead79909cbec96dab4043"
     },
     "src/resources/embeddings.ts": {
       "mode": "100644",
@@ -735,7 +735,7 @@
     },
     "src/resources/index.ts": {
       "mode": "100644",
-      "sha256": "74e3f7cfc9bd81a792991699634f219fb7c8a1709bfda5082dadd35e45acfd73"
+      "sha256": "f559e1790ce7a4c2dccb8f4c3fcdd534eeb285166de6b03f11a0d3399b2bd4d5"
     },
     "src/resources/live.ts": {
       "mode": "100644",
@@ -1307,7 +1307,7 @@
     },
     "tests/api-resources/decisions.test.ts": {
       "mode": "100644",
-      "sha256": "f5c2b8adc510c701d18e54e12246266515cd1c6b5de53a96a87d79ac61406b78"
+      "sha256": "a0233dbe83a63f385e567635c9dcb0da74fca53555ae7a7314bab96fb75dd879"
     },
     "tests/api-resources/embeddings.test.ts": {
       "mode": "100644",
