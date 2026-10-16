@@ -61,13 +61,21 @@ export class Images extends APIResource {
       '/images/edits',
       resolveResourceRequestOptions(options, (options) =>
         multipartFormRequestOptions(
-          {
+          ((requestOptions) => ({
+            ...requestOptions,
+            body: Object.fromEntries(
+              Object.entries(requestOptions.body ?? {}).map(([key, value]) => [
+                key,
+                key === 'safety_identifier' && value === null ? undefined : value,
+              ]),
+            ),
+          }))({
             body,
             ...options,
             stream: body.stream ?? false,
             __metadata: { ...options?.__metadata, ...(body.model == null ? {} : { model: body.model }) },
             __security: { bearerAuth: true },
-          },
+          }),
           this._client,
         ),
       ),
@@ -178,6 +186,13 @@ export interface ImageEditCompletedEvent {
    * generation.
    */
   usage: ImageEditCompletedEvent.Usage;
+
+  /**
+   * The effective safety identifier used for safety monitoring and abuse detection.
+   * This is the non-empty `safety_identifier` from the request, or the deprecated
+   * `user` value when `safety_identifier` is omitted, null, or empty.
+   */
+  safety_identifier?: string | null;
 }
 
 export namespace ImageEditCompletedEvent {
@@ -319,6 +334,13 @@ export interface ImageGenCompletedEvent {
    * generation.
    */
   usage: ImageGenCompletedEvent.Usage;
+
+  /**
+   * The effective safety identifier used for safety monitoring and abuse detection.
+   * This is the non-empty `safety_identifier` from the request, or the deprecated
+   * `user` value when `safety_identifier` is omitted, null, or empty.
+   */
+  safety_identifier?: string | null;
 }
 
 export namespace ImageGenCompletedEvent {
@@ -466,6 +488,13 @@ export interface ImagesResponse {
    * `max`.
    */
   quality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+  /**
+   * The effective safety identifier used for safety monitoring and abuse detection.
+   * This is the non-empty `safety_identifier` from the request, or the deprecated
+   * `user` value when `safety_identifier` is omitted, null, or empty.
+   */
+  safety_identifier?: string | null;
 
   /**
    * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
@@ -684,6 +713,16 @@ export interface ImageEditParamsBase {
   response_format?: 'url' | 'b64_json' | null;
 
   /**
+   * A stable identifier for an end user in your organization, used for safety
+   * monitoring and abuse detection. Hash a username or email address to avoid
+   * sending identifying information. A non-empty value takes precedence over the
+   * deprecated `user` parameter. If omitted, null, or empty, the API uses `user`
+   * when available.
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
+   */
+  safety_identifier?: string | null;
+
+  /**
    * The size of the generated images. Defaults to `auto`. For `gpt-image-2`,
    * `gpt-image-2-2026-04-21`, `gpt-image-2.5-sunburst`,
    * `gpt-image-2.5-sunburst-2026-09-08`, `gpt-image-2.5-flare`, and
@@ -706,8 +745,9 @@ export interface ImageEditParamsBase {
   stream?: boolean | null;
 
   /**
-   * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse.
+   * @deprecated Deprecated: use `safety_identifier` instead. This parameter remains
+   * accepted for backward compatibility and is used when `safety_identifier` is
+   * omitted, null, or empty.
    * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
@@ -820,6 +860,16 @@ export interface ImageGenerateParamsBase {
   response_format?: 'url' | 'b64_json' | null;
 
   /**
+   * A stable identifier for an end user in your organization, used for safety
+   * monitoring and abuse detection. Hash a username or email address to avoid
+   * sending identifying information. A non-empty value takes precedence over the
+   * deprecated `user` parameter. If omitted, null, or empty, the API uses `user`
+   * when available.
+   * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
+   */
+  safety_identifier?: string | null;
+
+  /**
    * The size of the generated images. For `gpt-image-2`, `gpt-image-2-2026-04-21`,
    * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
    * `gpt-image-2.5-flare`, and `gpt-image-2.5-flare-2026-09-08`, arbitrary
@@ -857,8 +907,9 @@ export interface ImageGenerateParamsBase {
   style?: 'vivid' | 'natural' | null;
 
   /**
-   * A unique identifier representing your end-user, which can help OpenAI to monitor
-   * and detect abuse.
+   * @deprecated Deprecated: use `safety_identifier` instead. This parameter remains
+   * accepted for backward compatibility and is used when `safety_identifier` is
+   * omitted, null, or empty.
    * [Learn more](https://developers.openai.com/api/docs/guides/safety-best-practices#implement-safety-identifiers).
    */
   user?: string;
