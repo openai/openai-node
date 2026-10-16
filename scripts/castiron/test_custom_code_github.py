@@ -47,9 +47,11 @@ class GitHubAPI:
             f"{root}/pulls/3": self.pull,
             f"{root}/pulls/4": self.pull,
             f"{root}/git/ref/heads/main": {"object": {"sha": self.main}},
-            f"{root}/rules/branches/main": self.rules,
+            f"{root}/rules/branches/main?per_page=100&page=1": self.rules[:100],
+            f"{root}/rules/branches/main?per_page=100&page=2": self.rules[100:200],
             f"{root}/git/ref/heads/next": {"object": {"sha": self.next}},
-            f"{root}/rules/branches/next": self.rules,
+            f"{root}/rules/branches/next?per_page=100&page=1": self.rules[:100],
+            f"{root}/rules/branches/next?per_page=100&page=2": self.rules[100:200],
             f"{root}/commits/{self.run['head_sha']}/pulls?per_page=100": self.associations,
             f"{root}/pulls?state=open&head=contributor%3Asdk&per_page=100&page=1": self.branches,
             f"{root}/issues/3/comments?per_page=100&page=1": [],
@@ -388,6 +390,22 @@ class GitHubBudgetTests(unittest.TestCase):
     def test_merge_queue_rule_is_required_before_passing(self) -> None:
         self.api.run = source_run(self.head, "merge_group")
         self.api.rules = [{"type": "required_status_checks"}]
+        with self.assertRaisesRegex(ValueError, "must require a merge queue"):
+            self.evaluate()
+        self.assertFalse(self.repo.exists())
+
+    def test_merge_queue_rule_on_later_page_is_honored(self) -> None:
+        self.api.rules = [{"type": "required_status_checks"}] * 100 + [{"type": "merge_queue"}]
+        with (
+            mock.patch.object(budget.subprocess, "run"),
+            mock.patch.object(budget.report, "git"),
+            mock.patch.object(budget, "evaluate", return_value=({}, b"")) as evaluate,
+        ):
+            self.evaluate()
+        evaluate.assert_called_once()
+
+    def test_merge_queue_rule_absent_after_full_page_is_rejected(self) -> None:
+        self.api.rules = [{"type": "required_status_checks"}] * 100
         with self.assertRaisesRegex(ValueError, "must require a merge queue"):
             self.evaluate()
         self.assertFalse(self.repo.exists())

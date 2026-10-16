@@ -253,13 +253,43 @@ class BudgetTests(GitTestCase):
         self.assertIn("human approving review", summary)
 
 
+class InventoryTests(unittest.TestCase):
+    def test_literal_inventory_is_data_not_executable_code(self) -> None:
+        source = (
+            b"raise AssertionError('must not execute')\n"
+            b"GENERATED_GITHUB_PATHS = frozenset({b'.github/workflows/generated.yml'})\n"
+        )
+        self.assertEqual(
+            budget.checkpoint_github_inventory(source),
+            frozenset({b".github/workflows/generated.yml"}),
+        )
+        self.assertEqual(
+            budget.checkpoint_github_inventory(b"GENERATED_GITHUB_PATHS = frozenset({})"),
+            frozenset(),
+        )
+
+    def test_inventory_rejects_missing_ambiguous_and_nonliteral_values(self) -> None:
+        for source in (
+            b"pass",
+            b"GENERATED_GITHUB_PATHS = frozenset({})\nGENERATED_GITHUB_PATHS = frozenset({})",
+            b"GENERATED_GITHUB_PATHS = __import__('os').environ",
+            b"GENERATED_GITHUB_PATHS = frozenset(__import__('os').environ)",
+            b"GENERATED_GITHUB_PATHS = frozenset({'text'})",
+            b"GENERATED_GITHUB_PATHS = frozenset({b'not-github'})",
+        ):
+            with self.subTest(source=source), self.assertRaises(ValueError):
+                budget.checkpoint_github_inventory(source)
+
+
 class StrictTests(GitTestCase):
     workflow = ".github/workflows/castiron-custom-code.yml"
 
     def setUp(self) -> None:  # pyright: ignore[reportImplicitOverride]
         super().setUp()
         self.write("generated.py", "generated\n")
-        self.write(self.workflow, "workflow\n")
+        for path in budget.GENERATED_GITHUB_PATHS:
+            self.write(path.decode(), "workflow\n")
+        self.inventory(budget.GENERATED_GITHUB_PATHS)
         self.manifest()
         self.generated, _ = self.baseline()
         self.write(
@@ -270,13 +300,26 @@ class StrictTests(GitTestCase):
         )
         self.base = self.commit("enable strict ownership")
 
-    def manifest(self) -> None:
+    def inventory(self, paths: frozenset[bytes]) -> None:
+        # Checkpoint code is data. A verifier must never execute this statement.
+        self.write(
+            "scripts/castiron/custom_code_budget.py",
+            "raise AssertionError('checkpoint code must not execute')\n"
+            f"GENERATED_GITHUB_PATHS = frozenset({set(paths)!r})\n",
+        )
+
+    def manifest(self, extra: tuple[str, ...] = ()) -> None:
         files = {
             p: {
                 "mode": "100644",
                 "sha256": hashlib.sha256((self.repo / p).read_bytes()).hexdigest(),
             }
-            for p in ("generated.py", self.workflow)
+            for p in (
+                "generated.py",
+                *(path.decode() for path in budget.GENERATED_GITHUB_PATHS),
+                "scripts/castiron/custom_code_budget.py",
+                *extra,
+            )
         }
         self.write(budget.MANIFEST.decode(), json.dumps({"schema_version": 1, "files": files}))
 
@@ -509,6 +552,8 @@ class StrictTests(GitTestCase):
                 ):
                     self.git("checkout", "--detach", "-q", self.generated)
                     self.write(path, "generated workflow or action\n")
+                    self.inventory(budget.GENERATED_GITHUB_PATHS)
+                    self.manifest((path,))
                     manifest = json.loads((self.repo / budget.MANIFEST.decode()).read_text())
                     manifest["files"][path] = {
                         "mode": "100644",
@@ -521,9 +566,73 @@ class StrictTests(GitTestCase):
                     else:
                         (self.repo / path).chmod(0o755)
                     self.write(budget.MANIFEST.decode(), json.dumps(manifest))
-                    error = "cover.*exactly" if mutation == "omit" else "disagrees"
+                    error = (
+                        "omits generated GitHub inventory path"
+                        if mutation == "omit"
+                        else "disagrees"
+                    )
                     with self.assertRaisesRegex(ValueError, error):
                         budget.generated_manifest(self.repo, self.commit())
+
+    def test_checkpoint_inventory_can_add_and_retire_generated_ci(self) -> None:
+        for path in (".github/workflows/new.yml", ".github/actions/new/action.yml"):
+            with self.subTest(path=path):
+                self.git("checkout", "--detach", "-q", self.generated)
+                self.write(path, "new generated CI\n")
+                self.inventory(budget.GENERATED_GITHUB_PATHS | {path.encode()})
+                self.manifest((path,))
+                newer = self.commit("new compiler inventory")
+                # The executing verifier still has the old inventory.
+                self.assertNotIn(path.encode(), budget.GENERATED_GITHUB_PATHS)
+                self.assertEqual(
+                    budget.verify_generated(self.repo, newer, newer, previous=self.generated), []
+                )
+                (self.repo / path).unlink()
+                public = self.commit("public checkpoint omits private CI blob")
+                self.assertEqual(
+                    budget.verify_generated(self.repo, public, newer, previous=self.generated), []
+                )
+                # A newer verifier must also read the prior inventory to enforce retirement.
+                self.assertEqual(
+                    budget.verify_generated(self.repo, self.generated, self.base, previous=public), []
+                )
+                self.git("checkout", "--detach", "-q", self.base)
+                self.write(path, "retired generated CI\n")
+                failures = budget.verify_generated(
+                    self.repo, self.generated, self.commit(), previous=public
+                )
+                self.assertTrue(any(path in failure and "retired" in failure for failure in failures))
+
+    def test_manifest_cannot_claim_sdk_owned_workflows_or_actions(self) -> None:
+        for path in (".github/workflows/ci.yml", ".github/actions/setup-go/action.yml"):
+            for keep_blob in (True, False):
+                with self.subTest(path=path, keep_blob=keep_blob):
+                    self.git("checkout", "--detach", "-q", self.generated)
+                    self.write(path, "SDK-owned configuration\n")
+                    manifest = json.loads((self.repo / budget.MANIFEST.decode()).read_text())
+                    manifest["files"][path] = {
+                        "mode": "100644",
+                        "sha256": hashlib.sha256((self.repo / path).read_bytes()).hexdigest(),
+                    }
+                    if not keep_blob:
+                        (self.repo / path).unlink()
+                    self.write(budget.MANIFEST.decode(), json.dumps(manifest))
+                    with self.assertRaisesRegex(ValueError, "SDK-owned GitHub path"):
+                        budget.generated_manifest(self.repo, self.commit())
+
+    def test_public_snapshot_requires_every_inventory_identity(self) -> None:
+        for path in (self.workflow, ".github/actions/generated/action.yml"):
+            with self.subTest(path=path):
+                self.git("checkout", "--detach", "-q", self.generated)
+                self.write(path, "generated CI\n")
+                self.inventory(budget.GENERATED_GITHUB_PATHS | {path.encode()})
+                self.manifest((path,))
+                (self.repo / path).unlink()
+                manifest = json.loads((self.repo / budget.MANIFEST.decode()).read_text())
+                del manifest["files"][path]
+                self.write(budget.MANIFEST.decode(), json.dumps(manifest))
+                with self.assertRaisesRegex(ValueError, "omits generated GitHub inventory path"):
+                    budget.generated_manifest(self.repo, self.commit("incomplete public checkpoint"))
 
     def test_public_snapshot_keeps_strict_workflow_identity_without_private_blob(self) -> None:
         self.git("checkout", "--detach", "-q", self.generated)

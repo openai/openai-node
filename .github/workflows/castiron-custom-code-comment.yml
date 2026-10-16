@@ -176,6 +176,9 @@ jobs:
               if (run.event !== 'merge_group' || !match) return;
               branch = match[1];
             }
+            // These required contexts belong to main. Next reports are advisory:
+            // GitHub does not rebuild its queue when main's policy changes.
+            if (branch !== 'main') return;
             fresh = fresh && evaluatedBranch === branch;
             const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             // Concurrency serializes writes, but does not order runs or retries.
@@ -218,9 +221,7 @@ jobs:
                 cursor = next;
               } while (true);
               const {data: target} = await github.rest.git.getRef({...context.repo, ref: `heads/${branch}`});
-              const {data: main} = branch === 'main' ? {data: target}
-                : await github.rest.git.getRef({...context.repo, ref: 'heads/main'});
-              fresh = fresh && base === target.object.sha && policy === main.object.sha;
+              fresh = fresh && base === target.object.sha && policy === target.object.sha;
               fresh = fresh && member;
             }
             for (const [name, result] of [

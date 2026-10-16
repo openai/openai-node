@@ -11,6 +11,35 @@ import {
 const BACKLOG_SIZE = 4096;
 
 describe.each(websocketVariants)('$name public stream buffering', ({ create, event }) => {
+  test('preserves cleanup when an overridden listener registration delivers events immediately', async () => {
+    const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }));
+    const emitter: {
+      on: (name: 'event' | 'raw' | 'error', listener: (...args: unknown[]) => void) => void;
+    } = connection;
+    const originalOn = emitter.on.bind(emitter);
+    const eventNames = ['event', 'raw', 'error'] as const;
+    const initialListeners = eventNames.map((name) => !!connection['_hasListener'](name));
+    const initialOpenListeners = connection.socket.platformSocket.listenerCount('open');
+    const on = vi.spyOn(emitter, 'on').mockImplementation((name, listener) => {
+      originalOn(name, listener);
+      if (name === 'event') {
+        dispatchFrame(connection, JSON.stringify(event(0)));
+        dispatchFrame(connection, JSON.stringify(event(1)));
+      }
+      return connection;
+    });
+    try {
+      const stream = connection.stream({ maxBufferedEvents: 1 });
+      await expect(stream.next()).rejects.toThrow('maxBufferedEvents (1)');
+      expect(eventNames.map((name) => !!connection['_hasListener'](name))).toEqual(initialListeners);
+      expect(connection.socket.platformSocket.listenerCount('open')).toBe(initialOpenListeners);
+      expect(connection.socket.readyState).toBe(1);
+    } finally {
+      on.mockRestore();
+      connection.close();
+    }
+  });
+
   test('preserves FIFO and raw identity at the snapshotted limit, regardless of payload size', async () => {
     const connection = create(new OpenAI({ apiKey: 'synthetic-key', baseURL: 'https://example.test/v1' }));
     const options = { maxBufferedEvents: 2 };

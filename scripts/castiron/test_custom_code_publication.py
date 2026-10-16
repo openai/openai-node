@@ -331,7 +331,7 @@ class StatusPublisherTests(unittest.TestCase):
         run = source_run(head, event_name)
         if event_name == "merge_group":
             run["head_branch"] = f"gh-readonly-queue/{branch}/pr-7-example"
-        payload = {
+        payload: dict[str, Any] = {
             "main_sha": "d" * 40
             if policy_changed
             else ("c" * 40 if branch == "main" and base_changed else base),
@@ -386,33 +386,50 @@ class StatusPublisherTests(unittest.TestCase):
                     all(r["sha"] == "b" * 40 and r["state"] == "success" for r in results)
                 )
 
-    def test_next_statuses_bind_target_policy_and_queue_membership(self) -> None:
+    def test_next_cannot_overwrite_main_results(self) -> None:
+        for main_event in ("pull_request", "merge_group"):
+            main = self.publish(event_name=main_event, failed_budget=True)
+            self.assertEqual([r["state"] for r in main], ["success", "failure"])
+            for event in ("pull_request", "merge_group"):
+                with self.subTest(main_event=main_event, event=event):
+                    # Both evaluations use the same commit. A next success
+                    # must not replace the main target's required failure.
+                    result = self.publish(event_name=event, branch="next", previous_statuses=main)
+                    self.assertEqual(result, [])
+
+    def test_next_queue_never_authorizes_against_a_stale_main_policy(self) -> None:
+        for changed in (False, True):
+            with self.subTest(policy_changed=changed):
+                self.assertEqual(
+                    self.publish(event_name="merge_group", branch="next", policy_changed=changed),
+                    [],
+                )
+
+    def test_main_statuses_bind_target_policy_and_queue_membership(self) -> None:
         for event in ("pull_request", "merge_group"):
             with self.subTest(event=event):
-                result = self.publish(event_name=event, branch="next")
-                self.assertEqual(len(result), 2)
-                self.assertTrue(all(r["state"] == "success" for r in result))
-                self.assertTrue(all("next" in r["description"] for r in result))
-                stale = self.publish(event_name=event, branch="next", evaluated_branch="main")
-                self.assertTrue(all(r["state"] == "failure" for r in stale))
-        for options in ({"base_changed": True}, {"policy_changed": True}, {"queue_absent": True}):
-            result = self.publish(event_name="merge_group", branch="next", **options)
-            self.assertEqual(len(result), 2)
-            self.assertTrue(all(r["state"] == "failure" for r in result))
-        self.assertEqual(self.publish(branch="next", retarget_during_publication=True), [])
+                stale = self.publish(event_name=event, evaluated_branch="next")
+                self.assertEqual([r["state"] for r in stale], ["failure", "failure"])
+        for policy_changed, queue_absent in ((True, False), (False, True)):
+            with self.subTest(policy_changed=policy_changed, queue_absent=queue_absent):
+                result = self.publish(
+                    event_name="merge_group", policy_changed=policy_changed, queue_absent=queue_absent
+                )
+                self.assertEqual([r["state"] for r in result], ["failure", "failure"])
+        self.assertEqual(self.publish(retarget_during_publication=True), [])
 
     def test_next_fork_and_unsupported_targets(self) -> None:
         result = self.publish(
             branch="next", run_overrides={"pull_requests": []}, fallback_pulls=[{"number": 3}]
         )
-        self.assertEqual([r["state"] for r in result], ["success", "success"])
+        self.assertEqual(result, [])
         for event in ("pull_request", "merge_group"):
             for branch in ("Next", "Main", "release", "next-other"):
                 with self.subTest(event=event, branch=branch):
                     self.assertEqual(self.publish(event_name=event, branch=branch), [])
 
-    def test_next_queue_membership_paginates(self) -> None:
-        pages = [
+    def test_main_queue_membership_paginates(self) -> None:
+        pages: list[dict[str, Any]] = [
             {
                 "expected_cursor": None,
                 "nodes": [],
@@ -424,7 +441,7 @@ class StatusPublisherTests(unittest.TestCase):
                 "pageInfo": {"hasNextPage": False, "endCursor": None},
             },
         ]
-        result = self.publish(event_name="merge_group", branch="next", queue_pages=pages)
+        result = self.publish(event_name="merge_group", queue_pages=pages)
         self.assertEqual([r["state"] for r in result], ["success", "success"])
 
     def test_fork_statuses_with_no_commit_association(self) -> None:

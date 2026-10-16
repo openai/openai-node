@@ -1,30 +1,18 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { ResponsesEmitter, ResponsesStreamMessage, WebSocketError, buildURL } from './internal-base';
+import { WebSocketConnection } from '../../internal/ws-connection-controller';
+import type { WebSocketLike } from '../../internal/ws-adapter';
 import {
-  sendWebSocketEvent,
-  sendRawWebSocketData,
-  flushWebSocketSendQueue,
-  waitForWebSocketOpen,
-} from '../../internal/ws-connection';
-import { InternalEventEmitter } from '../../core/EventEmitter';
-import { sleep } from '../../internal/utils/sleep';
-import { type WebSocketLike, ReadyState } from '../../internal/ws-adapter';
-import {
-  SendQueue,
-  getMaxBufferedEvents,
-  recordWebSocketError,
-  rawByteLength,
   type WebSocketStreamOptions,
-  isRecoverableClose,
   type RawWebSocketData,
   type ReconnectingEvent,
   type ReconnectingOverrides,
-  type UnsentMessage,
+  recordWebSocketError,
+  rawByteLength,
 } from '../../internal/ws';
 import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../client';
-import { OpenAIError } from '../../core/error';
 
 const webSocketEventPayloads = new WeakMap<ResponsesAPI.ResponsesServerEvent, string>();
 const webSocketEventBytes = new WeakMap<ResponsesAPI.ResponsesServerEvent, number>();
@@ -90,35 +78,64 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
 
   protected _client: OpenAI;
   protected _parameters: Record<string, unknown> | null | undefined;
-  private _reconnectOptions: ResponsesWSReconnectOptions | null;
-  private _sendQueue: SendQueue<ResponsesAPI.ResponsesClientEvent>;
-  private _isReconnecting: boolean = false;
-  private _intentionallyClosed = false;
-  private _closeCode: number = 1000;
-  private _closeReason: string = 'OK';
-  private _lastCloseCode: number = 1006;
-  private _lastCloseReason: string = '';
-
-  // Necessary to keep the public event interface clean while we manage reconnecting
-  private _internalEvents = new InternalEventEmitter<{
-    socketSwap: (oldSocket: TSocket, newSocket: TSocket) => void;
-    reconnecting: (event: ReconnectingEvent<Record<string, unknown>>) => void;
-    reconnected: () => void;
-    close: (code: number, reason: string, unsent: UnsentMessage<ResponsesAPI.ResponsesClientEvent>[]) => void;
-  }>();
+  #connection: WebSocketConnection<
+    TSocket,
+    ResponsesAPI.ResponsesClientEvent,
+    ResponsesAPI.ResponsesServerEvent,
+    WebSocketError,
+    Record<string, unknown>
+  >;
 
   constructor(client: OpenAI, options?: ResponsesWSBaseOptions | undefined) {
     super();
     this._client = client;
     this._parameters = undefined;
-    this._reconnectOptions = options?.reconnect ?? null;
-    this._sendQueue = new SendQueue<ResponsesAPI.ResponsesClientEvent>(options?.maxQueueSize);
+    const owner = this;
+    this.#connection = new WebSocketConnection<
+      TSocket,
+      ResponsesAPI.ResponsesClientEvent,
+      ResponsesAPI.ResponsesServerEvent,
+      WebSocketError,
+      Record<string, unknown>
+    >(
+      this,
+      {
+        buildURL: () => buildURL(this._client, this._parameters ?? {}),
+        createSocket: (url) => this._createSocket(url, this._authHeaders()),
+        get parameters() {
+          return owner._parameters;
+        },
+        set parameters(parameters) {
+          owner._parameters = parameters;
+        },
+        isErrorEvent: (event) => event.type === 'error',
+        onMessage: (data, isBinary) => this.#onMessage(data, isBinary),
+        onError: (message, cause) => this._onError(null, message, cause),
+        createError: (message) => new WebSocketError(message, null),
+        subscribe: (onEvent, onRaw, onError) => {
+          this.on('event', onEvent);
+          this.on('raw', onRaw);
+          this.on('error', onError);
+        },
+        unsubscribe: (onEvent, onRaw, onError) => {
+          this.off('event', onEvent);
+          this.off('raw', onRaw);
+          this.off('error', onError);
+        },
+        emitReconnecting: (event) => this._emit('reconnecting', event),
+        emitReconnected: () => this._emit('reconnected'),
+        emitClose: (code, reason, unsent) => this._emit('close', code, reason, unsent),
+        onSocketError: recordWebSocketError,
+        prepareReconnectSocket: () => this._prepareReconnectSocket(),
+      },
+      options,
+    );
   }
 
   /** Establishes the initial WebSocket connection. */
   protected _connectInitial(): void {
     this.url = buildURL(this._client, {});
-    this.socket = this._connect();
+    this.socket = this.#connection.connect();
   }
 
   /**
@@ -128,42 +145,16 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
    */
   protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
 
-  private _cancelRefresh: (() => void) | undefined;
-
   send(event: ResponsesAPI.ResponsesClientEvent) {
-    sendWebSocketEvent(
-      this,
-      event,
-      this._sendQueue,
-      () => this._isReconnecting,
-      (message, cause) => this._onError(null, message, cause),
-    );
+    this.#connection.send(event);
   }
 
   sendRaw(data: RawWebSocketData) {
-    sendRawWebSocketData(
-      this,
-      data,
-      this._sendQueue,
-      () => this._isReconnecting,
-      (message, cause) => this._onError(null, message, cause),
-    );
+    this.#connection.sendRaw(data);
   }
 
   close(props?: { code: number; reason: string }) {
-    if (!this.socket) {
-      throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
-    }
-
-    this._intentionallyClosed = true;
-    this._closeCode = props?.code ?? 1000;
-    this._closeReason = props?.reason ?? 'OK';
-    this._cancelRefresh?.();
-    try {
-      this.socket.close(this._closeCode, this._closeReason);
-    } catch (err) {
-      this._onError(null, 'could not close the connection', err);
-    }
+    this.#connection.close(props);
   }
 
   /**
@@ -199,500 +190,70 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
   }
 
   [Symbol.asyncIterator](options?: WebSocketStreamOptions): AsyncIterableIterator<ResponsesStreamMessage> {
-    if (!this.socket) {
-      throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
+    return this.#connection.iterate(options);
+  }
+
+  #onMessage(data: string | ArrayBuffer | ArrayBufferView, isBinary: boolean): void {
+    if (isBinary) {
+      this._emit('raw', data);
+      return;
     }
 
-    const maxBufferedEvents = getMaxBufferedEvents(options);
+    // Coerce to string in case the adapter delivers a typed-array for text frames.
+    const text = typeof data === 'string' ? data : String(data);
 
-    // Two-queue async iterator: `queue` buffers incoming messages,
-    // `resolvers` buffers waiting next() calls. A push wakes the
-    // oldest next(); a next() drains the oldest message.
-    const queue: (ResponsesStreamMessage | undefined)[] = [];
-    const resolvers: ((() => void) | undefined)[] = [];
-    let queueHead = 0;
-    let resolverHead = 0;
-    let done = false;
-    let failure: WebSocketError | undefined;
-    let currentSocket = this.socket;
+    let event: ResponsesAPI.ResponsesServerEvent;
+    try {
+      event = JSON.parse(text) as ResponsesAPI.ResponsesServerEvent;
+    } catch {
+      this._emit('raw', data);
+      return;
+    }
 
-    const wakeResolver = () => {
-      if (resolverHead >= resolvers.length) return;
+    if (
+      event === null ||
+      typeof event !== 'object' ||
+      Array.isArray(event) ||
+      !Object.prototype.hasOwnProperty.call(event, 'type') ||
+      typeof event.type !== 'string'
+    ) {
+      this._onError(
+        null,
+        'received invalid WebSocket event: expected an object with an own string type',
+        undefined,
+      );
+      return;
+    }
 
-      const resolver = resolvers[resolverHead];
-      resolvers[resolverHead] = undefined;
-      resolverHead += 1;
-      if (resolverHead >= 64 && resolverHead * 2 >= resolvers.length) {
-        resolvers.splice(0, resolverHead);
-        resolverHead = 0;
-      }
-      resolver?.();
-    };
+    const eventType: string = event.type;
+    const errorEvent = event.type === 'error' ? event : undefined;
+    const reservedEventType =
+      eventType === 'raw' ||
+      eventType === 'close' ||
+      eventType === 'event' ||
+      eventType === 'reconnecting' ||
+      eventType === 'reconnected' ||
+      eventType === 'open' ||
+      eventType === 'error';
+    if (reservedEventType && eventType !== 'error') {
+      this._onError(null, 'received reserved WebSocket event type', undefined);
+      return;
+    }
 
-    const push = (msg: ResponsesStreamMessage) => {
-      if (done) return;
+    webSocketEventBytes.set(event, rawByteLength(data));
+    webSocketEventPayloads.set(event, text);
+    try {
+      this._emit('event', event);
+    } finally {
+      webSocketEventPayloads.delete(event);
+    }
 
-      if (maxBufferedEvents !== undefined && queue.length - queueHead >= maxBufferedEvents) {
-        failure = new WebSocketError(
-          `WebSocket stream exceeded maxBufferedEvents (${maxBufferedEvents})`,
-          null,
-        );
-        done = true;
-        queue.length = 0;
-        queueHead = 0;
-        cleanup();
-        flushResolvers();
-        return;
-      }
-
-      queue.push(msg);
-      wakeResolver();
-    };
-
-    const onEvent = (event: ResponsesAPI.ResponsesServerEvent) => {
-      if (event.type === 'error') return; // handled by onEmitterError
-      push({ type: 'message', message: event });
-    };
-
-    const onRaw = (data: RawWebSocketData) => {
-      push({ type: 'raw', data });
-    };
-
-    // All errors (API + socket) funnel through _onError → 'error' event
-    const onEmitterError = (err: WebSocketError) => {
-      push({ type: 'error', error: err });
-    };
-
-    const onOpen = () => {
-      push({ type: 'open' });
-    };
-
-    const onReconnecting = (evt: ReconnectingEvent<Record<string, unknown>>) => {
-      push({ type: 'reconnecting', reconnect: evt });
-    };
-
-    const onReconnected = () => {
-      push({ type: 'reconnected' });
-    };
-
-    const flushResolvers = () => {
-      while (resolverHead < resolvers.length) {
-        const resolver = resolvers[resolverHead];
-        resolvers[resolverHead] = undefined;
-        resolverHead += 1;
-        resolver?.();
-      }
-      resolvers.length = 0;
-      resolverHead = 0;
-    };
-
-    const onClose = (
-      code: number,
-      reason: string,
-      unsent: UnsentMessage<ResponsesAPI.ResponsesClientEvent>[],
-    ) => {
-      push({ type: 'close', code, reason, unsent });
-      done = true;
-      flushResolvers();
-      cleanup();
-    };
-
-    const onSocketSwap = (_oldSocket: TSocket, newSocket: TSocket) => {
-      if (currentSocket === newSocket) return;
-      currentSocket.off('open', onOpen);
-      newSocket.on('open', onOpen);
-      currentSocket = newSocket;
-    };
-
-    const cleanup = () => {
-      this.off('event', onEvent);
-      this.off('raw', onRaw);
-      this.off('error', onEmitterError);
-      currentSocket.off('open', onOpen);
-      this._internalEvents.off('close', onClose);
-      this._internalEvents.off('socketSwap', onSocketSwap);
-      this._internalEvents.off('reconnecting', onReconnecting);
-      this._internalEvents.off('reconnected', onReconnected);
-    };
-
-    this.on('event', onEvent);
-    this.on('raw', onRaw);
-    this.on('error', onEmitterError);
-    this.socket.on('open', onOpen);
-    this._internalEvents.on('close', onClose);
-    this._internalEvents.on('socketSwap', onSocketSwap);
-    this._internalEvents.on('reconnecting', onReconnecting);
-    this._internalEvents.on('reconnected', onReconnected);
-
-    if (this._isReconnecting) {
-      // A reconnect is already in flight. The socket may be CLOSED but the
-      // instance is still alive. Emit 'reconnecting' so the iterator stays
-      // open and receives the upcoming reconnected/message events.
-      push({
-        type: 'reconnecting',
-        reconnect: { attempt: 0, maxAttempts: 0, delay: 0, closeCode: 0, parameters: undefined },
-      });
+    if (errorEvent) {
+      this._onError(errorEvent);
     } else {
-      switch (this.socket.readyState) {
-        case ReadyState.CONNECTING:
-          push({ type: 'connecting' });
-          break;
-        case ReadyState.OPEN:
-          push({ type: 'open' });
-          break;
-        case ReadyState.CLOSING:
-          push({ type: 'closing' });
-          break;
-        case ReadyState.CLOSED:
-          push({
-            type: 'close',
-            code: this._lastCloseCode,
-            reason: this._lastCloseReason,
-            unsent: this._sendQueue.drain(),
-          });
-          done = true;
-          cleanup();
-          break;
-      }
+      // @ts-ignore TS isn't smart enough to get the relationship right here
+      this._emit(eventType, event);
     }
-
-    const resolve = (
-      res: (value: IteratorResult<ResponsesStreamMessage>) => void,
-      reject: (error: WebSocketError) => void,
-    ) => {
-      if (failure) {
-        reject(failure);
-      } else if (queueHead < queue.length) {
-        const queued = queue[queueHead]!;
-        queue[queueHead] = undefined;
-        queueHead += 1;
-        if (queueHead >= 64 && queueHead * 2 >= queue.length) {
-          queue.splice(0, queueHead);
-          queueHead = 0;
-        }
-        res({ value: queued, done: false });
-      } else if (done) {
-        res({ value: undefined, done: true });
-      } else {
-        return false;
-      }
-      return true;
-    };
-
-    const next = (): Promise<IteratorResult<ResponsesStreamMessage>> =>
-      new Promise((res, reject) => {
-        if (resolve(res, reject)) return;
-        resolvers.push(() => {
-          resolve(res, reject);
-        });
-      });
-
-    return {
-      next,
-      return: (): Promise<IteratorReturnResult<undefined>> => {
-        done = true;
-        queue.length = 0;
-        queueHead = 0;
-        cleanup();
-        flushResolvers();
-        return Promise.resolve({ value: undefined, done: true });
-      },
-      [Symbol.asyncIterator]() {
-        return this;
-      },
-    };
-  }
-
-  private _connect(
-    createSocket: (url: URL) => TSocket = (url) => this._createSocket(url, this._authHeaders()),
-    url: URL = buildURL(this._client, this._parameters ?? {}),
-  ): TSocket {
-    this.url = url;
-
-    const socket = createSocket(this.url);
-
-    socket.on('message', (data: string | ArrayBuffer | ArrayBufferView, isBinary: boolean) => {
-      if (isBinary) {
-        this._emit('raw', data);
-        return;
-      }
-
-      // Coerce to string in case the adapter delivers a typed-array for text frames.
-      const text = typeof data === 'string' ? data : String(data);
-
-      let event: ResponsesAPI.ResponsesServerEvent;
-      try {
-        event = JSON.parse(text) as ResponsesAPI.ResponsesServerEvent;
-      } catch {
-        this._emit('raw', data);
-        return;
-      }
-
-      if (
-        event === null ||
-        typeof event !== 'object' ||
-        Array.isArray(event) ||
-        !Object.prototype.hasOwnProperty.call(event, 'type') ||
-        typeof event.type !== 'string'
-      ) {
-        this._onError(
-          null,
-          'received invalid WebSocket event: expected an object with an own string type',
-          undefined,
-        );
-        return;
-      }
-
-      const eventType: string = event.type;
-      const errorEvent = event.type === 'error' ? event : undefined;
-      const reservedEventType =
-        eventType === 'raw' ||
-        eventType === 'close' ||
-        eventType === 'event' ||
-        eventType === 'reconnecting' ||
-        eventType === 'reconnected' ||
-        eventType === 'open' ||
-        eventType === 'error';
-      if (reservedEventType && eventType !== 'error') {
-        this._onError(null, 'received reserved WebSocket event type', undefined);
-        return;
-      }
-
-      webSocketEventBytes.set(event, rawByteLength(data));
-      webSocketEventPayloads.set(event, text);
-      try {
-        this._emit('event', event);
-      } finally {
-        webSocketEventPayloads.delete(event);
-      }
-
-      if (errorEvent) {
-        this._onError(errorEvent);
-      } else {
-        // @ts-ignore TS isn't smart enough to get the relationship right here
-        this._emit(eventType, event);
-      }
-    });
-
-    socket.on('error', (err: Error) => {
-      recordWebSocketError(socket, err);
-      // Suppress transient errors during reconnection — the retry loop
-      // already handles them and will surface a close if retries exhaust.
-      if (this._isReconnecting) return;
-      this._onError(null, err.message, err);
-    });
-
-    socket.on('open', () => {
-      this._flushSendQueue();
-    });
-
-    socket.on('close', (code: number, reason: string) => {
-      // Ignore close events from superseded sockets — a stale socket's
-      // late close must not kick off a second reconnect loop.
-      if (socket !== this.socket) return;
-      if (!this._intentionallyClosed && this._canReconnect(code)) {
-        this._reconnect(code);
-      } else if (!this._isReconnecting) {
-        this._emitPermanentClose(code, reason);
-      }
-    });
-
-    return socket;
-  }
-
-  // Reconnect is opt-in via onReconnecting so callers can pass
-  // state (e.g. session IDs) into the new connection.
-  private _canReconnect(code: number): boolean {
-    if (this._intentionallyClosed) return false;
-    if (!this._reconnectOptions) return false;
-    if (this._reconnectOptions.maxRetries === 0) return false;
-    if (!this._reconnectOptions.onReconnecting) return false;
-    return isRecoverableClose(code);
-  }
-
-  private async _reconnect(closeCode: number): Promise<void> {
-    if (!this.socket) {
-      throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
-    }
-
-    if (this._isReconnecting || !this._reconnectOptions) return;
-    this._isReconnecting = true;
-
-    const maxRetries = this._reconnectOptions.maxRetries ?? 5;
-    const initialDelay = this._reconnectOptions.initialDelay ?? 500;
-    const maxDelay = this._reconnectOptions.maxDelay ?? 8000;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      if (!this._canReconnect(closeCode)) {
-        this._isReconnecting = false;
-        if (!this._intentionallyClosed) {
-          this._onError(
-            null,
-            `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`,
-            undefined,
-          );
-        }
-        this._emitPermanentClose(
-          this._intentionallyClosed ? this._closeCode : closeCode,
-          this._intentionallyClosed ? this._closeReason : 'reconnect aborted',
-        );
-        return;
-      }
-
-      const baseDelay = Math.min(initialDelay * Math.pow(2, attempt - 1), maxDelay);
-      // Jitter: rand [0.75, 1.0] to spread out connection attempts without over-delaying
-      const jitter = 0.75 + Math.random() * 0.25;
-      const actualDelay = Math.round(baseDelay * jitter);
-
-      let reconnectingEvent: ReconnectingEvent<Record<string, unknown>> = {
-        attempt,
-        maxAttempts: maxRetries,
-        delay: actualDelay,
-        closeCode,
-        parameters: this._parameters ? { ...this._parameters } : undefined,
-      };
-
-      let overrides: ReconnectingOverrides<Record<string, unknown>> | void;
-      try {
-        overrides = this._reconnectOptions.onReconnecting(reconnectingEvent);
-      } catch (err) {
-        this._isReconnecting = false;
-        this._onError(null, 'onReconnecting callback threw', err);
-        this._emitPermanentClose(closeCode, 'onReconnecting callback threw');
-        return;
-      }
-
-      if (overrides && 'abort' in overrides && overrides.abort) {
-        this._isReconnecting = false;
-        this._emitPermanentClose(closeCode, 'reconnect aborted by handler');
-        return;
-      }
-
-      if (overrides && 'parameters' in overrides) {
-        this._parameters = overrides.parameters;
-        reconnectingEvent = { ...reconnectingEvent, parameters: this._parameters };
-      }
-
-      try {
-        this._emit('reconnecting', reconnectingEvent);
-      } catch (err) {
-        this._onError(null, 'onReconnecting callback threw', err);
-      }
-      this._internalEvents._emit('reconnecting', reconnectingEvent);
-
-      if (!this._canReconnect(closeCode)) {
-        this._isReconnecting = false;
-        if (!this._intentionallyClosed) {
-          this._onError(
-            null,
-            `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`,
-            undefined,
-          );
-        }
-        this._emitPermanentClose(
-          this._intentionallyClosed ? this._closeCode : closeCode,
-          this._intentionallyClosed ? this._closeReason : 'reconnect aborted',
-        );
-        return;
-      }
-
-      await sleep(actualDelay);
-
-      if (!this._canReconnect(closeCode)) {
-        this._isReconnecting = false;
-        if (!this._intentionallyClosed) {
-          this._onError(
-            null,
-            `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`,
-            undefined,
-          );
-        }
-        this._emitPermanentClose(
-          this._intentionallyClosed ? this._closeCode : closeCode,
-          this._intentionallyClosed ? this._closeReason : 'reconnect aborted',
-        );
-        return;
-      }
-
-      let closeCodePromise: Promise<number> | undefined;
-      try {
-        const oldSocket = this.socket;
-        const url = buildURL(this._client, this._parameters ?? {});
-        const canceled = new Promise<undefined>((resolve) => {
-          this._cancelRefresh = () => resolve(undefined);
-        });
-        let createSocket: ((url: URL) => TSocket) | undefined;
-        try {
-          createSocket = await Promise.race([this._prepareReconnectSocket(), canceled]);
-        } finally {
-          this._cancelRefresh = undefined;
-        }
-        if (!this._canReconnect(closeCode)) {
-          this._isReconnecting = false;
-          this._emitPermanentClose(this._closeCode, this._closeReason);
-          return;
-        }
-        this.socket = this._connect(createSocket, url);
-        // Registered synchronously after _connect() and before any
-        // await so the code is captured even when ws emits 'close'
-        // in the same tick as 'error' (e.g. abortHandshake).
-        closeCodePromise = new Promise<number>((resolve) => {
-          this.socket.once('close', resolve);
-        });
-
-        await waitForWebSocketOpen(this.socket);
-
-        this._internalEvents._emit('socketSwap', oldSocket, this.socket);
-        this._isReconnecting = false;
-        this._flushSendQueue();
-        this._emit('reconnected');
-        this._internalEvents._emit('reconnected');
-        return;
-      } catch {
-        if (this._intentionallyClosed) {
-          // A public close observer may have thrown after lifecycle cleanup.
-          // Only emit here if the reconnect itself had not already closed.
-          if (this._isReconnecting) {
-            this._isReconnecting = false;
-            this._emitPermanentClose(this._closeCode, this._closeReason);
-          }
-          return;
-        }
-        if (closeCodePromise) {
-          // ws may emit 'error' before 'close', so await the code
-          // rather than reading it synchronously.
-          closeCode = await closeCodePromise;
-        }
-      }
-    }
-
-    // All retries exhausted — surface an error so consumers can
-    // distinguish retry failure from a clean close.
-    this._isReconnecting = false;
-    this._onError(
-      null,
-      `WebSocket reconnect failed after ${maxRetries} attempts (close code: ${closeCode})`,
-      undefined,
-    );
-    this._emitPermanentClose(closeCode, `reconnect failed after ${maxRetries} attempts`);
-  }
-
-  private _flushSendQueue(): void {
-    flushWebSocketSendQueue(this, this._sendQueue, (message, cause) => this._onError(null, message, cause));
-  }
-
-  /**
-   * Emits the public `close` event with unsent messages and the internal
-   * `close` event used by the async iterator.
-   */
-  private _emitPermanentClose(code: number, reason: string): void {
-    this._lastCloseCode = code;
-    this._lastCloseReason = reason;
-    const unsent = this._sendQueue.drain();
-    // Internal close fires first so the async iterator is guaranteed to
-    // terminate even if a public 'close' listener throws.
-    this._internalEvents._emit('close', code, reason, unsent);
-    this._emit('close', code, reason, unsent);
   }
 
   protected _prepareReconnectSocket(): Promise<(url: URL) => TSocket> {
