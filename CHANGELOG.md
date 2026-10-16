@@ -1,5 +1,33 @@
 # Changelog
 
+## [7.35.0](https://github.com/openai/openai-node/compare/v7.34.0...v7.35.0) (2026-10-16)
+
+
+### Features
+
+* **api:** add Decisions prompt caching options ([#2956](https://github.com/openai/openai-node/issues/2956)) ([468b54e](https://github.com/openai/openai-node/commit/468b54eb4f3bd23468ec146c2fc6119134ecc2e2))
+* **api:** add prompt-based voice creation ([#2955](https://github.com/openai/openai-node/issues/2955)) ([e9f788e](https://github.com/openai/openai-node/commit/e9f788ebfb1b6e2f5aa59022eee3da202110390e))
+* **api:** add response error diagnostics and model notices ([#2948](https://github.com/openai/openai-node/issues/2948)) ([4fd22b0](https://github.com/openai/openai-node/commit/4fd22b056057aa560bd9d8e9dd08161b69385f95))
+* **api:** support audio fixture playback in Live sessions ([#2946](https://github.com/openai/openai-node/issues/2946)) ([41d0966](https://github.com/openai/openai-node/commit/41d09663c773442339bd5df8c57143c485905bf4))
+* **api:** support Decisions in Live sessions ([#2951](https://github.com/openai/openai-node/issues/2951)) ([68b051e](https://github.com/openai/openai-node/commit/68b051e59c5f8d84037a5e141bea44bd4ffeab2c))
+* **api:** support project API key scope updates ([#2943](https://github.com/openai/openai-node/issues/2943)) ([7665932](https://github.com/openai/openai-node/commit/7665932e2b7965a5e0a3123fe3de4dbdb4131933))
+
+
+### Bug Fixes
+
+* **api:** declare Realtime response error messages ([#2944](https://github.com/openai/openai-node/issues/2944)) ([4ca7bd6](https://github.com/openai/openai-node/commit/4ca7bd61c05effec8d2ace880a000047da37f1f3))
+
+
+### Chores
+
+* **api:** clarify the Live startup history token limit ([#2949](https://github.com/openai/openai-node/issues/2949)) ([35bfd1f](https://github.com/openai/openai-node/commit/35bfd1f8832cb199e0b210a9a5d698f158f8c000))
+
+
+### Refactors
+
+* share existing WebSocket send and open handling ([#2947](https://github.com/openai/openai-node/issues/2947)) ([5f218bf](https://github.com/openai/openai-node/commit/5f218bf5d8770de5445012b4f1c3b150db983379))
+* share WebSocket connection lifecycle and generated bindings ([#2953](https://github.com/openai/openai-node/issues/2953)) ([88b67c1](https://github.com/openai/openai-node/commit/88b67c10f5253148f2ec311a2b3bcdf1c7e7b249))
+
 ## [7.34.0](https://github.com/openai/openai-node/compare/v7.33.0...v7.34.0) (2026-10-14)
 
 
