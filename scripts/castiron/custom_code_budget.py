@@ -9,6 +9,7 @@ file and its workflows are generated from shared Castiron templates.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import html
 import importlib.util
@@ -75,14 +76,74 @@ def read_policy(repo: Path, revision: str) -> dict[str, Any]:
 
 
 def read_budget(repo: Path, revision: str) -> int:
-    return read_policy(repo, revision)["max_custom_patch_lines"]
+    return cast(int, read_policy(repo, revision)["max_custom_patch_lines"])
 
 
 def strict_policy(repo: Path, revision: str) -> bool:
-    return read_policy(repo, revision)["schema_version"] == 2
+    return cast(int, read_policy(repo, revision)["schema_version"]) == 2
 
 
 MANIFEST = b"scripts/castiron/generated-files.json"
+# Derived from the renderer's repository-file inventory, also used by checkpoint
+# publication to distinguish generated tooling from protected SDK-owned CI.
+GENERATED_GITHUB_PATHS = frozenset(
+    {
+        b".github/workflows/castiron-custom-code.yml",
+        b".github/workflows/castiron-custom-code-comment.yml",
+    }
+)
+
+
+
+# Audited inventory of the authenticated pre-inventory checker format. These
+# historical snapshots bind the checker bytes and manifest through their codegen
+# hash. Never infer their inventory from the running compiler or candidate tree.
+LEGACY_CHECKPOINT_INVENTORIES = {
+    "e504abba2701f4733eb4b8ce26856cca596e13feab1e7e323adc8e7d2ccb64bc": frozenset(
+        {
+            b".github/workflows/castiron-custom-code-comment.yml",
+            b".github/workflows/castiron-custom-code.yml",
+        }
+    ),
+}
+
+
+def checkpoint_github_inventory(source: bytes) -> frozenset[bytes]:
+    """Read literal compiler inventory from verified checkpoint data, without execution."""
+    values = [
+        node.value
+        for node in ast.parse(source).body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "GENERATED_GITHUB_PATHS"
+            for target in node.targets
+        )
+    ]
+    if not values:
+        historical = LEGACY_CHECKPOINT_INVENTORIES.get(hashlib.sha256(source).hexdigest())
+        if historical is not None:
+            return historical
+    if len(values) != 1:
+        raise ValueError("checkpoint must contain one generated GitHub inventory")
+    value = values[0]
+    if (
+        not isinstance(value, ast.Call)
+        or not isinstance(value.func, ast.Name)
+        or value.func.id != "frozenset"
+        or len(value.args) != 1
+        or value.keywords
+    ):
+        raise ValueError("checkpoint generated GitHub inventory must be literal")
+    literal_paths: object = ast.literal_eval(value.args[0])
+    # An empty renderer inventory is written with an empty pair of braces.
+    if isinstance(literal_paths, dict) and not literal_paths:
+        return frozenset()
+    if not isinstance(literal_paths, set) or any(
+        not isinstance(path, bytes) or not path.startswith(b".github/")
+        for path in cast(set[object], literal_paths)
+    ):
+        raise ValueError("invalid checkpoint generated GitHub inventory")
+    return frozenset(cast(set[bytes], literal_paths))
 
 
 def generated_manifest(repo: Path, generated: str) -> dict[bytes, dict[str, str]]:
@@ -94,17 +155,22 @@ def generated_manifest(repo: Path, generated: str) -> dict[bytes, dict[str, str]
             "strict mode requires a generated ownership manifest; regenerate with Castiron"
         )
     blobs = report.read_blobs(repo, entries)
+    inventory_entry = entries.get(b"scripts/castiron/custom_code_budget.py")
+    if inventory_entry is None or inventory_entry.mode not in (b"100644", b"100755"):
+        raise ValueError("checkpoint is missing its generated GitHub inventory")
+    github_paths = checkpoint_github_inventory(blobs[inventory_entry.oid])
     value = json.loads(blobs[entry.oid], object_pairs_hook=unique_keys)
+    if not isinstance(value, dict) or set(cast(dict[str, Any], value)) != {"schema_version", "files"}:
+        raise ValueError("invalid generated ownership manifest")
+    value = cast(dict[str, Any], value)
     if (
-        not isinstance(value, dict)
-        or set(value) != {"schema_version", "files"}
-        or type(value["schema_version"]) is not int
+        type(value["schema_version"]) is not int
         or value["schema_version"] != 1
         or not isinstance(value["files"], dict)
     ):
         raise ValueError("invalid generated ownership manifest")
     files: dict[bytes, dict[str, str]] = {}
-    for name, identity in value["files"].items():
+    for name, identity in cast(dict[Any, Any], value["files"]).items():
         if (
             not isinstance(name, str)
             or not name
@@ -116,22 +182,37 @@ def generated_manifest(repo: Path, generated: str) -> dict[bytes, dict[str, str]
         path = name.encode("utf-8")
         if path == MANIFEST:
             raise ValueError("generated manifest cannot include itself")
+        # A matching identity cannot turn inherited, SDK-owned CI into generated
+        # output. Use this verified checkpoint's literal compiler inventory, not
+        # the executing verifier's version or candidate Python/manifest claims.
+        # Public checkpoints may omit the private workflow/action blobs.
+        if not report.included(path) and path not in github_paths:
+            raise ValueError(f"generated manifest claims SDK-owned GitHub path: {name}")
+        if not isinstance(identity, dict) or set(cast(dict[str, Any], identity)) != {"mode", "sha256"}:
+            raise ValueError(f"invalid generated identity: {name}")
+        identity = cast(dict[str, Any], identity)
         if (
-            not isinstance(identity, dict)
-            or set(identity) != {"mode", "sha256"}
-            or identity["mode"] not in ("100644", "100755")
+            identity["mode"] not in ("100644", "100755")
             or not isinstance(identity["sha256"], str)
             or not report.HASH.fullmatch(identity["sha256"])
         ):
             raise ValueError(f"invalid generated identity: {name}")
         files[path] = identity
-    # Private snapshots must bind every generated file, including workflows and
-    # actions omitted from the legacy hash. Public snapshots retain these
-    # identities but deliberately omit their private blobs.
+    # Sanitized public checkpoints omit GitHub blobs, not their ownership entries.
+    # Otherwise an omitted identity would also escape strict candidate checks.
+    if missing := github_paths - files.keys():
+        raise ValueError(
+            f"generated manifest omits generated GitHub inventory path: {min(missing).decode()}"
+        )
+    # Checkpoints retain SDK-owned workflow/action subtrees from their parent.
+    # Those are outside generated ownership. Every other snapshot path, including
+    # renderer-owned GitHub files omitted from the legacy hash, must be listed.
+    # Public snapshots retain generated identities without the private blobs.
     snapshot_paths = set(entries) - {MANIFEST}
-    if snapshot_paths - files.keys() or any(
-        report.included(path) for path in files.keys() - snapshot_paths
-    ):
+    if any(
+        report.included(path) or path in github_paths
+        for path in snapshot_paths - files.keys()
+    ) or any(report.included(path) for path in files.keys() - snapshot_paths):
         raise ValueError("generated manifest does not cover the verified snapshot exactly")
     for path, identity in files.items():
         if path in entries:
@@ -263,7 +344,7 @@ def evaluate(
 ) -> tuple[dict[str, Any], bytes]:
     """In a queue, isolate each PR but budget the complete merged candidate."""
     base, head = report.require_sha(base), report.require_sha(head)
-    policy_sha = report.require_sha(policy_sha or base)
+    policy_sha = cast(str, report.require_sha(policy_sha or base))
     result: dict[str, Any] = {
         "base_sha": base,
         "policy_sha": policy_sha,
@@ -502,9 +583,16 @@ def github_evaluate(
         raise ValueError("unsupported budget event")
     # PR statuses can outlive their base revision. Require the queue's fresh,
     # combined candidate check before merging rather than relying on those alone.
-    rules = report.api("GET", f"{root}/rules/branches/{branch}")
-    if not any(rule["type"] == "merge_queue" for rule in rules):
-        raise ValueError(f"{branch} must require a merge queue before activating the budget gate")
+    page = 1
+    while True:
+        rules = report.api("GET", f"{root}/rules/branches/{branch}?per_page=100&page={page}")
+        if any(rule["type"] == "merge_queue" for rule in rules):
+            break
+        if len(rules) < 100:
+            raise ValueError(
+                f"{branch} must require a merge queue before activating the budget gate"
+            )
+        page += 1
     measurement = None
     if trusted_report_dir is not None:
         # Only the preceding main-branch step may supply this directory. Never

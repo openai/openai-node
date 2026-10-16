@@ -4,7 +4,7 @@
 
 The custom-code reporter measures the SDK's remaining customization of generated
 files. The budget gate checks that measurement against the repository's policy.
-See [CONTRIBUTING.md](../../CONTRIBUTING.md#custom-code-budget) for budget changes
+See [CONTRIBUTING.md](../../.github/CONTRIBUTING.md#custom-code-budget) for budget changes
 and human review, and [AGENTS.md](../../AGENTS.md#custom-code-budget) for agent rules.
 
 ## What is counted
@@ -59,6 +59,8 @@ or manifest edits cannot exempt a generated file. Generated workflow/action
 hashes are covered by the manifest even though the legacy patch counter and
 public snapshot publication continue to exclude those subtrees. Handwritten
 files and repository-owned governance remain outside generated ownership.
+Private checkpoints retain SDK-owned CI workflows and actions from their parent;
+the generated ownership inventory does not claim those inherited files.
 
 The existing required `Castiron / custom-code budget` status fails on any strict
 violation. Its trusted-main execution and merge-queue checks remain mandatory.
@@ -88,11 +90,16 @@ The custom-code workflow pair separates candidate execution from trusted checks:
   per constituent PR and budgets the complete candidate using trusted main policy.
   A policy increase in next or the same group cannot grant a higher limit.
 
-A separate publisher with no checkout attaches these statuses to the exact PR
-head or merge-group SHA, after rechecking the PR head/target or queue base freshness:
+A separate publisher with no checkout attaches these statuses only to PRs and
+merge groups targeting `main`, after rechecking the PR head/target or queue base freshness:
 
 - `Castiron / budget-only change`
 - `Castiron / custom-code budget`
+
+These contexts are reserved for `main`. Reports for `next` are advisory and
+never write required statuses, even when both targets use the same commit.
+GitHub does not rebuild the `next` queue when policy on `main` changes, so a
+captured `next` result cannot safely authorize a merge against current policy.
 
 The policy is read from the captured main commit, not next, the PR, or its merge
 base. Target baseline, trusted policy, and candidate identities are recorded
@@ -166,7 +173,10 @@ added later.
 Land shared tooling in Castiron first, then generate and review its SDK update
 onto main. Keep required status activation separate until hosted tests have
 exercised main and next PRs, forks, retargeting, policy changes, and both merge
-queues. Add the two exact trusted statuses to next only after this validation;
-preserve its reviews, CODEOWNERS, merge queue, and all existing main protections.
+queues. Do not require the `main` status contexts on `next`. Authoritative next
+checks need separate contexts and a mechanism that keeps queue authorization
+bound to current main policy, including changes after a result is published.
+Until that mechanism is implemented and reviewed, next reports remain advisory.
+Preserve its reviews, CODEOWNERS, merge queue, and all existing main protections.
 This checker support does not enable generation or promotion to next, or releases
 from next. Those require separate reviewed implementation.

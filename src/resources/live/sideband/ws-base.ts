@@ -1,23 +1,16 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { SidebandEmitter, SidebandStreamMessage, WebSocketError, buildURL } from './internal-base';
-import { InternalEventEmitter } from '../../../core/EventEmitter';
-import { sleep } from '../../../internal/utils/sleep';
-import { type WebSocketLike, ReadyState } from '../../../internal/ws-adapter';
+import { WebSocketConnection } from '../../../internal/ws-connection-controller';
+import type { WebSocketLike } from '../../../internal/ws-adapter';
 import {
-  SendQueue,
-  getMaxBufferedEvents,
   type WebSocketStreamOptions,
-  flattenRawData,
-  isRecoverableClose,
   type RawWebSocketData,
   type ReconnectingEvent,
   type ReconnectingOverrides,
-  type UnsentMessage,
 } from '../../../internal/ws';
 import * as SidebandAPI from './sideband';
 import { OpenAI } from '../../../client';
-import { OpenAIError } from '../../../core/error';
 
 export interface SidebandWSParameters extends Record<string, unknown> {
   /**
@@ -78,97 +71,79 @@ export abstract class SidebandWSBase<TSocket extends WebSocketLike> extends Side
 
   protected _client: OpenAI;
   protected _parameters: SidebandWSParameters | null | undefined;
-  private _reconnectOptions: SidebandWSReconnectOptions | null;
-  private _sendQueue: SendQueue<SidebandAPI.ConnectClientEvent>;
-  private _isReconnecting: boolean = false;
-  private _intentionallyClosed = false;
-  private _closeCode: number = 1000;
-  private _closeReason: string = 'OK';
-  private _lastCloseCode: number = 1006;
-  private _lastCloseReason: string = '';
-
-  // Necessary to keep the public event interface clean while we manage reconnecting
-  private _internalEvents = new InternalEventEmitter<{
-    socketSwap: (oldSocket: TSocket, newSocket: TSocket) => void;
-    reconnecting: (event: ReconnectingEvent<SidebandWSParameters>) => void;
-    reconnected: () => void;
-    close: (code: number, reason: string, unsent: UnsentMessage<SidebandAPI.ConnectClientEvent>[]) => void;
-  }>();
+  #connection: WebSocketConnection<
+    TSocket,
+    SidebandAPI.ConnectClientEvent,
+    SidebandAPI.ConnectServerEvent,
+    WebSocketError,
+    SidebandWSParameters
+  >;
 
   constructor(client: OpenAI, parameters: SidebandWSParameters, options?: SidebandWSBaseOptions | undefined) {
     super();
     this._client = client;
     this._parameters = parameters ?? undefined;
-    this._reconnectOptions = options?.reconnect ?? null;
-    this._sendQueue = new SendQueue<SidebandAPI.ConnectClientEvent>(options?.maxQueueSize);
+    const owner = this;
+    this.#connection = new WebSocketConnection<
+      TSocket,
+      SidebandAPI.ConnectClientEvent,
+      SidebandAPI.ConnectServerEvent,
+      WebSocketError,
+      SidebandWSParameters
+    >(
+      this,
+      {
+        buildURL: () => buildURL(this._client, this._parameters ?? {}),
+        createSocket: (url) => this._createSocket(url, this._authHeaders()),
+        get parameters() {
+          return owner._parameters;
+        },
+        set parameters(parameters) {
+          owner._parameters = parameters;
+        },
+        isErrorEvent: (event) => event.type === 'error',
+        onMessage: (data, isBinary) => this.#onMessage(data, isBinary),
+        onError: (message, cause) => this._onError(null, message, cause),
+        createError: (message) => new WebSocketError(message, null),
+        subscribe: (onEvent, onRaw, onError) => {
+          this.on('event', onEvent);
+          this.on('raw', onRaw);
+          this.on('error', onError);
+        },
+        unsubscribe: (onEvent, onRaw, onError) => {
+          this.off('event', onEvent);
+          this.off('raw', onRaw);
+          this.off('error', onError);
+        },
+        emitReconnecting: (event) => this._emit('reconnecting', event),
+        emitReconnected: () => this._emit('reconnected'),
+        emitClose: (code, reason, unsent) => this._emit('close', code, reason, unsent),
+        requeueFailed: false,
+        prepareReconnectSocket: () => this._prepareReconnectSocket(),
+      },
+      options,
+    );
   }
 
   /** Establishes the initial WebSocket connection. */
   protected _connectInitial(): void {
     this.url = buildURL(this._client, this._parameters ?? {});
-    this.socket = this._connect();
+    this.socket = this.#connection.connect();
   }
 
   /** Creates a platform-specific WebSocket for the given URL and auth headers. */
   protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
 
   send(event: SidebandAPI.ConnectClientEvent) {
-    if (!this.socket) {
-      throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
-    }
-
-    if (this._isReconnecting || this.socket.readyState === ReadyState.CONNECTING) {
-      if (!this._sendQueue.enqueue(event)) {
-        this._onError(null, 'send queue is full, message discarded', undefined);
-      }
-      return;
-    }
-    if (this.socket.readyState !== ReadyState.OPEN) {
-      this._onError(null, 'cannot send on a closed WebSocket', undefined);
-      return;
-    }
-    try {
-      this.socket.send(JSON.stringify(event));
-    } catch (err) {
-      this._onError(null, 'could not send data', err);
-    }
+    this.#connection.send(event);
   }
 
   sendRaw(data: RawWebSocketData) {
-    if (!this.socket) {
-      throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
-    }
-
-    if (this._isReconnecting || this.socket.readyState === ReadyState.CONNECTING) {
-      if (!this._sendQueue.enqueueRaw(data)) {
-        this._onError(null, 'send queue is full, message discarded', undefined);
-      }
-      return;
-    }
-    if (this.socket.readyState !== ReadyState.OPEN) {
-      this._onError(null, 'cannot send on a closed WebSocket', undefined);
-      return;
-    }
-    try {
-      this.socket.send(flattenRawData(data));
-    } catch (err) {
-      this._onError(null, 'could not send data', err);
-    }
+    this.#connection.sendRaw(data);
   }
 
   close(props?: { code: number; reason: string }) {
-    if (!this.socket) {
-      throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
-    }
-
-    this._intentionallyClosed = true;
-    this._closeCode = props?.code ?? 1000;
-    this._closeReason = props?.reason ?? 'OK';
-    try {
-      this.socket.close(this._closeCode, this._closeReason);
-    } catch (err) {
-      this._onError(null, 'could not close the connection', err);
-    }
+    this.#connection.close(props);
   }
 
   /**
@@ -204,506 +179,74 @@ export abstract class SidebandWSBase<TSocket extends WebSocketLike> extends Side
   }
 
   [Symbol.asyncIterator](options?: WebSocketStreamOptions): AsyncIterableIterator<SidebandStreamMessage> {
-    if (!this.socket) {
-      throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
-    }
-
-    const maxBufferedEvents = getMaxBufferedEvents(options);
-
-    // Two-queue async iterator: `queue` buffers incoming messages,
-    // `resolvers` buffers waiting next() calls. A push wakes the
-    // oldest next(); a next() drains the oldest message.
-    const queue: (SidebandStreamMessage | undefined)[] = [];
-    const resolvers: ((() => void) | undefined)[] = [];
-    let queueHead = 0;
-    let resolverHead = 0;
-    let done = false;
-    let failure: WebSocketError | undefined;
-    let currentSocket = this.socket;
-
-    const wakeResolver = () => {
-      if (resolverHead >= resolvers.length) return;
-
-      const resolver = resolvers[resolverHead];
-      resolvers[resolverHead] = undefined;
-      resolverHead += 1;
-      if (resolverHead >= 64 && resolverHead * 2 >= resolvers.length) {
-        resolvers.splice(0, resolverHead);
-        resolverHead = 0;
-      }
-      resolver?.();
-    };
-
-    const push = (msg: SidebandStreamMessage) => {
-      if (done) return;
-
-      if (maxBufferedEvents !== undefined && queue.length - queueHead >= maxBufferedEvents) {
-        failure = new WebSocketError(
-          `WebSocket stream exceeded maxBufferedEvents (${maxBufferedEvents})`,
-          null,
-        );
-        done = true;
-        queue.length = 0;
-        queueHead = 0;
-        cleanup();
-        flushResolvers();
-        return;
-      }
-
-      queue.push(msg);
-      wakeResolver();
-    };
-
-    const onEvent = (event: SidebandAPI.ConnectServerEvent) => {
-      if (event.type === 'error') return; // handled by onEmitterError
-      push({ type: 'message', message: event });
-    };
-
-    const onRaw = (data: RawWebSocketData) => {
-      push({ type: 'raw', data });
-    };
-
-    // All errors (API + socket) funnel through _onError → 'error' event
-    const onEmitterError = (err: WebSocketError) => {
-      push({ type: 'error', error: err });
-    };
-
-    const onOpen = () => {
-      push({ type: 'open' });
-    };
-
-    const onReconnecting = (evt: ReconnectingEvent<SidebandWSParameters>) => {
-      push({ type: 'reconnecting', reconnect: evt });
-    };
-
-    const onReconnected = () => {
-      push({ type: 'reconnected' });
-    };
-
-    const flushResolvers = () => {
-      while (resolverHead < resolvers.length) {
-        const resolver = resolvers[resolverHead];
-        resolvers[resolverHead] = undefined;
-        resolverHead += 1;
-        resolver?.();
-      }
-      resolvers.length = 0;
-      resolverHead = 0;
-    };
-
-    const onClose = (
-      code: number,
-      reason: string,
-      unsent: UnsentMessage<SidebandAPI.ConnectClientEvent>[],
-    ) => {
-      push({ type: 'close', code, reason, unsent });
-      done = true;
-      flushResolvers();
-      cleanup();
-    };
-
-    const onSocketSwap = (_oldSocket: TSocket, newSocket: TSocket) => {
-      if (currentSocket === newSocket) return;
-      currentSocket.off('open', onOpen);
-      newSocket.on('open', onOpen);
-      currentSocket = newSocket;
-    };
-
-    const cleanup = () => {
-      this.off('event', onEvent);
-      this.off('raw', onRaw);
-      this.off('error', onEmitterError);
-      currentSocket.off('open', onOpen);
-      this._internalEvents.off('close', onClose);
-      this._internalEvents.off('socketSwap', onSocketSwap);
-      this._internalEvents.off('reconnecting', onReconnecting);
-      this._internalEvents.off('reconnected', onReconnected);
-    };
-
-    this.on('event', onEvent);
-    this.on('raw', onRaw);
-    this.on('error', onEmitterError);
-    this.socket.on('open', onOpen);
-    this._internalEvents.on('close', onClose);
-    this._internalEvents.on('socketSwap', onSocketSwap);
-    this._internalEvents.on('reconnecting', onReconnecting);
-    this._internalEvents.on('reconnected', onReconnected);
-
-    if (this._isReconnecting) {
-      // A reconnect is already in flight. The socket may be CLOSED but the
-      // instance is still alive. Emit 'reconnecting' so the iterator stays
-      // open and receives the upcoming reconnected/message events.
-      push({
-        type: 'reconnecting',
-        reconnect: { attempt: 0, maxAttempts: 0, delay: 0, closeCode: 0, parameters: undefined },
-      });
-    } else {
-      switch (this.socket.readyState) {
-        case ReadyState.CONNECTING:
-          push({ type: 'connecting' });
-          break;
-        case ReadyState.OPEN:
-          push({ type: 'open' });
-          break;
-        case ReadyState.CLOSING:
-          push({ type: 'closing' });
-          break;
-        case ReadyState.CLOSED:
-          push({
-            type: 'close',
-            code: this._lastCloseCode,
-            reason: this._lastCloseReason,
-            unsent: this._sendQueue.drain(),
-          });
-          done = true;
-          cleanup();
-          break;
-      }
-    }
-
-    const resolve = (
-      res: (value: IteratorResult<SidebandStreamMessage>) => void,
-      reject: (error: WebSocketError) => void,
-    ) => {
-      if (failure) {
-        reject(failure);
-      } else if (queueHead < queue.length) {
-        const queued = queue[queueHead]!;
-        queue[queueHead] = undefined;
-        queueHead += 1;
-        if (queueHead >= 64 && queueHead * 2 >= queue.length) {
-          queue.splice(0, queueHead);
-          queueHead = 0;
-        }
-        res({ value: queued, done: false });
-      } else if (done) {
-        res({ value: undefined, done: true });
-      } else {
-        return false;
-      }
-      return true;
-    };
-
-    const next = (): Promise<IteratorResult<SidebandStreamMessage>> =>
-      new Promise((res, reject) => {
-        if (resolve(res, reject)) return;
-        resolvers.push(() => {
-          resolve(res, reject);
-        });
-      });
-
-    return {
-      next,
-      return: (): Promise<IteratorReturnResult<undefined>> => {
-        done = true;
-        queue.length = 0;
-        queueHead = 0;
-        cleanup();
-        flushResolvers();
-        return Promise.resolve({ value: undefined, done: true });
-      },
-      [Symbol.asyncIterator]() {
-        return this;
-      },
-    };
+    return this.#connection.iterate(options);
   }
 
-  private _connect(): TSocket {
-    this.url = buildURL(this._client, this._parameters ?? {});
-
-    const socket = this._createSocket(this.url, this._authHeaders());
-
-    socket.on('message', (data: string | ArrayBuffer | ArrayBufferView, isBinary: boolean) => {
-      if (isBinary) {
-        this._emit('raw', data);
-        return;
-      }
-
-      // Coerce to string in case the adapter delivers a typed-array for text frames.
-      const text = typeof data === 'string' ? data : String(data);
-
-      let event: SidebandAPI.ConnectServerEvent;
-      try {
-        event = JSON.parse(text) as SidebandAPI.ConnectServerEvent;
-      } catch {
-        this._emit('raw', data);
-        return;
-      }
-
-      if (
-        event === null ||
-        typeof event !== 'object' ||
-        Array.isArray(event) ||
-        !Object.prototype.hasOwnProperty.call(event, 'type') ||
-        typeof event.type !== 'string'
-      ) {
-        this._onError(
-          null,
-          'received invalid WebSocket event: expected an object with an own string type',
-          undefined,
-        );
-        return;
-      }
-
-      const eventType: string = event.type;
-      const reservedEventType =
-        eventType === 'raw' ||
-        eventType === 'close' ||
-        eventType === 'event' ||
-        eventType === 'reconnecting' ||
-        eventType === 'reconnected' ||
-        eventType === 'open' ||
-        eventType === 'error';
-      if (reservedEventType && eventType !== 'error') {
-        this._onError(null, 'received reserved WebSocket event type', undefined);
-        return;
-      }
-
-      this._emit('event', event);
-
-      if (event.type === 'error') {
-        this._onError(event);
-      } else {
-        // @ts-ignore TS isn't smart enough to get the relationship right here
-        this._emit(event.type, event);
-      }
-    });
-
-    socket.on('error', (err: Error) => {
-      // Suppress transient errors during reconnection — the retry loop
-      // already handles them and will surface a close if retries exhaust.
-      if (this._isReconnecting) return;
-      this._onError(null, err.message, err);
-    });
-
-    socket.on('open', () => {
-      this._flushSendQueue();
-    });
-
-    socket.on('close', (code: number, reason: string) => {
-      // Ignore close events from superseded sockets — a stale socket's
-      // late close must not kick off a second reconnect loop.
-      if (socket !== this.socket) return;
-      if (!this._intentionallyClosed && this._canReconnect(code)) {
-        this._reconnect(code);
-      } else if (!this._isReconnecting) {
-        this._emitPermanentClose(code, reason);
-      }
-    });
-
-    return socket;
-  }
-
-  // Reconnect is opt-in via onReconnecting so callers can pass
-  // state (e.g. session IDs) into the new connection.
-  private _canReconnect(code: number): boolean {
-    if (this._intentionallyClosed) return false;
-    if (!this._reconnectOptions) return false;
-    if (this._reconnectOptions.maxRetries === 0) return false;
-    if (!this._reconnectOptions.onReconnecting) return false;
-    return isRecoverableClose(code);
-  }
-
-  private async _reconnect(closeCode: number): Promise<void> {
-    if (!this.socket) {
-      throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
+  #onMessage(data: string | ArrayBuffer | ArrayBufferView, isBinary: boolean): void {
+    if (isBinary) {
+      this._emit('raw', data);
+      return;
     }
 
-    if (this._isReconnecting || !this._reconnectOptions) return;
-    this._isReconnecting = true;
+    // Coerce to string in case the adapter delivers a typed-array for text frames.
+    const text = typeof data === 'string' ? data : String(data);
 
-    const maxRetries = this._reconnectOptions.maxRetries ?? 5;
-    const initialDelay = this._reconnectOptions.initialDelay ?? 500;
-    const maxDelay = this._reconnectOptions.maxDelay ?? 8000;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      if (!this._canReconnect(closeCode)) {
-        this._isReconnecting = false;
-        if (!this._intentionallyClosed) {
-          this._onError(
-            null,
-            `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`,
-            undefined,
-          );
-        }
-        this._emitPermanentClose(
-          this._intentionallyClosed ? this._closeCode : closeCode,
-          this._intentionallyClosed ? this._closeReason : 'reconnect aborted',
-        );
-        return;
-      }
-
-      const baseDelay = Math.min(initialDelay * Math.pow(2, attempt - 1), maxDelay);
-      // Jitter: rand [0.75, 1.0] to spread out connection attempts without over-delaying
-      const jitter = 0.75 + Math.random() * 0.25;
-      const actualDelay = Math.round(baseDelay * jitter);
-
-      let reconnectingEvent: ReconnectingEvent<SidebandWSParameters> = {
-        attempt,
-        maxAttempts: maxRetries,
-        delay: actualDelay,
-        closeCode,
-        parameters: this._parameters ? { ...this._parameters } : undefined,
-      };
-
-      let overrides: ReconnectingOverrides<SidebandWSParameters> | void;
-      try {
-        overrides = this._reconnectOptions.onReconnecting(reconnectingEvent);
-      } catch (err) {
-        this._isReconnecting = false;
-        this._onError(null, 'onReconnecting callback threw', err);
-        this._emitPermanentClose(closeCode, 'onReconnecting callback threw');
-        return;
-      }
-
-      if (overrides && 'abort' in overrides && overrides.abort) {
-        this._isReconnecting = false;
-        this._emitPermanentClose(closeCode, 'reconnect aborted by handler');
-        return;
-      }
-
-      if (overrides && 'parameters' in overrides) {
-        this._parameters = overrides.parameters;
-        reconnectingEvent = { ...reconnectingEvent, parameters: this._parameters };
-      }
-
-      try {
-        this._emit('reconnecting', reconnectingEvent);
-      } catch (err) {
-        this._onError(null, 'onReconnecting callback threw', err);
-      }
-      this._internalEvents._emit('reconnecting', reconnectingEvent);
-
-      if (!this._canReconnect(closeCode)) {
-        this._isReconnecting = false;
-        if (!this._intentionallyClosed) {
-          this._onError(
-            null,
-            `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`,
-            undefined,
-          );
-        }
-        this._emitPermanentClose(
-          this._intentionallyClosed ? this._closeCode : closeCode,
-          this._intentionallyClosed ? this._closeReason : 'reconnect aborted',
-        );
-        return;
-      }
-
-      await sleep(actualDelay);
-
-      if (!this._canReconnect(closeCode)) {
-        this._isReconnecting = false;
-        if (!this._intentionallyClosed) {
-          this._onError(
-            null,
-            `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`,
-            undefined,
-          );
-        }
-        this._emitPermanentClose(
-          this._intentionallyClosed ? this._closeCode : closeCode,
-          this._intentionallyClosed ? this._closeReason : 'reconnect aborted',
-        );
-        return;
-      }
-
-      let closeCodePromise: Promise<number> | undefined;
-      try {
-        const oldSocket = this.socket;
-        this.socket = this._connect();
-        // Registered synchronously after _connect() and before any
-        // await so the code is captured even when ws emits 'close'
-        // in the same tick as 'error' (e.g. abortHandshake).
-        closeCodePromise = new Promise<number>((resolve) => {
-          this.socket.once('close', resolve);
-        });
-
-        await this._awaitOpen(this.socket);
-
-        this._internalEvents._emit('socketSwap', oldSocket, this.socket);
-        this._isReconnecting = false;
-        this._flushSendQueue();
-        this._emit('reconnected');
-        this._internalEvents._emit('reconnected');
-        return;
-      } catch {
-        if (closeCodePromise) {
-          // ws may emit 'error' before 'close', so await the code
-          // rather than reading it synchronously.
-          closeCode = await closeCodePromise;
-        }
-      }
-    }
-
-    // All retries exhausted — surface an error so consumers can
-    // distinguish retry failure from a clean close.
-    this._isReconnecting = false;
-    this._onError(
-      null,
-      `WebSocket reconnect failed after ${maxRetries} attempts (close code: ${closeCode})`,
-      undefined,
-    );
-    this._emitPermanentClose(closeCode, `reconnect failed after ${maxRetries} attempts`);
-  }
-
-  /**
-   * Resolves once the socket is open, rejects if it errors or closes first
-   */
-  private _awaitOpen(socket: TSocket): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const cleanup = () => {
-        socket.off('open', onOpen);
-        socket.off('error', onError);
-        socket.off('close', onFail);
-      };
-      const onOpen = () => {
-        cleanup();
-        resolve();
-      };
-      const onError = (err: Error) => {
-        cleanup();
-        reject(err);
-      };
-      const onFail = () => {
-        cleanup();
-        reject(new Error('socket closed before open'));
-      };
-      socket.once('open', onOpen);
-      socket.once('error', onError);
-      socket.once('close', onFail);
-    });
-  }
-
-  private _flushSendQueue(): void {
-    if (!this.socket) {
-      throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
-    }
-
+    let event: SidebandAPI.ConnectServerEvent;
     try {
-      this._sendQueue.flush((data) => this.socket.send(flattenRawData(data)));
-    } catch (err) {
-      this._onError(null, 'could not send queued data', err);
+      event = JSON.parse(text) as SidebandAPI.ConnectServerEvent;
+    } catch {
+      this._emit('raw', data);
+      return;
+    }
+
+    if (
+      event === null ||
+      typeof event !== 'object' ||
+      Array.isArray(event) ||
+      !Object.prototype.hasOwnProperty.call(event, 'type') ||
+      typeof event.type !== 'string'
+    ) {
+      this._onError(
+        null,
+        'received invalid WebSocket event: expected an object with an own string type',
+        undefined,
+      );
+      return;
+    }
+
+    const eventType: string = event.type;
+    const reservedEventType =
+      eventType === 'raw' ||
+      eventType === 'close' ||
+      eventType === 'event' ||
+      eventType === 'reconnecting' ||
+      eventType === 'reconnected' ||
+      eventType === 'open' ||
+      eventType === 'error';
+    if (reservedEventType && eventType !== 'error') {
+      this._onError(null, 'received reserved WebSocket event type', undefined);
+      return;
+    }
+
+    this._emit('event', event);
+
+    if (event.type === 'error') {
+      this._onError(event);
+    } else {
+      // @ts-ignore TS isn't smart enough to get the relationship right here
+      this._emit(event.type, event);
     }
   }
 
-  /**
-   * Emits the public `close` event with unsent messages and the internal
-   * `close` event used by the async iterator.
-   */
-  private _emitPermanentClose(code: number, reason: string): void {
-    this._lastCloseCode = code;
-    this._lastCloseReason = reason;
-    const unsent = this._sendQueue.drain();
-    // Internal close fires first so the async iterator is guaranteed to
-    // terminate even if a public 'close' listener throws.
-    this._internalEvents._emit('close', code, reason, unsent);
-    this._emit('close', code, reason, unsent);
+  protected _prepareReconnectSocket(): Promise<(url: URL) => TSocket> {
+    const authHeaders = this._authHeaders();
+    return Promise.resolve((url) => this._createSocket(url, authHeaders));
   }
 
-  protected _authHeaders(): Record<string, string> {
-    if (this._client.apiKey) {
-      return { Authorization: `Bearer ${this._client.apiKey}` };
+  protected _authHeaders(apiKey = this._client.apiKey): Record<string, string> {
+    if (typeof apiKey !== 'string' || !apiKey) return {};
+    if (apiKey) {
+      return { Authorization: `Bearer ${apiKey}` };
     }
     return {};
   }
