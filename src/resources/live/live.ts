@@ -2,6 +2,7 @@
 
 import { APIResource } from '../../core/resource';
 import * as LiveAPI from './live';
+import * as DecisionsAPI from '../decisions';
 import * as SessionsAPI from './sessions';
 import {
   SessionAcceptParams,
@@ -175,6 +176,9 @@ export type ClientEvent =
   | InstructionsAppendEvent
   | ThinkingAppendEvent
   | CommentaryAppendEvent
+  | DecisionCreateEvent
+  | DecisionItemCreateEvent
+  | DecisionItemDeleteEvent
   | ResponseItemCreateEvent
   | ResponseCreateEvent
   | SessionCloseEvent;
@@ -272,8 +276,504 @@ export interface DataChannelConfig {
 }
 
 /**
- * Returned when the Live model delegates work to your application or a Responses
- * backend. Contains delegation metadata and the position on the session timeline
+ * Evaluate the configured questions using the current conversation and Decision
+ * inputs. Reusing an event_id is rejected for the lifetime of the session.
+ */
+export interface DecisionCreateEvent {
+  event_id: string;
+
+  type: 'decision.create';
+}
+
+/**
+ * A Decision API event for a Live delegation or transcript trigger. For a trigger,
+ * source_event_id identifies the transcript delta that caused this evaluation.
+ */
+export interface DecisionEvent {
+  /**
+   * The Live delegation ID, or null for a transcript trigger.
+   */
+  delegation_id: string | null;
+
+  event: DecisionEvent.Event;
+
+  /**
+   * The unique ID of this Live server event.
+   */
+  event_id: string;
+
+  /**
+   * The event_id of the transcript delta that fired this trigger, or null for a
+   * delegation.
+   */
+  source_event_id: string | null;
+
+  source_event_type: 'session.input_transcript.delta' | 'session.output_transcript.delta' | null;
+
+  /**
+   * The Live-assigned ID of this trigger firing, or null for a delegation.
+   */
+  trigger_id: string | null;
+
+  type: 'decision.event';
+}
+
+export namespace DecisionEvent {
+  export interface Event {
+    /**
+     * The native Decision API response, including its model, ordered answers, and
+     * token usage.
+     */
+    decision: DecisionsAPI.Decision;
+
+    type: 'decision.completed';
+  }
+}
+
+/**
+ * Append an input item for future decisions without starting an evaluation or
+ * changing Live voice context.
+ */
+export interface DecisionItemCreateEvent {
+  item: DecisionItemCreateEvent.Item;
+
+  type: 'decision.item.create';
+
+  /**
+   * Optional client identifier for correlating this command with a server event's
+   * client_event_id or error.client_event_id.
+   */
+  event_id?: string | null;
+}
+
+export namespace DecisionItemCreateEvent {
+  export interface Item {
+    /**
+     * The text input to the model.
+     */
+    content: string | Array<Item.InputText | Item.InputImage>;
+
+    /**
+     * The message role. Always `user`.
+     */
+    role: 'user';
+
+    /**
+     * The unique ID of this message item.
+     */
+    id?: string | null;
+
+    type?: 'message';
+  }
+
+  export namespace Item {
+    export interface InputText {
+      /**
+       * The text input to the model.
+       */
+      text: string;
+
+      /**
+       * The type of the input item. Always `input_text`.
+       */
+      type: 'input_text';
+    }
+
+    export interface InputImage {
+      /**
+       * An inline image encoded as a data URL.
+       */
+      image_url: string;
+
+      /**
+       * The type of the input item. Always `input_image`.
+       */
+      type: 'input_image';
+
+      /**
+       * The detail level of the image to be sent to the model. One of `high`, `low`,
+       * `auto`, or `original`. Defaults to `auto`.
+       */
+      detail?: 'low' | 'high' | 'auto' | 'original' | null;
+    }
+  }
+}
+
+/**
+ * An input item was appended for future decisions.
+ */
+export interface DecisionItemCreatedEvent {
+  /**
+   * The unique ID of the Live server event.
+   */
+  event_id: string;
+
+  item: DecisionItemCreatedEvent.Item;
+
+  type: 'decision.item.created';
+
+  /**
+   * The event_id of the client command associated with this server event, when
+   * supplied.
+   */
+  client_event_id?: string;
+}
+
+export namespace DecisionItemCreatedEvent {
+  export interface Item {
+    /**
+     * The ID of the stored Decision input item.
+     */
+    id: string;
+
+    /**
+     * The text input to the model.
+     */
+    content: string | Array<Item.InputText | Item.InputImage>;
+
+    /**
+     * The message role. Always `user`.
+     */
+    role: 'user';
+
+    type?: 'message';
+  }
+
+  export namespace Item {
+    export interface InputText {
+      /**
+       * The text input to the model.
+       */
+      text: string;
+
+      /**
+       * The type of the input item. Always `input_text`.
+       */
+      type: 'input_text';
+    }
+
+    export interface InputImage {
+      /**
+       * An inline image encoded as a data URL.
+       */
+      image_url: string;
+
+      /**
+       * The type of the input item. Always `input_image`.
+       */
+      type: 'input_image';
+
+      /**
+       * The detail level of the image to be sent to the model. One of `high`, `low`,
+       * `auto`, or `original`. Defaults to `auto`.
+       */
+      detail?: 'low' | 'high' | 'auto' | 'original' | null;
+    }
+  }
+}
+
+/**
+ * Delete an input item from future decisions without starting an evaluation or
+ * changing Live voice context.
+ */
+export interface DecisionItemDeleteEvent {
+  item_id: string;
+
+  type: 'decision.item.delete';
+
+  /**
+   * Optional client identifier for correlating this command with a server event's
+   * client_event_id or error.client_event_id.
+   */
+  event_id?: string | null;
+}
+
+/**
+ * An input item was removed from future decisions.
+ */
+export interface DecisionItemDeletedEvent {
+  /**
+   * The unique ID of the Live server event.
+   */
+  event_id: string;
+
+  item_id: string;
+
+  type: 'decision.item.deleted';
+
+  /**
+   * The event_id of the client command associated with this server event, when
+   * supplied.
+   */
+  client_event_id?: string;
+}
+
+export interface DecisionTrigger {
+  /**
+   * Questions evaluated using the current transcript and the session's shared
+   * Decision items.
+   */
+  decisions: DecisionTrigger.Decisions;
+
+  event_type: 'session.input_transcript.delta' | 'session.output_transcript.delta';
+
+  type: 'decisions';
+}
+
+export namespace DecisionTrigger {
+  /**
+   * Questions evaluated using the current transcript and the session's shared
+   * Decision items.
+   */
+  export interface Decisions {
+    /**
+     * Native Decision API questions evaluated together, in order.
+     */
+    questions: Array<
+      Decisions.QuestionParamPredicate | Decisions.QuestionParamChoice | Decisions.QuestionParamScore
+    >;
+  }
+
+  export namespace Decisions {
+    /**
+     * Estimate how likely it is that a statement about the input is true.
+     */
+    export interface QuestionParamPredicate {
+      instructions: string;
+
+      /**
+       * The type of the object. Always `predicate`.
+       */
+      type: 'predicate';
+
+      name?: string;
+    }
+
+    /**
+     * Choose from the supplied options based on the input.
+     */
+    export interface QuestionParamChoice {
+      /**
+       * Provide between 2 and 255 choices. Each choice must be unique.
+       */
+      choices: Array<QuestionParamChoice.Choice>;
+
+      instructions: string;
+
+      /**
+       * The type of the object. Always `choice`.
+       */
+      type: 'choice';
+
+      name?: string;
+    }
+
+    export namespace QuestionParamChoice {
+      export interface Choice {
+        /**
+         * Choice values are typed: a string and a boolean with the same text are distinct.
+         */
+        value: string | boolean;
+
+        description?: string;
+      }
+    }
+
+    /**
+     * Rate the input against the supplied ordered levels.
+     */
+    export interface QuestionParamScore {
+      instructions: string;
+
+      levels: Array<QuestionParamScore.Level>;
+
+      /**
+       * The type of the object. Always `score`.
+       */
+      type: 'score';
+
+      name?: string;
+    }
+
+    export namespace QuestionParamScore {
+      export interface Level {
+        label: string;
+
+        description?: string;
+      }
+    }
+  }
+}
+
+export interface DecisionsDelegationConfig {
+  model: string;
+
+  /**
+   * Native Decision API questions evaluated together, in order.
+   */
+  questions: Array<
+    | DecisionsDelegationConfig.QuestionParamPredicate
+    | DecisionsDelegationConfig.QuestionParamChoice
+    | DecisionsDelegationConfig.QuestionParamScore
+  >;
+}
+
+export namespace DecisionsDelegationConfig {
+  /**
+   * Estimate how likely it is that a statement about the input is true.
+   */
+  export interface QuestionParamPredicate {
+    instructions: string;
+
+    /**
+     * The type of the object. Always `predicate`.
+     */
+    type: 'predicate';
+
+    name?: string;
+  }
+
+  /**
+   * Choose from the supplied options based on the input.
+   */
+  export interface QuestionParamChoice {
+    /**
+     * Provide between 2 and 255 choices. Each choice must be unique.
+     */
+    choices: Array<QuestionParamChoice.Choice>;
+
+    instructions: string;
+
+    /**
+     * The type of the object. Always `choice`.
+     */
+    type: 'choice';
+
+    name?: string;
+  }
+
+  export namespace QuestionParamChoice {
+    export interface Choice {
+      /**
+       * Choice values are typed: a string and a boolean with the same text are distinct.
+       */
+      value: string | boolean;
+
+      description?: string;
+    }
+  }
+
+  /**
+   * Rate the input against the supplied ordered levels.
+   */
+  export interface QuestionParamScore {
+    instructions: string;
+
+    levels: Array<QuestionParamScore.Level>;
+
+    /**
+     * The type of the object. Always `score`.
+     */
+    type: 'score';
+
+    name?: string;
+  }
+
+  export namespace QuestionParamScore {
+    export interface Level {
+      label: string;
+
+      description?: string;
+    }
+  }
+}
+
+export interface DecisionsDelegationUpdateConfig {
+  model?: string;
+
+  /**
+   * Native Decision API questions evaluated together, in order.
+   */
+  questions?: Array<
+    | DecisionsDelegationUpdateConfig.QuestionParamPredicate
+    | DecisionsDelegationUpdateConfig.QuestionParamChoice
+    | DecisionsDelegationUpdateConfig.QuestionParamScore
+  >;
+}
+
+export namespace DecisionsDelegationUpdateConfig {
+  /**
+   * Estimate how likely it is that a statement about the input is true.
+   */
+  export interface QuestionParamPredicate {
+    instructions: string;
+
+    /**
+     * The type of the object. Always `predicate`.
+     */
+    type: 'predicate';
+
+    name?: string;
+  }
+
+  /**
+   * Choose from the supplied options based on the input.
+   */
+  export interface QuestionParamChoice {
+    /**
+     * Provide between 2 and 255 choices. Each choice must be unique.
+     */
+    choices: Array<QuestionParamChoice.Choice>;
+
+    instructions: string;
+
+    /**
+     * The type of the object. Always `choice`.
+     */
+    type: 'choice';
+
+    name?: string;
+  }
+
+  export namespace QuestionParamChoice {
+    export interface Choice {
+      /**
+       * Choice values are typed: a string and a boolean with the same text are distinct.
+       */
+      value: string | boolean;
+
+      description?: string;
+    }
+  }
+
+  /**
+   * Rate the input against the supplied ordered levels.
+   */
+  export interface QuestionParamScore {
+    instructions: string;
+
+    levels: Array<QuestionParamScore.Level>;
+
+    /**
+     * The type of the object. Always `score`.
+     */
+    type: 'score';
+
+    name?: string;
+  }
+
+  export namespace QuestionParamScore {
+    export interface Level {
+      label: string;
+
+      description?: string;
+    }
+  }
+}
+
+/**
+ * Returned when the Live model delegates work to your application, Responses, or
+ * Decisions. Contains delegation metadata and the position on the session timeline
  * where the work was delegated.
  */
 export interface DelegationCreatedEvent {
@@ -314,15 +814,14 @@ export namespace DelegationCreatedEvent {
   export interface Delegation {
     /**
      * The unique ID of the delegation. Use this as delegation_id when replying to
-     * client-owned work or correlating Responses events.
+     * client-owned work or correlating backend events.
      */
     id: string;
 
     /**
-     * Where the Live model delegated the work: `client` for your application, or
-     * `responses` for the configured Responses backend.
+     * Where the Live model delegated the work: `client`, `responses`, or `decisions`.
      */
-    target: 'client' | 'responses';
+    target: 'client' | 'responses' | 'decisions';
 
     /**
      * The object type, always `delegation`.
@@ -962,9 +1461,10 @@ export interface MediaSessionConfig {
 
   /**
    * Who handles tasks delegated by the Live model. Omitted or null selects your
-   * application; use `responses` to let the API manage a Responses backend.
+   * application; use `responses` or `decisions` to delegate to the corresponding
+   * API.
    */
-  delegation?: ClientDelegation | MediaSessionConfig.Responses | null;
+  delegation?: ClientDelegation | MediaSessionConfig.Responses | MediaSessionConfig.Decisions | null;
 
   /**
    * Ordered text-only history supplied before startup. Supports developer, user, and
@@ -989,6 +1489,14 @@ export interface MediaSessionConfig {
    * to false for new sessions.
    */
   store?: boolean;
+
+  /**
+   * At most one Decisions trigger per transcript event type. Triggers run
+   * independently of delegation. On update, omit triggers to keep the current
+   * configuration, send a list to replace it, or send an empty list to disable
+   * triggers.
+   */
+  triggers?: Array<DecisionTrigger>;
 }
 
 export namespace MediaSessionConfig {
@@ -1032,6 +1540,12 @@ export namespace MediaSessionConfig {
      * The delegation owner. Always `responses` for tasks handled by the Responses API.
      */
     type: 'responses';
+  }
+
+  export interface Decisions {
+    decisions: LiveAPI.DecisionsDelegationConfig;
+
+    type: 'decisions';
   }
 }
 
@@ -1548,6 +2062,9 @@ export type ServerEvent =
   | InputTranscriptDeltaEvent
   | OutputTranscriptDeltaEvent
   | DelegationCreatedEvent
+  | DecisionEvent
+  | DecisionItemCreatedEvent
+  | DecisionItemDeletedEvent
   | ResponseEvent
   | SessionUsageUpdatedEvent
   | SessionClosedEvent
@@ -1773,9 +2290,10 @@ export interface SessionConfig {
 
   /**
    * Who handles tasks delegated by the Live model. Omitted or null selects your
-   * application; use `responses` to let the API manage a Responses backend.
+   * application; use `responses` or `decisions` to delegate to the corresponding
+   * API.
    */
-  delegation?: ClientDelegation | SessionConfig.Responses | null;
+  delegation?: ClientDelegation | SessionConfig.Responses | SessionConfig.Decisions | null;
 
   /**
    * Ordered text-only history supplied before startup. Supports developer, user, and
@@ -1800,6 +2318,14 @@ export interface SessionConfig {
    * to false for new sessions.
    */
   store?: boolean;
+
+  /**
+   * At most one Decisions trigger per transcript event type. Triggers run
+   * independently of delegation. On update, omit triggers to keep the current
+   * configuration, send a list to replace it, or send an empty list to disable
+   * triggers.
+   */
+  triggers?: Array<DecisionTrigger>;
 }
 
 export namespace SessionConfig {
@@ -1849,6 +2375,12 @@ export namespace SessionConfig {
      */
     type: 'responses';
   }
+
+  export interface Decisions {
+    decisions: LiveAPI.DecisionsDelegationConfig;
+
+    type: 'decisions';
+  }
 }
 
 /**
@@ -1894,9 +2426,10 @@ export interface SessionResource {
 
   /**
    * Who handles tasks delegated by the Live model. Omitted or null selects your
-   * application; use `responses` to let the API manage a Responses backend.
+   * application; use `responses` or `decisions` to delegate to the corresponding
+   * API.
    */
-  delegation?: ClientDelegation | SessionResource.Responses | null;
+  delegation?: ClientDelegation | SessionResource.Responses | SessionResource.Decisions | null;
 
   /**
    * Ordered text-only history supplied before startup. Supports developer, user, and
@@ -1921,6 +2454,14 @@ export interface SessionResource {
    * to false for new sessions.
    */
   store?: boolean;
+
+  /**
+   * At most one Decisions trigger per transcript event type. Triggers run
+   * independently of delegation. On update, omit triggers to keep the current
+   * configuration, send a list to replace it, or send an empty list to disable
+   * triggers.
+   */
+  triggers?: Array<DecisionTrigger>;
 }
 
 export namespace SessionResource {
@@ -1969,6 +2510,12 @@ export namespace SessionResource {
      * The delegation owner. Always `responses` for tasks handled by the Responses API.
      */
     type: 'responses';
+  }
+
+  export interface Decisions {
+    decisions: LiveAPI.DecisionsDelegationConfig;
+
+    type: 'decisions';
   }
 }
 
@@ -2024,15 +2571,22 @@ export interface SessionStartedEvent {
 }
 
 /**
- * Changes to an active Live session. Only delegation backend settings can be
- * updated after startup.
+ * Changes to an active Live session's delegation settings and transcript triggers.
  */
 export interface SessionUpdateConfig {
   /**
    * Delegation settings to update. The delegation type must match the current
    * session; omitted settings retain their values.
    */
-  delegation?: ClientDelegation | SessionUpdateConfig.Responses | null;
+  delegation?: ClientDelegation | SessionUpdateConfig.Responses | SessionUpdateConfig.Decisions | null;
+
+  /**
+   * At most one Decisions trigger per transcript event type. Triggers run
+   * independently of delegation. On update, omit triggers to keep the current
+   * configuration, send a list to replace it, or send an empty list to disable
+   * triggers.
+   */
+  triggers?: Array<DecisionTrigger>;
 }
 
 export namespace SessionUpdateConfig {
@@ -2052,17 +2606,23 @@ export namespace SessionUpdateConfig {
      */
     responses?: LiveAPI.ResponsesDelegationUpdateConfig;
   }
+
+  export interface Decisions {
+    type: 'decisions';
+
+    decisions?: LiveAPI.DecisionsDelegationUpdateConfig;
+  }
 }
 
 /**
- * Update the delegation settings of an active Live session. The server
- * acknowledges accepted changes with `session.updated`.
+ * Update the delegation settings or transcript triggers of an active Live session.
+ * The server acknowledges accepted changes with `session.updated`.
  */
 export interface SessionUpdateEvent {
   /**
-   * Sparse delegation updates. Omitted settings retain their values. The delegation
-   * type cannot change, including resetting Responses delegation to null or client.
-   * Model, frontend instructions, audio, and startup input are immutable.
+   * Sparse delegation and trigger updates. Omitted settings retain their values. The
+   * delegation type cannot change. Model, frontend instructions, audio, and startup
+   * input are immutable.
    */
   session: SessionUpdateConfig;
 
@@ -2322,6 +2882,15 @@ export declare namespace Live {
     type CommentaryAppendedEvent as CommentaryAppendedEvent,
     type CustomVoice as CustomVoice,
     type DataChannelConfig as DataChannelConfig,
+    type DecisionCreateEvent as DecisionCreateEvent,
+    type DecisionEvent as DecisionEvent,
+    type DecisionItemCreateEvent as DecisionItemCreateEvent,
+    type DecisionItemCreatedEvent as DecisionItemCreatedEvent,
+    type DecisionItemDeleteEvent as DecisionItemDeleteEvent,
+    type DecisionItemDeletedEvent as DecisionItemDeletedEvent,
+    type DecisionTrigger as DecisionTrigger,
+    type DecisionsDelegationConfig as DecisionsDelegationConfig,
+    type DecisionsDelegationUpdateConfig as DecisionsDelegationUpdateConfig,
     type DelegationCreatedEvent as DelegationCreatedEvent,
     type Error as Error,
     type ErrorEvent as ErrorEvent,
