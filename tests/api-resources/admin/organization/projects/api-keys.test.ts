@@ -31,7 +31,6 @@ describe('resource apiKeys', () => {
   test('update: only required params', async () => {
     const responsePromise = client.admin.organization.projects.apiKeys.update('api_key_id', {
       project_id: 'project_id',
-      expires_in_seconds: 1,
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -46,6 +45,7 @@ describe('resource apiKeys', () => {
     await client.admin.organization.projects.apiKeys.update('api_key_id', {
       project_id: 'project_id',
       expires_in_seconds: 1,
+      scopes: ['api.all.read'],
     });
   });
 

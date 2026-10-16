@@ -147,7 +147,7 @@
     },
     "src/resources/admin/organization/projects/api-keys.ts": {
       "mode": "100644",
-      "sha256": "ee7a6dc0e8ad4fe301fc0e038fd33019cec8972a02a3c5b19e2d338e70f92dda"
+      "sha256": "dce1cef58ab46425647487a9803cc01f38e534f803a4fc81c3dfff0e5ec869e7"
     },
     "src/resources/admin/organization/projects/certificates.ts": {
       "mode": "100644",
@@ -1055,7 +1055,7 @@
     },
     "tests/api-resources/admin/organization/projects/api-keys.test.ts": {
       "mode": "100644",
-      "sha256": "02f6be61a598062066dfeb0e96db7373c06063f910a208ee59905eb98fda3fa1"
+      "sha256": "98e533e0a68ee009a70ac86a23c063f4d8cfcc2bfdc3fb051706399928a47fb3"
     },
     "tests/api-resources/admin/organization/projects/certificates.test.ts": {
       "mode": "100644",
