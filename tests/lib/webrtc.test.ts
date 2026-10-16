@@ -516,7 +516,7 @@ it('infers named payloads from each public helper’s generated server-event uni
   });
   expectTypeOf(unsubscribe).toEqualTypeOf<() => void>();
   liveChannel.on('session.delegation.created', (event) => {
-    expectTypeOf(event.delegation.target).toEqualTypeOf<'client' | 'responses'>();
+    expectTypeOf(event.delegation.target).toEqualTypeOf<'client' | 'responses' | 'decisions'>();
   });
   realtime.on('session.created', (event) => {
     expectTypeOf(event.type).toEqualTypeOf<'session.created'>();

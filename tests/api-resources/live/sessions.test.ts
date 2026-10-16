@@ -40,6 +40,21 @@ describe('resource sessions', () => {
         ],
         instructions: 'instructions',
         store: true,
+        triggers: [
+          {
+            decisions: {
+              questions: [
+                {
+                  instructions: 'instructions',
+                  type: 'predicate',
+                  name: 'name',
+                },
+              ],
+            },
+            event_type: 'session.input_transcript.delta',
+            type: 'decisions',
+          },
+        ],
       },
     });
   });
