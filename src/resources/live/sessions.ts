@@ -237,9 +237,10 @@ export namespace SessionAcceptParams {
 
     /**
      * Who handles tasks delegated by the Live model. Omitted or null selects your
-     * application; use `responses` to let the API manage a Responses backend.
+     * application; use `responses` or `decisions` to delegate to the corresponding
+     * API.
      */
-    delegation?: LiveAPI.ClientDelegation | Session.Responses | null;
+    delegation?: LiveAPI.ClientDelegation | Session.Responses | Session.Decisions | null;
 
     /**
      * Ordered text-only history supplied before startup. Supports developer, user, and
@@ -264,6 +265,14 @@ export namespace SessionAcceptParams {
      * to false for new sessions.
      */
     store?: boolean;
+
+    /**
+     * At most one Decisions trigger per transcript event type. Triggers run
+     * independently of delegation. On update, omit triggers to keep the current
+     * configuration, send a list to replace it, or send an empty list to disable
+     * triggers.
+     */
+    triggers?: Array<LiveAPI.DecisionTrigger>;
   }
 
   export namespace Session {
@@ -308,6 +317,12 @@ export namespace SessionAcceptParams {
        * The delegation owner. Always `responses` for tasks handled by the Responses API.
        */
       type: 'responses';
+    }
+
+    export interface Decisions {
+      decisions: LiveAPI.DecisionsDelegationConfig;
+
+      type: 'decisions';
     }
   }
 }
