@@ -30,6 +30,7 @@ Types:
 - <code><a href="./src/resources/decisions.ts">DecisionInputMessage</a></code>
 - <code><a href="./src/resources/decisions.ts">DecisionInputPart</a></code>
 - <code><a href="./src/resources/decisions.ts">DecisionInputText</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionPromptCacheBreakpoint</a></code>
 
 Methods:
 
