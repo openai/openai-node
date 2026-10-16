@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.36.0](https://github.com/openai/openai-node/compare/v7.35.0...v7.36.0) (2026-10-16)
+
+
+### Features
+
+* **api:** add safety identifiers to image requests and responses ([#2957](https://github.com/openai/openai-node/issues/2957)) ([c95ccaf](https://github.com/openai/openai-node/commit/c95ccafbd9eeb2de3159a813d40f175afa5c8748))
+
 ## [7.35.0](https://github.com/openai/openai-node/compare/v7.34.0...v7.35.0) (2026-10-16)
 
 
