@@ -21,6 +21,9 @@ export type ForkClientEvent =
   | LiveAPI.InstructionsAppendEvent
   | LiveAPI.ThinkingAppendEvent
   | LiveAPI.CommentaryAppendEvent
+  | LiveAPI.DecisionCreateEvent
+  | LiveAPI.DecisionItemCreateEvent
+  | LiveAPI.DecisionItemDeleteEvent
   | LiveAPI.ResponseItemCreateEvent
   | LiveAPI.ResponseCreateEvent
   | LiveAPI.SessionCloseEvent;
@@ -47,6 +50,9 @@ export type ForkServerEvent =
   | LiveAPI.InputTranscriptDeltaEvent
   | LiveAPI.OutputTranscriptDeltaEvent
   | LiveAPI.DelegationCreatedEvent
+  | LiveAPI.DecisionEvent
+  | LiveAPI.DecisionItemCreatedEvent
+  | LiveAPI.DecisionItemDeletedEvent
   | LiveAPI.ResponseEvent
   | LiveAPI.SessionUsageUpdatedEvent
   | LiveAPI.SessionClosedEvent

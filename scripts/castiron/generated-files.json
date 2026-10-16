@@ -743,7 +743,7 @@
     },
     "src/resources/live/api.md": {
       "mode": "100644",
-      "sha256": "edabb404d86a7d4449fcc597c67b042539e0aabd546011eb84a661dcae872dcd"
+      "sha256": "7ba050133595c085c2b33fc645a9222b540efb6be312c8fec9bfc5daac5a1fe9"
     },
     "src/resources/live/forks.ts": {
       "mode": "100644",
@@ -751,7 +751,7 @@
     },
     "src/resources/live/forks/forks.ts": {
       "mode": "100644",
-      "sha256": "624d42a82f3505ec0622c65526c20ed7cdb314a537754d99483391d1b1fed2cb"
+      "sha256": "2bd6a328e128c1d6f082fc0f22082602f12313719b2a0f8bb4e46bc4dcae3981"
     },
     "src/resources/live/forks/index.ts": {
       "mode": "100644",
@@ -779,11 +779,11 @@
     },
     "src/resources/live/live.ts": {
       "mode": "100644",
-      "sha256": "bec794f0d3266425425756048461d611641b77b77f21144f13f9356a1d8a1dfa"
+      "sha256": "3d8a6b9aec15284288eaa5ff4ddf2a2ffe969aef5901944f92522ecb418e72d9"
     },
     "src/resources/live/sessions.ts": {
       "mode": "100644",
-      "sha256": "c3cd33b7c7b8c61b9e47ab551d16bbad695c9dccfdd202afa4598ecdb95be755"
+      "sha256": "5ae7100978acd80444b13c11bfbc4cf547b8edc35de9666eb87d12342f952ae1"
     },
     "src/resources/live/sideband.ts": {
       "mode": "100644",
@@ -799,7 +799,7 @@
     },
     "src/resources/live/sideband/sideband.ts": {
       "mode": "100644",
-      "sha256": "2d16a82eaa3d6b71359bcf05f642e2d8a319b4b13d5673c1eef315c02e8f96ed"
+      "sha256": "45716dac2f9cbf6cebceba76e464875cf781e72912b435e5a523e5a6b8fc761c"
     },
     "src/resources/live/sideband/ws-base.ts": {
       "mode": "100644",
@@ -1351,11 +1351,11 @@
     },
     "tests/api-resources/live/live.test.ts": {
       "mode": "100644",
-      "sha256": "a5ef94b558b6cde14e0a82eca2456fd955c39c6f926acb98310423dee5cff897"
+      "sha256": "2793cf951c6d0a025fdd5b5ac5139d88970591d6b5b8e50441cb85929c2ffc74"
     },
     "tests/api-resources/live/sessions.test.ts": {
       "mode": "100644",
-      "sha256": "41b311519aac446fdc89f567649b8d3bc1ab7a56d91444951ae757c241fcb956"
+      "sha256": "51d2dc8718c5979ec968836b26e49b4eb6d5e5d8bb7ef558aea419df8912d889"
     },
     "tests/api-resources/models.test.ts": {
       "mode": "100644",

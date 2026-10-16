@@ -11,6 +11,15 @@ Types:
 - <code><a href="./src/resources/live/live.ts">CommentaryAppendedEvent</a></code>
 - <code><a href="./src/resources/live/live.ts">CustomVoice</a></code>
 - <code><a href="./src/resources/live/live.ts">DataChannelConfig</a></code>
+- <code><a href="./src/resources/live/live.ts">DecisionCreateEvent</a></code>
+- <code><a href="./src/resources/live/live.ts">DecisionEvent</a></code>
+- <code><a href="./src/resources/live/live.ts">DecisionItemCreateEvent</a></code>
+- <code><a href="./src/resources/live/live.ts">DecisionItemCreatedEvent</a></code>
+- <code><a href="./src/resources/live/live.ts">DecisionItemDeleteEvent</a></code>
+- <code><a href="./src/resources/live/live.ts">DecisionItemDeletedEvent</a></code>
+- <code><a href="./src/resources/live/live.ts">DecisionTrigger</a></code>
+- <code><a href="./src/resources/live/live.ts">DecisionsDelegationConfig</a></code>
+- <code><a href="./src/resources/live/live.ts">DecisionsDelegationUpdateConfig</a></code>
 - <code><a href="./src/resources/live/live.ts">DelegationCreatedEvent</a></code>
 - <code><a href="./src/resources/live/live.ts">Error</a></code>
 - <code><a href="./src/resources/live/live.ts">ErrorEvent</a></code>
