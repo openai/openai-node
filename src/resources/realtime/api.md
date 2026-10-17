@@ -147,6 +147,10 @@ Methods:
 
 ## Translations
 
+Types:
+
+- <code><a href="./src/resources/realtime/translations/translations.ts">ConnectClientEvent</a></code>
+
 ### ClientSecrets
 
 Methods:
