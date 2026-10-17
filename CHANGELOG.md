@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.38.0](https://github.com/openai/openai-node/compare/v7.37.0...v7.38.0) (2026-10-17)
+
+
+### Features
+
+* **api:** add typed Live sideband events ([#2964](https://github.com/openai/openai-node/issues/2964)) ([4be6e72](https://github.com/openai/openai-node/commit/4be6e7285439b84d97a075358659aade97eb878c))
+
 ## [7.37.0](https://github.com/openai/openai-node/compare/v7.36.0...v7.37.0) (2026-10-17)
 
 
