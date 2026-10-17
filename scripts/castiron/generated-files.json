@@ -799,7 +799,7 @@
     },
     "src/resources/live/sideband/sideband.ts": {
       "mode": "100644",
-      "sha256": "45716dac2f9cbf6cebceba76e464875cf781e72912b435e5a523e5a6b8fc761c"
+      "sha256": "c98785582db4f464ab1f7f167e4eb3337aeea74abc9aa99d82195d1b25427925"
     },
     "src/resources/live/sideband/ws-base.ts": {
       "mode": "100644",
