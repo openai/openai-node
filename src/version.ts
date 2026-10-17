@@ -1,2 +1,2 @@
 /** Version of the installed OpenAI SDK package. */
-export const VERSION = '7.35.0'; // x-release-please-version
+export const VERSION = '7.36.0'; // x-release-please-version
