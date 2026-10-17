@@ -79442,6 +79442,7 @@ components:
       enum:
       - pending
       - validated
+      - degraded
       - unhealthy
     ExternalStorageResponse:
       properties:

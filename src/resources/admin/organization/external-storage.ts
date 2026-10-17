@@ -385,7 +385,7 @@ export interface ExternalStorageConfiguration {
     | GcpExternalStorageProvider
     | OciExternalStorageProvider;
 
-  status: 'pending' | 'validated' | 'unhealthy';
+  status: 'pending' | 'validated' | 'degraded' | 'unhealthy';
 }
 
 export interface ExternalStorageDeleted {
