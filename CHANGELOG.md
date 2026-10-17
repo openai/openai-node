@@ -1,5 +1,22 @@
 # Changelog
 
+## [7.37.0](https://github.com/openai/openai-node/compare/v7.36.0...v7.37.0) (2026-10-17)
+
+
+### Features
+
+* **api:** add degraded external storage status ([#2963](https://github.com/openai/openai-node/issues/2963)) ([e0fe092](https://github.com/openai/openai-node/commit/e0fe092414395b9b4643a88b354fdda1be9b25f5))
+
+
+### Chores
+
+* **api:** add shutdown notices for GPT-4 model aliases ([#2959](https://github.com/openai/openai-node/issues/2959)) ([648cd0a](https://github.com/openai/openai-node/commit/648cd0a410e91834e5b5d60d19d6290504fe5d64))
+
+
+### Refactors
+
+* **realtime:** use generated Translation bindings ([#2961](https://github.com/openai/openai-node/issues/2961)) ([bb024d4](https://github.com/openai/openai-node/commit/bb024d41522d0b5a6b6c64055471111068811ccd))
+
 ## [7.36.0](https://github.com/openai/openai-node/compare/v7.35.0...v7.36.0) (2026-10-16)
 
 
