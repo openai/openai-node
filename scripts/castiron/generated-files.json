@@ -107,7 +107,7 @@
     },
     "src/resources/admin/organization/external-storage.ts": {
       "mode": "100644",
-      "sha256": "9ba3c5968074e0075e45b4072491febea281cae209cbdddda6c5572b37956e46"
+      "sha256": "6f11c00489dff60c60a04618938a44d7a373f542e126e2d4a88456313b90cdb8"
     },
     "src/resources/admin/organization/groups.ts": {
       "mode": "100644",
