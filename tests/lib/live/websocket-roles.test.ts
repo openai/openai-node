@@ -154,3 +154,122 @@ describe.each(['primary', 'fork', 'sideband'] as const)('Live %s wire contract',
     },
   );
 });
+
+test('sideband exposes typed transport events and retains unknown events', async () => {
+  const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+  await once(server, 'listening');
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Missing local server address');
+  }
+  const frames = [
+    { type: 'session.input_audio.append', audio: 'AAE=' },
+    { type: 'transport.dtmf.received', event_id: 'r1', event: '5' },
+    { type: 'transport.dtmf.send', event_id: 's1', event: '#', client_event_id: 'command1' },
+    { type: 'transport.ringing', event_id: 'r2', session_id: 'live_test' },
+    { type: 'transport.answered', event_id: 'a1', session_id: 'live_test' },
+    {
+      type: 'transport.failed',
+      event_id: 'f1',
+      session_id: 'live_test',
+      error: {
+        type: 'call_error',
+        code: 'provider_invite_failed',
+        message: 'synthetic failure',
+        param: null,
+      },
+    },
+    // Null is outside the server schema; retain the existing lenient decode behavior.
+    { type: 'transport.dtmf.send', event_id: 's2', event: '#', client_event_id: null },
+    { type: 'transport.dtmf.send', event_id: 's3', event: '#' },
+    { type: 'session.output_audio.delta', delta: 'AAE=', start_ms: 10, end_ms: 20 },
+    { type: 'future.transport.event', marker: 42 },
+  ];
+  server.on('connection', (socket) => {
+    for (const frame of frames) {
+      socket.send(JSON.stringify(frame));
+    }
+  });
+  const client = new OpenAI({ apiKey: 'synthetic', baseURL: `http://127.0.0.1:${address.port}/v1` });
+  const connection = new SidebandWS(client, { session_id: 'live_test' });
+  const stream = connection.stream();
+  const typedValues = [];
+  let received = 0;
+  try {
+    for await (const item of stream) {
+      if (item.type === 'error') {
+        throw item.error;
+      }
+      if (item.type === 'close') {
+        throw new Error('Socket closed before events drained');
+      }
+      if (item.type !== 'message') {
+        continue;
+      }
+      const event = item.message;
+      expect(event).toEqual(frames[received]);
+      received += 1;
+      switch (event.type) {
+        case 'session.input_audio.append': {
+          typedValues.push(event.audio);
+          break;
+        }
+        case 'session.output_audio.delta': {
+          typedValues.push(event.delta, event.start_ms, event.end_ms);
+          break;
+        }
+        case 'transport.dtmf.received': {
+          typedValues.push(event.event);
+          break;
+        }
+        case 'transport.dtmf.send': {
+          typedValues.push(event.client_event_id);
+          break;
+        }
+        case 'transport.ringing': {
+          typedValues.push(event.session_id);
+          break;
+        }
+        case 'transport.answered': {
+          typedValues.push(event.session_id);
+          break;
+        }
+        case 'transport.failed': {
+          typedValues.push(event.error.message);
+          break;
+        }
+        default: {
+          expect(event).toEqual({ type: 'future.transport.event', marker: 42 });
+        }
+      }
+      if (received === frames.length) {
+        break;
+      }
+    }
+    expect(typedValues).toEqual([
+      'AAE=',
+      '5',
+      'command1',
+      'live_test',
+      'live_test',
+      'synthetic failure',
+      null,
+      undefined,
+      'AAE=',
+      10,
+      20,
+    ]);
+    const closed = once(connection.socket.platformSocket, 'close');
+    connection.close();
+    await closed;
+  } finally {
+    await stream.return?.();
+    connection.close();
+    for (const socket of server.clients) {
+      socket.terminate();
+    }
+    const closed = once(server, 'close');
+    server.close();
+    await closed;
+  }
+});
