@@ -26,8 +26,7 @@ export type ConnectClientEvent =
 
 /**
  * Server events received by an attached Live sideband WebSocket, including
- * reflected input audio and transport notifications. Output audio deltas are
- * delivered over the primary connection.
+ * reflected input and output audio and transport notifications.
  */
 export type ConnectServerEvent =
   | LiveAPI.SessionStartedEvent
@@ -51,6 +50,7 @@ export type ConnectServerEvent =
   | LiveAPI.ErrorEvent
   | LiveAPI.InfoEvent
   | ConnectServerEvent.SessionInputAudioAppend
+  | LiveAPI.OutputAudioDeltaEvent
   | ConnectServerEvent.TransportDtmfReceived
   | ConnectServerEvent.TransportDtmfSend
   | ConnectServerEvent.TransportRinging
