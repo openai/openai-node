@@ -831,7 +831,7 @@
     },
     "src/resources/realtime/api.md": {
       "mode": "100644",
-      "sha256": "331f4f60883b8859f22d5c8e000c895740bfc9f3202879175a4ca1d7a6f4d0d4"
+      "sha256": "c20eb393b74267d1b50e3adc3e1bbc9be8820cc8fb442331ba40d940e3824bfe"
     },
     "src/resources/realtime/calls.ts": {
       "mode": "100644",
@@ -843,11 +843,11 @@
     },
     "src/resources/realtime/index.ts": {
       "mode": "100644",
-      "sha256": "bac531a263e62f58fa1f2c59eee640b97cf736bd18fcc67329b61345db87017a"
+      "sha256": "52cfa69f89ec858cd6770fcb350a72a3b56dc10460332e850dd5dfa0f6fa2d64"
     },
     "src/resources/realtime/realtime.ts": {
       "mode": "100644",
-      "sha256": "fbbe4b12d5f8e9eaa8763166ede9ac1fee58ab45e77a0fbb608563200716dd8a"
+      "sha256": "e01414625ab3fb5c15d3b8088d475721c5ef7e961f51fcb3d044148bbb7f5220"
     },
     "src/resources/realtime/translations.ts": {
       "mode": "100644",
@@ -859,11 +859,15 @@
     },
     "src/resources/realtime/translations/index.ts": {
       "mode": "100644",
-      "sha256": "3bc13257c156334ffe22c17aece3cab18a1918521eefd9497d54fb88b28ada75"
+      "sha256": "983d5016a27066b629fcdbe1617d47341a982dad9d80482c2c5d0d16b18136ba"
     },
     "src/resources/realtime/translations/translations.ts": {
       "mode": "100644",
-      "sha256": "ffa98d0c88f48f41fc69421f61641ba118bee5232112cfc49b93cf3ccca47122"
+      "sha256": "075f9ab1bac5feb0a1d0358802d2ceb94a97fac8c0fbdc0076301faf4f7f7861"
+    },
+    "src/resources/realtime/translations/websocket-binding.ts": {
+      "mode": "100644",
+      "sha256": "8d3b9f50d4ef43ba3201bc222d6431387254c92775dc6c9e39cf2991b1c71eb0"
     },
     "src/resources/responses.ts": {
       "mode": "100644",

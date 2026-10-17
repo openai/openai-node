@@ -1122,6 +1122,28 @@ describe('translation connection authentication', () => {
     expect(observed.headers['user-agent']).toContain('OpenAI/JS');
   });
 
+  test('preserves the absolute URL and two-argument request hook', async () => {
+    const calls: Parameters<OpenAI['buildURL']>[] = [];
+    let expectedEndpoint = '';
+    class HookClient extends OpenAI {
+      override buildURL(...args: Parameters<OpenAI['buildURL']>): string {
+        calls.push(args);
+        const url = new URL(super.buildURL(...args));
+        url.searchParams.set('hook', 'kept');
+        return url.toString();
+      }
+    }
+    const observed = await inspectHandshake((baseURL) => {
+      expectedEndpoint = `${baseURL}/custom/realtime/translations?base=kept#configuration`;
+      return new HookClient({
+        apiKey: 'synthetic-key',
+        baseURL: `${baseURL}/custom?base=kept#configuration`,
+      });
+    });
+    expect(calls).toEqual([[expectedEndpoint, { model: 'model with space' }]]);
+    expect(observed.path).toBe('/v1/custom/realtime/translations?base=kept&model=model+with+space&hook=kept');
+  });
+
   test('captures concurrent function credentials per connection', async () => {
     await withServer(async (server, baseURL) => {
       const headers: IncomingHttpHeaders[] = [];
