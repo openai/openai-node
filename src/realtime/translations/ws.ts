@@ -11,10 +11,13 @@ import { NodeWebSocket } from '../../internal/ws-adapter-node';
 import type {
   RealtimeError,
   RealtimeErrorEvent,
-  RealtimeTranslationClientEvent,
-  RealtimeTranslationServerEvent,
   RealtimeTranslationSession,
 } from '../../resources/realtime/realtime';
+import type {
+  ClientEvent as RealtimeTranslationClientEvent,
+  ServerEvent as RealtimeTranslationServerEvent,
+} from '../../resources/realtime/translations/websocket-binding';
+import { prepareRequest } from '../../resources/realtime/translations/websocket-binding';
 import { isAzure, OpenAIRealtimeError } from '../internal-base';
 
 /** An event envelope, including event types added by the service in the future. */
@@ -194,9 +197,10 @@ function buildTranslationURL(client: OpenAI, model: string): URL {
   if (typeof model !== 'string' || !model) {
     throw new Error('A translation model is required.');
   }
+  const request = prepareRequest({ model });
   const endpoint = new URL(client.baseURL);
-  endpoint.pathname = `${endpoint.pathname.replace(/\/$/u, '')}/realtime/translations`;
-  const url = new URL(client.buildURL(endpoint.toString(), { model }));
+  endpoint.pathname = `${endpoint.pathname.replace(/\/$/u, '')}${request.path}`;
+  const url = new URL(client.buildURL(endpoint.toString(), request.query));
   if (url.protocol !== 'https:') {
     throw new Error('The translation endpoint must use HTTPS.');
   }

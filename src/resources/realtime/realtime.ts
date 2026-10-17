@@ -17,7 +17,7 @@ import {
 } from './client-secrets';
 import * as ResponsesAPI from '../responses/responses';
 import * as TranslationsAPI from './translations/translations';
-import { Translations } from './translations/translations';
+import { ConnectClientEvent, Translations } from './translations/translations';
 
 export class Realtime extends APIResource {
   clientSecrets: ClientSecretsAPI.ClientSecrets = new ClientSecretsAPI.ClientSecrets(this._client);
@@ -5606,5 +5606,5 @@ export declare namespace Realtime {
     type CallRejectParams as CallRejectParams,
   };
 
-  export { Translations as Translations };
+  export { Translations as Translations, type ConnectClientEvent as ConnectClientEvent };
 }
