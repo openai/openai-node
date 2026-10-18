@@ -1,3 +1,5 @@
+import type { RealtimeRecoveryOptions } from '../internal/realtime-recovery';
+import type { ReconnectingEvent, UnsentMessage } from '../internal/ws';
 import type {
   RealtimeClientEvent,
   RealtimeServerEvent,
@@ -75,6 +77,12 @@ type RealtimeEvents = Simplify<
   {
     /** Receives every server event before its event-specific listener is notified. */
     event: (event: RealtimeServerEvent) => void;
+    /** A physical replacement is about to be attempted. */
+    reconnecting: (event: ReconnectingEvent) => void;
+    /** The new socket is open. Restore session state before flushing retained events. */
+    reconnected: () => void;
+    /** Permanent closure, including never-attempted retained events. */
+    close: (code: number, reason: string, unsent: UnsentMessage<RealtimeClientEvent>[]) => void;
 
     /** Receives API-reported errors and client-side WebSocket failures. */
     error: (error: OpenAIRealtimeError) => void;
@@ -154,7 +162,7 @@ export function isAzure(client: Pick<OpenAI, 'apiKey' | 'baseURL'>): client is A
   return client instanceof AzureOpenAI;
 }
 
-interface RealtimeURLBuilderOptions {
+interface RealtimeURLBuilderOptions extends RealtimeRecoveryOptions {
   /**
    * Builds the exact WebSocket URL after the connection target has been validated.
    *
@@ -319,7 +327,14 @@ export function getAzureRealtimeConnection(
   const hasCallID = connection.callID !== undefined;
   const hasIntent = connection.intent !== undefined;
   const customURLBuilder = connection.buildRealtimeURL;
-  const normalizedOptions = customURLBuilder ? { buildRealtimeURL: customURLBuilder } : {};
+  const normalizedOptions = {
+    ...(customURLBuilder ? { buildRealtimeURL: customURLBuilder } : {}),
+    reconnect: connection.reconnect,
+    maxReconnectAttempts: connection.maxReconnectAttempts,
+    reconnectInitialDelay: connection.reconnectInitialDelay,
+    reconnectMaxDelay: connection.reconnectMaxDelay,
+    maxQueueBytes: connection.maxQueueBytes,
+  };
 
   if (
     Number(hasDeploymentName) + Number(hasCallID) + Number(hasIntent) > 1 ||

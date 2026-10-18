@@ -73,6 +73,11 @@ export interface WebSocketConnectionHooks<TSocket, TClientEvent, TServerEvent, T
   prepareReconnectSocket?: () => Promise<(url: URL) => TSocket>;
   /** Preserve whether a failed queued write remains in the legacy unsent list. */
   requeueFailed?: boolean;
+  /** Retain unsent events until the application explicitly restores state and flushes. */
+  manualQueue?: boolean;
+  /** Bound retries across this logical connection, rather than per disconnect. */
+  lifetimeRetries?: boolean;
+  shouldReconnect?: (code: number) => boolean;
 }
 
 type WebSocketParameters = NonNullable<ReconnectingEvent['parameters']>;
@@ -113,12 +118,59 @@ export class WebSocketConnection<
     this._owner = owner;
     this._hooks = hooks;
     this._reconnectOptions = options?.reconnect ?? null;
-    this._sendQueue = new SendQueue<TClientEvent>(options?.maxQueueSize);
+    this._sendQueue = new SendQueue<TClientEvent>(
+      options?.maxQueueSize ?? (hooks.manualQueue ? 0 : undefined),
+      !hooks.manualQueue,
+    );
+  }
+
+  private _retryCount = 0;
+  private _permanentClosed = false;
+  private _backoff = new AbortController();
+
+  get reconnecting(): boolean {
+    return this._isReconnecting;
+  }
+
+  takePending(): UnsentMessage<TClientEvent>[] {
+    return this._sendQueue.drain();
+  }
+
+  flushPending(): void {
+    if (
+      this._intentionallyClosed ||
+      this._permanentClosed ||
+      this._isReconnecting ||
+      this._owner.socket.readyState !== ReadyState.OPEN
+    ) {
+      this._hooks.onError('cannot flush before the WebSocket is open');
+      return;
+    }
+    this._flushSendQueue(true);
   }
 
   private _cancelRefresh: (() => void) | undefined;
 
   send(event: TClientEvent) {
+    if (this._hooks.manualQueue) {
+      if (this._intentionallyClosed || this._permanentClosed) {
+        this._hooks.onError('cannot send on a closed WebSocket');
+        return;
+      }
+      if (this._isReconnecting || this._owner.socket.readyState === ReadyState.CONNECTING) {
+        let accepted: boolean;
+        try {
+          accepted = this._sendQueue.enqueue(event);
+        } catch (error) {
+          this._hooks.onError('could not send data', error);
+          return;
+        }
+        if (!accepted) {
+          this._hooks.onError('send queue is full, message discarded');
+        }
+        return;
+      }
+    }
     sendWebSocketEvent(
       this._owner,
       event,
@@ -147,10 +199,17 @@ export class WebSocketConnection<
     this._closeCode = props?.code ?? 1000;
     this._closeReason = props?.reason ?? 'OK';
     this._cancelRefresh?.();
+    this._backoff.abort();
     try {
       this._owner.socket.close(this._closeCode, this._closeReason);
     } catch (error) {
-      this._hooks.onError('could not close the connection', error);
+      try {
+        this._hooks.onError('could not close the connection', error);
+      } finally {
+        if (this._hooks.manualQueue) {
+          this._emitPermanentClose(this._closeCode, this._closeReason);
+        }
+      }
     }
   }
 
@@ -391,9 +450,16 @@ export class WebSocketConnection<
 
     const socket = createSocket(this._owner.url);
 
-    socket.on('message', (data, isBinary) => this._hooks.onMessage(data, isBinary));
+    socket.on('message', (data, isBinary) => {
+      if (socket === this._owner.socket) {
+        this._hooks.onMessage(data, isBinary);
+      }
+    });
 
     socket.on('error', (err: Error) => {
+      if (socket !== this._owner.socket) {
+        return;
+      }
       this._hooks.onSocketError?.(socket, err);
       // Suppress transient errors during reconnection — the retry loop
       // already handles them and will surface a close if retries exhaust.
@@ -404,6 +470,9 @@ export class WebSocketConnection<
     });
 
     socket.on('open', () => {
+      if (socket !== this._owner.socket) {
+        return;
+      }
       this._flushSendQueue();
     });
 
@@ -426,7 +495,7 @@ export class WebSocketConnection<
   // Reconnect is opt-in via onReconnecting so callers can pass
   // state (e.g. session IDs) into the new connection.
   private _canReconnect(code: number): boolean {
-    if (this._intentionallyClosed) {
+    if (this._intentionallyClosed || this._permanentClosed) {
       return false;
     }
     if (!this._reconnectOptions) {
@@ -438,7 +507,7 @@ export class WebSocketConnection<
     if (!this._reconnectOptions.onReconnecting) {
       return false;
     }
-    return isRecoverableClose(code);
+    return this._hooks.shouldReconnect?.(code) ?? isRecoverableClose(code);
   }
 
   private _abortReconnect(closeCode: number): boolean {
@@ -446,13 +515,16 @@ export class WebSocketConnection<
       return false;
     }
     this._isReconnecting = false;
-    if (!this._intentionallyClosed) {
-      this._hooks.onError(`WebSocket reconnect aborted: non-recoverable close code ${closeCode}`);
+    try {
+      if (!this._intentionallyClosed && !this._permanentClosed) {
+        this._hooks.onError(`WebSocket reconnect aborted: non-recoverable close code ${closeCode}`);
+      }
+    } finally {
+      this._emitPermanentClose(
+        this._intentionallyClosed ? this._closeCode : closeCode,
+        this._intentionallyClosed ? this._closeReason : 'reconnect aborted',
+      );
     }
-    this._emitPermanentClose(
-      this._intentionallyClosed ? this._closeCode : closeCode,
-      this._intentionallyClosed ? this._closeReason : 'reconnect aborted',
-    );
     return true;
   }
 
@@ -467,8 +539,11 @@ export class WebSocketConnection<
       overrides = options.onReconnecting(reconnectingEvent);
     } catch (error) {
       this._isReconnecting = false;
-      this._hooks.onError('onReconnecting callback threw', error);
-      this._emitPermanentClose(closeCode, 'onReconnecting callback threw');
+      try {
+        this._hooks.onError('onReconnecting callback threw', error);
+      } finally {
+        this._emitPermanentClose(closeCode, 'onReconnecting callback threw');
+      }
       return false;
     }
 
@@ -486,10 +561,23 @@ export class WebSocketConnection<
     try {
       this._hooks.emitReconnecting(reconnectingEvent);
     } catch (error) {
+      if (this._hooks.manualQueue) {
+        this._isReconnecting = false;
+        try {
+          this._hooks.onError('onReconnecting callback threw', error);
+        } finally {
+          this._emitPermanentClose(closeCode, 'onReconnecting callback threw');
+        }
+        return false;
+      }
       this._hooks.onError('onReconnecting callback threw', error);
     }
     this._internalEvents._emit('reconnecting', reconnectingEvent);
     return true;
+  }
+
+  private _hasRetryBudget(attempt: number, maximum: number): boolean {
+    return attempt <= maximum && (!this._hooks.lifetimeRetries || this._retryCount < maximum);
   }
 
   private async _reconnect(initialCloseCode: number): Promise<void> {
@@ -508,7 +596,8 @@ export class WebSocketConnection<
     const maxDelay = this._reconnectOptions.maxDelay ?? 8000;
 
     /* oxlint-disable eslint/no-await-in-loop -- Reconnect attempts and their credential refresh must run sequentially. */
-    for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+    for (let attempt = 1; this._hasRetryBudget(attempt, maxRetries); attempt += 1) {
+      this._retryCount += 1;
       if (this._abortReconnect(closeCode)) {
         return;
       }
@@ -534,15 +623,20 @@ export class WebSocketConnection<
         return;
       }
 
-      await sleep(actualDelay);
+      try {
+        await sleep(actualDelay, this._backoff.signal);
+      } catch {
+        this._abortReconnect(closeCode);
+        return;
+      }
 
       if (this._abortReconnect(closeCode)) {
         return;
       }
 
       let closeCodePromise: Promise<number> | undefined;
+      const oldSocket = this._owner.socket;
       try {
-        const oldSocket = this._owner.socket;
         if (this._hooks.prepareReconnectSocket) {
           const url = this._hooks.buildURL();
           // oxlint-disable-next-line promise/avoid-new -- Public close cancels the pending credential refresh through this callback.
@@ -574,15 +668,8 @@ export class WebSocketConnection<
         });
 
         await waitForWebSocketOpen(this._owner.socket);
-
-        this._internalEvents._emit('socketSwap', oldSocket, this._owner.socket);
-        this._isReconnecting = false;
-        this._flushSendQueue();
-        this._hooks.emitReconnected();
-        this._internalEvents._emit('reconnected');
-        return;
       } catch {
-        if (this._hooks.prepareReconnectSocket && this._intentionallyClosed) {
+        if (this._intentionallyClosed) {
           // A public close observer may have thrown after lifecycle cleanup.
           // Only emit here if the reconnect itself had not already closed.
           if (this._isReconnecting) {
@@ -596,18 +683,33 @@ export class WebSocketConnection<
           // rather than reading it synchronously.
           closeCode = await closeCodePromise;
         }
+        continue;
       }
+      this._isReconnecting = false;
+      this._internalEvents._emit('socketSwap', oldSocket, this._owner.socket);
+      this._internalEvents._emit('reconnected');
+      this._flushSendQueue();
+      this._hooks.emitReconnected();
+      return;
     }
 
     /* oxlint-enable eslint/no-await-in-loop */
     // All retries exhausted — surface an error so consumers can
     // distinguish retry failure from a clean close.
     this._isReconnecting = false;
-    this._hooks.onError(`WebSocket reconnect failed after ${maxRetries} attempts (close code: ${closeCode})`);
-    this._emitPermanentClose(closeCode, `reconnect failed after ${maxRetries} attempts`);
+    try {
+      this._hooks.onError(
+        `WebSocket reconnect failed after ${maxRetries} attempts (close code: ${closeCode})`,
+      );
+    } finally {
+      this._emitPermanentClose(closeCode, `reconnect failed after ${maxRetries} attempts`);
+    }
   }
 
-  private _flushSendQueue(): void {
+  private _flushSendQueue(explicit = false): void {
+    if (this._hooks.manualQueue && !explicit) {
+      return;
+    }
     flushWebSocketSendQueue(
       this._owner,
       this._sendQueue,
@@ -621,6 +723,10 @@ export class WebSocketConnection<
    * `close` event used by the async iterator.
    */
   private _emitPermanentClose(code: number, reason: string): void {
+    if (this._permanentClosed) {
+      return;
+    }
+    this._permanentClosed = true;
     this._lastCloseCode = code;
     this._lastCloseReason = reason;
     const unsent = this._sendQueue.drain();

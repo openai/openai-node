@@ -529,6 +529,26 @@ rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta)
 
 For more information see [docs/realtime.md](docs/realtime.md).
 
+For GA model sessions, `reconnect: true` enables bounded transport recovery on
+`OpenAIRealtimeWS` and `OpenAIRealtimeWebSocket`, including their async factories.
+Recovery is off by default and does not apply to transcription or existing-call
+connections. The logical connection stays the same, but its `.socket` changes.
+Use the SDK's `reconnecting`, `reconnected`, and final `close` events when recovery
+is enabled; listeners attached directly to an old socket do not move to the new one.
+
+Recovery creates a new server session. It never restores conversation state or
+replays commands already attempted. `maxReconnectAttempts` defaults to five over
+the connection's lifetime. Retry delays start at 500 ms and cap at 8 seconds;
+`reconnectInitialDelay` and `reconnectMaxDelay` can override them. `close()` cancels
+pending retries and credential refresh. Register an `error` listener as usual.
+
+By default, sends during recovery are rejected. Set `maxQueueBytes` to retain a
+bounded number of encoded bytes instead. After restoring application-owned session
+state, call `flushPending()` to send those never-attempted events in order, or
+`takePending()` to remove them without sending. A final `close` event includes any
+remaining unsent events as its third argument. A successful local send does not
+establish that the server received or processed a command.
+
 ## Microsoft Azure OpenAI
 
 To use this library with [Azure OpenAI](https://learn.microsoft.com/azure/ai-services/openai/overview), use the `AzureOpenAI`
