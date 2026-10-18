@@ -527,7 +527,7 @@ const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime-2' });
 rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
 ```
 
-For more information see [docs/realtime.md](docs/realtime.md).
+Realtime model sessions can opt in to reconnection with `reconnect: true`. Each reconnection starts a new server session, so your application must restore its state. See [the Realtime guide](docs/realtime.md) for connection options and session restoration.
 
 ## Microsoft Azure OpenAI
 

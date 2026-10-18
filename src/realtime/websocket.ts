@@ -1,3 +1,7 @@
+import { BrowserWebSocket } from '../internal/ws-adapter-browser';
+import { createRealtimeRecovery, validateRealtimeRecovery } from '../internal/realtime-recovery';
+import type { WebSocketConnection } from '../internal/ws-connection-controller';
+import type { UnsentMessage } from '../internal/ws';
 import { getRealtimeAPIKey, resolveRealtimeAPIKey } from '../internal/realtime-credentials';
 import type { AzureOpenAI } from '../index';
 import { assertBedrockWebSocketOrigin } from '../internal/bedrock';
@@ -153,6 +157,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
 
   /** Underlying runtime-native WebSocket instance for connection lifecycle events. */
   socket: _WebSocket;
+  private _recovery?: WebSocketConnection<BrowserWebSocket, RealtimeClientEvent, never, Error>;
 
   /**
    * Immediately opens a native WebSocket session or attaches to an existing call.
@@ -184,6 +189,10 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
     super();
+    validateRealtimeRecovery(props);
+    if (props.reconnect && !props.model) {
+      throw new Error('Automatic Realtime recovery requires a model session');
+    }
     let apiKey = getRealtimeAPIKey(client, props.__apiKey);
     // SAFETY: The supplied OpenAI client owns _options; these compatibility reads preserve its provider and browser-consent settings.
     const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
@@ -198,9 +207,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       );
     }
 
-    client ??= new OpenAI({ dangerouslyAllowBrowser });
+    const connectionClient = client ?? new OpenAI({ dangerouslyAllowBrowser });
     if (apiKey === undefined) {
-      apiKey = client.apiKey;
+      apiKey = connectionClient.apiKey;
     }
 
     if (hasProvider && !props?.__resolvedApiKey) {
@@ -212,62 +221,104 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       );
     }
 
-    this.url = buildRealtimeURL(client, props);
-    props.onURL?.(this.url);
-    if (this.url.protocol !== 'wss:') {
-      throw new OpenAIError('Realtime WebSocket URLs must use the wss: protocol.');
-    }
-    assertBedrockWebSocketOrigin(client, this.url);
-
-    const azure = isAzure(client);
-    const protocols = ['realtime', ...(azure ? [] : [`openai-insecure-api-key.${apiKey}`])];
-
-    this.socket = azure
-      ? createAzureWebSocket(this.url, apiKey, props.__resolvedApiKey === true, protocols)
-      : new WebSocket(this.url.toString(), protocols);
-
-    this.socket.addEventListener('message', (websocketEvent: MessageEvent) => {
-      const event = (() => {
-        try {
-          const parsedEvent = parseRealtimeEvent(websocketEvent.data.toString());
-
-          if (
-            typeof parsedEvent !== 'object' ||
-            parsedEvent === null ||
-            Array.isArray(parsedEvent) ||
-            !Object.getOwnPropertyDescriptor(parsedEvent, 'type') ||
-            typeof parsedEvent.type !== 'string'
-          ) {
-            throw new TypeError('Realtime WebSocket event must be an object with a string type.');
-          }
-
-          return parsedEvent;
-        } catch (err) {
-          this._onError(null, 'could not parse websocket event', err);
-          return null;
-        }
-      })();
-
-      if (event) {
-        this._emit('event', event);
-
-        if (event.type === 'error') {
-          this._onError(event);
-        } else {
-          // @ts-expect-error TS isn't smart enough to get the relationship right here
-          this._emit(event.type, event);
-        }
+    const open = (attemptKey: string | null, resolvedApiKey: boolean, capturedURL?: URL) => {
+      // SAFETY: OpenAI owns _options; this reads its existing browser-consent flag.
+      const allowed =
+        props.dangerouslyAllowBrowser ??
+        (connectionClient as any)._options?.dangerouslyAllowBrowser ??
+        attemptKey?.startsWith('ek_');
+      if (!allowed && isRunningInBrowserOrBrowserWorker()) {
+        throw new OpenAIError('Realtime browser connections require an ephemeral credential.');
       }
-    });
+      const url = capturedURL ?? buildRealtimeURL(connectionClient, props);
+      props.onURL?.(url);
+      validateRealtimeRecovery(props, url);
+      if (url.protocol !== 'wss:') {
+        throw new OpenAIError('Realtime WebSocket URLs must use the wss: protocol.');
+      }
+      assertBedrockWebSocketOrigin(connectionClient, url);
 
-    this.socket.addEventListener('error', (event: any) => {
-      // Native ErrorEvents can carry an empty message while `error` still holds the failure.
-      const cause = event.error ?? null;
-      const message = [event.message, cause?.message].find(
-        (value) => typeof value === 'string' && value !== '',
-      );
-      this._onError(null, message ?? 'unknown error', cause);
-    });
+      const azure = isAzure(connectionClient);
+      const protocols = ['realtime', ...(azure ? [] : [`openai-insecure-api-key.${attemptKey}`])];
+
+      const socket = azure
+        ? createAzureWebSocket(url, attemptKey, resolvedApiKey === true, protocols)
+        : new WebSocket(url.toString(), protocols);
+
+      socket.addEventListener('message', (websocketEvent: MessageEvent) => {
+        if (this._recovery && (socket !== this.socket || this._recovery.isClosed)) {
+          return;
+        }
+        const event = (() => {
+          try {
+            const parsedEvent = parseRealtimeEvent(websocketEvent.data.toString());
+
+            if (
+              typeof parsedEvent !== 'object' ||
+              parsedEvent === null ||
+              Array.isArray(parsedEvent) ||
+              !Object.getOwnPropertyDescriptor(parsedEvent, 'type') ||
+              typeof parsedEvent.type !== 'string'
+            ) {
+              throw new TypeError('Realtime WebSocket event must be an object with a string type.');
+            }
+
+            return parsedEvent;
+          } catch (err) {
+            this._onError(null, 'could not parse websocket event', err);
+            return null;
+          }
+        })();
+
+        if (event) {
+          this._emit('event', event);
+
+          if (this._recovery?.isClosed) {
+            return;
+          }
+          if (event.type === 'error') {
+            this._onError(event);
+          } else if (!this._recovery || !['close', 'reconnecting', 'reconnected'].includes(event.type)) {
+            // @ts-expect-error TS cannot relate the event discriminant to the mapped callback type.
+            this._emit(event.type, event);
+          }
+        }
+      });
+
+      socket.addEventListener('error', (event: any) => {
+        if (this._recovery) {
+          return;
+        }
+        // Native ErrorEvents can carry an empty message while `error` still holds the failure.
+        const cause = event.error ?? null;
+        const message = [event.message, cause?.message].find(
+          (value) => typeof value === 'string' && value !== '',
+        );
+        this._onError(null, message ?? 'unknown error', cause);
+      });
+      return { url, socket };
+    };
+    const initial = open(apiKey, props.__resolvedApiKey === true);
+    this.url = initial.url;
+    this.socket = initial.socket;
+    if (props.reconnect) {
+      this._recovery = createRealtimeRecovery<BrowserWebSocket, RealtimeClientEvent>(this, props, {
+        buildURL: () => buildRealtimeURL(connectionClient, props),
+        adaptSocket: (socket) => new BrowserWebSocket(socket, { preserveBinaryType: true }),
+        prepare: async () => {
+          // SAFETY: The branch checks _callApiKey before using the client's credential resolver.
+          const credential =
+            '_callApiKey' in connectionClient && typeof connectionClient._callApiKey === 'function'
+              ? await resolveRealtimeAPIKey(connectionClient as Pick<OpenAI, 'apiKey' | '_callApiKey'>, true)
+              : { isProvider: false, commit: () => connectionClient.apiKey };
+          return (url) => open(credential.commit(), credential.isProvider, url).socket;
+        },
+        onError: (message, cause) => this._onError(null, message, cause),
+        onReconnecting: (event) => this._emit('reconnecting', event),
+        onReconnected: () => this._emit('reconnected'),
+        onClose: (code, reason, unsent) => this._emit('close', code, reason, unsent),
+      });
+    }
   }
 
   /**
@@ -340,11 +391,24 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
    * Serialization and transport failures are delivered to the SDK `error` event.
    */
   send(event: RealtimeClientEvent): void {
+    if (this._recovery) {
+      return this._recovery.send(event);
+    }
     try {
       this.socket.send(JSON.stringify(event));
     } catch (err) {
       this._onError(null, 'could not send data', err);
     }
+  }
+
+  /** Explicitly flush never-attempted events after restoring the replacement session. */
+  flushPending(): void {
+    this._recovery?.flushPending();
+  }
+
+  /** Remove retained events without transmitting them. */
+  takePending(): UnsentMessage<RealtimeClientEvent>[] {
+    return this._recovery?.takePending() ?? [];
   }
 
   /**
@@ -358,6 +422,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     /** WebSocket close reason; defaults to `OK`. */
     reason: string;
   }): void {
+    if (this._recovery) {
+      return this._recovery.close(props);
+    }
     try {
       this.socket.close(props?.code ?? 1000, props?.reason ?? 'OK');
     } catch (err) {

@@ -1,5 +1,5 @@
 import { once } from 'node:events';
-import { createServer } from 'node:https';
+import { Agent, createServer } from 'node:https';
 import { getCACertificates, setDefaultCACertificates } from 'node:tls';
 
 import OpenAI, { AzureOpenAI } from 'openai';
@@ -312,4 +312,443 @@ describe.each([
       }
     },
   );
+});
+
+test.each([StableWS, StableNative])(
+  'recovery only retains sends after a disconnect (%s)',
+  async (Realtime) => {
+    const connected = once(peers, 'connection');
+    const realtime = new Realtime(
+      { ...settings, reconnect: true, maxQueueBytes: 1024 },
+      new OpenAI({ baseURL, apiKey: 'ek_initial' }),
+    );
+    const errors: Error[] = [];
+    realtime.on('error', (error) => errors.push(error));
+    const opened = rawEvent(realtime.socket, 'open');
+    realtime.send({ type: 'response.create' });
+    try {
+      await connected;
+      await opened;
+      expect({ errors: errors.length, pending: realtime.takePending() }).toEqual({ errors: 1, pending: [] });
+    } finally {
+      realtime.close();
+    }
+  },
+);
+
+test.each([StableWS, StableNative])(
+  'opt-in model recovery refreshes credentials and holds unsent events until explicit flush (%s)',
+  async (Realtime) => {
+    let resolutions = 0;
+    const client = new OpenAI({ baseURL, apiKey: async () => `ek_recovery_${(resolutions += 1)}` });
+    let cachedKey: string | null = null;
+    Object.defineProperty(client, 'apiKey', {
+      get: () => (cachedKey === null ? null : `${cachedKey}_committed`),
+      set: (value: string | null) => {
+        cachedKey = value;
+      },
+    });
+    const connected = once(peers, 'connection');
+    const realtime = await Realtime.create(client, {
+      ...settings,
+      reconnect: true,
+      maxQueueBytes: 1024,
+      reconnectInitialDelay: 1,
+    });
+    realtime.on('error', () => {});
+    const [first] = await connected;
+    await rawEvent(realtime.socket, 'open');
+    const oldSocket = realtime.socket;
+    const initialBinaryType = oldSocket.binaryType;
+    const sent = once(first, 'message');
+    realtime.send({ type: 'response.create', event_id: 'already_sent' });
+    await sent;
+    realtime.on('reconnecting', () => realtime.send({ type: 'response.create', event_id: 'held' }));
+    const replacement = once(peers, 'connection');
+    const recovered = realtime.emitted('reconnected');
+    first.close(1012);
+    const [next, request] = await replacement;
+    const commands: unknown[] = [];
+    next.on('message', (data: Buffer) => commands.push(JSON.parse(String(data))));
+    await recovered;
+    try {
+      expect(resolutions).toBe(2);
+      if (Realtime === StableWS) {
+        expect(request.headers.authorization).toBe('Bearer ek_recovery_2_committed');
+      } else {
+        expect(request.headers['sec-websocket-protocol']).toContain('ek_recovery_2_committed');
+        expect([initialBinaryType, realtime.socket.binaryType]).toEqual(['blob', 'blob']);
+      }
+      expect(realtime.socket).not.toBe(oldSocket);
+      expect(commands).toEqual([]);
+      realtime.send({ type: 'session.update', session: { type: 'realtime' } });
+      realtime.flushPending();
+      // oxlint-disable-next-line promise/avoid-new -- Wait for both ordered wire messages, independent of their scheduling.
+      await new Promise<void>((resolve) => {
+        const check = () => {
+          if (commands.length === 2) {
+            resolve();
+          }
+        };
+        next.on('message', check);
+        check();
+      });
+      expect(commands).toEqual([
+        { type: 'session.update', session: { type: 'realtime' } },
+        { type: 'response.create', event_id: 'held' },
+      ]);
+      expect(realtime.takePending()).toEqual([]);
+      const closed = realtime.emitted('close');
+      next.close(1000, 'peer done');
+      await expect(closed).resolves.toEqual([1000, 'peer done', []]);
+    } finally {
+      realtime.close();
+    }
+  },
+);
+
+test('recovery captures ws options before refreshing credentials', async () => {
+  const options = {
+    ca: Buffer.from(lab.certificateAuthority),
+    headers: { 'x-recovery-snapshot': 'original' },
+  };
+  let resolutions = 0;
+  const client = new OpenAI({
+    baseURL,
+    apiKey: async () => {
+      if ((resolutions += 1) === 2) {
+        options.ca.fill(0);
+        options.headers['x-recovery-snapshot'] = 'mutated';
+      }
+      return `ek_snapshot_${resolutions}`;
+    },
+  });
+  const connected = once(peers, 'connection');
+  const realtime = await StableWS.create(client, {
+    model: settings.model,
+    options,
+    reconnect: true,
+    maxReconnectAttempts: 1,
+    reconnectInitialDelay: 1,
+  });
+  realtime.on('error', () => {});
+  const [first] = await connected;
+  await rawEvent(realtime.socket, 'open');
+  const incoming = once(peers, 'connection', { signal: AbortSignal.timeout(5000) });
+  const recovered = realtime.emitted('reconnected');
+  first.close(1012);
+  try {
+    const [[, request]] = await Promise.all([incoming, recovered]);
+    expect(request.headers['x-recovery-snapshot']).toBe('original');
+  } finally {
+    realtime.close();
+  }
+});
+
+test('opt-in recovery can be canceled during backoff without opening another socket', async () => {
+  const connected = once(peers, 'connection');
+  const realtime = new StableWS(
+    { ...settings, reconnect: true, reconnectInitialDelay: 60_000 },
+    new OpenAI({ baseURL, apiKey: 'ek_cancel' }),
+  );
+  realtime.on('error', () => {});
+  const [first] = await connected;
+  const originalSocket = realtime.socket;
+  await rawEvent(originalSocket, 'open');
+  const closed = realtime.emitted('close');
+  const reconnecting = realtime.emitted('reconnecting');
+  first.close(1012);
+  await reconnecting;
+  realtime.close();
+  expect(await closed).toEqual([1000, 'OK', []]);
+  expect(realtime.socket).toBe(originalSocket);
+});
+
+test.each([StableWS, StableNative])('recovery uses one URL per lifetime attempt (%s)', async (Realtime) => {
+  let builtURLs = 0;
+  const connected = once(peers, 'connection');
+  const realtime = new Realtime(
+    {
+      ...settings,
+      reconnect: true,
+      maxReconnectAttempts: 2,
+      reconnectInitialDelay: 1,
+      buildRealtimeURL: () => {
+        const url = new URL('realtime', baseURL);
+        url.protocol = 'wss:';
+        url.searchParams.set('target', String((builtURLs += 1)));
+        return url;
+      },
+    },
+    new OpenAI({ baseURL, apiKey: 'ek_attempt' }),
+  );
+  realtime.on('error', () => {});
+  const attempts: number[] = [];
+  realtime.on('reconnecting', ({ attempt }) => attempts.push(attempt));
+  const reconnect = async (peer: WebSocket) => {
+    const incoming = once(peers, 'connection');
+    const recovered = realtime.emitted('reconnected');
+    peer.close(1012);
+    const [replacement, request] = await incoming;
+    await recovered;
+    return {
+      peer: replacement,
+      target: new URL(request.url, baseURL).searchParams.get('target'),
+      reported: realtime.url.searchParams.get('target'),
+    };
+  };
+  try {
+    const [first] = await connected;
+    await rawEvent(realtime.socket, 'open');
+    const second = await reconnect(first);
+    const third = await reconnect(second.peer);
+    expect({
+      attempts,
+      targets: [second.target, third.target],
+      reported: [second.reported, third.reported],
+    }).toEqual({
+      attempts: [1, 2],
+      targets: ['2', '3'],
+      reported: ['2', '3'],
+    });
+  } finally {
+    realtime.close();
+  }
+});
+
+test.each([StableWS, StableNative])(
+  'recovery rejects overflow and keeps wire events separate from lifecycle (%s)',
+  async (Realtime) => {
+    const connected = once(peers, 'connection');
+    const realtime = new Realtime(
+      { ...settings, reconnect: true, maxReconnectAttempts: 1, reconnectInitialDelay: 1 },
+      new OpenAI({ baseURL, apiKey: 'ek_limits' }),
+    );
+    const errors: Error[] = [];
+    realtime.on('error', (error) => errors.push(error));
+    const [first] = await connected;
+    await rawEvent(realtime.socket, 'open');
+    let closes = 0;
+    realtime.on('close', () => {
+      closes += 1;
+    });
+    for (const type of ['close', 'reconnected', 'reconnecting']) {
+      const event = realtime.emitted('event');
+      first.send(JSON.stringify({ type }));
+      // oxlint-disable-next-line eslint/no-await-in-loop -- Each event acts as a barrier before checking the next wire type.
+      expect(await event).toEqual({ type });
+    }
+    expect(closes).toBe(0);
+    realtime.on('reconnecting', () => {
+      realtime.send({ type: 'response.create' });
+      const unserializable = {
+        type: 'response.create' as const,
+        toJSON() {
+          throw new Error('serialization failed');
+        },
+      };
+      realtime.send(unserializable);
+      // oxlint-disable-next-line unicorn/no-useless-undefined -- Exercise JSON.stringify returning undefined.
+      const omitted = { type: 'response.create' as const, toJSON: () => undefined };
+      realtime.send(omitted);
+    });
+    const replacement = once(peers, 'connection');
+    // oxlint-disable-next-line promise/avoid-new -- Expected admission errors must not reject this lifecycle wait.
+    const recovered = new Promise<void>((resolve) => {
+      realtime.on('reconnected', resolve);
+    });
+    first.close(1012);
+    const [next] = await replacement;
+    await recovered;
+    expect(errors).toHaveLength(3);
+    expect(realtime.takePending()).toEqual([]);
+    // oxlint-disable-next-line promise/avoid-new -- Wait for terminal cleanup while also observing expected error events.
+    const closed = new Promise<void>((resolve) => {
+      realtime.on('close', () => resolve());
+    });
+    next.close(1012);
+    await closed;
+    expect(closes).toBe(1);
+    expect(errors).toHaveLength(4);
+    expect(errors[3]?.message).toContain('1 attempts');
+    realtime.close();
+  },
+);
+
+test.each([StableWS, StableNative])(
+  'failed physical close ends transport and logical recovery (%s)',
+  async (Realtime) => {
+    const connected = once(peers, 'connection');
+    const realtime = new Realtime(
+      { ...settings, reconnect: true },
+      new OpenAI({ baseURL, apiKey: 'ek_close' }),
+    );
+    const errors: Error[] = [];
+    realtime.on('error', (error) => errors.push(error));
+    const [first] = await connected;
+    await rawEvent(realtime.socket, 'open');
+    const physicalClose = once(first, 'close', { signal: AbortSignal.timeout(5000) });
+    const rawClose = rawEvent(realtime.socket, 'close');
+    const notifications: string[] = [];
+    realtime.on('event', ({ type }) => {
+      notifications.push(type);
+      if (type === 'session.created') {
+        realtime.close({ code: 1, reason: 'invalid physical close' });
+      }
+    });
+    realtime.on('session.created', () => notifications.push('session.created callback'));
+    // oxlint-disable-next-line promise/avoid-new -- Wait for terminal cleanup while also observing expected error events.
+    const closed = new Promise<void>((resolve) => {
+      realtime.on('close', () => {
+        notifications.push('close');
+        resolve();
+      });
+    });
+    first.send(JSON.stringify({ type: 'session.created' }));
+    first.send(JSON.stringify({ type: 'session.updated' }));
+    await Promise.all([closed, physicalClose, rawClose]);
+    expect(notifications).toEqual(['session.created', 'close']);
+    realtime.send({ type: 'response.create' });
+    expect(errors).toHaveLength(2);
+    expect(errors[1]?.message).toContain('closed WebSocket');
+  },
+);
+
+const terminalFailures = ['initial authentication', 'authentication', 'TLS'];
+test.each(terminalFailures)('recovery reports a terminal %s rejection', async (failure) => {
+  const tls = failure === 'TLS';
+  const initial = failure === 'initial authentication';
+  const endpoint = createServer({ cert: lab.server.certificate, key: lab.server.privateKey });
+  let attempts = 0;
+  const sockets = new WebSocketServer({
+    server: endpoint,
+    verifyClient: () => (attempts += 1) === 1 && !initial,
+  });
+  await once(endpoint.listen(0, '127.0.0.1'), 'listening');
+  const address = endpoint.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Missing server address');
+  }
+  const connected = initial ? undefined : once(sockets, 'connection');
+  const agent = new Agent({ maxCachedSessions: 0 });
+  const realtime = new StableWS(
+    {
+      ...settings,
+      options: { ...settings.options, agent },
+      reconnect: true,
+      reconnectInitialDelay: 1,
+      maxReconnectAttempts: tls ? 5 : 1,
+    },
+    new OpenAI({ baseURL: `https://127.0.0.1:${address.port}/v1`, apiKey: 'ek_rejected' }),
+  );
+  const errors: Error[] = [];
+  realtime.on('error', (error) => errors.push(error));
+  // oxlint-disable-next-line promise/avoid-new -- Authentication errors must not reject the cleanup wait.
+  const closed = new Promise<void>((resolve) => {
+    realtime.on('close', () => resolve());
+  });
+  try {
+    if (connected) {
+      const [first] = await connected;
+      await rawEvent(realtime.socket, 'open');
+      if (tls) {
+        endpoint.setSecureContext({ cert: lab.proxyServer.certificate, key: lab.proxyServer.privateKey });
+      }
+      first.close(1012);
+    }
+    await closed;
+    expect(attempts).toBe(initial || tls ? 1 : 2);
+    const diagnostic = tls ? /certificate|verify/iu : /401/u;
+    expect(errors).toEqual([
+      expect.objectContaining({
+        message: expect.stringMatching(diagnostic),
+        cause: expect.objectContaining({ message: expect.stringMatching(diagnostic) }),
+      }),
+    ]);
+    expect(realtime.socket.readyState).toBe(WebSocket.CLOSED);
+  } finally {
+    realtime.close();
+    agent.destroy();
+    sockets.close();
+    endpoint.close();
+  }
+});
+
+test.each([StableWS, StableNative])(
+  'recovery reports the latest credential failure (%s)',
+  async (Realtime) => {
+    const failures = [new Error('first refresh failed'), new Error('latest refresh failed')];
+    let resolutions = 0;
+    const client = new OpenAI({
+      baseURL,
+      apiKey: async () => {
+        resolutions += 1;
+        if (resolutions === 1) {
+          return 'ek_refresh';
+        }
+        throw failures[resolutions - 2];
+      },
+    });
+    const connected = once(peers, 'connection');
+    const realtime = await Realtime.create(client, {
+      ...settings,
+      reconnect: true,
+      maxReconnectAttempts: 2,
+      reconnectInitialDelay: 1,
+    });
+    const errors: Error[] = [];
+    realtime.on('error', (error) => errors.push(error));
+    // oxlint-disable-next-line promise/avoid-new -- Expected credential errors must not reject the cleanup wait.
+    const closed = new Promise<void>((resolve) => {
+      realtime.on('close', () => resolve());
+    });
+    try {
+      const [first] = await connected;
+      await rawEvent(realtime.socket, 'open');
+      first.close(1012);
+      await closed;
+      expect(resolutions).toBe(3);
+      expect(errors).toEqual([
+        expect.objectContaining({
+          message: expect.stringContaining('2 attempts'),
+          cause: expect.objectContaining({ cause: failures[1] }),
+        }),
+      ]);
+    } finally {
+      realtime.close();
+    }
+  },
+);
+
+test.each([StableWS, StableNative])('recovery rejects sideband selectors in custom URLs (%s)', (Realtime) => {
+  expect(
+    () =>
+      new Realtime(
+        {
+          ...settings,
+          reconnect: true,
+          buildRealtimeURL: () => new URL('wss://localhost/realtime?call_id=existing'),
+        },
+        new OpenAI({ apiKey: 'ek_sideband' }),
+      ),
+  ).toThrow('requires a model session');
+});
+
+test.each([StableWS, StableNative])('recovery rejects delays outside the timer range (%s)', (Realtime) => {
+  for (const delay of [{ reconnectInitialDelay: 2_147_483_648 }, { reconnectMaxDelay: 2_147_483_648 }]) {
+    expect(
+      () =>
+        new Realtime(
+          {
+            ...settings,
+            ...delay,
+            reconnect: true,
+            buildRealtimeURL: () => {
+              throw new Error('URL should not be built');
+            },
+          },
+          new OpenAI({ apiKey: 'ek_timer' }),
+        ),
+    ).toThrow('2147483647');
+  }
 });

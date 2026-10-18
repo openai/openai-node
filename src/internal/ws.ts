@@ -384,8 +384,11 @@ export class SendQueue<T = unknown> {
   private _bytes = 0;
   private _maxBytes: number;
 
+  private readonly allowOversizedFirstMessage: boolean;
+
   /** Creates a queue with a one-mebibyte default byte budget. */
-  constructor(maxBytes = 1_048_576) {
+  constructor(maxBytes = 1_048_576, allowOversizedFirstMessage = true) {
+    this.allowOversizedFirstMessage = allowOversizedFirstMessage;
     this._maxBytes = maxBytes;
   }
 
@@ -397,8 +400,14 @@ export class SendQueue<T = unknown> {
    */
   enqueue(event: T): boolean {
     const data = JSON.stringify(event);
+    if (data === undefined) {
+      throw new TypeError('WebSocket event could not be serialized as JSON');
+    }
     const byteLength = encodeUTF8(data).byteLength;
-    if (this._bytes + byteLength > this._maxBytes && this._queue.length > 0) {
+    if (
+      this._bytes + byteLength > this._maxBytes &&
+      (!this.allowOversizedFirstMessage || this._queue.length > 0)
+    ) {
       return false;
     }
     this._queue.push({ kind: 'json', data, byteLength });
@@ -416,7 +425,10 @@ export class SendQueue<T = unknown> {
   enqueueRaw(data: RawWebSocketData): boolean {
     const snapshot = snapshotRawData(data);
     const byteLength = rawByteLength(snapshot);
-    if (this._bytes + byteLength > this._maxBytes && this._queue.length > 0) {
+    if (
+      this._bytes + byteLength > this._maxBytes &&
+      (!this.allowOversizedFirstMessage || this._queue.length > 0)
+    ) {
       return false;
     }
     this._queue.push({ kind: 'raw', data: snapshot, byteLength });

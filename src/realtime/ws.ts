@@ -1,3 +1,7 @@
+import { createRealtimeRecovery, validateRealtimeRecovery } from '../internal/realtime-recovery';
+import { NodeWebSocket, snapshotNodeWebSocketOptions } from '../internal/ws-adapter-node';
+import type { WebSocketConnection } from '../internal/ws-connection-controller';
+import type { UnsentMessage } from '../internal/ws';
 import { resolveRealtimeAPIKey } from '../internal/realtime-credentials';
 import * as WS from 'ws';
 import { assertBedrockWebSocketOrigin } from '../internal/bedrock';
@@ -28,6 +32,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
 
   /** Underlying `ws.WebSocket` instance for connection lifecycle and transport events. */
   socket: WS.WebSocket;
+  private _recovery?: WebSocketConnection<NodeWebSocket, RealtimeClientEvent, never, Error>;
 
   /**
    * Immediately opens a model or transcription session, or attaches to an existing call.
@@ -53,10 +58,14 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     client?: Pick<OpenAI, 'apiKey' | 'baseURL'>,
   ) {
     super();
-    client ??= new OpenAI();
-    const apiKey = props.__apiKey === undefined ? client.apiKey : props.__apiKey;
+    validateRealtimeRecovery(props);
+    if (props.reconnect && !props.model) {
+      throw new Error('Automatic Realtime recovery requires a model session');
+    }
+    const connectionClient = client ?? new OpenAI();
+    const apiKey = props.__apiKey === undefined ? connectionClient.apiKey : props.__apiKey;
     // SAFETY: The supplied OpenAI client owns _options; this read detects its existing API-key provider without changing its public surface.
-    const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
+    const hasProvider = typeof (connectionClient as any)?._options?.apiKey === 'function';
     if (hasProvider && !props.__resolvedApiKey) {
       throw new Error(
         [
@@ -65,60 +74,143 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
         ].join('\n'),
       );
     }
-    this.url = buildRealtimeURL(client, props);
-    assertBedrockWebSocketOrigin(client, this.url);
-    const headers = {
-      'User-Agent': `${client.constructor.name}/JS ${VERSION}`,
-      ...props.options?.headers,
-      // A credential must be an own data property without invoking an inherited setter.
-      ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${apiKey}` }),
-    };
-
-    this.socket = new WS.WebSocket(
-      this.url,
-      protectWebSocketOptionsFromCredentialRedirects({
-        ...props.options,
-        headers,
-      }),
-    );
-
-    this.socket.on('message', (wsEvent) => {
-      const event = (() => {
-        try {
-          const parsedEvent = parseRealtimeEvent(wsEvent.toString());
-
-          if (
-            typeof parsedEvent !== 'object' ||
-            parsedEvent === null ||
-            Array.isArray(parsedEvent) ||
-            !Object.getOwnPropertyDescriptor(parsedEvent, 'type') ||
-            typeof parsedEvent.type !== 'string'
-          ) {
-            throw new TypeError('Realtime WebSocket event must be an object with a string type.');
-          }
-
-          return parsedEvent;
-        } catch (err) {
-          this._onError(null, 'could not parse websocket event', err);
-          return null;
-        }
-      })();
-
-      if (event) {
-        this._emit('event', event);
-
-        if (event.type === 'error') {
-          this._onError(event);
-        } else {
-          // @ts-expect-error TS isn't smart enough to get the relationship right here
-          this._emit(event.type, event);
-        }
+    const terminalErrors = new WeakMap<WS.WebSocket, Error>();
+    const open = (
+      attemptKey: string | null,
+      resolvedApiKey: boolean,
+      capturedURL?: URL,
+      options: typeof props.options | ReturnType<typeof snapshotNodeWebSocketOptions> = props.options,
+    ) => {
+      const url = capturedURL ?? buildRealtimeURL(connectionClient, props);
+      validateRealtimeRecovery(props, url);
+      assertBedrockWebSocketOrigin(connectionClient, url);
+      if (isAzure(connectionClient) && props.__apiKey !== undefined && !attemptKey) {
+        throw new Error('Azure OpenAI Realtime requires an API key');
       }
-    });
+      const azureKey = isAzure(connectionClient) && !resolvedApiKey;
+      const headers = {
+        'User-Agent': `${connectionClient.constructor.name}/JS ${VERSION}`,
+        ...options?.headers,
+        // Credentials remain own data properties without invoking inherited setters.
+        ...(azureKey && props.__apiKey !== undefined ? { 'api-key': attemptKey ?? '' } : {}),
+        ...(azureKey ? {} : { Authorization: `Bearer ${attemptKey}` }),
+      };
 
-    this.socket.on('error', (err) => {
-      this._onError(null, err.message, err);
-    });
+      const socket = new WS.WebSocket(
+        url,
+        protectWebSocketOptionsFromCredentialRedirects({
+          ...options,
+          headers,
+        }),
+      );
+
+      socket.on('message', (wsEvent) => {
+        if (this._recovery && (socket !== this.socket || this._recovery.isClosed)) {
+          return;
+        }
+        const event = (() => {
+          try {
+            const parsedEvent = parseRealtimeEvent(wsEvent.toString());
+
+            if (
+              typeof parsedEvent !== 'object' ||
+              parsedEvent === null ||
+              Array.isArray(parsedEvent) ||
+              !Object.getOwnPropertyDescriptor(parsedEvent, 'type') ||
+              typeof parsedEvent.type !== 'string'
+            ) {
+              throw new TypeError('Realtime WebSocket event must be an object with a string type.');
+            }
+
+            return parsedEvent;
+          } catch (err) {
+            this._onError(null, 'could not parse websocket event', err);
+            return null;
+          }
+        })();
+
+        if (event) {
+          this._emit('event', event);
+
+          if (this._recovery?.isClosed) {
+            return;
+          }
+          if (event.type === 'error') {
+            this._onError(event);
+          } else if (!this._recovery || !['close', 'reconnecting', 'reconnected'].includes(event.type)) {
+            // @ts-expect-error TS cannot relate the event discriminant to the mapped callback type.
+            this._emit(event.type, event);
+          }
+        }
+      });
+
+      if (props.reconnect) {
+        socket.on('unexpected-response', (_request, response) => {
+          if (![408, 429, 500, 502, 503, 504].includes(response.statusCode ?? 0)) {
+            terminalErrors.set(
+              socket,
+              new Error(`Unexpected server response: ${response.statusCode ?? 'unknown'}`),
+            );
+          }
+          response.resume();
+          socket.terminate();
+        });
+      }
+      socket.on('error', (err) => {
+        if (this._recovery) {
+          if (
+            'code' in err &&
+            typeof err.code === 'string' &&
+            (err.code.startsWith('ERR_TLS_') ||
+              err.code.startsWith('CERT_') ||
+              [
+                'DEPTH_ZERO_SELF_SIGNED_CERT',
+                'SELF_SIGNED_CERT_IN_CHAIN',
+                'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+                'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+              ].includes(err.code))
+          ) {
+            terminalErrors.set(socket, err);
+          }
+          return;
+        }
+        this._onError(null, err.message, err);
+      });
+      return { url, socket };
+    };
+    const initial = open(apiKey, props.__resolvedApiKey === true);
+    this.url = initial.url;
+    this.socket = initial.socket;
+    if (props.reconnect) {
+      this._recovery = createRealtimeRecovery<NodeWebSocket, RealtimeClientEvent>(this, props, {
+        buildURL: () => buildRealtimeURL(connectionClient, props),
+        adaptSocket: (socket) => new NodeWebSocket(socket),
+        prepare: async () => {
+          const options = snapshotNodeWebSocketOptions(props.options);
+          // SAFETY: The branch checks _callApiKey before using the client's credential resolver.
+          const credential =
+            '_callApiKey' in connectionClient && typeof connectionClient._callApiKey === 'function'
+              ? await resolveRealtimeAPIKey(connectionClient as Pick<OpenAI, 'apiKey' | '_callApiKey'>, true)
+              : { isProvider: false, commit: () => connectionClient.apiKey };
+          return (url) => open(credential.commit(), credential.isProvider, url, options).socket;
+        },
+        shouldReconnect: () => !terminalErrors.has(this.socket),
+        onError: (message, cause) => {
+          const terminal = terminalErrors.get(this.socket);
+          this._onError(
+            null,
+            terminal && terminal.message !== message ? `${message}: ${terminal.message}` : message,
+            terminal ?? cause,
+          );
+        },
+        onReconnecting: (event) => this._emit('reconnecting', event),
+        onReconnected: () => this._emit('reconnected'),
+        onClose: (code, reason, unsent) => {
+          terminalErrors.delete(this.socket);
+          this._emit('close', code, reason, unsent);
+        },
+      });
+    }
   }
 
   /**
@@ -196,11 +288,24 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
    * Serialization and transport failures are delivered to the SDK `error` event.
    */
   send(event: RealtimeClientEvent): void {
+    if (this._recovery) {
+      return this._recovery.send(event);
+    }
     try {
       this.socket.send(JSON.stringify(event));
     } catch (err) {
       this._onError(null, 'could not send data', err);
     }
+  }
+
+  /** Explicitly flush never-attempted events after restoring the replacement session. */
+  flushPending(): void {
+    this._recovery?.flushPending();
+  }
+
+  /** Remove retained events without transmitting them. */
+  takePending(): UnsentMessage<RealtimeClientEvent>[] {
+    return this._recovery?.takePending() ?? [];
   }
 
   /**
@@ -214,6 +319,9 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     /** WebSocket close reason; defaults to `OK`. */
     reason: string;
   }): void {
+    if (this._recovery) {
+      return this._recovery.close(props);
+    }
     try {
       this.socket.close(props?.code ?? 1000, props?.reason ?? 'OK');
     } catch (err) {

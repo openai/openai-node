@@ -15,7 +15,7 @@ interface WebSocket {
   binaryType: string;
 
   /** Sends a text or binary WebSocket frame. */
-  send(data: string | ArrayBufferLike | ArrayBufferView): void;
+  send(data: string | ArrayBufferLike | ArrayBufferView | Blob): void;
 
   /** Initiates a closing handshake with an optional status code and reason. */
   close(code?: number, reason?: string): void;
@@ -39,7 +39,7 @@ interface CloseEvent {
 /**
  * Adapts a browser-native WebSocket to the SDK's platform-neutral event API.
  *
- * Binary messages are received as `ArrayBuffer` values, browser event objects
+ * Binary messages are received as `ArrayBuffer` values by default, browser event objects
  * are converted into positional listener arguments, and browser errors are
  * normalized to `Error` instances.
  */
@@ -47,10 +47,12 @@ export class BrowserWebSocket implements WebSocketLike {
   private _ws: WebSocket;
   private _listenerMap = new Map<string, Map<Listener, DOMEventHandler[]>>();
 
-  /** Wraps an existing browser socket and configures binary frames as array buffers. */
-  constructor(ws: WebSocket) {
+  /** Wraps an existing browser socket, preserving its binary mode for lifecycle-only use if requested. */
+  constructor(ws: WebSocket, options?: { preserveBinaryType?: boolean }) {
     this._ws = ws;
-    this._ws.binaryType = 'arraybuffer';
+    if (!options?.preserveBinaryType) {
+      this._ws.binaryType = 'arraybuffer';
+    }
   }
 
   /** The browser-native socket; accessing it makes calling code platform-specific. */

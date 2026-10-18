@@ -12,6 +12,9 @@ export interface WebSocketLike {
   /** Initiates the closing handshake, optionally providing a close code and reason. */
   close(code?: number, reason?: string): void;
 
+  /** Forcibly closes the transport when a graceful close fails, if the platform supports it. */
+  terminate?(): void;
+
   /** Registers a listener that runs when the socket connection opens. */
   on(event: 'open', listener: () => void): void;
 
