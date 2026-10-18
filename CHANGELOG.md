@@ -1,5 +1,17 @@
 # Changelog
 
+## [7.39.0](https://github.com/openai/openai-node/compare/v7.38.0...v7.39.0) (2026-10-18)
+
+
+### Features
+
+* **realtime:** add opt-in bounded connection recovery ([#2968](https://github.com/openai/openai-node/issues/2968)) ([64872e5](https://github.com/openai/openai-node/commit/64872e51eb0624c7cdee8378fba8a6b848fcd8e7))
+
+
+### Chores
+
+* **api:** use neutral moderation examples ([#2969](https://github.com/openai/openai-node/issues/2969)) ([3a3b852](https://github.com/openai/openai-node/commit/3a3b8521a9278d68120c9256a0de4075acb82d80))
+
 ## [7.38.0](https://github.com/openai/openai-node/compare/v7.37.0...v7.38.0) (2026-10-17)
 
 
