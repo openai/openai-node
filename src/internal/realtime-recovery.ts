@@ -35,12 +35,16 @@ export function validateRealtimeRecovery(options: RealtimeRecoveryOptions, url?:
 }
 
 /** Adapts the existing protocol controller to Realtime's explicit restoration/flush policy. */
-export function createRealtimeRecovery<TSocket extends WebSocketLike, TEvent>(
-  owner: { socket: TSocket; url: URL },
+export function createRealtimeRecovery<
+  TSocket extends WebSocketLike & { readonly platformSocket: unknown },
+  TEvent,
+>(
+  owner: { socket: TSocket['platformSocket']; url: URL },
   options: RealtimeRecoveryOptions,
   hooks: {
     buildURL: () => URL;
-    prepare: () => Promise<(url: URL) => TSocket>;
+    adaptSocket: (socket: TSocket['platformSocket']) => TSocket;
+    prepare: () => Promise<(url: URL) => TSocket['platformSocket']>;
     onError: (message: string, cause?: unknown) => void;
     onReconnecting: (event: ReconnectingEvent) => void;
     onReconnected: () => void;
@@ -48,13 +52,32 @@ export function createRealtimeRecovery<TSocket extends WebSocketLike, TEvent>(
     onClose: (code: number, reason: string, unsent: UnsentMessage<TEvent>[]) => void;
   },
 ): WebSocketConnection<TSocket, TEvent, never, Error> {
-  const first = owner.socket;
+  const first = hooks.adaptSocket(owner.socket);
+  let currentSocket = first;
+  const controllerOwner = {
+    get socket() {
+      return currentSocket;
+    },
+    set socket(socket: TSocket) {
+      currentSocket = socket;
+      owner.socket = socket.platformSocket;
+    },
+    get url() {
+      return owner.url;
+    },
+    set url(url: URL) {
+      owner.url = url;
+    },
+  };
   const controller = new WebSocketConnection<TSocket, TEvent, never, Error>(
-    owner,
+    controllerOwner,
     {
       buildURL: hooks.buildURL,
       createSocket: () => first,
-      prepareReconnectSocket: hooks.prepare,
+      prepareReconnectSocket: async () => {
+        const createSocket = await hooks.prepare();
+        return (url) => hooks.adaptSocket(createSocket(url));
+      },
       parameters: undefined,
       isErrorEvent: () => false,
       onMessage: () => {

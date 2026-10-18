@@ -207,9 +207,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       );
     }
 
-    client ??= new OpenAI({ dangerouslyAllowBrowser });
+    const connectionClient = client ?? new OpenAI({ dangerouslyAllowBrowser });
     if (apiKey === undefined) {
-      apiKey = client.apiKey;
+      apiKey = connectionClient.apiKey;
     }
 
     if (hasProvider && !props?.__resolvedApiKey) {
@@ -225,20 +225,20 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       // SAFETY: OpenAI owns _options; this reads its existing browser-consent flag.
       const allowed =
         props.dangerouslyAllowBrowser ??
-        (client as any)._options?.dangerouslyAllowBrowser ??
+        (connectionClient as any)._options?.dangerouslyAllowBrowser ??
         attemptKey?.startsWith('ek_');
       if (!allowed && isRunningInBrowserOrBrowserWorker()) {
         throw new OpenAIError('Realtime browser connections require an ephemeral credential.');
       }
-      const url = buildRealtimeURL(client, props);
+      const url = buildRealtimeURL(connectionClient, props);
       validateRealtimeRecovery(props, url);
       props.onURL?.(url);
       if (url.protocol !== 'wss:') {
         throw new OpenAIError('Realtime WebSocket URLs must use the wss: protocol.');
       }
-      assertBedrockWebSocketOrigin(client, url);
+      assertBedrockWebSocketOrigin(connectionClient, url);
 
-      const azure = isAzure(client);
+      const azure = isAzure(connectionClient);
       const protocols = ['realtime', ...(azure ? [] : [`openai-insecure-api-key.${attemptKey}`])];
 
       const socket = azure
@@ -299,38 +299,20 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     this.url = initial.url;
     this.socket = initial.socket;
     if (props.reconnect) {
-      let adapter = new BrowserWebSocket(initial.socket);
-      // oxlint-disable-next-line typescript/no-this-alias, unicorn/no-this-assignment -- The accessor receiver is the controller owner, not the public wrapper.
-      const instance = this;
-      const owner = {
-        get socket() {
-          return adapter;
-        },
-        set socket(value: BrowserWebSocket) {
-          adapter = value;
-          // SAFETY: BrowserWebSocket wraps the native socket created by this wrapper.
-          instance.socket = value.platformSocket as _WebSocket;
-        },
-        get url() {
-          return instance.url;
-        },
-        set url(value: URL) {
-          instance.url = value;
-        },
-      };
-      this._recovery = createRealtimeRecovery<BrowserWebSocket, RealtimeClientEvent>(owner, props, {
-        buildURL: () => buildRealtimeURL(client, props),
+      this._recovery = createRealtimeRecovery<BrowserWebSocket, RealtimeClientEvent>(this, props, {
+        buildURL: () => buildRealtimeURL(connectionClient, props),
+        adaptSocket: (socket) => new BrowserWebSocket(socket),
         prepare: async () => {
           // SAFETY: The branch checks _callApiKey before using the client's credential resolver.
           const credential =
-            '_callApiKey' in client && typeof client._callApiKey === 'function'
-              ? await resolveRealtimeAPIKey(client as Pick<OpenAI, 'apiKey' | '_callApiKey'>, true)
-              : { apiKey: client.apiKey, isProvider: false, commit: () => client.apiKey };
+            '_callApiKey' in connectionClient && typeof connectionClient._callApiKey === 'function'
+              ? await resolveRealtimeAPIKey(connectionClient as Pick<OpenAI, 'apiKey' | '_callApiKey'>, true)
+              : { apiKey: connectionClient.apiKey, isProvider: false, commit: () => connectionClient.apiKey };
           return () => {
             credential.commit();
             const next = open(credential.apiKey, credential.isProvider);
-            instance.url = next.url;
-            return new BrowserWebSocket(next.socket);
+            this.url = next.url;
+            return next.socket;
           };
         },
         onError: (message, cause) => this._onError(null, message, cause),

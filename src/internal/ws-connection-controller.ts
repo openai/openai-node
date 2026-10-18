@@ -128,10 +128,6 @@ export class WebSocketConnection<
   private _permanentClosed = false;
   private _backoff = new AbortController();
 
-  get reconnecting(): boolean {
-    return this._isReconnecting;
-  }
-
   takePending(): UnsentMessage<TClientEvent>[] {
     return this._sendQueue.drain();
   }

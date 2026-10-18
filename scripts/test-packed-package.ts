@@ -222,6 +222,7 @@ const packedPackagePath = require('node:path');
         "    on(event: 'message', listener: (data: ArrayBuffer | Uint8Array | Uint8Array[], isBinary: boolean) => void): this;",
         "    on(event: 'error', listener: (error: Error) => void): this;",
         "    on(event: 'redirect', listener: (url: string, request: { getHeaders(): Record<string, string | string[] | undefined> }) => void): this;",
+        "    on(event: 'unexpected-response', listener: (request: unknown, response: { statusCode?: number; resume(): void }) => void): this;",
         '    on(event: string, listener: (...args: unknown[]) => void): this;',
         '    removeListener(event: string, listener: (...args: unknown[]) => void): this;',
         '  }',

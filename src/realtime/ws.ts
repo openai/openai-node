@@ -1,4 +1,5 @@
 import { createRealtimeRecovery, validateRealtimeRecovery } from '../internal/realtime-recovery';
+import { NodeWebSocket } from '../internal/ws-adapter-node';
 import type { WebSocketConnection } from '../internal/ws-connection-controller';
 import type { UnsentMessage } from '../internal/ws';
 import { resolveRealtimeAPIKey } from '../internal/realtime-credentials';
@@ -31,7 +32,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
 
   /** Underlying `ws.WebSocket` instance for connection lifecycle and transport events. */
   socket: WS.WebSocket;
-  private _recovery?: WebSocketConnection<WS.WebSocket, RealtimeClientEvent, never, Error>;
+  private _recovery?: WebSocketConnection<NodeWebSocket, RealtimeClientEvent, never, Error>;
 
   /**
    * Immediately opens a model or transcription session, or attaches to an existing call.
@@ -61,10 +62,10 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     if (props.reconnect && !props.model) {
       throw new Error('Automatic Realtime recovery requires a model session');
     }
-    client ??= new OpenAI();
-    const apiKey = props.__apiKey === undefined ? client.apiKey : props.__apiKey;
+    const connectionClient = client ?? new OpenAI();
+    const apiKey = props.__apiKey === undefined ? connectionClient.apiKey : props.__apiKey;
     // SAFETY: The supplied OpenAI client owns _options; this read detects its existing API-key provider without changing its public surface.
-    const hasProvider = typeof (client as any)?._options?.apiKey === 'function';
+    const hasProvider = typeof (connectionClient as any)?._options?.apiKey === 'function';
     if (hasProvider && !props.__resolvedApiKey) {
       throw new Error(
         [
@@ -75,15 +76,15 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     }
     const terminalSockets = new WeakSet<WS.WebSocket>();
     const open = (attemptKey: string | null, resolvedApiKey: boolean) => {
-      const url = buildRealtimeURL(client, props);
+      const url = buildRealtimeURL(connectionClient, props);
       validateRealtimeRecovery(props, url);
-      assertBedrockWebSocketOrigin(client, url);
-      if (isAzure(client) && props.__apiKey !== undefined && !attemptKey) {
+      assertBedrockWebSocketOrigin(connectionClient, url);
+      if (isAzure(connectionClient) && props.__apiKey !== undefined && !attemptKey) {
         throw new Error('Azure OpenAI Realtime requires an API key');
       }
-      const azureKey = isAzure(client) && !resolvedApiKey;
+      const azureKey = isAzure(connectionClient) && !resolvedApiKey;
       const headers = {
-        'User-Agent': `${client.constructor.name}/JS ${VERSION}`,
+        'User-Agent': `${connectionClient.constructor.name}/JS ${VERSION}`,
         ...props.options?.headers,
         // Credentials remain own data properties without invoking inherited setters.
         ...(azureKey && props.__apiKey !== undefined ? { 'api-key': attemptKey ?? '' } : {}),
@@ -170,14 +171,15 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     this.url = initial.url;
     this.socket = initial.socket;
     if (props.reconnect) {
-      this._recovery = createRealtimeRecovery<WS.WebSocket, RealtimeClientEvent>(this, props, {
-        buildURL: () => buildRealtimeURL(client, props),
+      this._recovery = createRealtimeRecovery<NodeWebSocket, RealtimeClientEvent>(this, props, {
+        buildURL: () => buildRealtimeURL(connectionClient, props),
+        adaptSocket: (socket) => new NodeWebSocket(socket),
         prepare: async () => {
           // SAFETY: The branch checks _callApiKey before using the client's credential resolver.
           const credential =
-            '_callApiKey' in client && typeof client._callApiKey === 'function'
-              ? await resolveRealtimeAPIKey(client as Pick<OpenAI, 'apiKey' | '_callApiKey'>, true)
-              : { apiKey: client.apiKey, isProvider: false, commit: () => client.apiKey };
+            '_callApiKey' in connectionClient && typeof connectionClient._callApiKey === 'function'
+              ? await resolveRealtimeAPIKey(connectionClient as Pick<OpenAI, 'apiKey' | '_callApiKey'>, true)
+              : { apiKey: connectionClient.apiKey, isProvider: false, commit: () => connectionClient.apiKey };
           return () => {
             credential.commit();
             return open(credential.apiKey, credential.isProvider).socket;

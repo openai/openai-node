@@ -370,6 +370,9 @@ test.each([StableWS, StableNative])(
         { type: 'response.create', event_id: 'held' },
       ]);
       expect(realtime.takePending()).toEqual([]);
+      const closed = realtime.emitted('close');
+      next.close(1000, 'peer done');
+      await expect(closed).resolves.toEqual([1000, 'peer done', []]);
     } finally {
       realtime.close();
     }

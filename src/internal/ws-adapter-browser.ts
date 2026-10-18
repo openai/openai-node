@@ -15,7 +15,7 @@ interface WebSocket {
   binaryType: string;
 
   /** Sends a text or binary WebSocket frame. */
-  send(data: string | ArrayBufferLike | ArrayBufferView): void;
+  send(data: string | ArrayBufferLike | ArrayBufferView | Blob): void;
 
   /** Initiates a closing handshake with an optional status code and reason. */
   close(code?: number, reason?: string): void;
