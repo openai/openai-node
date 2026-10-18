@@ -1,5 +1,5 @@
 import { once } from 'node:events';
-import { createServer } from 'node:https';
+import { Agent, createServer } from 'node:https';
 import { getCACertificates, setDefaultCACertificates } from 'node:tls';
 
 import OpenAI, { AzureOpenAI } from 'openai';
@@ -624,10 +624,11 @@ test.each(['authentication', 'TLS'])('recovery reports a terminal %s rejection',
     throw new Error('Missing server address');
   }
   const connected = once(sockets, 'connection');
+  const agent = new Agent({ maxCachedSessions: 0 });
   const realtime = new StableWS(
     {
       ...settings,
-      options: { ...settings.options, agent: false },
+      options: { ...settings.options, agent },
       reconnect: true,
       reconnectInitialDelay: 1,
       maxReconnectAttempts: tls ? 5 : 1,
@@ -659,6 +660,7 @@ test.each(['authentication', 'TLS'])('recovery reports a terminal %s rejection',
     expect(realtime.socket.readyState).toBe(WebSocket.CLOSED);
   } finally {
     realtime.close();
+    agent.destroy();
     sockets.close();
     endpoint.close();
   }
