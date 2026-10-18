@@ -1367,7 +1367,7 @@
     },
     "tests/api-resources/moderations.test.ts": {
       "mode": "100644",
-      "sha256": "572834ddb67a64ccd69b6cf3736b432cb085fe138ee01521aff3c511d9db312a"
+      "sha256": "9fdad0e0bbc9e20f61ab13de0c1239755a41e633a6c8a5f29515b484a954ecba"
     },
     "tests/api-resources/realtime/calls.test.ts": {
       "mode": "100644",
