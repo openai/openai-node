@@ -252,7 +252,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
           headers: {
             ...props.options?.headers,
             // A credential must be an own data property without invoking an inherited setter.
-            ...(isApiKeyProvider ? {} : { 'api-key': apiKey ?? '' }),
+            ...(isApiKeyProvider ? {} : { 'api-key': apiKey }),
           },
         },
         __resolvedApiKey: isApiKeyProvider,
