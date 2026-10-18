@@ -341,6 +341,13 @@ test.each([StableWS, StableNative])(
   async (Realtime) => {
     let resolutions = 0;
     const client = new OpenAI({ baseURL, apiKey: async () => `ek_recovery_${(resolutions += 1)}` });
+    let cachedKey: string | null = null;
+    Object.defineProperty(client, 'apiKey', {
+      get: () => (cachedKey === null ? null : `${cachedKey}_committed`),
+      set: (value: string | null) => {
+        cachedKey = value;
+      },
+    });
     const connected = once(peers, 'connection');
     const realtime = await Realtime.create(client, {
       ...settings,
@@ -367,9 +374,9 @@ test.each([StableWS, StableNative])(
     try {
       expect(resolutions).toBe(2);
       if (Realtime === StableWS) {
-        expect(request.headers.authorization).toBe('Bearer ek_recovery_2');
+        expect(request.headers.authorization).toBe('Bearer ek_recovery_2_committed');
       } else {
-        expect(request.headers['sec-websocket-protocol']).toContain('ek_recovery_2');
+        expect(request.headers['sec-websocket-protocol']).toContain('ek_recovery_2_committed');
         expect([initialBinaryType, realtime.socket.binaryType]).toEqual(['blob', 'blob']);
       }
       expect(realtime.socket).not.toBe(oldSocket);
@@ -606,7 +613,8 @@ test.each([StableWS, StableNative])(
   },
 );
 
-test('recovery stops after a permanent authentication rejection', async () => {
+test.each(['authentication', 'TLS'])('recovery reports a terminal %s rejection', async (failure) => {
+  const tls = failure === 'TLS';
   const endpoint = createServer({ cert: lab.server.certificate, key: lab.server.privateKey });
   let attempts = 0;
   const sockets = new WebSocketServer({ server: endpoint, verifyClient: () => (attempts += 1) === 1 });
@@ -617,20 +625,37 @@ test('recovery stops after a permanent authentication rejection', async () => {
   }
   const connected = once(sockets, 'connection');
   const realtime = new StableWS(
-    { ...settings, reconnect: true, reconnectInitialDelay: 1 },
+    {
+      ...settings,
+      options: { ...settings.options, agent: false },
+      reconnect: true,
+      reconnectInitialDelay: 1,
+      maxReconnectAttempts: tls ? 5 : 1,
+    },
     new OpenAI({ baseURL: `https://127.0.0.1:${address.port}/v1`, apiKey: 'ek_rejected' }),
   );
-  realtime.on('error', () => {});
+  const errors: Error[] = [];
+  realtime.on('error', (error) => errors.push(error));
   try {
     const [first] = await connected;
     await rawEvent(realtime.socket, 'open');
+    if (tls) {
+      endpoint.setSecureContext({ cert: lab.proxyServer.certificate, key: lab.proxyServer.privateKey });
+    }
     // oxlint-disable-next-line promise/avoid-new -- Authentication errors must not reject the cleanup wait.
     const closed = new Promise<void>((resolve) => {
       realtime.on('close', () => resolve());
     });
     first.close(1012);
     await closed;
-    expect(attempts).toBe(2);
+    expect(attempts).toBe(tls ? 1 : 2);
+    const diagnostic = tls ? /certificate|verify/iu : /401/u;
+    expect(errors).toEqual([
+      expect.objectContaining({
+        message: expect.stringMatching(diagnostic),
+        cause: expect.objectContaining({ message: expect.stringMatching(diagnostic) }),
+      }),
+    ]);
     expect(realtime.socket.readyState).toBe(WebSocket.CLOSED);
   } finally {
     realtime.close();

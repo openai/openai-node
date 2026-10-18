@@ -74,7 +74,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
         ].join('\n'),
       );
     }
-    const terminalSockets = new WeakSet<WS.WebSocket>();
+    const terminalErrors = new WeakMap<WS.WebSocket, Error>();
     const open = (
       attemptKey: string | null,
       resolvedApiKey: boolean,
@@ -147,7 +147,10 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       if (props.reconnect) {
         socket.on('unexpected-response', (_request, response) => {
           if (![408, 429, 500, 502, 503, 504].includes(response.statusCode ?? 0)) {
-            terminalSockets.add(socket);
+            terminalErrors.set(
+              socket,
+              new Error(`Unexpected server response: ${response.statusCode ?? 'unknown'}`),
+            );
           }
           response.resume();
           socket.terminate();
@@ -167,7 +170,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
                 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
               ].includes(err.code))
           ) {
-            terminalSockets.add(socket);
+            terminalErrors.set(socket, err);
           }
           return;
         }
@@ -188,17 +191,20 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
           const credential =
             '_callApiKey' in connectionClient && typeof connectionClient._callApiKey === 'function'
               ? await resolveRealtimeAPIKey(connectionClient as Pick<OpenAI, 'apiKey' | '_callApiKey'>, true)
-              : { apiKey: connectionClient.apiKey, isProvider: false, commit: () => connectionClient.apiKey };
-          return (url) => {
-            credential.commit();
-            return open(credential.apiKey, credential.isProvider, url, options).socket;
-          };
+              : { isProvider: false, commit: () => connectionClient.apiKey };
+          return (url) => open(credential.commit(), credential.isProvider, url, options).socket;
         },
-        shouldReconnect: () => !terminalSockets.has(this.socket),
-        onError: (message, cause) => this._onError(null, message, cause),
+        shouldReconnect: () => !terminalErrors.has(this.socket),
+        onError: (message, cause) => {
+          const terminal = cause === undefined ? terminalErrors.get(this.socket) : undefined;
+          this._onError(null, terminal ? `${message}: ${terminal.message}` : message, terminal ?? cause);
+        },
         onReconnecting: (event) => this._emit('reconnecting', event),
         onReconnected: () => this._emit('reconnected'),
-        onClose: (code, reason, unsent) => this._emit('close', code, reason, unsent),
+        onClose: (code, reason, unsent) => {
+          terminalErrors.delete(this.socket);
+          this._emit('close', code, reason, unsent);
+        },
       });
     }
   }

@@ -310,11 +310,8 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
           const credential =
             '_callApiKey' in connectionClient && typeof connectionClient._callApiKey === 'function'
               ? await resolveRealtimeAPIKey(connectionClient as Pick<OpenAI, 'apiKey' | '_callApiKey'>, true)
-              : { apiKey: connectionClient.apiKey, isProvider: false, commit: () => connectionClient.apiKey };
-          return (url) => {
-            credential.commit();
-            return open(credential.apiKey, credential.isProvider, url).socket;
-          };
+              : { isProvider: false, commit: () => connectionClient.apiKey };
+          return (url) => open(credential.commit(), credential.isProvider, url).socket;
         },
         onError: (message, cause) => this._onError(null, message, cause),
         onReconnecting: (event) => this._emit('reconnecting', event),
