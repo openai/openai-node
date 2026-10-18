@@ -400,6 +400,9 @@ export class SendQueue<T = unknown> {
    */
   enqueue(event: T): boolean {
     const data = JSON.stringify(event);
+    if (data === undefined) {
+      throw new TypeError('WebSocket event could not be serialized as JSON');
+    }
     const byteLength = encodeUTF8(data).byteLength;
     if (
       this._bytes + byteLength > this._maxBytes &&

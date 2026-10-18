@@ -576,6 +576,11 @@ export class WebSocketConnection<
     return attempt <= maximum && (!this._hooks.lifetimeRetries || this._retryCount < maximum);
   }
 
+  private _nextRetryAttempt(attempt: number): number {
+    this._retryCount += 1;
+    return this._hooks.lifetimeRetries ? this._retryCount : attempt;
+  }
+
   private async _reconnect(initialCloseCode: number): Promise<void> {
     let closeCode = initialCloseCode;
     if (!this._owner.socket) {
@@ -593,7 +598,7 @@ export class WebSocketConnection<
 
     /* oxlint-disable eslint/no-await-in-loop -- Reconnect attempts and their credential refresh must run sequentially. */
     for (let attempt = 1; this._hasRetryBudget(attempt, maxRetries); attempt += 1) {
-      this._retryCount += 1;
+      const reportedAttempt = this._nextRetryAttempt(attempt);
       if (this._abortReconnect(closeCode)) {
         return;
       }
@@ -604,7 +609,7 @@ export class WebSocketConnection<
       const actualDelay = Math.round(baseDelay * jitter);
 
       const reconnectingEvent: ReconnectingEvent<TParameters> = {
-        attempt,
+        attempt: reportedAttempt,
         maxAttempts: maxRetries,
         delay: actualDelay,
         closeCode,

@@ -3,6 +3,8 @@ import type { WebSocketLike } from './ws-adapter';
 import { isRecoverableClose } from './ws';
 import type { ReconnectingEvent, UnsentMessage } from './ws';
 
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 /** Optional transport recovery. Reconnecting creates a new session; it does not restore server state. */
 export interface RealtimeRecoveryOptions {
   /** Enable automatic transport recovery. Default: false. */
@@ -22,15 +24,14 @@ export function validateRealtimeRecovery(options: RealtimeRecoveryOptions, url?:
   if (options.reconnect && (url?.searchParams.has('intent') || url?.searchParams.has('call_id'))) {
     throw new Error('Automatic Realtime recovery requires a model session');
   }
-  for (const value of [
-    options.maxReconnectAttempts,
-    options.reconnectInitialDelay,
-    options.reconnectMaxDelay,
-    options.maxQueueBytes,
-  ]) {
+  const delays = [options.reconnectInitialDelay, options.reconnectMaxDelay];
+  for (const value of [options.maxReconnectAttempts, ...delays, options.maxQueueBytes]) {
     if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
       throw new Error('Realtime recovery limits must be nonnegative safe integers');
     }
+  }
+  if (delays.some((delay) => delay !== undefined && delay > MAX_TIMER_DELAY_MS)) {
+    throw new Error(`Realtime reconnect delays must not exceed ${MAX_TIMER_DELAY_MS} ms`);
   }
 }
 

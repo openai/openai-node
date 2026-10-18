@@ -221,7 +221,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       );
     }
 
-    const open = (attemptKey: string | null, resolvedApiKey: boolean) => {
+    const open = (attemptKey: string | null, resolvedApiKey: boolean, capturedURL?: URL) => {
       // SAFETY: OpenAI owns _options; this reads its existing browser-consent flag.
       const allowed =
         props.dangerouslyAllowBrowser ??
@@ -230,9 +230,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       if (!allowed && isRunningInBrowserOrBrowserWorker()) {
         throw new OpenAIError('Realtime browser connections require an ephemeral credential.');
       }
-      const url = buildRealtimeURL(connectionClient, props);
-      validateRealtimeRecovery(props, url);
+      const url = capturedURL ?? buildRealtimeURL(connectionClient, props);
       props.onURL?.(url);
+      validateRealtimeRecovery(props, url);
       if (url.protocol !== 'wss:') {
         throw new OpenAIError('Realtime WebSocket URLs must use the wss: protocol.');
       }
@@ -308,11 +308,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
             '_callApiKey' in connectionClient && typeof connectionClient._callApiKey === 'function'
               ? await resolveRealtimeAPIKey(connectionClient as Pick<OpenAI, 'apiKey' | '_callApiKey'>, true)
               : { apiKey: connectionClient.apiKey, isProvider: false, commit: () => connectionClient.apiKey };
-          return () => {
+          return (url) => {
             credential.commit();
-            const next = open(credential.apiKey, credential.isProvider);
-            this.url = next.url;
-            return next.socket;
+            return open(credential.apiKey, credential.isProvider, url).socket;
           };
         },
         onError: (message, cause) => this._onError(null, message, cause),

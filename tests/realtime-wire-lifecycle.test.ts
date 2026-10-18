@@ -394,6 +394,58 @@ test('opt-in recovery can be canceled during backoff without opening another soc
   expect(await closed).toEqual([1000, 'OK', []]);
 });
 
+test.each([StableWS, StableNative])('recovery uses one URL per lifetime attempt (%s)', async (Realtime) => {
+  let builtURLs = 0;
+  const connected = once(peers, 'connection');
+  const realtime = new Realtime(
+    {
+      ...settings,
+      reconnect: true,
+      maxReconnectAttempts: 2,
+      reconnectInitialDelay: 1,
+      buildRealtimeURL: () => {
+        const url = new URL('realtime', baseURL);
+        url.protocol = 'wss:';
+        url.searchParams.set('target', String((builtURLs += 1)));
+        return url;
+      },
+    },
+    new OpenAI({ baseURL, apiKey: 'ek_attempt' }),
+  );
+  realtime.on('error', () => {});
+  const attempts: number[] = [];
+  realtime.on('reconnecting', ({ attempt }) => attempts.push(attempt));
+  const reconnect = async (peer: WebSocket) => {
+    const incoming = once(peers, 'connection');
+    const recovered = realtime.emitted('reconnected');
+    peer.close(1012);
+    const [replacement, request] = await incoming;
+    await recovered;
+    return {
+      peer: replacement,
+      target: new URL(request.url, baseURL).searchParams.get('target'),
+      reported: realtime.url.searchParams.get('target'),
+    };
+  };
+  try {
+    const [first] = await connected;
+    await rawEvent(realtime.socket, 'open');
+    const second = await reconnect(first);
+    const third = await reconnect(second.peer);
+    expect({
+      attempts,
+      targets: [second.target, third.target],
+      reported: [second.reported, third.reported],
+    }).toEqual({
+      attempts: [1, 2],
+      targets: ['2', '3'],
+      reported: ['2', '3'],
+    });
+  } finally {
+    realtime.close();
+  }
+});
+
 test.each([StableWS, StableNative])(
   'recovery rejects overflow and keeps wire events separate from lifecycle (%s)',
   async (Realtime) => {
@@ -426,6 +478,9 @@ test.each([StableWS, StableNative])(
         },
       };
       realtime.send(unserializable);
+      // oxlint-disable-next-line unicorn/no-useless-undefined -- Exercise JSON.stringify returning undefined.
+      const omitted = { type: 'response.create' as const, toJSON: () => undefined };
+      realtime.send(omitted);
     });
     const replacement = once(peers, 'connection');
     // oxlint-disable-next-line promise/avoid-new -- Expected admission errors must not reject this lifecycle wait.
@@ -435,7 +490,7 @@ test.each([StableWS, StableNative])(
     first.close(1012);
     const [next] = await replacement;
     await recovered;
-    expect(errors).toHaveLength(2);
+    expect(errors).toHaveLength(3);
     expect(realtime.takePending()).toEqual([]);
     // oxlint-disable-next-line promise/avoid-new -- Wait for terminal cleanup while also observing expected error events.
     const closed = new Promise<void>((resolve) => {
@@ -444,8 +499,8 @@ test.each([StableWS, StableNative])(
     next.close(1012);
     await closed;
     expect(closes).toBe(1);
-    expect(errors).toHaveLength(3);
-    expect(errors[2]?.message).toContain('1 attempts');
+    expect(errors).toHaveLength(4);
+    expect(errors[3]?.message).toContain('1 attempts');
     realtime.close();
   },
 );
@@ -517,4 +572,23 @@ test.each([StableWS, StableNative])('recovery rejects sideband selectors in cust
         new OpenAI({ apiKey: 'ek_sideband' }),
       ),
   ).toThrow('requires a model session');
+});
+
+test.each([StableWS, StableNative])('recovery rejects delays outside the timer range (%s)', (Realtime) => {
+  for (const delay of [{ reconnectInitialDelay: 2_147_483_648 }, { reconnectMaxDelay: 2_147_483_648 }]) {
+    expect(
+      () =>
+        new Realtime(
+          {
+            ...settings,
+            ...delay,
+            reconnect: true,
+            buildRealtimeURL: () => {
+              throw new Error('URL should not be built');
+            },
+          },
+          new OpenAI({ apiKey: 'ek_timer' }),
+        ),
+    ).toThrow('2147483647');
+  }
 });

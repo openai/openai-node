@@ -75,8 +75,8 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       );
     }
     const terminalSockets = new WeakSet<WS.WebSocket>();
-    const open = (attemptKey: string | null, resolvedApiKey: boolean) => {
-      const url = buildRealtimeURL(connectionClient, props);
+    const open = (attemptKey: string | null, resolvedApiKey: boolean, capturedURL?: URL) => {
+      const url = capturedURL ?? buildRealtimeURL(connectionClient, props);
       validateRealtimeRecovery(props, url);
       assertBedrockWebSocketOrigin(connectionClient, url);
       if (isAzure(connectionClient) && props.__apiKey !== undefined && !attemptKey) {
@@ -180,9 +180,9 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
             '_callApiKey' in connectionClient && typeof connectionClient._callApiKey === 'function'
               ? await resolveRealtimeAPIKey(connectionClient as Pick<OpenAI, 'apiKey' | '_callApiKey'>, true)
               : { apiKey: connectionClient.apiKey, isProvider: false, commit: () => connectionClient.apiKey };
-          return () => {
+          return (url) => {
             credential.commit();
-            return open(credential.apiKey, credential.isProvider).socket;
+            return open(credential.apiKey, credential.isProvider, url).socket;
           };
         },
         shouldReconnect: () => !terminalSockets.has(this.socket),
