@@ -1,5 +1,5 @@
 import { createRealtimeRecovery, validateRealtimeRecovery } from '../internal/realtime-recovery';
-import { NodeWebSocket } from '../internal/ws-adapter-node';
+import { NodeWebSocket, snapshotNodeWebSocketOptions } from '../internal/ws-adapter-node';
 import type { WebSocketConnection } from '../internal/ws-connection-controller';
 import type { UnsentMessage } from '../internal/ws';
 import { resolveRealtimeAPIKey } from '../internal/realtime-credentials';
@@ -75,7 +75,12 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       );
     }
     const terminalSockets = new WeakSet<WS.WebSocket>();
-    const open = (attemptKey: string | null, resolvedApiKey: boolean, capturedURL?: URL) => {
+    const open = (
+      attemptKey: string | null,
+      resolvedApiKey: boolean,
+      capturedURL?: URL,
+      options: typeof props.options | ReturnType<typeof snapshotNodeWebSocketOptions> = props.options,
+    ) => {
       const url = capturedURL ?? buildRealtimeURL(connectionClient, props);
       validateRealtimeRecovery(props, url);
       assertBedrockWebSocketOrigin(connectionClient, url);
@@ -85,7 +90,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       const azureKey = isAzure(connectionClient) && !resolvedApiKey;
       const headers = {
         'User-Agent': `${connectionClient.constructor.name}/JS ${VERSION}`,
-        ...props.options?.headers,
+        ...options?.headers,
         // Credentials remain own data properties without invoking inherited setters.
         ...(azureKey && props.__apiKey !== undefined ? { 'api-key': attemptKey ?? '' } : {}),
         ...(azureKey ? {} : { Authorization: `Bearer ${attemptKey}` }),
@@ -94,13 +99,13 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       const socket = new WS.WebSocket(
         url,
         protectWebSocketOptionsFromCredentialRedirects({
-          ...props.options,
+          ...options,
           headers,
         }),
       );
 
       socket.on('message', (wsEvent) => {
-        if (this._recovery && socket !== this.socket) {
+        if (this._recovery && (socket !== this.socket || this._recovery.isClosed)) {
           return;
         }
         const event = (() => {
@@ -127,6 +132,9 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
         if (event) {
           this._emit('event', event);
 
+          if (this._recovery?.isClosed) {
+            return;
+          }
           if (event.type === 'error') {
             this._onError(event);
           } else if (!this._recovery || !['close', 'reconnecting', 'reconnected'].includes(event.type)) {
@@ -175,6 +183,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
         buildURL: () => buildRealtimeURL(connectionClient, props),
         adaptSocket: (socket) => new NodeWebSocket(socket),
         prepare: async () => {
+          const options = snapshotNodeWebSocketOptions(props.options);
           // SAFETY: The branch checks _callApiKey before using the client's credential resolver.
           const credential =
             '_callApiKey' in connectionClient && typeof connectionClient._callApiKey === 'function'
@@ -182,7 +191,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
               : { apiKey: connectionClient.apiKey, isProvider: false, commit: () => connectionClient.apiKey };
           return (url) => {
             credential.commit();
-            return open(credential.apiKey, credential.isProvider, url).socket;
+            return open(credential.apiKey, credential.isProvider, url, options).socket;
           };
         },
         shouldReconnect: () => !terminalSockets.has(this.socket),

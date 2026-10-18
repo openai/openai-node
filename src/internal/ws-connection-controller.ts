@@ -128,6 +128,11 @@ export class WebSocketConnection<
   private _permanentClosed = false;
   private _backoff = new AbortController();
 
+  /** Whether the logical connection has emitted its terminal close. */
+  get isClosed(): boolean {
+    return this._permanentClosed;
+  }
+
   takePending(): UnsentMessage<TClientEvent>[] {
     return this._sendQueue.drain();
   }
@@ -153,7 +158,7 @@ export class WebSocketConnection<
         this._hooks.onError('cannot send on a closed WebSocket');
         return;
       }
-      if (this._isReconnecting || this._owner.socket.readyState === ReadyState.CONNECTING) {
+      if (this._isReconnecting) {
         let accepted: boolean;
         try {
           accepted = this._sendQueue.enqueue(event);
@@ -164,6 +169,10 @@ export class WebSocketConnection<
         if (!accepted) {
           this._hooks.onError('send queue is full, message discarded');
         }
+        return;
+      }
+      if (this._owner.socket.readyState === ReadyState.CONNECTING) {
+        this._hooks.onError('cannot send before the WebSocket is open');
         return;
       }
     }
@@ -203,7 +212,16 @@ export class WebSocketConnection<
         this._hooks.onError('could not close the connection', error);
       } finally {
         if (this._hooks.manualQueue) {
-          this._emitPermanentClose(this._closeCode, this._closeReason);
+          try {
+            const { socket } = this._owner;
+            if (socket.terminate) {
+              socket.terminate();
+            } else {
+              socket.close();
+            }
+          } finally {
+            this._emitPermanentClose(this._closeCode, this._closeReason);
+          }
         }
       }
     }

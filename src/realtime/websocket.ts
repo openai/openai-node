@@ -246,7 +246,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
         : new WebSocket(url.toString(), protocols);
 
       socket.addEventListener('message', (websocketEvent: MessageEvent) => {
-        if (this._recovery && socket !== this.socket) {
+        if (this._recovery && (socket !== this.socket || this._recovery.isClosed)) {
           return;
         }
         const event = (() => {
@@ -273,6 +273,9 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
         if (event) {
           this._emit('event', event);
 
+          if (this._recovery?.isClosed) {
+            return;
+          }
           if (event.type === 'error') {
             this._onError(event);
           } else if (!this._recovery || !['close', 'reconnecting', 'reconnected'].includes(event.type)) {
@@ -301,7 +304,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     if (props.reconnect) {
       this._recovery = createRealtimeRecovery<BrowserWebSocket, RealtimeClientEvent>(this, props, {
         buildURL: () => buildRealtimeURL(connectionClient, props),
-        adaptSocket: (socket) => new BrowserWebSocket(socket),
+        adaptSocket: (socket) => new BrowserWebSocket(socket, { preserveBinaryType: true }),
         prepare: async () => {
           // SAFETY: The branch checks _callApiKey before using the client's credential resolver.
           const credential =

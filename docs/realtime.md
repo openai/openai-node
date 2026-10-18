@@ -158,31 +158,47 @@ rt.on('error', (err) => {
 
 ### Disconnection and restoring a session
 
-Realtime does not automatically retry or reconnect. That retry bound is zero:
-an SDK `error` from a protocol rejection can leave the same socket usable,
-while a raw socket `close` (including a transport failure) ends that connection.
-Do not keep retrying permission or authentication failures. Check
-`response.done` to learn the response's outcome; a close alone cannot tell
-you whether a request completed.
+By default, Realtime does not retry or reconnect. A protocol `error` can leave
+the same socket usable, while a socket `close` ends that connection. Do not keep
+retrying permission or authentication failures. Check `response.done` to learn
+whether a response completed; a close alone cannot tell you its outcome.
 
-Only your application can decide whether to create a new session. Construct a
-new client socket, or use `OpenAIRealtimeWS.create(client, options)` (and
-`OpenAIRealtimeWebSocket.create` for native WebSockets) for a function-based
-credential. Each factory call resolves the current credential anew. For Azure,
-call the appropriate `.azure(client, options)` factory again. Register new
-listeners and wait for the new socket's `open` before sending new session
-configuration. Neither session settings nor conversation context are restored
-automatically. Remove unwanted listeners with `rt.off(event, originalListener)`;
-it detaches that listener only.
+To create a new connection yourself, call `OpenAIRealtimeWS.create(client, options)`
+or `OpenAIRealtimeWebSocket.create(client, options)`. Each call resolves the current
+credential again. For Azure, call the appropriate `.azure(client, options)` factory.
+Register listeners on the new connection and wait for `open` before sending.
+Remove unwanted listeners with `rt.off(event, originalListener)`.
 
-`send()` returns `void` and writes to the current raw socket: it is not a
-durable pre-open queue. Wait for `open`; report send/serialization errors via
-an `error` listener. If your application queues commands, it owns that queue.
-It may choose what to do with commands it never attempted. A command already
-passed to `send()` is delivery-uncertain after a disconnect and must not be
-replayed automatically. The SDK does not retry or transfer it to the new
-socket. These rules apply to stable and beta Realtime; other WebSocket
-endpoints can have different contracts.
+The helpers imported from `openai/realtime/ws` and `openai/realtime/websocket` also
+support `reconnect: true` for model sessions. This option does not support
+transcription sessions or connections to an existing call. Helpers imported from
+`openai/beta/realtime/ws` and `openai/beta/realtime/websocket` keep their existing
+behavior and do not reconnect.
+
+With reconnection enabled, the SDK keeps the same connection object but replaces
+its `.socket`. Each replacement starts a new server session and refreshes
+credentials. Listeners attached directly to the old socket do not move to the
+new one. Use the connection's `reconnecting`, `reconnected`, and `close` events.
+
+The SDK allows five reconnect attempts in total by default. Set
+`maxReconnectAttempts` to change the limit. Delays start at 500 ms and grow to
+8 seconds; use `reconnectInitialDelay` and `reconnectMaxDelay` to change them.
+Calling `close()` stops retries and prevents a pending credential refresh from
+opening another socket.
+
+Wait for the initial `open` before sending. During reconnection, the SDK rejects
+sends by default. Set `maxQueueBytes` to retain unsent commands up to that byte
+limit. After `reconnected`, restore any session settings and conversation state
+your application needs, then call `flushPending()` to send the retained commands
+in order. Pause other application sends during restoration. To remove retained
+commands without sending them, call `takePending()`. The final `close` event
+includes remaining unsent commands as its third argument.
+
+`send()` returns `void`; handle send and serialization errors with an `error`
+listener. The SDK never resends a command it already tried to send. A successful
+send does not confirm receipt or processing by the server, and a disconnect can
+leave that outcome unknown. The pending queue stays in memory; it is not durable
+storage. The SDK does not restore server-side state automatically.
 
 ## Realtime translation
 

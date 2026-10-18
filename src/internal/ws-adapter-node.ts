@@ -124,6 +124,11 @@ export class NodeWebSocket implements WebSocketLike {
     this._ws.close(code, reason);
   }
 
+  /** Forcibly closes the underlying transport. */
+  terminate(): void {
+    this._ws.terminate();
+  }
+
   /** Registers a listener with normalized message payloads and close reasons. */
   on(event: string, listener: Listener): void {
     const wrapped = NodeWebSocket._wrapListener(event, listener);

@@ -544,7 +544,8 @@ Register an `error` listener as usual.
 The SDK allows five reconnect attempts in total by default. Set
 `maxReconnectAttempts` to change this limit. Retry delays start at 500 ms and grow
 to 8 seconds. Set `reconnectInitialDelay` and `reconnectMaxDelay` to change them.
-Calling `close()` cancels pending retries and credential refresh.
+Calling `close()` stops retries and prevents a pending credential refresh from
+opening another socket.
 
 By default, the SDK rejects sends while reconnecting. Set `maxQueueBytes` to hold
 unsent events up to that size in bytes. After you restore session state, call
