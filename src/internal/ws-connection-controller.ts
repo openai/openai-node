@@ -716,9 +716,9 @@ export class WebSocketConnection<
       }
       this._isReconnecting = false;
       this._internalEvents._emit('socketSwap', oldSocket, this._owner.socket);
-      this._internalEvents._emit('reconnected');
       this._flushSendQueue();
       this._hooks.emitReconnected();
+      this._internalEvents._emit('reconnected');
       return;
     }
 

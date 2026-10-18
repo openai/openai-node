@@ -381,11 +381,8 @@ test.each([StableWS, StableNative])(
       }
       expect(realtime.socket).not.toBe(oldSocket);
       expect(commands).toEqual([]);
-      const flushed = once(next, 'message');
       realtime.send({ type: 'session.update', session: { type: 'realtime' } });
       realtime.flushPending();
-      await flushed;
-      // The following server event is a wire barrier after both client commands.
       // oxlint-disable-next-line promise/avoid-new -- Wait for both ordered wire messages, independent of their scheduling.
       await new Promise<void>((resolve) => {
         const check = () => {
@@ -456,11 +453,15 @@ test('opt-in recovery can be canceled during backoff without opening another soc
   );
   realtime.on('error', () => {});
   const [first] = await connected;
-  await rawEvent(realtime.socket, 'open');
+  const originalSocket = realtime.socket;
+  await rawEvent(originalSocket, 'open');
   const closed = realtime.emitted('close');
-  realtime.on('reconnecting', () => realtime.close());
+  const reconnecting = realtime.emitted('reconnecting');
   first.close(1012);
+  await reconnecting;
+  realtime.close();
   expect(await closed).toEqual([1000, 'OK', []]);
+  expect(realtime.socket).toBe(originalSocket);
 });
 
 test.each([StableWS, StableNative])('recovery uses one URL per lifetime attempt (%s)', async (Realtime) => {

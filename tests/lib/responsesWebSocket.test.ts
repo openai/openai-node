@@ -398,14 +398,16 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
     expect(listener).toHaveBeenCalledWith(1001, 'going away', []);
   });
 
-  test('reconnects after recoverable closes and flushes queued messages', async () => {
+  test('reconnects, flushes queued messages, and honors a close in the reconnected listener', async () => {
     const reconnect = vi.fn(() => ({ parameters: { starting_after: 'event_123' } }));
     const websocket = createWebSocket({
       reconnect: { onReconnecting: reconnect, maxRetries: 1, initialDelay: 0, maxDelay: 0 },
     });
-    const reconnected = vi.fn();
+    const reconnected = vi.fn(() => websocket.close());
     websocket.on('error', vi.fn());
     websocket.on('reconnected', reconnected);
+    const iterator = websocket.stream();
+    await iterator.next();
     const original = websocket.socket;
 
     original.readyState = ReadyState.CLOSED;
@@ -423,6 +425,9 @@ describe.each(variants)('%s Responses WebSocket', (_version, Base, WebSocketErro
     expect(websocket.url.toString()).toBe('wss://example.com/v1/responses?starting_after=event_123');
     expect(replacement.send).toHaveBeenCalledWith('{"type":"queued-during-reconnect"}');
     expect(reconnected).toHaveBeenCalledTimes(1);
+    await expect(iterator.next()).resolves.toMatchObject({ value: { type: 'reconnecting' } });
+    await expect(iterator.next()).resolves.toMatchObject({ value: { type: 'close' } });
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
 
   test('emits a permanent close when a reconnect callback aborts', async () => {

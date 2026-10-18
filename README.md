@@ -527,32 +527,7 @@ const rt = new OpenAIRealtimeWebSocket({ model: 'gpt-realtime-2' });
 rt.on('response.output_text.delta', (event) => process.stdout.write(event.delta));
 ```
 
-For more information see [docs/realtime.md](docs/realtime.md).
-
-Set `reconnect: true` to reconnect after a temporary connection failure.
-`OpenAIRealtimeWS` and `OpenAIRealtimeWebSocket` support this option, including
-when you create them asynchronously. It is off by default. It does not support
-transcription sessions or connections to an existing call.
-
-Reconnecting keeps the same connection object but replaces its `.socket` and
-starts a new server session. Your application must restore any session settings
-and conversation state it needs. The SDK does not resend commands it already
-tried to send. Use the connection's `reconnecting`, `reconnected`, and `close`
-events. Listeners attached directly to the old socket do not move to the new one.
-Register an `error` listener as usual.
-
-The SDK allows five reconnect attempts in total by default. Set
-`maxReconnectAttempts` to change this limit. Retry delays start at 500 ms and grow
-to 8 seconds. Set `reconnectInitialDelay` and `reconnectMaxDelay` to change them.
-Calling `close()` stops retries and prevents a pending credential refresh from
-opening another socket.
-
-By default, the SDK rejects sends while reconnecting. Set `maxQueueBytes` to hold
-unsent events up to that size in bytes. After you restore session state, call
-`flushPending()` to send these events in order, or `takePending()` to remove them
-without sending. The final `close` event includes any remaining unsent events as
-its third argument. A successful send does not confirm that the server received
-or processed the command.
+Realtime model sessions can opt in to reconnection with `reconnect: true`. Each reconnection starts a new server session, so your application must restore its state. See [the Realtime guide](docs/realtime.md) for connection options and session restoration.
 
 ## Microsoft Azure OpenAI
 
