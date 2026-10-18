@@ -10,7 +10,7 @@ const client = new OpenAI({
 
 describe('resource moderations', () => {
   test('create: only required params', async () => {
-    const responsePromise = client.moderations.create({ input: 'I want to kill them.' });
+    const responsePromise = client.moderations.create({ input: '...text to classify goes here...' });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -22,7 +22,7 @@ describe('resource moderations', () => {
 
   test('create: required and optional params', async () => {
     await client.moderations.create({
-      input: 'I want to kill them.',
+      input: '...text to classify goes here...',
       model: 'omni-moderation-2024-09-26',
     });
   });
