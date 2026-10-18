@@ -5,10 +5,10 @@ import type { Server } from 'node:https';
 import OpenAI from 'openai';
 import { OpenAIRealtimeTranslationWS } from 'openai/realtime/translations/ws';
 import { LiveWS } from 'openai/resources/live/ws';
-import type { LiveWSClientOptions } from 'openai/resources/live/ws';
 import { ForksWS } from 'openai/resources/live/forks/ws';
 import { SidebandWS } from 'openai/resources/live/sideband/ws';
 import { WebSocketServer } from 'ws';
+import type WebSocket from 'ws';
 import { createX509TestLab } from './utils/x509-test-lab';
 
 async function within<T>(promise: Promise<T>): Promise<T> {
@@ -27,21 +27,36 @@ async function within<T>(promise: Promise<T>): Promise<T> {
 
 const lab = createX509TestLab();
 const tls = { cert: lab.server.certificate, key: lab.server.privateKey };
-const variants = [
-  { name: 'Live', connect: (client: OpenAI, options: LiveWSClientOptions) => new LiveWS(client, options) },
+interface WireOptions {
+  ca: string | Buffer;
+  headers?: Record<string, string>;
+  followRedirects?: boolean;
+  handshakeTimeout?: number;
+}
+interface WireConnection {
+  socket: { platformSocket: WebSocket };
+  close: () => void;
+  send: (event: { type: 'session.close' }) => void;
+  emitted: (event: 'error' | 'event') => Promise<Error | { type: string }>;
+  on: (event: 'error', listener: (error: Error) => void) => void;
+}
+const variants: {
+  name: string;
+  connect: (client: OpenAI, options: WireOptions) => WireConnection | Promise<WireConnection>;
+}[] = [
+  { name: 'Live', connect: (client: OpenAI, options: WireOptions) => new LiveWS(client, options) },
   {
     name: 'fork',
-    connect: (client: OpenAI, options: LiveWSClientOptions) =>
-      new ForksWS(client, { session_id: 'test' }, options),
+    connect: (client: OpenAI, options: WireOptions) => new ForksWS(client, { session_id: 'test' }, options),
   },
   {
     name: 'sideband',
-    connect: (client: OpenAI, options: LiveWSClientOptions) =>
+    connect: (client: OpenAI, options: WireOptions) =>
       new SidebandWS(client, { session_id: 'test' }, options),
   },
   {
     name: 'Translation',
-    connect: (client: OpenAI, options: LiveWSClientOptions) =>
+    connect: (client: OpenAI, options: WireOptions) =>
       OpenAIRealtimeTranslationWS.create(client, { model: 'test', options }),
   },
 ];
