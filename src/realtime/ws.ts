@@ -196,8 +196,12 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
         },
         shouldReconnect: () => !terminalErrors.has(this.socket),
         onError: (message, cause) => {
-          const terminal = cause === undefined ? terminalErrors.get(this.socket) : undefined;
-          this._onError(null, terminal ? `${message}: ${terminal.message}` : message, terminal ?? cause);
+          const terminal = terminalErrors.get(this.socket);
+          this._onError(
+            null,
+            terminal && terminal.message !== message ? `${message}: ${terminal.message}` : message,
+            terminal ?? cause,
+          );
         },
         onReconnecting: (event) => this._emit('reconnecting', event),
         onReconnected: () => this._emit('reconnected'),

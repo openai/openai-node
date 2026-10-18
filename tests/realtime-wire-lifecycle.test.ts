@@ -613,17 +613,22 @@ test.each([StableWS, StableNative])(
   },
 );
 
-test.each(['authentication', 'TLS'])('recovery reports a terminal %s rejection', async (failure) => {
+const terminalFailures = ['initial authentication', 'authentication', 'TLS'];
+test.each(terminalFailures)('recovery reports a terminal %s rejection', async (failure) => {
   const tls = failure === 'TLS';
+  const initial = failure === 'initial authentication';
   const endpoint = createServer({ cert: lab.server.certificate, key: lab.server.privateKey });
   let attempts = 0;
-  const sockets = new WebSocketServer({ server: endpoint, verifyClient: () => (attempts += 1) === 1 });
+  const sockets = new WebSocketServer({
+    server: endpoint,
+    verifyClient: () => (attempts += 1) === 1 && !initial,
+  });
   await once(endpoint.listen(0, '127.0.0.1'), 'listening');
   const address = endpoint.address();
   if (!address || typeof address === 'string') {
     throw new Error('Missing server address');
   }
-  const connected = once(sockets, 'connection');
+  const connected = initial ? undefined : once(sockets, 'connection');
   const agent = new Agent({ maxCachedSessions: 0 });
   const realtime = new StableWS(
     {
@@ -637,19 +642,21 @@ test.each(['authentication', 'TLS'])('recovery reports a terminal %s rejection',
   );
   const errors: Error[] = [];
   realtime.on('error', (error) => errors.push(error));
+  // oxlint-disable-next-line promise/avoid-new -- Authentication errors must not reject the cleanup wait.
+  const closed = new Promise<void>((resolve) => {
+    realtime.on('close', () => resolve());
+  });
   try {
-    const [first] = await connected;
-    await rawEvent(realtime.socket, 'open');
-    if (tls) {
-      endpoint.setSecureContext({ cert: lab.proxyServer.certificate, key: lab.proxyServer.privateKey });
+    if (connected) {
+      const [first] = await connected;
+      await rawEvent(realtime.socket, 'open');
+      if (tls) {
+        endpoint.setSecureContext({ cert: lab.proxyServer.certificate, key: lab.proxyServer.privateKey });
+      }
+      first.close(1012);
     }
-    // oxlint-disable-next-line promise/avoid-new -- Authentication errors must not reject the cleanup wait.
-    const closed = new Promise<void>((resolve) => {
-      realtime.on('close', () => resolve());
-    });
-    first.close(1012);
     await closed;
-    expect(attempts).toBe(tls ? 1 : 2);
+    expect(attempts).toBe(initial || tls ? 1 : 2);
     const diagnostic = tls ? /certificate|verify/iu : /401/u;
     expect(errors).toEqual([
       expect.objectContaining({
@@ -665,6 +672,52 @@ test.each(['authentication', 'TLS'])('recovery reports a terminal %s rejection',
     endpoint.close();
   }
 });
+
+test.each([StableWS, StableNative])(
+  'recovery reports the latest credential failure (%s)',
+  async (Realtime) => {
+    const failures = [new Error('first refresh failed'), new Error('latest refresh failed')];
+    let resolutions = 0;
+    const client = new OpenAI({
+      baseURL,
+      apiKey: async () => {
+        resolutions += 1;
+        if (resolutions === 1) {
+          return 'ek_refresh';
+        }
+        throw failures[resolutions - 2];
+      },
+    });
+    const connected = once(peers, 'connection');
+    const realtime = await Realtime.create(client, {
+      ...settings,
+      reconnect: true,
+      maxReconnectAttempts: 2,
+      reconnectInitialDelay: 1,
+    });
+    const errors: Error[] = [];
+    realtime.on('error', (error) => errors.push(error));
+    // oxlint-disable-next-line promise/avoid-new -- Expected credential errors must not reject the cleanup wait.
+    const closed = new Promise<void>((resolve) => {
+      realtime.on('close', () => resolve());
+    });
+    try {
+      const [first] = await connected;
+      await rawEvent(realtime.socket, 'open');
+      first.close(1012);
+      await closed;
+      expect(resolutions).toBe(3);
+      expect(errors).toEqual([
+        expect.objectContaining({
+          message: expect.stringContaining('2 attempts'),
+          cause: expect.objectContaining({ cause: failures[1] }),
+        }),
+      ]);
+    } finally {
+      realtime.close();
+    }
+  },
+);
 
 test.each([StableWS, StableNative])('recovery rejects sideband selectors in custom URLs (%s)', (Realtime) => {
   expect(

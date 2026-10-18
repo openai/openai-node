@@ -524,14 +524,22 @@ export class WebSocketConnection<
     return this._hooks.shouldReconnect?.(code) ?? isRecoverableClose(code);
   }
 
-  private _abortReconnect(closeCode: number): boolean {
+  private _reportReconnectFailure(message: string, cause?: unknown): void {
+    // Preserve the legacy automatic-queue clients' reconnect error contract.
+    this._hooks.onError(message, this._hooks.manualQueue ? cause : undefined);
+  }
+
+  private _abortReconnect(closeCode: number, cause?: unknown): boolean {
     if (this._canReconnect(closeCode)) {
       return false;
     }
     this._isReconnecting = false;
     try {
       if (!this._intentionallyClosed && !this._permanentClosed) {
-        this._hooks.onError(`WebSocket reconnect aborted: non-recoverable close code ${closeCode}`);
+        this._reportReconnectFailure(
+          `WebSocket reconnect aborted: non-recoverable close code ${closeCode}`,
+          cause,
+        );
       }
     } finally {
       this._emitPermanentClose(
@@ -613,11 +621,12 @@ export class WebSocketConnection<
     const maxRetries = this._reconnectOptions.maxRetries ?? 5;
     const initialDelay = this._reconnectOptions.initialDelay ?? 500;
     const maxDelay = this._reconnectOptions.maxDelay ?? 8000;
+    let lastError: unknown;
 
     /* oxlint-disable eslint/no-await-in-loop -- Reconnect attempts and their credential refresh must run sequentially. */
     for (let attempt = 1; this._hasRetryBudget(attempt, maxRetries); attempt += 1) {
       const reportedAttempt = this._nextRetryAttempt(attempt);
-      if (this._abortReconnect(closeCode)) {
+      if (this._abortReconnect(closeCode, lastError)) {
         return;
       }
 
@@ -638,18 +647,18 @@ export class WebSocketConnection<
         return;
       }
 
-      if (this._abortReconnect(closeCode)) {
+      if (this._abortReconnect(closeCode, lastError)) {
         return;
       }
 
       try {
         await sleep(actualDelay, this._backoff.signal);
       } catch {
-        this._abortReconnect(closeCode);
+        this._abortReconnect(closeCode, lastError);
         return;
       }
 
-      if (this._abortReconnect(closeCode)) {
+      if (this._abortReconnect(closeCode, lastError)) {
         return;
       }
 
@@ -687,7 +696,7 @@ export class WebSocketConnection<
         });
 
         await waitForWebSocketOpen(this._owner.socket);
-      } catch {
+      } catch (error) {
         if (this._intentionallyClosed) {
           // A public close observer may have thrown after lifecycle cleanup.
           // Only emit here if the reconnect itself had not already closed.
@@ -697,6 +706,7 @@ export class WebSocketConnection<
           }
           return;
         }
+        lastError = error;
         if (closeCodePromise) {
           // ws may emit 'error' before 'close', so await the code
           // rather than reading it synchronously.
@@ -717,8 +727,9 @@ export class WebSocketConnection<
     // distinguish retry failure from a clean close.
     this._isReconnecting = false;
     try {
-      this._hooks.onError(
+      this._reportReconnectFailure(
         `WebSocket reconnect failed after ${maxRetries} attempts (close code: ${closeCode})`,
+        lastError,
       );
     } finally {
       this._emitPermanentClose(closeCode, `reconnect failed after ${maxRetries} attempts`);
