@@ -422,14 +422,14 @@ Before an SDK promotion:
 
 ## Execution ledger and event handling
 
-| Item                       | Status                              | Evidence / next action                                                                                          |
-| -------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Baseline inventory         | Verified                            | 47 files / 2,743 patch lines at the pinned revisions above                                                      |
-| Documentation PR           | Ready for review                    | [PR #2985](https://github.com/openai/openai-node/pull/2985); SDK team review requested; no SDK behavior changes |
-| H1 file-processing binding | Implemented; independently reviewed | Exact current signature/delegate preserved; compiler test execution/publication in progress                     |
-| E export projection        | Implemented; independently reviewed | OpenAI-only opt-in wildcard projection; compiler test execution/publication in progress                         |
-| SDK drawdown               | Waiting on prerequisites            | No reduction claimed before merged compiler and verified promotion                                              |
-| Continuation routing       | Not yet verified                    | Native task attachment/heartbeat tools failed during setup; recheck before claiming automatic delivery          |
+| Item                       | Status                   | Evidence / next action                                                                                                                          |
+| -------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline inventory         | Verified                 | 47 files / 2,743 patch lines at the pinned revisions above                                                                                      |
+| Documentation PR           | Ready for review         | [PR #2985](https://github.com/openai/openai-node/pull/2985); SDK team review requested; no SDK behavior changes                                 |
+| H1 file-processing binding | Published ready upstream | Independently reviewed; normal hooks passed; local Bazel blocked before compilation; expected 1-file/11-line reduction after verified promotion |
+| E export projection        | Published ready upstream | Independently reviewed; normal hooks passed; consumer type/runtime regressions added; local Bazel blocked before compilation                    |
+| SDK drawdown               | Waiting on prerequisites | No reduction claimed before merged compiler and verified promotion                                                                              |
+| Continuation routing       | Not yet verified         | Owning conversation identified in PR/Delta bodies; native attachment and heartbeat tools failed with connection errors                          |
 
 Validation recorded during this audit:
 
