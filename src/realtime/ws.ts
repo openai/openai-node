@@ -229,12 +229,13 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     },
   ): Promise<OpenAIRealtimeWS> {
     const { apiKey, isProvider: resolvedApiKey } = await resolveRealtimeAPIKey(client);
-    const url = buildRealtimeURL(client, props);
-    assertBedrockWebSocketOrigin(client, url);
+    const buildURL = props.buildRealtimeURL;
     return new OpenAIRealtimeWS(
       {
         ...props,
-        buildRealtimeURL: () => url,
+        ...(buildURL
+          ? { buildRealtimeURL: (connectionClient) => buildURL.call(props, connectionClient, props) }
+          : {}),
         __resolvedApiKey: resolvedApiKey,
         __apiKey: apiKey,
       },

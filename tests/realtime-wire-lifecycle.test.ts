@@ -5,6 +5,7 @@ import { getCACertificates, setDefaultCACertificates } from 'node:tls';
 import OpenAI, { AzureOpenAI } from 'openai';
 import { OpenAIRealtimeWS as StableWS } from 'openai/realtime/ws';
 import { OpenAIRealtimeWebSocket as StableNative } from 'openai/realtime/websocket';
+import type { RealtimeConnectionConfig } from 'openai/realtime/internal-base';
 import { OpenAIRealtimeWS as BetaWS } from 'openai/beta/realtime/ws';
 import { OpenAIRealtimeWebSocket as BetaNative } from 'openai/beta/realtime/websocket';
 import { WebSocket, WebSocketServer } from 'ws';
@@ -464,24 +465,35 @@ test('opt-in recovery can be canceled during backoff without opening another soc
   expect(realtime.socket).toBe(originalSocket);
 });
 
-test.each([StableWS, StableNative])('recovery uses one URL per lifetime attempt (%s)', async (Realtime) => {
+test.each([
+  { Realtime: StableWS, entrypoint: 'constructor' },
+  { Realtime: StableNative, entrypoint: 'constructor' },
+  { Realtime: StableWS, entrypoint: 'factory' },
+  { Realtime: StableNative, entrypoint: 'factory' },
+])('recovery uses one URL per lifetime attempt ($entrypoint $Realtime)', async ({ Realtime, entrypoint }) => {
   let builtURLs = 0;
   const connected = once(peers, 'connection');
-  const realtime = new Realtime(
-    {
-      ...settings,
-      reconnect: true,
-      maxReconnectAttempts: 2,
-      reconnectInitialDelay: 1,
-      buildRealtimeURL: () => {
-        const url = new URL('realtime', baseURL);
-        url.protocol = 'wss:';
-        url.searchParams.set('target', String((builtURLs += 1)));
-        return url;
-      },
+  const config = {
+    ...settings,
+    reconnect: true,
+    maxReconnectAttempts: 2,
+    reconnectInitialDelay: 1,
+    buildRealtimeURL(_client: Pick<OpenAI, 'apiKey' | 'baseURL'>, received: RealtimeConnectionConfig): URL {
+      expect(this).toBe(config);
+      expect(received).toBe(config);
+      expect(received).not.toHaveProperty('__apiKey');
+      const url = new URL('realtime', baseURL);
+      url.protocol = 'wss:';
+      url.searchParams.set('target', String((builtURLs += 1)));
+      return url;
     },
-    new OpenAI({ baseURL, apiKey: 'ek_attempt' }),
-  );
+  };
+  const client = new OpenAI({
+    baseURL,
+    apiKey: entrypoint === 'factory' ? async () => 'ek_attempt' : 'ek_attempt',
+  });
+  const realtime =
+    entrypoint === 'factory' ? await Realtime.create(client, config) : new Realtime(config, client);
   realtime.on('error', () => {});
   const attempts: number[] = [];
   realtime.on('reconnecting', ({ attempt }) => attempts.push(attempt));
@@ -498,8 +510,9 @@ test.each([StableWS, StableNative])('recovery uses one URL per lifetime attempt 
     };
   };
   try {
-    const [first] = await connected;
+    const [first, request] = await connected;
     await rawEvent(realtime.socket, 'open');
+    expect(request.url).toBe('/v1/realtime?target=1');
     const second = await reconnect(first);
     const third = await reconnect(second.peer);
     expect({
