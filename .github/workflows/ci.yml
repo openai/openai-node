@@ -118,8 +118,8 @@ jobs:
       - name: Check build
         run: pnpm build
 
-      - name: Check mock launcher fixture cleanup
-        run: ./scripts/test tests/mock-launcher.test.ts
+      - name: Check compiled fixtures and mock launcher cleanup
+        run: ./scripts/test tests/mock-launcher.test.ts tests/lib/realtime-example-status.test.ts --maxWorkers=1
 
   node_matrix:
     name: Read Node.js test matrix
