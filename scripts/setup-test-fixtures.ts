@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import glob from 'fast-glob';
 import { create } from 'ts-node';
@@ -23,6 +23,11 @@ export default function setup(project: TestProject) {
       mkdirSync(path.dirname(output), { recursive: true });
       writeFileSync(output, compiler.compile(readFileSync(filename, 'utf-8'), filename));
     }
+    symlinkSync(
+      path.join(root, 'examples/node_modules'),
+      path.join(directory, 'examples/node_modules'),
+      'junction',
+    );
     // Preserve private package-import routing using the same metadata projection as the SDK build.
     writeFileSync(
       path.join(directory, 'src/package.json'),

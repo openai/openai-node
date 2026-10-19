@@ -174,6 +174,7 @@ Module._load = function(request, ...args) {
           OPENAI_CUSTOM_HEADERS: undefined,
           OPENAI_LOG: 'off',
           NODE_EXTRA_CA_CERTS: certificatePath,
+          NODE_PATH: undefined,
           DOTENV_CONFIG_PATH: path.join(directory, '.env'),
           TS_NODE_PROJECT: compiledFixtureConfig(),
           DISABLE_V8_COMPILE_CACHE: '1',
@@ -194,7 +195,7 @@ Module._load = function(request, ...args) {
     try {
       const [exitCode, signal] = await once(child, 'close');
       expect(signal).toBeNull();
-      expect(urls).toEqual([
+      expect(urls, stderr).toEqual([
         provider === 'azure'
           ? '/openai/v1/realtime?model=gpt-4o-realtime-preview-1001'
           : '/v1/realtime?model=gpt-realtime',
