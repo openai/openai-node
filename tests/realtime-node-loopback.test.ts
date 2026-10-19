@@ -3,6 +3,7 @@ import { createServer } from 'node:https';
 import { OpenAI } from 'openai';
 import { OpenAIRealtimeError } from 'openai/realtime';
 import { OpenAIRealtimeWS } from 'openai/realtime/ws';
+import { OpenAIRealtimeWS as BetaRealtimeWS } from 'openai/beta/realtime/ws';
 import { WebSocketServer } from 'ws';
 import { createX509TestLab } from './utils/x509-test-lab';
 
@@ -36,6 +37,94 @@ afterAll(async () => {
   server.close();
   await stopped;
 });
+
+describe.each([
+  ['stable', OpenAIRealtimeWS],
+  ['beta', BetaRealtimeWS],
+] as const)('%s Realtime payload limits', (_name, Realtime) => {
+  test.each([
+    ['default', {}],
+    ['explicit unlimited', { maxPayload: 0 }],
+  ] as const)('accepts a message above the ws dependency default (%s)', async (_label, options) => {
+    const incoming = once(peers, 'connection');
+    const realtime = new Realtime(
+      { model: 'gpt-realtime', options: { ca: lab.certificateAuthority, ...options } },
+      new OpenAI({ apiKey: 'synthetic-client-key', baseURL }),
+    );
+    // A transport error must fail promptly even when it prevents the event.
+    const received =
+      realtime instanceof OpenAIRealtimeWS ? realtime.emitted('event') : realtime.emitted('event');
+    const opened = once(realtime.socket, 'open');
+    try {
+      const [peer] = await incoming;
+      await opened;
+      peer.send(JSON.stringify({ type: 'session.created', padding: 'a'.repeat(100 * 1024 * 1024) }));
+      const event = await received;
+      expect(event).toMatchObject({ type: 'session.created' });
+      expect(event).toHaveProperty('padding.length', 100 * 1024 * 1024);
+    } finally {
+      realtime.close();
+    }
+  });
+
+  test('honors a caller-specified payload limit', async () => {
+    const incoming = once(peers, 'connection');
+    const realtime = new Realtime(
+      { model: 'gpt-realtime', options: { ca: lab.certificateAuthority, maxPayload: 128 } },
+      new OpenAI({ apiKey: 'synthetic-client-key', baseURL }),
+    );
+    const failed =
+      realtime instanceof OpenAIRealtimeWS ? realtime.emitted('error') : realtime.emitted('error');
+    const opened = once(realtime.socket, 'open');
+    try {
+      const [peer] = await incoming;
+      await opened;
+      peer.send(JSON.stringify({ type: 'session.created', padding: 'a'.repeat(256) }));
+      expect(await failed).toMatchObject({ message: 'Max payload size exceeded' });
+    } finally {
+      realtime.close();
+    }
+  });
+});
+
+test.each([
+  ['default', {}, 100 * 1024 * 1024],
+  ['caller', { maxPayload: 128 }, 256],
+] as const)(
+  'stable recovery preserves the %s payload limit on replacement sockets',
+  async (_name, options, size) => {
+    const incoming = once(peers, 'connection');
+    const realtime = new OpenAIRealtimeWS(
+      {
+        model: 'gpt-realtime',
+        options: { ca: lab.certificateAuthority, ...options },
+        reconnect: true,
+        maxReconnectAttempts: 1,
+        reconnectInitialDelay: 1,
+      },
+      new OpenAI({ apiKey: 'synthetic-client-key', baseURL }),
+    );
+    const opened = once(realtime.socket, 'open');
+    try {
+      const [first] = await incoming;
+      await opened;
+      const incomingAgain = once(peers, 'connection');
+      const recovered = realtime.emitted('reconnected');
+      first.close(1012);
+      const [replacement] = await incomingAgain;
+      await recovered;
+      const received = realtime.emitted('event');
+      replacement.send(JSON.stringify({ type: 'session.created', padding: 'a'.repeat(size) }));
+      if ('maxPayload' in options) {
+        await expect(received).rejects.toMatchObject({ message: 'Max payload size exceeded' });
+      } else {
+        expect(await received).toHaveProperty('padding.length', size);
+      }
+    } finally {
+      realtime.close();
+    }
+  },
+);
 
 test('GA Realtime WSS preserves handshake options and accepts another command after an API error', async () => {
   const incoming = once(peers, 'connection');
