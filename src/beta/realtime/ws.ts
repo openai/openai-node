@@ -85,6 +85,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       this.url,
       protectWebSocketOptionsFromCredentialRedirects({
         ...props.options,
+        maxPayload: props.options?.maxPayload ?? 0,
         headers,
       }),
     );
