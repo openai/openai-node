@@ -419,17 +419,26 @@ Before an SDK promotion:
 - Obtain independent code review; require relevant maintainer/security review for
   sensitive boundaries. Open ready PRs, preserve normal CI/review/merge gates,
   and never use agent credentials to approve a budget increase.
+- Request review for every PR and Delta in a deduplicated root message in
+  `#sdk-reviews`, including compiler changes. Native reviewer requests supplement
+  this Slack request. Wait for Conductor state updates and react to them; do not
+  set up independent polling.
 
 ## Execution ledger and event handling
 
-| Item                       | Status                   | Evidence / next action                                                                                                                          |
-| -------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Baseline inventory         | Verified                 | 47 files / 2,743 patch lines at the pinned revisions above                                                                                      |
-| Documentation PR           | Ready for review         | [PR #2985](https://github.com/openai/openai-node/pull/2985); SDK team review requested; no SDK behavior changes                                 |
-| H1 file-processing binding | Published ready upstream | Independently reviewed; normal hooks passed; local Bazel blocked before compilation; expected 1-file/11-line reduction after verified promotion |
-| E export projection        | Published ready upstream | Independently reviewed; normal hooks passed; consumer type/runtime regressions added; local Bazel blocked before compilation                    |
-| SDK drawdown               | Waiting on prerequisites | No reduction claimed before merged compiler and verified promotion                                                                              |
-| Continuation routing       | Not yet verified         | Owning conversation identified in PR/Delta bodies; native attachment and heartbeat tools failed with connection errors                          |
+| Item                       | Status                           | Evidence / next action                                                                                                                          |
+| -------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline inventory         | Verified                         | 47 files / 2,743 patch lines at the pinned revisions above                                                                                      |
+| Documentation PR           | Ready for review                 | [PR #2985](https://github.com/openai/openai-node/pull/2985); SDK team review requested; no SDK behavior changes                                 |
+| H1 file-processing binding | Published ready upstream         | Independently reviewed; normal hooks passed; local Bazel blocked before compilation; expected 1-file/11-line reduction after verified promotion |
+| E export projection        | Published ready upstream         | Independently reviewed; normal hooks passed; consumer type/runtime regressions added; local Bazel blocked before compilation                    |
+| SDK drawdown               | Waiting on prerequisites         | No reduction claimed before merged compiler and verified promotion                                                                              |
+| Continuation               | Awaiting Conductor state updates | Every PR/Delta requires a deduplicated root request in #sdk-reviews; no independent polling                                                     |
+
+A deduplicated root `#sdk-reviews` request was posted on 2026-10-19 covering the
+plan PR and both initial compiler Deltas. Future changes require the same review
+request. Native task-tool connection failures during setup do not change the
+instruction to wait for Conductor messages and react here.
 
 Validation recorded during this audit:
 
