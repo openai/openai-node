@@ -403,6 +403,12 @@ export namespace UsageAudioSpeechesResponse {
 
       /**
        * The aggregated number of input tokens written to the cache with a 30-minute
+       * retention period. May be absent or null for older responses.
+       */
+      input_cache_write_30m_tokens?: number | null;
+
+      /**
+       * The aggregated number of input tokens written to the cache with a 30-minute
        * retention period.
        */
       input_cache_write_tokens?: number;
@@ -994,6 +1000,12 @@ export namespace UsageAudioTranscriptionsResponse {
        * retention period.
        */
       input_cache_write_12h_tokens?: number;
+
+      /**
+       * The aggregated number of input tokens written to the cache with a 30-minute
+       * retention period. May be absent or null for older responses.
+       */
+      input_cache_write_30m_tokens?: number | null;
 
       /**
        * The aggregated number of input tokens written to the cache with a 30-minute
@@ -1591,6 +1603,12 @@ export namespace UsageCodeInterpreterSessionsResponse {
 
       /**
        * The aggregated number of input tokens written to the cache with a 30-minute
+       * retention period. May be absent or null for older responses.
+       */
+      input_cache_write_30m_tokens?: number | null;
+
+      /**
+       * The aggregated number of input tokens written to the cache with a 30-minute
        * retention period.
        */
       input_cache_write_tokens?: number;
@@ -2182,6 +2200,12 @@ export namespace UsageCompletionsResponse {
        * retention period.
        */
       input_cache_write_12h_tokens?: number;
+
+      /**
+       * The aggregated number of input tokens written to the cache with a 30-minute
+       * retention period. May be absent or null for older responses.
+       */
+      input_cache_write_30m_tokens?: number | null;
 
       /**
        * The aggregated number of input tokens written to the cache with a 30-minute
@@ -2779,6 +2803,12 @@ export namespace UsageCostsResponse {
 
       /**
        * The aggregated number of input tokens written to the cache with a 30-minute
+       * retention period. May be absent or null for older responses.
+       */
+      input_cache_write_30m_tokens?: number | null;
+
+      /**
+       * The aggregated number of input tokens written to the cache with a 30-minute
        * retention period.
        */
       input_cache_write_tokens?: number;
@@ -3363,6 +3393,12 @@ export namespace UsageDecisionsResponse {
        * The aggregated number of input tokens written to the cache with a 30-minute
        * retention period.
        */
+      input_cache_write_30m_tokens?: number | null;
+
+      /**
+       * The aggregated number of input tokens written to the cache with a 30-minute
+       * retention period.
+       */
       input_cache_write_tokens?: number | null;
 
       /**
@@ -3534,6 +3570,12 @@ export namespace UsageEmbeddingsResponse {
        * retention period.
        */
       input_cache_write_12h_tokens?: number;
+
+      /**
+       * The aggregated number of input tokens written to the cache with a 30-minute
+       * retention period. May be absent or null for older responses.
+       */
+      input_cache_write_30m_tokens?: number | null;
 
       /**
        * The aggregated number of input tokens written to the cache with a 30-minute
@@ -4131,6 +4173,12 @@ export namespace UsageFileSearchCallsResponse {
 
       /**
        * The aggregated number of input tokens written to the cache with a 30-minute
+       * retention period. May be absent or null for older responses.
+       */
+      input_cache_write_30m_tokens?: number | null;
+
+      /**
+       * The aggregated number of input tokens written to the cache with a 30-minute
        * retention period.
        */
       input_cache_write_tokens?: number;
@@ -4722,6 +4770,12 @@ export namespace UsageImagesResponse {
        * retention period.
        */
       input_cache_write_12h_tokens?: number;
+
+      /**
+       * The aggregated number of input tokens written to the cache with a 30-minute
+       * retention period. May be absent or null for older responses.
+       */
+      input_cache_write_30m_tokens?: number | null;
 
       /**
        * The aggregated number of input tokens written to the cache with a 30-minute
@@ -5319,6 +5373,12 @@ export namespace UsageModerationsResponse {
 
       /**
        * The aggregated number of input tokens written to the cache with a 30-minute
+       * retention period. May be absent or null for older responses.
+       */
+      input_cache_write_30m_tokens?: number | null;
+
+      /**
+       * The aggregated number of input tokens written to the cache with a 30-minute
        * retention period.
        */
       input_cache_write_tokens?: number;
@@ -5913,6 +5973,12 @@ export namespace UsageVectorStoresResponse {
 
       /**
        * The aggregated number of input tokens written to the cache with a 30-minute
+       * retention period. May be absent or null for older responses.
+       */
+      input_cache_write_30m_tokens?: number | null;
+
+      /**
+       * The aggregated number of input tokens written to the cache with a 30-minute
        * retention period.
        */
       input_cache_write_tokens?: number;
@@ -6504,6 +6570,12 @@ export namespace UsageWebSearchCallsResponse {
        * retention period.
        */
       input_cache_write_12h_tokens?: number;
+
+      /**
+       * The aggregated number of input tokens written to the cache with a 30-minute
+       * retention period. May be absent or null for older responses.
+       */
+      input_cache_write_30m_tokens?: number | null;
 
       /**
        * The aggregated number of input tokens written to the cache with a 30-minute
