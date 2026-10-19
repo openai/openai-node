@@ -42,7 +42,7 @@ importers:
         version: 26.6.4
       '@types/ws':
         specifier: ^8.5.13
-        version: 8.18.1
+        version: 8.18.2
       '@types/yargs':
         specifier: ^17.0.35
         version: 17.0.35
@@ -111,7 +111,7 @@ importers:
         version: 5.0.3(@types/node@26.6.4)(vite@8.1.5(@types/node@26.6.4)(yaml@2.9.1))
       ws:
         specifier: ^8.21.0
-        version: 8.21.3
+        version: 8.22.0
       yargs:
         specifier: ^18.1.0
         version: 18.2.0
@@ -132,7 +132,7 @@ importers:
         version: 5.3.0
       openai:
         specifier: file:..
-        version: file:(@aws-sdk/credential-provider-node@3.972.84)(@smithy/hash-node@4.5.2)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.21.3)(zod@4.6.5)
+        version: file:(@aws-sdk/credential-provider-node@3.972.84)(@smithy/hash-node@4.5.2)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
       undici:
         specifier: ^8.9.0
         version: 8.11.2
@@ -1320,8 +1320,8 @@ packages:
   '@types/stack-utils@2.0.3':
     resolution: {integrity: sha512-9aEbYZ3TbYMznPdcdr3SmIrLXwC/AKZXQeCf9Pgao5CKb8CyHuEX5jzWPTkvregvhRJHcpRO6BFoGW9ycaOkYw==}
 
-  '@types/ws@8.18.1':
-    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+  '@types/ws@8.18.2':
+    resolution: {integrity: sha512-67MQl+fpWKVTT1NYdnmo3U4sc/xPo/zQBncVnI74qmQa0z/b+1g6iYqNmGCPbxO+zz2aklb08a0oHfegiVd0/w==}
 
   '@types/yargs-parser@21.0.3':
     resolution: {integrity: sha512-I4q9QU9MQv4oEOz4tAHJtNz1cwuLxn2F3xcc2iV5WdqLPpUnj30aUuxt1mAxYTG+oe8CZMV/+6rU4S4gRDzqtQ==}
@@ -3403,8 +3403,8 @@ packages:
     resolution: {integrity: sha512-+QU2zd6OTD8XWIJCbffaiQeH9U73qIqafo1x6V1snCWYGJf6cVE0cDR4D8xRzcEnfI21IFrUPzPGtcPf8AC+Rw==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
-  ws@8.21.3:
-    resolution: {integrity: sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw==}
+  ws@8.22.0:
+    resolution: {integrity: sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -4713,7 +4713,7 @@ snapshots:
 
   '@types/stack-utils@2.0.3': {}
 
-  '@types/ws@8.18.1':
+  '@types/ws@8.18.2':
     dependencies:
       '@types/node': 26.6.4
 
@@ -6176,13 +6176,13 @@ snapshots:
       is-inside-container: 1.0.0
       wsl-utils: 0.1.0
 
-  openai@file:(@aws-sdk/credential-provider-node@3.972.84)(@smithy/hash-node@4.5.2)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.21.3)(zod@4.6.5):
+  openai@file:(@aws-sdk/credential-provider-node@3.972.84)(@smithy/hash-node@4.5.2)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.84
       '@smithy/hash-node': 4.5.2
       '@smithy/signature-v4': 5.7.4
       undici: 8.11.2
-      ws: 8.21.3
+      ws: 8.22.0
       zod: 4.6.5
 
   oxfmt@0.72.0:
@@ -6855,7 +6855,7 @@ snapshots:
       imurmurhash: 0.1.4
       signal-exit: 4.1.0
 
-  ws@8.21.3: {}
+  ws@8.22.0: {}
 
   wsl-utils@0.1.0:
     dependencies:
