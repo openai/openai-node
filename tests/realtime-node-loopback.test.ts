@@ -52,7 +52,8 @@ describe.each([
       new OpenAI({ apiKey: 'synthetic-client-key', baseURL }),
     );
     // A transport error must fail promptly even when it prevents the event.
-    const received = realtime.emitted('event');
+    const received =
+      realtime instanceof OpenAIRealtimeWS ? realtime.emitted('event') : realtime.emitted('event');
     const opened = once(realtime.socket, 'open');
     try {
       const [peer] = await incoming;
@@ -72,7 +73,8 @@ describe.each([
       { model: 'gpt-realtime', options: { ca: lab.certificateAuthority, maxPayload: 128 } },
       new OpenAI({ apiKey: 'synthetic-client-key', baseURL }),
     );
-    const failed = realtime.emitted('error');
+    const failed =
+      realtime instanceof OpenAIRealtimeWS ? realtime.emitted('error') : realtime.emitted('error');
     const opened = once(realtime.socket, 'open');
     try {
       const [peer] = await incoming;
