@@ -126,8 +126,11 @@ type RecordAudioOptions = {
   /** Stops recording when aborted; successful termination returns the captured audio. */
   signal?: AbortSignal;
 
-  /** Zero-based audio-input index (ALSA card number on Linux); defaults to `0`. */
-  device?: number;
+  /**
+   * Audio-input index (defaults to `0`) or device name. Windows requires a name.
+   * Linux names are ALSA device identifiers, such as `default` or `hw:USB,0`.
+   */
+  device?: number | string;
 
   /** Positive recording duration in milliseconds; nonpositive values disable the timeout. */
   timeout?: number;
@@ -143,9 +146,21 @@ function removeRecordingAbortListener(signal: AbortSignal | undefined, listener:
 
 function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {}): Promise<File> {
   checkFileSupport();
+  const provider = recordingProviders[platform];
+  let input: string;
+  if (provider === 'dshow') {
+    if (typeof device !== 'string' || device.trim() === '') {
+      throw new Error('Windows recording requires an audio device name, such as "Microphone (USB Audio)"');
+    }
+    input = `audio=${device}`;
+  } else if (provider === 'alsa') {
+    input = typeof device === 'string' ? device : `hw:${device ?? 0}`;
+  } else {
+    input = `:${device ?? 0}`;
+  }
+
   return new Promise((resolve, reject) => {
     const data: any[] = [];
-    const provider = recordingProviders[platform];
     let ffmpeg: ReturnType<typeof spawn> | undefined;
     let internalSignal: AbortSignal | undefined;
     let wasStopped = false;
@@ -246,7 +261,7 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
           '-f',
           provider,
           '-i',
-          provider === 'alsa' ? `hw:${device ?? 0}` : `:${device ?? 0}`,
+          input,
           '-ar',
           DEFAULT_SAMPLE_RATE.toString(),
           '-ac',
@@ -310,8 +325,9 @@ function nodejsRecordAudio({ signal, device, timeout }: RecordAudioOptions = {})
  * This helper is supported only in Node.js-compatible runtimes and requires
  * the `ffmpeg` executable from FFmpeg to be available on `PATH`. Recording
  * continues until the FFmpeg process exits, the supplied signal is aborted, or
- * a positive timeout elapses. Successful cancellation returns the audio captured
- * so far; if sending `SIGTERM` throws, recording rejects with that error.
+ * a positive timeout elapses. On Windows, supply the audio device name in `device`;
+ * numeric indexes are supported on macOS and Linux. Successful cancellation returns
+ * the audio captured so far; if sending `SIGTERM` throws, recording rejects with that error.
  *
  * @param options Audio-input device, optional abort signal, and recording timeout.
  * @returns The captured WAV file with MIME type `audio/wav`.

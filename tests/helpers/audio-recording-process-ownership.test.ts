@@ -41,7 +41,8 @@ if (scenario === 'setup failure') {
 (async () => {
   let outcome;
   try {
-    const file = await recordAudio({ signal: caller.signal });
+    const device = ['win32', 'cygwin'].includes(process.platform) ? 'Synthetic microphone' : undefined;
+    const file = await recordAudio({ signal: caller.signal, device });
     outcome = { name: file.name, type: file.type, content: await file.text() };
   } catch (error) {
     outcome = { code: error.code, message: error.message };
