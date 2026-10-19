@@ -64,7 +64,13 @@ CI, required review and compiler-before-promotion rules remain required.
       streaming behavior. Stable event change coordinates with P3/W.
 - [ ] R: separate null-filter, admin-auth, image metadata and Skills filename slices
       (five files, 40 lines). Acceptance: existing request bytes, precedence and key
-      selection preserved. Verify actual public request boundary and security regressions.
+      selection preserved. For `images.edit`, normalize explicit null safety identifiers
+      in the effective body after `options.body` overrides so multipart omits the
+      field; preserve non-null/empty strings, other values/fields and caller objects.
+      Retain `tests/lib/image-safety-identifier.test.ts` across streaming/non-streaming
+      and eager/lazy uploads, including override precedence and body-read behavior.
+      Preserve JSON image-generation behavior. Verify actual public request boundary
+      and security regressions.
       Prefer source schema/configuration when already supported; no new guessed lists.
 - [ ] S: webhook async verification interface generation (77 lines).
       Acceptance: exact current signature/defaults/errors/security behavior. Verify
@@ -92,6 +98,12 @@ CI, required review and compiler-before-promotion rules remain required.
 
 - [ ] Verified inventory reaches zero files and zero patch lines without exclusions,
       checkpoint edits or checker changes; handwritten code growth assessed separately.
+- [ ] Full trusted manifest comparison passes for every generated-owned file,
+      including workflows/actions, file bytes and Git modes, exact manifest and
+      retired paths. Record verifier/candidate/checkpoint revisions and zero
+      violations. This is mandatory even if schema-v2 activation is deferred;
+      a policy-gated schema-v1 no-op is not a pass. Missing manifest/verifier support
+      blocks completion until normal upstream generation supplies it.
 - [ ] Public contracts, packed CJS/ESM, exact runtime floor, supported Node lines,
       TypeScript floor, optional integrations and relevant ecosystems verified.
 - [ ] All compiler prerequisites and SDK promotions actually merged.

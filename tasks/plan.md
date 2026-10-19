@@ -61,6 +61,10 @@ and `src/index.ts` are absent from this snapshot. Their additions in a raw tree
 diff are outside the current mixed-file metric. They still require compatibility
 review when a generated bridge imports them. The reporter excludes GitHub workflow
 and action paths; those paths are outside this inventory, not certified clean.
+The final checkpoint therefore requires an additional full manifest comparison
+covering every generated-owned path, including generated workflows/actions, even
+if schema-v2 policy activation is deferred. Zero legacy patch lines alone cannot
+certify completion.
 
 Reproduce using the unchanged repository reporter:
 
@@ -265,6 +269,15 @@ These small patches are behavior-critical and should not become one omnibus PR:
   provider behavior without exposing credentials.
 - Images: preserve existing model metadata merge and nullish behavior; do not
   replace caller metadata or conflate absent model values with empty strings.
+  For `images.edit`, normalize only an explicit `safety_identifier: null` in the
+  **effective body after `options.body` precedence** to `undefined` before multipart
+  serialization, so the field is omitted. Preserve non-null strings (including
+  `''`), omitted/undefined values, unrelated fields, streaming options, and caller
+  object contents. Keep `tests/lib/image-safety-identifier.test.ts` as a required
+  request-boundary regression for this slice: direct nulls and body overrides,
+  streaming/non-streaming requests, eager/lazy uploads, own emitted fields,
+  effective-body read behavior, and caller immutability. Do not extend this
+  normalization to JSON image generation, Responses, or Chat Completions.
 - Skills and versions: preserve upload filenames and current request-option
   normalization/precedence. Generate through the owning multipart policy; do not
   globally change filename rules for other resources.
@@ -371,7 +384,8 @@ small, coherent PRs, not one large PR per row of the workstream table.
    edits; rebase and rerun affected tests after a dependency lands.
 5. Treat W and C as dedicated staged queues. Their prototypes/hooks/authentication
    contracts must be covered before generated adapters replace handwritten bridges.
-6. Once the verified count reaches zero, separately propose a budget-only PR to
+6. Once the legacy count reaches zero, require the full ownership certification
+   below before declaring completion. Then separately propose a budget-only PR to
    reduce the ceiling and optionally activate supported strict generated ownership.
    Do not combine policy activation with SDK/compiler implementation or alter the
    trusted checker. Preserve ordinary CODEOWNERS and review requirements.
@@ -424,6 +438,31 @@ Before an SDK promotion:
   this Slack request. Wait for Conductor state updates and react to them; do not
   set up independent polling.
 
+### Final ownership certification — mandatory
+
+The final checkpoint must compare the complete compiler-owned manifest from a
+provenance-verified generated checkpoint with the exact integrated SDK commit.
+Use the trusted compiler/checker's `verify_generated` comparison for all owned
+paths, including generated `.github/workflows/` and `.github/actions/` files that
+legacy patch accounting excludes. Verify file bytes, Git modes, the manifest
+itself, and retired generated paths using the previous verified checkpoint.
+Handwritten files and inherited SDK-owned governance remain outside generated
+ownership; do not broaden ownership to improve the result.
+
+This comparison is required **regardless of schema-v2 policy activation**. A
+policy-gated verifier invocation that returns success without comparing paths
+under schema v1 does not satisfy it. Use the existing trusted comparator directly
+or an unconditional compiler-owned diagnostic; if that comparison or a complete
+verified manifest is unavailable, completion is blocked until the owning compiler
+support lands and normal generation supplies it. Do not edit policy, manifests,
+metadata, or exclusions to manufacture a passing result.
+
+Record the compiler/verifier revision, candidate commit, current and previous
+verified checkpoints, complete owned-path inventory and an empty violation result.
+A zero legacy mixed-file report and a passing full ownership comparison are both
+required. Strict policy activation may remain a later isolated policy-only PR;
+full ownership certification may not be deferred.
+
 ## Execution ledger and event handling
 
 | Item                       | Status                           | Evidence / next action                                                                                                                          |
@@ -437,8 +476,11 @@ Before an SDK promotion:
 
 A deduplicated root `#sdk-reviews` request was posted on 2026-10-19 covering the
 plan PR and both initial compiler Deltas. Future changes require the same review
-request. Native task-tool connection failures during setup do not change the
-instruction to wait for Conductor messages and react here.
+request. Conductor delivered an ownership-verified message for this visible
+conversation
+at head `ebb2d08aeadfff247380ba8cb3bf1b8ceaebd99f` on 2026-10-19, establishing the
+routing receipt. Continue to wait for Conductor state messages and react here;
+earlier task-tool connection failures do not require independent polling.
 
 Validation recorded during this audit:
 
@@ -454,6 +496,9 @@ Validation recorded during this audit:
 - The initial verified full custom-code report succeeded. A subsequent local
   candidate budget check stalled in `git cat-file --batch`, including a retry
   outside the sandbox, and was stopped. No candidate-budget pass is claimed.
+- Review follow-up: `./scripts/test tests/lib/image-safety-identifier.test.ts`
+  passed all 37 existing request-boundary regressions for the documented Images
+  contract; the follow-up changes only this plan and its task checklist.
 - Both initial compiler implementations received separate independent read-only
   reviews without blocking findings. Compiler test results and actual promotion
   compatibility remain separate prerequisites; review does not substitute for them.
@@ -469,8 +514,9 @@ remeasure and start the next unblocked slice. CI green and queue enrollment are
 not proof of merge. Do not react to stale-head results or duplicate a repair already
 being handled. Preserve this plan's zero-breaking-change requirement on every wake.
 
-Completion means verified **zero mixed files and zero custom patch lines**, all
-public behavior/type/export compatibility gates satisfied, no accounting bypass,
-and no remaining unpromoted compiler prerequisite. Track handwritten code size
-separately so a clean mixed-file metric is not mistaken for eliminating all
+Completion means verified **zero legacy mixed files and zero custom patch lines**,
+a **passing full ownership certification of every manifest-owned file including
+generated workflows/actions**, all public behavior/type/export compatibility gates
+satisfied, no accounting bypass, and no remaining unpromoted compiler prerequisite.
+Track handwritten code size separately so a clean mixed-file metric is not mistaken for eliminating all
 handwritten SDK code.
