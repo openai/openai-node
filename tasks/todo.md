@@ -8,7 +8,7 @@ CI, required review and compiler-before-promotion rules remain required.
 
 - [x] Verify current-main snapshot and all 47 mixed-file counts.
 - [x] Map each mixed file to an owning workstream and compatibility constraints.
-- [ ] Submit ready documentation PR after count/link/format and independent review.
+- [x] Submit ready documentation PR after count/link/format and independent review: [#2985](https://github.com/openai/openai-node/pull/2985).
 - [ ] Verify Conductor ownership/routing and record working continuation mechanism.
 
 ## First parallel compiler slices

@@ -422,14 +422,32 @@ Before an SDK promotion:
 
 ## Execution ledger and event handling
 
-| Item                       | Status                   | Evidence / next action                                                                                 |
-| -------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------ |
-| Baseline inventory         | Verified                 | 47 files / 2,743 patch lines at the pinned revisions above                                             |
-| Documentation PR           | In preparation           | This plan and `todo.md`; no SDK behavior changes                                                       |
-| H1 file-processing binding | Implementing upstream    | Isolated compiler work; preserve exact current signature                                               |
-| E export projection        | Investigating upstream   | Independent compiler/configuration slice; avoid duplicate upstream work                                |
-| SDK drawdown               | Waiting on prerequisites | No reduction claimed before merged compiler and verified promotion                                     |
-| Continuation routing       | Not yet verified         | Native task attachment/heartbeat tools failed during setup; recheck before claiming automatic delivery |
+| Item                       | Status                              | Evidence / next action                                                                                          |
+| -------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Baseline inventory         | Verified                            | 47 files / 2,743 patch lines at the pinned revisions above                                                      |
+| Documentation PR           | Ready for review                    | [PR #2985](https://github.com/openai/openai-node/pull/2985); SDK team review requested; no SDK behavior changes |
+| H1 file-processing binding | Implemented; independently reviewed | Exact current signature/delegate preserved; compiler test execution/publication in progress                     |
+| E export projection        | Implemented; independently reviewed | OpenAI-only opt-in wildcard projection; compiler test execution/publication in progress                         |
+| SDK drawdown               | Waiting on prerequisites            | No reduction claimed before merged compiler and verified promotion                                              |
+| Continuation routing       | Not yet verified                    | Native task attachment/heartbeat tools failed during setup; recheck before claiming automatic delivery          |
+
+Validation recorded during this audit:
+
+- `pnpm install --frozen-lockfile` passed using Node 24 and pinned pnpm, without
+  tracked dependency changes.
+- The pinned `oxfmt --check` and `git diff --check` passed for both Markdown files;
+  all 47 table rows and relative document links were checked independently.
+- `./scripts/test tests/lib/file-processing.test.ts tests/generated-resource-helpers.test.ts tests/resource-exports.test.ts`
+  passed: 111 tests across three files. These establish the unchanged SDK baseline;
+  they do not verify newly generated compiler output.
+- `python3 -m unittest discover -s scripts/castiron -p 'test_custom_code*.py'`
+  passed: 95 tests, one skip.
+- The initial verified full custom-code report succeeded. A subsequent local
+  candidate budget check stalled in `git cat-file --batch`, including a retry
+  outside the sandbox, and was stopped. No candidate-budget pass is claimed.
+- Both initial compiler implementations received separate independent read-only
+  reviews without blocking findings. Compiler test results and actual promotion
+  compatibility remain separate prerequisites; review does not substitute for them.
 
 For each resulting PR/Delta, record the link, exact head, compiler dependency,
 current-head validation, review outcome, actual merge commit, generated snapshot,
