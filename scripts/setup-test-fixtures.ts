@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import glob from 'fast-glob';
 import { create } from 'ts-node';
@@ -22,6 +30,14 @@ export default function setup(project: TestProject) {
       const output = path.join(directory, source.replace(/\.(?:c)?ts$/u, '.js'));
       mkdirSync(path.dirname(output), { recursive: true });
       writeFileSync(output, compiler.compile(readFileSync(filename, 'utf-8'), filename));
+    }
+    // Resolve each installed package before linking it. Linking node_modules itself
+    // nests pnpm's relative links inside a junction and breaks resolution on Windows.
+    const examples = JSON.parse(readFileSync(path.join(root, 'examples/package.json'), 'utf-8'));
+    for (const name of Object.keys({ ...examples.dependencies, ...examples.devDependencies })) {
+      const destination = path.join(directory, 'examples/node_modules', name);
+      mkdirSync(path.dirname(destination), { recursive: true });
+      symlinkSync(realpathSync(path.join(root, 'examples/node_modules', name)), destination, 'junction');
     }
     // Preserve private package-import routing using the same metadata projection as the SDK build.
     writeFileSync(
