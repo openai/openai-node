@@ -465,14 +465,15 @@ full ownership certification may not be deferred.
 
 ## Execution ledger and event handling
 
-| Item                       | Status                           | Evidence / next action                                                                                                                          |
-| -------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Baseline inventory         | Verified                         | 47 files / 2,743 patch lines at the pinned revisions above                                                                                      |
-| Documentation PR           | Ready for review                 | [PR #2985](https://github.com/openai/openai-node/pull/2985); SDK team review requested; no SDK behavior changes                                 |
-| H1 file-processing binding | Published ready upstream         | Independently reviewed; normal hooks passed; local Bazel blocked before compilation; expected 1-file/11-line reduction after verified promotion |
-| E export projection        | Published ready upstream         | Independently reviewed; normal hooks passed; consumer type/runtime regressions added; local Bazel blocked before compilation                    |
-| SDK drawdown               | Waiting on prerequisites         | No reduction claimed before merged compiler and verified promotion                                                                              |
-| Continuation               | Awaiting Conductor state updates | Every PR/Delta requires a deduplicated root request in #sdk-reviews; no independent polling                                                     |
+| Item                       | Status                            | Evidence / next action                                                                                                                                |
+| -------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline inventory         | Verified                          | 47 files / 2,743 patch lines at the pinned revisions above                                                                                            |
+| Documentation PR           | Merged                            | PR #2985 merged as `bd036b4c3d9ae78982ed0c632d54da6f9cd7f6d3`; verified Conductor queue-completion receipt                                            |
+| H1 file-processing binding | Published ready upstream          | Independently reviewed; normal hooks passed; local Bazel blocked before compilation; expected 1-file/11-line reduction after verified promotion       |
+| E export projection        | Published ready upstream          | Independently reviewed; normal hooks passed; consumer type/runtime regressions added; local Bazel blocked before compilation                          |
+| SDK drawdown               | Compiler-dependent slices waiting | Both initial compiler Deltas remain open and require human contract approval; no SDK output promoted                                                  |
+| D: duplicate API reference | Candidate prepared                | Remove duplicate block while preserving legacy fragment links; diagnostic candidate: 47 mixed files / 2,735 patch lines, pending trusted CI and merge |
+| Continuation               | Awaiting Conductor state updates  | Every PR/Delta requires a deduplicated root request in #sdk-reviews; no independent polling                                                           |
 
 A deduplicated root `#sdk-reviews` request was posted on 2026-10-19 covering the
 plan PR and both initial compiler Deltas. Future changes require the same review
@@ -481,6 +482,27 @@ conversation
 at head `ebb2d08aeadfff247380ba8cb3bf1b8ceaebd99f` on 2026-10-19, establishing the
 routing receipt. Continue to wait for Conductor state messages and react here;
 earlier task-tool connection failures do not require independent polling.
+
+The next independent documentation slice removes the duplicated Safety/Alerts
+reference block while retaining the canonical generated Cases/Alerts content.
+Explicit anchors preserve the existing `#safety-1` and `#alerts-1` fragment URLs;
+canonical `#safety` and `#alerts` targets, helper references, and all unique HTML
+link destinations remain available. The two compatibility anchors remain custom
+content until the owning reference generator emits them; do not claim `api.md`
+is clean or drop those links to reduce the count.
+
+Only `api.md` and this transition ledger/checklist change; no SDK code, generation
+metadata, ownership rules, checker, or budget policy changes. Main also received
+API generation PR #2984 while the plan was queued, so the candidate was measured
+against its current pinned public snapshot
+`b8300062d8af5a9504d00e3b0257a65630c2898d` at SDK base
+`bd036b4c3d9ae78982ed0c632d54da6f9cd7f6d3`. Diagnostic Git numstat using the
+existing reporter's generated ownership reduces `api.md` from 28 to 20 custom
+patch lines and the full patch from 2,743 to 2,735, with all 47 files still mixed.
+A bounded attempt to rerun the full reporter timed out; no new snapshot/hash or
+trusted candidate-budget pass is claimed. Trusted CI and actual merge must confirm
+the reduction before it is recorded as achieved. The historical baseline above
+stays fixed.
 
 Validation recorded during this audit:
 

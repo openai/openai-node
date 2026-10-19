@@ -409,17 +409,7 @@ Methods:
 - <code>client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">poll</a>(vectorStoreId, batchId, options?) -> Promise&lt;VectorStoreFileBatch&gt;</code>
 - <code>client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">uploadAndPoll</a>(vectorStoreId, { files, fileIds? }, options?) -> Promise&lt;VectorStoreFileBatch&gt;</code>
 
-# Safety
-
-## Alerts
-
-Types:
-
-- <code><a href="./src/resources/safety/alerts.ts">SafetyAlert</a></code>
-
-Methods:
-
-- <code title="get /safety/alerts/{id}">client.safety.alerts.<a href="./src/resources/safety/alerts.ts">retrieve</a>(id) -> SafetyAlert</code>
+<a id="safety-1"></a>
 
 # Safety
 
@@ -432,6 +422,8 @@ Types:
 Methods:
 
 - <code title="get /safety/cases/{id}">client.safety.cases.<a href="./src/resources/safety/cases.ts">retrieve</a>(id) -> SafetyCase</code>
+
+<a id="alerts-1"></a>
 
 ## Alerts
 
