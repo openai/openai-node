@@ -38,6 +38,13 @@ function resolveResourceRequestOptions(
   return Promise.resolve(options).then(buildOptions);
 }
 
+function withBodyFinalization<T extends RequestOptions>(
+  options: T,
+  finalization: { streamFromBody?: true; finalizeMultipart?: true },
+): T {
+  return { ...options, __metadata: { ...options.__metadata, ...finalization } };
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -199,15 +206,22 @@ export class Completions extends APIResource {
     return this._client
       .post<ChatCompletion | Stream<ChatCompletionWireChunk>>(
         '/chat/completions',
-        resolveResourceRequestOptions(options, (options) => ({
-          body,
-          ...options,
-          stream: body.stream ?? false,
-          __security: { bearerAuth: true },
-        })),
+        resolveResourceRequestOptions(options, (options) =>
+          withBodyFinalization(
+            {
+              body,
+              ...options,
+              stream: body.stream ?? false,
+              __security: { bearerAuth: true },
+            },
+            { streamFromBody: true },
+          ),
+        ),
       )
-      ._thenUnwrap((result) =>
-        body.stream ? normalizeChatCompletionStream(result as Stream<ChatCompletionWireChunk>) : result,
+      ._thenUnwrap((result, props) =>
+        props.options.stream
+          ? normalizeChatCompletionStream(result as Stream<ChatCompletionWireChunk>)
+          : result,
       ) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
   }
 

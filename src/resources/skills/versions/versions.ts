@@ -17,6 +17,13 @@ function resolveResourceRequestOptions(
   return Promise.resolve(options).then(buildOptions);
 }
 
+function withBodyFinalization<T extends RequestOptions>(
+  options: T,
+  finalization: { streamFromBody?: true; finalizeMultipart?: true },
+): T {
+  return { ...options, __metadata: { ...options.__metadata, ...finalization } };
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -137,9 +144,14 @@ export class Versions extends APIResource {
   ): APIPromise<SkillVersion> {
     return this._client.post(
       path`/skills/${skillID}/versions`,
-      maybeMultipartFormRequestOptions({ body, ...options, __security: { bearerAuth: true } }, this._client, {
-        stripFilenames: false,
-      }),
+      maybeMultipartFormRequestOptions(
+        withBodyFinalization(
+          { body, ...options, __security: { bearerAuth: true } },
+          { finalizeMultipart: true },
+        ),
+        this._client,
+        { stripFilenames: false },
+      ),
     );
   }
 
