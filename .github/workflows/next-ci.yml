@@ -37,7 +37,7 @@ jobs:
               const {data: metadata} = await github.rest.repos.get(context.repo);
               if (metadata.default_branch !== 'main' || metadata.full_name !== repository) fail('Unexpected repository');
               const {data: own} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: context.runId});
-              if (own.repository.full_name !== repository || own.path !== '.github/workflows/next-ci.yml' ||
+              if (own.repository.full_name !== repository || own.path?.split('@')[0] !== '.github/workflows/next-ci.yml' ||
                   own.head_branch !== 'main' || !['workflow_dispatch', 'workflow_run'].includes(own.event) ||
                   own.run_attempt !== positive(process.env.BRIDGE_ATTEMPT)) fail('Unexpected bridge execution');
             }
@@ -50,6 +50,15 @@ jobs:
               if (pull.state !== 'open' || pull.base.repo.full_name !== repository || pull.base.ref !== 'next' ||
                   sha(pull.head.sha) !== head || sha(pull.base.sha) !== base) fail('PR target, head or base changed');
               return pull;
+            }
+            async function mergeTree(number, head, base) {
+              const pull = await currentPull(number, head, base);
+              if (pull.mergeable === false) fail('PR has merge conflicts');
+              const merge = sha(pull.merge_commit_sha);
+              const {data: commit} = await github.rest.repos.getCommit({...context.repo, ref: `refs/pull/${positive(number)}/merge`});
+              if (commit.sha !== merge || commit.parents.length !== 2 || commit.parents[0].sha !== base ||
+                  commit.parents[1].sha !== head) fail('PR merge tree is missing or stale');
+              return merge;
             }
             async function liveQueue(head) {
               let cursor = null;
@@ -72,8 +81,11 @@ jobs:
               if (receipt.repository !== repository || !['pull_request','merge_group'].includes(receipt.kind)) fail('Invalid target receipt');
               const head = sha(receipt.head), base = sha(receipt.base);
               if (await nextBase() !== base) fail('Protected next base changed');
-              if (receipt.kind === 'pull_request') await currentPull(receipt.pull, head, base);
+              if (receipt.kind === 'pull_request') {
+                if (await mergeTree(receipt.pull, head, base) !== sha(receipt.scan)) fail('PR merge tree changed');
+              }
               else {
+                if (sha(receipt.scan) !== head) fail('Queue scan must use the queue SHA');
                 await liveQueue(head);
                 const {data: comparison} = await github.rest.repos.compareCommitsWithBasehead({...context.repo, basehead: `${base}...${head}`});
                 if (comparison.merge_base_commit.sha !== base || !['ahead','identical'].includes(comparison.status)) fail('Queue does not contain current next base');
@@ -92,7 +104,7 @@ jobs:
               if (source.repository.full_name !== repository || source.head_sha !== signal.head_sha ||
                   source.run_attempt !== signal.run_attempt || source.event !== signal.event || source.status !== 'completed') fail('Untrusted or superseded source run');
               // CI is also the detector's display name. Only ordinary CI is a signal.
-              if (source.path !== '.github/workflows/ci.yml') return;
+              if (source.path?.split('@')[0] !== '.github/workflows/ci.yml') return;
               if (!['pull_request','merge_group'].includes(source.event)) return;
               const head = sha(source.head_sha), base = await nextBase();
               if (source.event === 'pull_request') {
@@ -111,6 +123,7 @@ jobs:
                 receipt = {repository, kind: source.event, head, base};
               }
             } else fail('Unsupported bridge event');
+            receipt.scan = receipt.kind === 'pull_request' ? await mergeTree(receipt.pull, receipt.head, receipt.base) : receipt.head;
             await currentTarget(receipt);
             core.setOutput('receipt', JSON.stringify(receipt));
 
@@ -122,7 +135,7 @@ jobs:
       contents: read
     uses: ./.github/workflows/codeql.yml
     with:
-      candidate_sha: ${{ fromJSON(needs.authorize.outputs.receipt).head }}
+      candidate_sha: ${{ fromJSON(needs.authorize.outputs.receipt).scan }}
 
   detector:
     needs: authorize
@@ -131,7 +144,7 @@ jobs:
       contents: read
     uses: ./.github/workflows/detect-breaking-changes.yml
     with:
-      candidate_sha: ${{ fromJSON(needs.authorize.outputs.receipt).head }}
+      candidate_sha: ${{ fromJSON(needs.authorize.outputs.receipt).scan }}
       comparison_base: ${{ fromJSON(needs.authorize.outputs.receipt).base }}
 
   publish:
@@ -166,7 +179,7 @@ jobs:
               const {data: metadata} = await github.rest.repos.get(context.repo);
               if (metadata.default_branch !== 'main' || metadata.full_name !== repository) fail('Unexpected repository');
               const {data: own} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: context.runId});
-              if (own.repository.full_name !== repository || own.path !== '.github/workflows/next-ci.yml' ||
+              if (own.repository.full_name !== repository || own.path?.split('@')[0] !== '.github/workflows/next-ci.yml' ||
                   own.head_branch !== 'main' || !['workflow_dispatch', 'workflow_run'].includes(own.event) ||
                   own.run_attempt !== positive(process.env.BRIDGE_ATTEMPT)) fail('Unexpected bridge execution');
             }
@@ -179,6 +192,15 @@ jobs:
               if (pull.state !== 'open' || pull.base.repo.full_name !== repository || pull.base.ref !== 'next' ||
                   sha(pull.head.sha) !== head || sha(pull.base.sha) !== base) fail('PR target, head or base changed');
               return pull;
+            }
+            async function mergeTree(number, head, base) {
+              const pull = await currentPull(number, head, base);
+              if (pull.mergeable === false) fail('PR has merge conflicts');
+              const merge = sha(pull.merge_commit_sha);
+              const {data: commit} = await github.rest.repos.getCommit({...context.repo, ref: `refs/pull/${positive(number)}/merge`});
+              if (commit.sha !== merge || commit.parents.length !== 2 || commit.parents[0].sha !== base ||
+                  commit.parents[1].sha !== head) fail('PR merge tree is missing or stale');
+              return merge;
             }
             async function liveQueue(head) {
               let cursor = null;
@@ -201,8 +223,11 @@ jobs:
               if (receipt.repository !== repository || !['pull_request','merge_group'].includes(receipt.kind)) fail('Invalid target receipt');
               const head = sha(receipt.head), base = sha(receipt.base);
               if (await nextBase() !== base) fail('Protected next base changed');
-              if (receipt.kind === 'pull_request') await currentPull(receipt.pull, head, base);
+              if (receipt.kind === 'pull_request') {
+                if (await mergeTree(receipt.pull, head, base) !== sha(receipt.scan)) fail('PR merge tree changed');
+              }
               else {
+                if (sha(receipt.scan) !== head) fail('Queue scan must use the queue SHA');
                 await liveQueue(head);
                 const {data: comparison} = await github.rest.repos.compareCommitsWithBasehead({...context.repo, basehead: `${base}...${head}`});
                 if (comparison.merge_base_commit.sha !== base || !['ahead','identical'].includes(comparison.status)) fail('Queue does not contain current next base');

@@ -1,6 +1,8 @@
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const os = require('node:os');
+const { execFileSync, spawnSync } = require('node:child_process');
 
 const yaml = fs.readFileSync(path.join(__dirname, '../../.github/workflows/next-ci.yml'), 'utf-8');
 const scripts = [];
@@ -25,15 +27,19 @@ const runScript = scripts.map((code) => new AsyncFunction('github', 'context', '
 const repository = 'openai/openai-node';
 const head = 'a'.repeat(40);
 const base = 'b'.repeat(40);
+const merge = 'd'.repeat(40);
 function fixture(kind = 'pull_request') {
   const f = { writes: [], outputs: {}, base, head, queue: [head], prior: [], comparisonBase: base };
   f.pull = {
     number: 7,
     state: 'open',
+    merge_commit_sha: merge,
+    mergeable: true,
     head: { sha: head, repo: { full_name: repository } },
     base: { ref: 'next', sha: base, repo: { full_name: repository } },
   };
   f.pulls = [f.pull];
+  f.merge = { sha: merge, parents: [{ sha: base }, { sha: head }] };
   f.own = {
     repository: { full_name: repository },
     path: '.github/workflows/next-ci.yml',
@@ -64,6 +70,10 @@ function fixture(kind = 'pull_request') {
     rest: {
       repos: {
         get: async () => ({ data: { full_name: repository, default_branch: 'main' } }),
+        getCommit: async (x) => {
+          assert.equal(x.ref, 'refs/pull/7/merge');
+          return { data: f.merge };
+        },
         listPullRequestsAssociatedWithCommit: () => {
           throw new Error('Use the paginated API');
         },
@@ -377,8 +387,128 @@ test('hosted validation invokes the same read-only candidate jobs', async () => 
   assert(!validation.includes('workflow_dispatch:'));
   assert(validation.includes('uses: ./.github/workflows/codeql.yml'));
   assert(validation.includes('uses: ./.github/workflows/detect-breaking-changes.yml'));
-  assert(validation.includes('github.event.pull_request.head.sha'));
+  // oxlint-disable-next-line no-template-curly-in-string -- This is a literal GitHub Actions expression.
+  assert(validation.includes('candidate_sha: ${{ github.sha }}'));
+  assert(!validation.includes('github.event.pull_request.head.sha'));
   assert(validation.includes('github.event.pull_request.base.sha'));
+});
+test('workflow API ref suffixes are accepted without weakening path checks', async () => {
+  const f = fixture();
+  f.own.path += '@main';
+  f.source.path += '@refs/pull/7/merge';
+  await f.authorize();
+  await f.execute(1);
+  assert.equal(f.writes.length, 3);
+});
+reject('wrong workflow remains rejected with a main suffix', (f) => {
+  f.own.path = '.github/workflows/evil.yml@main';
+});
+test('PR scan uses authenticated merge tree while statuses attach to head', async () => {
+  const f = fixture();
+  await f.authorize();
+  assert.equal(JSON.parse(f.outputs.receipt).scan, merge);
+  await f.execute(1);
+  assert(f.writes.every((x) => x.sha === head));
+  assert.equal((yaml.match(/candidate_sha:.*receipt\)\.scan/gu) || []).length, 2);
+});
+reject('conflicted PR rejected', (f) => {
+  f.pull.mergeable = false;
+});
+reject('missing merge SHA rejected', (f) => {
+  f.pull.merge_commit_sha = null;
+});
+reject('stale merge base rejected', (f) => {
+  f.merge.parents[0].sha = 'e'.repeat(40);
+});
+reject('stale merge head rejected', (f) => {
+  f.merge.parents[1].sha = 'e'.repeat(40);
+});
+reject('foreign merge ref rejected', (f) => {
+  f.merge.sha = 'e'.repeat(40);
+});
+reject(
+  'merge ref change during checks prevents publication',
+  (f) => {
+    f.pull.merge_commit_sha = 'e'.repeat(40);
+    f.merge.sha = 'e'.repeat(40);
+  },
+  1,
+);
+reject(
+  'merge ref change during status pagination prevents publication',
+  (f) => {
+    f.duringPagination = () => {
+      f.pull.merge_commit_sha = 'e'.repeat(40);
+      f.merge.sha = 'e'.repeat(40);
+    };
+  },
+  1,
+);
+test('edited PR events trigger the ordinary CI signal', async () => {
+  const ci = fs.readFileSync(path.join(__dirname, '../../.github/workflows/ci.yml'), 'utf-8');
+  assert(/pull_request:\n\s+types: \[[^\]]*edited/u.test(ci));
+});
+test('real tooling guard rejects candidate detector and toolchain substitution', async () => {
+  const detector = fs.readFileSync(
+    path.join(__dirname, '../../.github/workflows/detect-breaking-changes.yml'),
+    'utf-8',
+  );
+  const [, guardStep] = detector.split('      - name: Reject untrusted detector tooling changes');
+  const [guard] = guardStep.split('      - name: Set up pnpm');
+  assert(guard.includes('github.workflow_sha'));
+  // Execute the actual workflow diff command over real Git trees; never candidate code.
+  const command = guard.slice(guard.indexOf('          git diff')).trim();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'next-detector-trust-'));
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: directory, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const write = (file, contents) => {
+    fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
+    fs.writeFileSync(path.join(directory, file), contents);
+  };
+  try {
+    git('init', '-q');
+    git('config', 'user.email', 'test@example.invalid');
+    git('config', 'user.name', 'Test');
+    write('scripts/detect-breaking-changes', 'exit 1');
+    write('src/index.ts', 'export const value = 1');
+    git('add', '.');
+    git('commit', '-qm', 'trusted');
+    const trusted = git('rev-parse', 'HEAD').trim();
+    const check = () =>
+      spawnSync('bash', ['-euc', command], {
+        cwd: directory,
+        env: { ...process.env, TRUSTED_WORKFLOW_SHA: trusted },
+      }).status;
+    for (const file of [
+      'scripts/detect-breaking-changes',
+      'scripts/lint',
+      'package.json',
+      'pnpm-lock.yaml',
+      'pnpm-workspace.yaml',
+      'tsconfig.json',
+      '.npmrc',
+      '.pnpmfile.cjs',
+      'oxlint.config.ts',
+      'node_modules/.bin/tsc',
+      'examples/node_modules/.bin/tsc',
+      'examples/package.json',
+      'examples/.npmrc',
+      'src/oxfmt.config.ts',
+    ]) {
+      git('reset', '--hard', trusted);
+      write(file, 'exit 0');
+      git('add', '.');
+      git('commit', '-qm', 'candidate tooling');
+      assert.notEqual(check(), 0, file);
+    }
+    git('reset', '--hard', trusted);
+    write('src/index.ts', 'export const value = 2');
+    git('add', '.');
+    git('commit', '-qm', 'candidate SDK');
+    assert.equal(check(), 0);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 async function runCases() {
   try {

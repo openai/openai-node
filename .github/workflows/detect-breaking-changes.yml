@@ -46,6 +46,21 @@ jobs:
       - name: Fetch comparison base
         run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
 
+      - name: Reject untrusted detector tooling changes
+        if: inputs.candidate_sha != ''
+        env:
+          TRUSTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          # workflow_sha is runner-owned: trusted main for the bridge, the proposed
+          # workflow merge for its readonly PR validation. Never supplied by a candidate.
+          git fetch --no-tags --depth=1 origin "$TRUSTED_WORKFLOW_SHA"
+          git diff --exit-code "$TRUSTED_WORKFLOW_SHA" HEAD -- \
+            scripts node_modules ':(glob)**/node_modules/**' package.json pnpm-lock.yaml pnpm-workspace.yaml .nvmrc .npmrc .pnpmfile.cjs \
+            ':(top,glob)*.json' ':(top,glob)*.ts' ':(top,glob)*.mts' ':(top,glob)*.cts' \
+            ':(top,glob)*.js' ':(top,glob)*.mjs' ':(top,glob)*.cjs' \
+            ':(glob)**/package.json' ':(glob)**/.npmrc' ':(glob)**/.pnpmfile.*' \
+            ':(glob)**/oxfmt.config.*' ':(glob)**/oxlint.config.*' ':(glob)**/tsconfig*.json'
+
       - name: Set up pnpm
         if: inputs.candidate_sha == ''
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4

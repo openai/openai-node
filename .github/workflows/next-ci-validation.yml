@@ -22,12 +22,12 @@ jobs:
       contents: read
     uses: ./.github/workflows/codeql.yml
     with:
-      candidate_sha: ${{ github.event.pull_request.head.sha }}
+      candidate_sha: ${{ github.sha }}
 
   detector:
     permissions:
       contents: read
     uses: ./.github/workflows/detect-breaking-changes.yml
     with:
-      candidate_sha: ${{ github.event.pull_request.head.sha }}
+      candidate_sha: ${{ github.sha }}
       comparison_base: ${{ github.event.pull_request.base.sha }}
