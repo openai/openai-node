@@ -283,15 +283,14 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
         headers.set(name.toLowerCase(), value);
       }
     }
+    const { maxPayload, perMessageDeflate, ...nativeOptions } = props.options ?? {};
     const options: WS.ClientOptions = {
-      maxPayload: 0,
-      perMessageDeflate: false,
-      ...props.options,
+      ...nativeOptions,
+      maxPayload: maxPayload ?? 0,
+      perMessageDeflate: perMessageDeflate ?? false,
       headers: Object.fromEntries(headers),
       followRedirects: false,
     };
-    options.maxPayload ??= 0;
-    options.perMessageDeflate ??= false;
     snapshotWebSocketCredentials(options);
     return new OpenAIRealtimeTranslationWS(url, options);
   }

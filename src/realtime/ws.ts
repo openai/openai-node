@@ -101,13 +101,13 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
         ...(azureKey ? {} : { Authorization: `Bearer ${attemptKey}` }),
       };
 
+      const { maxPayload, ...nativeOptions } = options ?? {};
       const socketOptions: WS.ClientOptions = {
-        maxPayload: 0,
         perMessageDeflate: false,
-        ...options,
+        ...nativeOptions,
+        maxPayload: maxPayload ?? 0,
         headers,
       };
-      socketOptions.maxPayload ??= 0;
       socketOptions.perMessageDeflate ??= false;
       const socket = new WS.WebSocket(url, protectWebSocketOptionsFromCredentialRedirects(socketOptions));
 
@@ -193,7 +193,8 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
         buildURL: () => buildRealtimeURL(connectionClient, props),
         adaptSocket: (socket) => new NodeWebSocket(socket),
         prepare: async () => {
-          const options = snapshotNodeWebSocketOptions(props.options);
+          const { maxPayload, headers, ...nativeOptions } = props.options ?? {};
+          const options = snapshotNodeWebSocketOptions({ ...nativeOptions, maxPayload, headers });
           // SAFETY: The branch checks _callApiKey before using the client's credential resolver.
           const credential =
             '_callApiKey' in connectionClient && typeof connectionClient._callApiKey === 'function'
