@@ -592,7 +592,17 @@ export class WebSocketConnection<
         }
         return false;
       }
-      this._hooks.onError('onReconnecting callback threw', error);
+      try {
+        this._hooks.onError('onReconnecting callback threw', error);
+      } catch (reportingError) {
+        this._isReconnecting = false;
+        try {
+          this._emitPermanentClose(closeCode, 'onReconnecting callback threw');
+        } catch {
+          // Keep the reporting failure if a later close observer also throws.
+        }
+        throw reportingError;
+      }
     }
     this._internalEvents._emit('reconnecting', reconnectingEvent);
     return true;
@@ -717,8 +727,11 @@ export class WebSocketConnection<
       this._isReconnecting = false;
       this._internalEvents._emit('socketSwap', oldSocket, this._owner.socket);
       this._flushSendQueue();
-      this._hooks.emitReconnected();
-      this._internalEvents._emit('reconnected');
+      try {
+        this._hooks.emitReconnected();
+      } finally {
+        this._internalEvents._emit('reconnected');
+      }
       return;
     }
 
