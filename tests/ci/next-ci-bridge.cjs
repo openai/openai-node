@@ -663,7 +663,8 @@ test('frozen baseline consumers expose API breaks masked by ambient ts and decla
     /rm -rf tests examples\n\s+git archive "\$BASE_SHA" tests examples \| tar -x/u,
   )?.[0];
   assert(restore);
-  assert(detector.indexOf(restore) > detector.indexOf('./scripts/bootstrap'));
+  assert(detector.indexOf(restore) < detector.lastIndexOf('./scripts/bootstrap'));
+  // Restoring after installation deletes examples/node_modules and breaks pnpm verification.
   assert(detector.indexOf(restore) < detector.lastIndexOf('./scripts/detect-breaking-changes "$BASE_SHA"'));
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'next-consumer-fixtures-'));
   const git = (...args) =>

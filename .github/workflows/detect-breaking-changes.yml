@@ -102,10 +102,10 @@ jobs:
               export PATH="$HOME/.local/bin:$PATH"
               version=$(node -e 'const fs=require("fs"); const pm=JSON.parse(fs.readFileSync("package.json")).packageManager; if(!/^pnpm@[0-9]+\.[0-9]+\.[0-9]+$/.test(pm)) process.exit(1); process.stdout.write(pm);')
               npm install --global --prefix "$HOME/.local" "$version"
-              ./scripts/bootstrap
               # Compatibility consumers come only from the authenticated target base.
               # Remove candidate extras, including ambient .ts/.d.ts module shims.
               rm -rf tests examples
               git archive "$BASE_SHA" tests examples | tar -x
+              ./scripts/bootstrap
               ./scripts/detect-breaking-changes "$BASE_SHA"
           CANDIDATE
