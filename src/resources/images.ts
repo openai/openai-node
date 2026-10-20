@@ -15,6 +15,13 @@ function resolveResourceRequestOptions(
   return Promise.resolve(options).then(buildOptions);
 }
 
+function withBodyFinalization<T extends RequestOptions>(
+  options: T,
+  finalization: { streamFromBody?: true; finalizeMultipart?: true },
+): T {
+  return { ...options, __metadata: { ...options.__metadata, ...finalization } };
+}
+
 /**
  * Given a prompt and/or an input image, the model will generate a new image.
  */
@@ -61,21 +68,24 @@ export class Images extends APIResource {
       '/images/edits',
       resolveResourceRequestOptions(options, (options) =>
         multipartFormRequestOptions(
-          ((requestOptions) => ({
-            ...requestOptions,
-            body: Object.fromEntries(
-              Object.entries(requestOptions.body ?? {}).map(([key, value]) => [
-                key,
-                key === 'safety_identifier' && value === null ? undefined : value,
-              ]),
-            ),
-          }))({
-            body,
-            ...options,
-            stream: body.stream ?? false,
-            __metadata: { ...options?.__metadata, ...(body.model == null ? {} : { model: body.model }) },
-            __security: { bearerAuth: true },
-          }),
+          withBodyFinalization(
+            ((requestOptions) => ({
+              ...requestOptions,
+              body: Object.fromEntries(
+                Object.entries(requestOptions.body ?? {}).map(([key, value]) => [
+                  key,
+                  key === 'safety_identifier' && value === null ? undefined : value,
+                ]),
+              ),
+            }))({
+              body,
+              ...options,
+              stream: body.stream ?? false,
+              __metadata: { ...options?.__metadata, ...(body.model == null ? {} : { model: body.model }) },
+              __security: { bearerAuth: true },
+            }),
+            { streamFromBody: true },
+          ),
           this._client,
         ),
       ),
@@ -108,12 +118,12 @@ export class Images extends APIResource {
   ): APIPromise<ImagesResponse> | APIPromise<Stream<ImageGenStreamEvent>> {
     return this._client.post(
       '/images/generations',
-      resolveResourceRequestOptions(options, (options) => ({
-        body,
-        ...options,
-        stream: body.stream ?? false,
-        __security: { bearerAuth: true },
-      })),
+      resolveResourceRequestOptions(options, (options) =>
+        withBodyFinalization(
+          { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
+          { streamFromBody: true },
+        ),
+      ),
     ) as APIPromise<ImagesResponse> | APIPromise<Stream<ImageGenStreamEvent>>;
   }
 }

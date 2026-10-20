@@ -181,7 +181,11 @@ describe('chat helper header precedence', () => {
 
     expect(buildRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        __metadata: { requestID: 'request_123', helperMethod: 'chat.completions.parse' },
+        __metadata: {
+          requestID: 'request_123',
+          helperMethod: 'chat.completions.parse',
+          streamFromBody: true,
+        },
       }),
       expect.objectContaining({ retryCount: 0 }),
     );
