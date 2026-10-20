@@ -2,6 +2,14 @@
 # that ordinary unit tests can miss.
 name: CI
 on:
+  workflow_call:
+    inputs:
+      candidate_sha:
+        type: string
+        required: true
+      comparison_base:
+        type: string
+        required: true
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
@@ -18,7 +26,7 @@ jobs:
     permissions:
       contents: read
     env:
-      BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+      BASE_SHA: ${{ inputs.comparison_base || github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
       FETCH_DEPTH: 0
     steps:
       - name: Calculate fetch-depth
@@ -32,25 +40,53 @@ jobs:
         with:
           # Keep the checkout shallow; fetch the exact comparison base below.
           fetch-depth: ${{ env.FETCH_DEPTH }}
+          ref: ${{ inputs.candidate_sha || github.sha }}
           persist-credentials: false
 
       - name: Fetch comparison base
         run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
 
       - name: Set up pnpm
+        if: inputs.candidate_sha == ''
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
 
       - name: Set up Node
+        if: inputs.candidate_sha == ''
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
           node-version-file: '.nvmrc'
-          cache: pnpm
+          # A trusted-main dispatch must not let candidate code populate main caches.
+          cache: ${{ inputs.candidate_sha == '' && 'pnpm' || '' }}
 
       - name: Install dependencies
+        if: inputs.candidate_sha == ''
         run: |
           ./scripts/bootstrap
 
       - name: Detect breaking changes
+        if: inputs.candidate_sha == ''
         run: |
           # The detector discovers tests from the base revision, including removed resources.
           ./scripts/detect-breaking-changes "$BASE_SHA"
+
+      - name: Run unchanged candidate checks without runner credentials
+        if: inputs.candidate_sha != ''
+        env:
+          NODE_IMAGE: node:24-bookworm@sha256:14078204b6bb268c107ceff6d3c43f45a888105e5c2b18b14c32b3409d93a1b0
+        run: |
+          docker run --rm -i --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --user "$(id -u):$(id -g)" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --tmpfs /tmp:rw,exec,mode=1777 \
+            --env HOME=/tmp/home --env CI=true --env "BASE_SHA=$BASE_SHA" \
+            "$NODE_IMAGE" bash -euo pipefail <<'CANDIDATE'
+              mkdir -p "$HOME" /tmp/candidate
+              cp -a /source/. /tmp/candidate/
+              cd /tmp/candidate
+              test "$(cat .nvmrc)" = 24
+              export PATH="$HOME/.local/bin:$PATH"
+              version=$(node -e 'const fs=require("fs"); const pm=JSON.parse(fs.readFileSync("package.json")).packageManager; if(!/^pnpm@[0-9]+\.[0-9]+\.[0-9]+$/.test(pm)) process.exit(1); process.stdout.write(pm);')
+              npm install --global --prefix "$HOME/.local" "$version"
+              ./scripts/bootstrap
+              ./scripts/detect-breaking-changes "$BASE_SHA"
+          CANDIDATE

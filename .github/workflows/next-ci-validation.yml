@@ -1,0 +1,33 @@
+# Exercise the same reusable scans before changes to the trusted-main bridge land.
+name: Next CI bridge validation
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+    paths:
+      - '.github/workflows/next-ci*.yml'
+      - '.github/workflows/codeql.yml'
+      - '.github/workflows/detect-breaking-changes.yml'
+      - 'tests/ci/next-ci-bridge.cjs'
+      - 'scripts/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+permissions: {}
+
+jobs:
+  codeql:
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/codeql.yml
+    with:
+      candidate_sha: ${{ github.event.pull_request.head.sha }}
+
+  detector:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/detect-breaking-changes.yml
+    with:
+      candidate_sha: ${{ github.event.pull_request.head.sha }}
+      comparison_base: ${{ github.event.pull_request.base.sha }}

@@ -1,0 +1,231 @@
+name: Next CI bridge
+on:
+  workflow_dispatch:
+    inputs:
+      pull_number:
+        description: Open next PR to validate
+        required: true
+        type: string
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+permissions: {}
+
+jobs:
+  authorize:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      receipt: ${{ steps.target.outputs.receipt }}
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        id: target
+        env:
+          BRIDGE_ATTEMPT: ${{ github.run_attempt }}
+        with:
+          script: |
+            const repository = 'openai/openai-node';
+            const names = ['Next CI / CodeQL (actions)', 'Next CI / CodeQL (javascript-typescript)', 'Next CI / detect-breaking-changes'];
+            const fail = message => { throw new Error(message); };
+            const sha = value => /^[0-9a-f]{40}$/.test(value || '') ? value : fail('Invalid immutable SHA');
+            const positive = value => /^[1-9][0-9]*$/.test(String(value)) && Number.isSafeInteger(Number(value)) ? Number(value) : fail('Invalid numeric identifier');
+            async function trustedRun() {
+              if (`${context.repo.owner}/${context.repo.repo}` !== repository || context.ref !== 'refs/heads/main') fail('Bridge must execute from trusted main');
+              const {data: metadata} = await github.rest.repos.get(context.repo);
+              if (metadata.default_branch !== 'main' || metadata.full_name !== repository) fail('Unexpected repository');
+              const {data: own} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: context.runId});
+              if (own.repository.full_name !== repository || own.path !== '.github/workflows/next-ci.yml' ||
+                  own.head_branch !== 'main' || !['workflow_dispatch', 'workflow_run'].includes(own.event) ||
+                  own.run_attempt !== positive(process.env.BRIDGE_ATTEMPT)) fail('Unexpected bridge execution');
+            }
+            async function nextBase() {
+              const {data} = await github.rest.git.getRef({...context.repo, ref: 'heads/next'});
+              return sha(data.object.sha);
+            }
+            async function currentPull(number, head, base) {
+              const {data: pull} = await github.rest.pulls.get({...context.repo, pull_number: positive(number)});
+              if (pull.state !== 'open' || pull.base.repo.full_name !== repository || pull.base.ref !== 'next' ||
+                  sha(pull.head.sha) !== head || sha(pull.base.sha) !== base) fail('PR target, head or base changed');
+              return pull;
+            }
+            async function liveQueue(head) {
+              let cursor = null;
+              do {
+                const response = await github.graphql(`query($owner:String!,$name:String!,$cursor:String) {
+                  repository(owner:$owner,name:$name) { mergeQueue(branch:"next") { entries(first:100,after:$cursor) {
+                    nodes { headCommit { oid } } pageInfo { hasNextPage endCursor }
+                  } } }
+                }`, {owner: context.repo.owner, name: context.repo.repo, cursor});
+                const entries = response.repository.mergeQueue?.entries;
+                if (!entries) fail('Next merge queue is absent');
+                if (entries.nodes.some(entry => entry.headCommit?.oid === head)) return;
+                if (!entries.pageInfo.hasNextPage) break;
+                if (!entries.pageInfo.endCursor || entries.pageInfo.endCursor === cursor) fail('Invalid queue pagination');
+                cursor = entries.pageInfo.endCursor;
+              } while (true);
+              fail('Queue SHA is no longer live');
+            }
+            async function currentTarget(receipt) {
+              if (receipt.repository !== repository || !['pull_request','merge_group'].includes(receipt.kind)) fail('Invalid target receipt');
+              const head = sha(receipt.head), base = sha(receipt.base);
+              if (await nextBase() !== base) fail('Protected next base changed');
+              if (receipt.kind === 'pull_request') await currentPull(receipt.pull, head, base);
+              else {
+                await liveQueue(head);
+                const {data: comparison} = await github.rest.repos.compareCommitsWithBasehead({...context.repo, basehead: `${base}...${head}`});
+                if (comparison.merge_base_commit.sha !== base || !['ahead','identical'].includes(comparison.status)) fail('Queue does not contain current next base');
+              }
+            }
+
+            await trustedRun();
+            let receipt;
+            if (context.eventName === 'workflow_dispatch') {
+              const number = positive(context.payload.inputs?.pull_number);
+              const {data: pull} = await github.rest.pulls.get({...context.repo, pull_number: number});
+              receipt = {repository, kind: 'pull_request', pull: number, head: sha(pull.head.sha), base: await nextBase()};
+            } else if (context.eventName === 'workflow_run') {
+              const signal = context.payload.workflow_run;
+              const {data: source} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: positive(signal.id)});
+              if (source.repository.full_name !== repository || source.head_sha !== signal.head_sha ||
+                  source.run_attempt !== signal.run_attempt || source.event !== signal.event || source.status !== 'completed') fail('Untrusted or superseded source run');
+              // CI is also the detector's display name. Only ordinary CI is a signal.
+              if (source.path !== '.github/workflows/ci.yml') return;
+              if (!['pull_request','merge_group'].includes(source.event)) return;
+              const head = sha(source.head_sha), base = await nextBase();
+              if (source.event === 'pull_request') {
+                const associated = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {...context.repo, commit_sha: head, per_page: 100});
+                const current = [];
+                for (const candidate of associated) {
+                  const {data: pull} = await github.rest.pulls.get({...context.repo, pull_number: candidate.number});
+                  if (pull.state === 'open' && pull.base.repo.full_name === repository && pull.base.ref === 'next' && pull.head.sha === head) current.push(pull);
+                }
+                if (current.length === 0) return;
+                if (current.length !== 1 || source.head_repository.full_name !== current[0].head.repo.full_name) fail('Ambiguous or foreign PR source');
+                receipt = {repository, kind: source.event, pull: current[0].number, head, base};
+              } else {
+                if (!source.head_branch.startsWith('gh-readonly-queue/next/')) return;
+                if (source.head_repository.full_name !== repository) fail('Foreign queue source');
+                receipt = {repository, kind: source.event, head, base};
+              }
+            } else fail('Unsupported bridge event');
+            await currentTarget(receipt);
+            core.setOutput('receipt', JSON.stringify(receipt));
+
+  codeql:
+    needs: authorize
+    if: needs.authorize.outputs.receipt != ''
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/codeql.yml
+    with:
+      candidate_sha: ${{ fromJSON(needs.authorize.outputs.receipt).head }}
+
+  detector:
+    needs: authorize
+    if: needs.authorize.outputs.receipt != ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/detect-breaking-changes.yml
+    with:
+      candidate_sha: ${{ fromJSON(needs.authorize.outputs.receipt).head }}
+      comparison_base: ${{ fromJSON(needs.authorize.outputs.receipt).base }}
+
+  publish:
+    needs: [authorize, codeql, detector]
+    concurrency:
+      group: next-ci-publish-${{ needs.authorize.outputs.receipt && fromJSON(needs.authorize.outputs.receipt).head || github.run_id }}
+      queue: max
+      cancel-in-progress: false
+    if: always() && needs.authorize.result == 'success' && needs.authorize.outputs.receipt != ''
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          BRIDGE_ATTEMPT: ${{ github.run_attempt }}
+          RECEIPT: ${{ needs.authorize.outputs.receipt }}
+          CODEQL_RESULT: ${{ needs.codeql.result }}
+          DETECTOR_RESULT: ${{ needs.detector.result }}
+        with:
+          script: |
+            const repository = 'openai/openai-node';
+            const names = ['Next CI / CodeQL (actions)', 'Next CI / CodeQL (javascript-typescript)', 'Next CI / detect-breaking-changes'];
+            const fail = message => { throw new Error(message); };
+            const sha = value => /^[0-9a-f]{40}$/.test(value || '') ? value : fail('Invalid immutable SHA');
+            const positive = value => /^[1-9][0-9]*$/.test(String(value)) && Number.isSafeInteger(Number(value)) ? Number(value) : fail('Invalid numeric identifier');
+            async function trustedRun() {
+              if (`${context.repo.owner}/${context.repo.repo}` !== repository || context.ref !== 'refs/heads/main') fail('Bridge must execute from trusted main');
+              const {data: metadata} = await github.rest.repos.get(context.repo);
+              if (metadata.default_branch !== 'main' || metadata.full_name !== repository) fail('Unexpected repository');
+              const {data: own} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: context.runId});
+              if (own.repository.full_name !== repository || own.path !== '.github/workflows/next-ci.yml' ||
+                  own.head_branch !== 'main' || !['workflow_dispatch', 'workflow_run'].includes(own.event) ||
+                  own.run_attempt !== positive(process.env.BRIDGE_ATTEMPT)) fail('Unexpected bridge execution');
+            }
+            async function nextBase() {
+              const {data} = await github.rest.git.getRef({...context.repo, ref: 'heads/next'});
+              return sha(data.object.sha);
+            }
+            async function currentPull(number, head, base) {
+              const {data: pull} = await github.rest.pulls.get({...context.repo, pull_number: positive(number)});
+              if (pull.state !== 'open' || pull.base.repo.full_name !== repository || pull.base.ref !== 'next' ||
+                  sha(pull.head.sha) !== head || sha(pull.base.sha) !== base) fail('PR target, head or base changed');
+              return pull;
+            }
+            async function liveQueue(head) {
+              let cursor = null;
+              do {
+                const response = await github.graphql(`query($owner:String!,$name:String!,$cursor:String) {
+                  repository(owner:$owner,name:$name) { mergeQueue(branch:"next") { entries(first:100,after:$cursor) {
+                    nodes { headCommit { oid } } pageInfo { hasNextPage endCursor }
+                  } } }
+                }`, {owner: context.repo.owner, name: context.repo.repo, cursor});
+                const entries = response.repository.mergeQueue?.entries;
+                if (!entries) fail('Next merge queue is absent');
+                if (entries.nodes.some(entry => entry.headCommit?.oid === head)) return;
+                if (!entries.pageInfo.hasNextPage) break;
+                if (!entries.pageInfo.endCursor || entries.pageInfo.endCursor === cursor) fail('Invalid queue pagination');
+                cursor = entries.pageInfo.endCursor;
+              } while (true);
+              fail('Queue SHA is no longer live');
+            }
+            async function currentTarget(receipt) {
+              if (receipt.repository !== repository || !['pull_request','merge_group'].includes(receipt.kind)) fail('Invalid target receipt');
+              const head = sha(receipt.head), base = sha(receipt.base);
+              if (await nextBase() !== base) fail('Protected next base changed');
+              if (receipt.kind === 'pull_request') await currentPull(receipt.pull, head, base);
+              else {
+                await liveQueue(head);
+                const {data: comparison} = await github.rest.repos.compareCommitsWithBasehead({...context.repo, basehead: `${base}...${head}`});
+                if (comparison.merge_base_commit.sha !== base || !['ahead','identical'].includes(comparison.status)) fail('Queue does not contain current next base');
+              }
+            }
+
+            await trustedRun();
+            const receipt = JSON.parse(process.env.RECEIPT);
+            const run = positive(context.runId), attempt = positive(process.env.BRIDGE_ATTEMPT);
+            const prior = await github.paginate(github.rest.repos.listCommitStatusesForRef, {...context.repo, ref: receipt.head, per_page: 100});
+            for (const status of prior) {
+              if (!names.includes(status.context) || status.creator?.login !== 'github-actions[bot]') continue;
+              const marker = /\[next-ci:v1:(\d+):(\d+)\]/.exec(status.description || '');
+              if (!marker || status.target_url !== `https://github.com/${repository}/actions/runs/${marker[1]}`) continue;
+              if (+marker[1] > run || (+marker[1] === run && +marker[2] > attempt)) return;
+            }
+            await currentTarget(receipt);
+            // These are runner-owned needs results from same-commit trusted reusable jobs,
+            // never candidate artifacts, job outputs, or source workflow conclusions.
+            const results = [process.env.CODEQL_RESULT, process.env.CODEQL_RESULT, process.env.DETECTOR_RESULT];
+            for (let index = 0; index < names.length; index++) {
+              const state = results[index] === 'success' ? 'success' : 'failure';
+              await github.rest.repos.createCommitStatus({...context.repo, sha: receipt.head, context: names[index], state,
+                description: `${state === 'success' ? 'Passed' : 'Failed'} next base ${receipt.base.slice(0,12)} [next-ci:v1:${run}:${attempt}]`,
+                target_url: `https://github.com/${repository}/actions/runs/${run}`});
+            }

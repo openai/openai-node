@@ -41,6 +41,9 @@ jobs:
       - name: Bootstrap
         run: ./scripts/bootstrap
 
+      - name: Check next CI bridge trust boundaries
+        run: node tests/ci/next-ci-bridge.cjs
+
       - name: Check formatting and lint rules
         run: ./scripts/lint
 
