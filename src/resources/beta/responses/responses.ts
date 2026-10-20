@@ -20,6 +20,13 @@ function resolveResourceRequestOptions(
   return Promise.resolve(options).then(buildOptions);
 }
 
+function withBodyFinalization<T extends RequestOptions>(
+  options: T,
+  finalization: { streamFromBody?: true; finalizeMultipart?: true },
+): T {
+  return { ...options, __metadata: { ...options.__metadata, ...finalization } };
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -168,16 +175,21 @@ export class Responses extends APIResource {
     const { betas, ...body } = params;
     return this._client.post(
       '/responses?beta=true',
-      resolveResourceRequestOptions(options, (options) => ({
-        body,
-        ...options,
-        headers: buildHeaders([
-          { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
-          options?.headers,
-        ]),
-        stream: params.stream ?? false,
-        __security: { bearerAuth: true },
-      })),
+      resolveResourceRequestOptions(options, (options) =>
+        withBodyFinalization(
+          {
+            body,
+            ...options,
+            headers: buildHeaders([
+              { ...(betas?.toString() != null ? { 'openai-beta': betas?.toString() } : undefined) },
+              options?.headers,
+            ]),
+            stream: params.stream ?? false,
+            __security: { bearerAuth: true },
+          },
+          { streamFromBody: true },
+        ),
+      ),
     ) as APIPromise<BetaResponse> | APIPromise<Stream<BetaResponseStreamEvent>>;
   }
 

@@ -14,6 +14,13 @@ function resolveResourceRequestOptions(
   return Promise.resolve(options).then(buildOptions);
 }
 
+function withBodyFinalization<T extends RequestOptions>(
+  options: T,
+  finalization: { streamFromBody?: true; finalizeMultipart?: true },
+): T {
+  return { ...options, __metadata: { ...options.__metadata, ...finalization } };
+}
+
 /**
  * Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
  */
@@ -44,12 +51,12 @@ export class Completions extends APIResource {
   ): APIPromise<Completion> | APIPromise<Stream<Completion>> {
     return this._client.post(
       '/completions',
-      resolveResourceRequestOptions(options, (options) => ({
-        body,
-        ...options,
-        stream: body.stream ?? false,
-        __security: { bearerAuth: true },
-      })),
+      resolveResourceRequestOptions(options, (options) =>
+        withBodyFinalization(
+          { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
+          { streamFromBody: true },
+        ),
+      ),
     ) as APIPromise<Completion> | APIPromise<Stream<Completion>>;
   }
 }
