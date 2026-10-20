@@ -79,6 +79,13 @@ function resolveResourceRequestOptions(
   return Promise.resolve(options).then(buildOptions);
 }
 
+function withBodyFinalization<T extends RequestOptions>(
+  options: T,
+  finalization: { streamFromBody?: true; finalizeMultipart?: true },
+): T {
+  return { ...options, __metadata: { ...options.__metadata, ...finalization } };
+}
+
 /**
  * Build Assistants that can call models and use tools.
  *
@@ -174,14 +181,19 @@ export class Threads extends APIResource {
   ): APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>> {
     return this._client.post(
       '/threads/runs',
-      resolveResourceRequestOptions(options, (options) => ({
-        body,
-        ...options,
-        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-        stream: body.stream ?? false,
-        __synthesizeEventData: true,
-        __security: { bearerAuth: true },
-      })),
+      resolveResourceRequestOptions(options, (options) =>
+        withBodyFinalization(
+          {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+            stream: body.stream ?? false,
+            __synthesizeEventData: true,
+            __security: { bearerAuth: true },
+          },
+          { streamFromBody: true },
+        ),
+      ),
     ) as APIPromise<RunsAPI.Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 

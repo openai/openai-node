@@ -275,6 +275,11 @@ import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
 import { mergeWebSocketAuthHeaders, webSocketHeaderRemovals } from './internal/ws';
 import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
+import {
+  finalizeStreamingFormRequestOptions,
+  hasUploadableValue,
+  maybeMultipartFormRequestOptions,
+} from './internal/uploads';
 import { readEnv } from './internal/utils/env';
 import {
   type LogLevel,
@@ -2233,7 +2238,81 @@ export class OpenAI {
       this._provider || x509Authentication
         ? undefined
         : await this.authHeaders(inputOptions, inputOptions.__security ?? { bearerAuth: true });
-    const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
+    let finalizedContentType: string | null = null;
+    if (options.__metadata?.['finalizeMultipart'] === true && hasUploadableValue(options.body)) {
+      const finalized = await maybeMultipartFormRequestOptions(
+        options,
+        this,
+        options.__metadata?.['preserveMultipartFilenames'] === true ? { stripFilenames: false } : undefined,
+      );
+      inputOptions.body = options.body = finalized.body;
+      inputOptions.headers = options.headers = finalized.headers;
+      inputOptions.__metadata = options.__metadata = { ...finalized.__metadata };
+      finalizedContentType = buildHeaders([finalized.headers]).values.get('content-type');
+    }
+    if (options.__metadata?.['streamFromBody'] === true) {
+      finalizeStreamingFormRequestOptions(options);
+      inputOptions.stream = options.stream;
+    }
+    const isRawJSON = (JSON as typeof JSON & { isRawJSON?: (value: unknown) => value is { rawJSON: string } })
+      .isRawJSON;
+    let jsonRoot: unknown;
+    let jsonRootVisited = false;
+    let jsonStream = false;
+    let jsonSerialized = false;
+    const stopObserving =
+      options.__metadata?.['streamFromBody'] === true &&
+      typeof options.body === 'object' &&
+      options.body !== null
+        ? Opts.observeJSONRequestBody(options.body, {
+            value(holder, key, value) {
+              if (!jsonRootVisited) {
+                jsonRootVisited = true;
+                jsonRoot = value;
+              } else if (holder === jsonRoot && key === 'stream') {
+                jsonStream = value === true;
+                if (isRawJSON?.(value)) {
+                  jsonStream = value.rawJSON === 'true';
+                } else if (value !== null && typeof value === 'object') {
+                  try {
+                    // JSON.stringify unboxes Boolean objects using their internal value.
+                    jsonStream = Boolean.prototype.valueOf.call(value);
+                  } catch {
+                    // Other objects are not boolean stream discriminators.
+                  }
+                }
+              }
+              return undefined;
+            },
+            complete() {
+              jsonSerialized = true;
+            },
+          })
+        : undefined;
+    let encodedBody: ReturnType<OpenAI['buildBody']>;
+    try {
+      encodedBody = this.buildBody({ options });
+    } finally {
+      stopObserving?.();
+    }
+    const { bodyHeaders, body, isStreamingBody } = encodedBody;
+
+    // Choose the parser from the encoded payload. Opaque bodies retain the
+    // caller's parser choice; JSON and multipart fields reflect serialization.
+    if (options.__metadata?.['streamFromBody'] === true) {
+      if (body instanceof FormData) {
+        inputOptions.stream = options.stream = body.get('stream') === 'true';
+      } else if (
+        jsonSerialized &&
+        jsonRoot !== null &&
+        typeof jsonRoot === 'object' &&
+        !Array.isArray(jsonRoot) &&
+        !isRawJSON?.(jsonRoot)
+      ) {
+        // Observe the existing serializer without parsing a second object graph.
+        inputOptions.stream = options.stream = jsonStream;
+      }
+    }
 
     if (isStreamingBody) {
       inputOptions.__metadata = {
@@ -2246,7 +2325,11 @@ export class OpenAI {
     const reqHeaders = await this.buildHeaders({
       options: inputOptions,
       method,
-      bodyHeaders,
+      // Keep encoding headers aligned with the finalized body.
+      bodyHeaders:
+        finalizedContentType === null
+          ? bodyHeaders
+          : buildHeaders([bodyHeaders, { 'content-type': finalizedContentType }]),
       authenticationHeaders,
       retryCount,
       x509Headers,

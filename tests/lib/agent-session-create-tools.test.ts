@@ -340,6 +340,7 @@ describe('creation-stream tool handlers', () => {
     expect(timeout).not.toHaveBeenCalled();
     const stream = await promise;
     await stream.finalResult();
+    expect(timeout).toHaveBeenCalledOnce();
     expect(prepare).toHaveBeenCalledOnce();
   });
 

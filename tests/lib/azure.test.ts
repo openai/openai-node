@@ -919,7 +919,9 @@ describe('azure request building', () => {
           );
 
           expect(buildRequest).toHaveBeenCalledWith(
-            expect.objectContaining({ __metadata: { requestID: 'request_123', model: deployment } }),
+            expect.objectContaining({
+              __metadata: { requestID: 'request_123', model: deployment, streamFromBody: true },
+            }),
             expect.objectContaining({ retryCount: 0 }),
           );
         } finally {

@@ -245,14 +245,24 @@ export const maybeMultipartFormRequestOptions = async (
   formOptions?: CreateFormOptions,
 ): Promise<RequestOptions> => {
   if (!hasUploadableValue(opts.body)) {
-    return opts;
+    // Retain endpoint-specific filename policy if an upload is added before serialization.
+    return opts.__metadata?.['finalizeMultipart'] === true && formOptions?.stripFilenames === false
+      ? { ...opts, __metadata: { ...opts.__metadata, preserveMultipartFilenames: true } }
+      : opts;
   }
+
+  // Already encoded uploads retain their eager capture semantics. Only requests
+  // that were still ordinary objects need a second classification before sending.
+  const finalizedOptions =
+    opts.__metadata?.['finalizeMultipart'] === true
+      ? { ...opts, __metadata: { ...opts.__metadata, finalizeMultipart: false } }
+      : opts;
 
   if (hasStreamingUploadableValue(opts.body)) {
-    return createStreamingFormRequestOptions(opts, formOptions);
+    return createStreamingFormRequestOptions(finalizedOptions, formOptions);
   }
 
-  return { ...opts, body: await createForm(opts.body, fetch, formOptions) };
+  return { ...finalizedOptions, body: await createForm(finalizedOptions.body, fetch, formOptions) };
 };
 
 /** Request options whose body must be encoded as multipart form data. */
@@ -394,7 +404,7 @@ const hasStreamingUploadableValue = (value: unknown): boolean => {
 };
 
 // SAFETY: The enclosing object guard and own-key enumeration allow reading these property values without assigning them a trusted value type.
-const hasUploadableValue = (value: unknown): boolean => {
+export const hasUploadableValue = (value: unknown): boolean => {
   if (isUploadable(value)) {
     return true;
   }
@@ -428,20 +438,55 @@ const snapshotPreservedUploadEntries = (
   return snapshot;
 };
 
+// Streaming multipart bodies remain visible to preparation hooks, but their fields
+// and response discriminator are captured together at request construction.
+const streamingFormFinalizers = new WeakMap<object, () => boolean>();
+
+export const finalizeStreamingFormRequestOptions = (opts: RequestOptions): void => {
+  if (typeof opts.body !== 'object' || opts.body === null) {
+    return;
+  }
+  const finalize = streamingFormFinalizers.get(opts.body);
+  if (finalize) {
+    opts.stream = finalize();
+    streamingFormFinalizers.delete(opts.body);
+  }
+};
+
 const createStreamingFormRequestOptions = (
   opts: RequestOptions,
   options: CreateFormOptions = {},
 ): RequestOptions => {
   const entries = iterateFormEntries(opts.body);
   const preservedFilenames = options.stripFilenames === false ? new WeakMap<object, string>() : undefined;
-  const multipartEntries = preservedFilenames
+  let multipartEntries = preservedFilenames
     ? snapshotPreservedUploadEntries(entries, preservedFilenames)
     : entries;
 
   const boundary = `openai-${Math.random().toString(36).slice(2)}`;
+  async function* multipartBody() {
+    yield* iterateMultipartBody(multipartEntries, boundary, options, preservedFilenames);
+  }
+  // Do not prefetch multipart entries before request preparation has finished.
   const body = ReadableStreamFrom(
-    iterateMultipartBody(multipartEntries, boundary, options, preservedFilenames),
+    multipartBody(),
+    opts.__metadata?.['streamFromBody'] === true ? { highWaterMark: 0 } : undefined,
   );
+  const originalBody = opts.body;
+  if (
+    opts.__metadata?.['streamFromBody'] === true &&
+    typeof originalBody === 'object' &&
+    originalBody !== null
+  ) {
+    streamingFormFinalizers.set(body, () => {
+      const capturedBody = { ...originalBody };
+      const capturedEntries = iterateFormEntries(capturedBody);
+      multipartEntries = preservedFilenames
+        ? snapshotPreservedUploadEntries(capturedEntries, preservedFilenames)
+        : capturedEntries;
+      return String('stream' in capturedBody ? capturedBody.stream : undefined) === 'true';
+    });
+  }
 
   return {
     ...opts,

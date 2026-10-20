@@ -48,6 +48,13 @@ function resolveResourceRequestOptions(
   return Promise.resolve(options).then(buildOptions);
 }
 
+function withBodyFinalization<T extends RequestOptions>(
+  options: T,
+  finalization: { streamFromBody?: true; finalizeMultipart?: true },
+): T {
+  return { ...options, __metadata: { ...options.__metadata, ...finalization } };
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -187,15 +194,20 @@ export class Runs extends APIResource {
     const { include, ...body } = params;
     return this._client.post(
       path`/threads/${threadID}/runs`,
-      resolveResourceRequestOptions(options, (options) => ({
-        query: { include },
-        body,
-        ...options,
-        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-        stream: params.stream ?? false,
-        __synthesizeEventData: true,
-        __security: { bearerAuth: true },
-      })),
+      resolveResourceRequestOptions(options, (options) =>
+        withBodyFinalization(
+          {
+            query: { include },
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+            stream: params.stream ?? false,
+            __synthesizeEventData: true,
+            __security: { bearerAuth: true },
+          },
+          { streamFromBody: true },
+        ),
+      ),
     ) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
@@ -445,14 +457,19 @@ export class Runs extends APIResource {
     const { thread_id, ...body } = params;
     return this._client.post(
       path`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`,
-      resolveResourceRequestOptions(options, (options) => ({
-        body,
-        ...options,
-        headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
-        stream: params.stream ?? false,
-        __synthesizeEventData: true,
-        __security: { bearerAuth: true },
-      })),
+      resolveResourceRequestOptions(options, (options) =>
+        withBodyFinalization(
+          {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'assistants=v2' }, options?.headers]),
+            stream: params.stream ?? false,
+            __synthesizeEventData: true,
+            __security: { bearerAuth: true },
+          },
+          { streamFromBody: true },
+        ),
+      ),
     ) as APIPromise<Run> | APIPromise<Stream<AssistantsAPI.AssistantStreamEvent>>;
   }
 
