@@ -21,15 +21,33 @@ for (let index = 0; index < lines.length; index += 1) {
   }
   scripts.push(code);
 }
-assert.equal(scripts.length, 2);
+assert.equal(scripts.length, 3);
+assert.equal(
+  scripts[1],
+  scripts[2],
+  'Pending and result publishers must share exactly the same trust checks',
+);
 const AsyncFunction = Object.getPrototypeOf(async () => null).constructor;
-const runScript = scripts.map((code) => new AsyncFunction('github', 'context', 'core', 'process', code));
+const runScript = [scripts[0], scripts[2], scripts[1]].map(
+  (code) => new AsyncFunction('github', 'context', 'core', 'process', code),
+);
 const repository = 'openai/openai-node';
 const head = 'a'.repeat(40);
 const base = 'b'.repeat(40);
 const merge = 'd'.repeat(40);
+const main = 'f'.repeat(40);
 function fixture(kind = 'pull_request') {
-  const f = { writes: [], outputs: {}, base, head, queue: [head], prior: [], comparisonBase: base };
+  const f = {
+    main,
+    rules: [{ type: 'merge_queue' }],
+    writes: [],
+    outputs: {},
+    base,
+    head,
+    queue: [head],
+    prior: [],
+    comparisonBase: base,
+  };
   f.pull = {
     number: 7,
     state: 'open',
@@ -44,6 +62,7 @@ function fixture(kind = 'pull_request') {
     repository: { full_name: repository },
     path: '.github/workflows/next-ci.yml',
     head_branch: 'main',
+    head_sha: main,
     event: 'workflow_run',
     run_attempt: 1,
   };
@@ -65,8 +84,20 @@ function fixture(kind = 'pull_request') {
     eventName: 'workflow_run',
     payload: { workflow_run: { id: 20, head_sha: head, event: kind, run_attempt: 1 } },
   };
-  f.env = { BRIDGE_ATTEMPT: '1', CODEQL_RESULT: 'success', DETECTOR_RESULT: 'success' };
+  f.env = {
+    WORKFLOW_SHA: main,
+    STATUS_PHASE: 'result',
+    INITIALIZATION_ATTEMPT: '1',
+    BRIDGE_ATTEMPT: '1',
+    CODEQL_RESULT: 'success',
+    DETECTOR_RESULT: 'success',
+  };
   f.github = {
+    request: async (route, args) => {
+      assert.equal(route, 'GET /repos/{owner}/{repo}/rules/branches/{branch}');
+      assert.equal(args.branch, 'next');
+      return { data: f.rules };
+    },
     rest: {
       repos: {
         get: async () => ({ data: { full_name: repository, default_branch: 'main' } }),
@@ -84,11 +115,14 @@ function fixture(kind = 'pull_request') {
           data: { merge_base_commit: { sha: f.comparisonBase }, status: 'ahead' },
         }),
         createCommitStatus: async (x) => {
+          if (f.failWrite === f.writes.length) {
+            throw new Error('Interrupted publication');
+          }
           f.writes.push(x);
         },
       },
       actions: { getWorkflowRun: async (x) => ({ data: x.run_id === 50 ? f.own : f.source }) },
-      git: { getRef: async () => ({ data: { object: { sha: f.base } } }) },
+      git: { getRef: async (x) => ({ data: { object: { sha: x.ref === 'heads/main' ? f.main : f.base } } }) },
       pulls: { get: async (x) => ({ data: f.pulls.find((p) => p.number === x.pull_number) }) },
     },
     graphql: async () => ({
@@ -318,7 +352,12 @@ test('publication has no checkout, scripts or candidate outputs', async () => {
   assert(publish.includes('${{ needs.codeql.result }}'));
   // oxlint-disable-next-line no-template-curly-in-string -- This is a literal GitHub Actions expression.
   assert(publish.includes('${{ needs.detector.result }}'));
-  assert(!before.includes('statuses: write'));
+  const [authorize, initialize] = before.split('  initialize:');
+  assert(!authorize.includes('statuses: write'));
+  assert(initialize.includes('statuses: write'));
+  assert(!initialize.includes('checkout@'));
+  assert(!initialize.includes('run:'));
+  assert(!initialize.includes('download-artifact'));
   assert(!yaml.includes('secrets: inherit'));
   assert(yaml.includes('permissions: {}'));
 });
@@ -509,6 +548,81 @@ test('real tooling guard rejects candidate detector and toolchain substitution',
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+reject('loose next checks without merge queue are rejected', (f) => {
+  f.rules = [{ type: 'required_status_checks' }];
+});
+reject(
+  'merge queue removal prevents publication',
+  (f) => {
+    f.rules = [];
+  },
+  1,
+);
+reject('old main bridge rerun rejected at authorization', (f) => {
+  f.main = 'e'.repeat(40);
+});
+reject('workflow SHA mismatch rejected at authorization', (f) => {
+  f.env.WORKFLOW_SHA = 'e'.repeat(40);
+});
+reject(
+  'main advance during compute prevents publication',
+  (f) => {
+    f.main = 'e'.repeat(40);
+  },
+  1,
+);
+reject(
+  'main advance during pagination prevents publication',
+  (f) => {
+    f.duringPagination = () => {
+      f.main = 'e'.repeat(40);
+    };
+  },
+  1,
+);
+reject(
+  'selected-job rerun cannot reuse an earlier pending initialization',
+  (f) => {
+    f.own.run_attempt = 2;
+    f.env.BRIDGE_ATTEMPT = '2';
+  },
+  1,
+);
+test('all contexts become pending before either scan may start', async () => {
+  const f = fixture();
+  await f.authorize();
+  f.env.STATUS_PHASE = 'pending';
+  await f.execute(2);
+  assert.equal(f.writes.length, 3);
+  assert(f.writes.every((x) => x.state === 'pending' && x.sha === head));
+  assert.equal(f.outputs.ready, 'true');
+  assert.equal(f.outputs.attempt, '1');
+  assert.equal((yaml.match(/needs.initialize.outputs.attempt == github.run_attempt/gu) || []).length, 3);
+  assert.equal((yaml.match(/needs: \[authorize, initialize\]/gu) || []).length, 2);
+  assert.equal((yaml.match(/if: needs.initialize.outputs.ready == 'true'/gu) || []).length, 2);
+});
+test('partial pending publication cannot authorize scans', async () => {
+  const f = fixture();
+  await f.authorize();
+  f.env.STATUS_PHASE = 'pending';
+  f.failWrite = 1;
+  await assert.rejects(() => f.execute(2));
+  assert.equal(f.outputs.ready, undefined);
+  assert.equal(f.writes.length, 1);
+  assert.equal(f.writes[0].state, 'pending');
+});
+test('interrupted result publication retains blocking pending detector', async () => {
+  const f = fixture();
+  await f.authorize();
+  f.env.STATUS_PHASE = 'pending';
+  await f.execute(2);
+  f.env.STATUS_PHASE = 'result';
+  f.env.DETECTOR_RESULT = 'failure';
+  f.failWrite = 5;
+  await assert.rejects(() => f.execute(1));
+  const latest = new Map(f.writes.map((x) => [x.context, x.state]));
+  assert.equal(latest.get('Next CI / detect-breaking-changes'), 'pending');
 });
 async function runCases() {
   try {
