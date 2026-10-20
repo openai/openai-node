@@ -9,6 +9,13 @@ export type { WebSocketStreamOptions } from '../../../internal/ws';
 
 export type { SidebandWSParameters, SidebandWSReconnectOptions } from './ws-base';
 
+/**
+ * Native Node WebSocket options.
+ *
+ * `maxPayload` defaults to 0 (unlimited). Set a byte limit supported by `ws` to cap incoming messages.
+ * `perMessageDeflate` defaults to false, including with a finite payload limit.
+ * Set it to true or a `ws` configuration object to enable compression.
+ */
 export interface SidebandWSClientOptions extends WS.ClientOptions, SidebandWSBaseOptions {}
 
 export class SidebandWS extends SidebandWSBase<NodeWebSocket> {
@@ -32,7 +39,9 @@ export class SidebandWS extends SidebandWSBase<NodeWebSocket> {
   }
 
   protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
-    const ws = new WS.WebSocket(url, {
+    const socketOptions: WS.ClientOptions = {
+      maxPayload: 0,
+      perMessageDeflate: false,
       ...this._wsOptions,
       headers: {
         ...this._client._buildWebSocketHeaders(authHeaders),
@@ -41,7 +50,10 @@ export class SidebandWS extends SidebandWSBase<NodeWebSocket> {
         ),
       },
       followRedirects: false,
-    });
+    };
+    socketOptions.maxPayload ??= 0;
+    socketOptions.perMessageDeflate ??= false;
+    const ws = new WS.WebSocket(url, socketOptions);
     return new NodeWebSocket(ws);
   }
 }
