@@ -10,6 +10,13 @@ export type { WebSocketStreamOptions } from '../../internal/ws';
 
 export type { ResponsesWSReconnectOptions } from './ws-base';
 
+/**
+ * Native Node WebSocket options.
+ *
+ * `maxPayload` defaults to 0 (unlimited). Set a byte limit supported by `ws` to cap incoming messages.
+ * `perMessageDeflate` defaults to false, including with a finite payload limit.
+ * Set it to true or a `ws` configuration object to enable compression.
+ */
 export interface ResponsesWSClientOptions extends WS.ClientOptions, ResponsesWSBaseOptions {
   /** Basic authentication forwarded by the Node `ws` transport. */
   auth?: string;
@@ -49,12 +56,18 @@ export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
 
   protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
     const capturedAuthHeaders = { ...authHeaders };
-    const socketOptions = this._credentials.build(
-      this._client,
-      capturedAuthHeaders,
-      this._wsOptions,
-      !this.socket ? this._usesSDKAPIKey(capturedAuthHeaders) : undefined,
-    );
+    const socketOptions: WS.ClientOptions = {
+      maxPayload: 0,
+      perMessageDeflate: false,
+      ...this._credentials.build(
+        this._client,
+        capturedAuthHeaders,
+        this._wsOptions,
+        !this.socket ? this._usesSDKAPIKey(capturedAuthHeaders) : undefined,
+      ),
+    };
+    socketOptions.maxPayload ??= 0;
+    socketOptions.perMessageDeflate ??= false;
     return new NodeWebSocket(new WS.WebSocket(url, socketOptions));
   }
 
