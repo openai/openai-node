@@ -236,13 +236,8 @@ jobs:
             const receipt = JSON.parse(process.env.RECEIPT);
             const run = positive(context.runId), attempt = positive(process.env.BRIDGE_ATTEMPT);
             if (process.env.STATUS_PHASE === 'result' && positive(process.env.INITIALIZATION_ATTEMPT) !== attempt) fail('Pending initialization must be from this attempt');
-            const prior = await github.paginate(github.rest.repos.listCommitStatusesForRef, {...context.repo, ref: receipt.head, per_page: 100});
-            for (const status of prior) {
-              if (!names.includes(status.context) || status.creator?.login !== 'github-actions[bot]') continue;
-              const marker = /\[next-ci:v1:(\d+):(\d+)\]/.exec(status.description || '');
-              if (!marker || status.target_url !== `https://github.com/${repository}/actions/runs/${marker[1]}`) continue;
-              if (+marker[1] > run || (+marker[1] === run && +marker[2] > attempt)) return;
-            }
+            // Commit statuses share an Actions bot identity across workflows.
+            // Never use their markers to skip this run's authenticated checks.
             await trustedRun();
             await currentTarget(receipt);
             // These are runner-owned needs results from same-commit trusted reusable jobs,
@@ -378,13 +373,8 @@ jobs:
             const receipt = JSON.parse(process.env.RECEIPT);
             const run = positive(context.runId), attempt = positive(process.env.BRIDGE_ATTEMPT);
             if (process.env.STATUS_PHASE === 'result' && positive(process.env.INITIALIZATION_ATTEMPT) !== attempt) fail('Pending initialization must be from this attempt');
-            const prior = await github.paginate(github.rest.repos.listCommitStatusesForRef, {...context.repo, ref: receipt.head, per_page: 100});
-            for (const status of prior) {
-              if (!names.includes(status.context) || status.creator?.login !== 'github-actions[bot]') continue;
-              const marker = /\[next-ci:v1:(\d+):(\d+)\]/.exec(status.description || '');
-              if (!marker || status.target_url !== `https://github.com/${repository}/actions/runs/${marker[1]}`) continue;
-              if (+marker[1] > run || (+marker[1] === run && +marker[2] > attempt)) return;
-            }
+            // Commit statuses share an Actions bot identity across workflows.
+            // Never use their markers to skip this run's authenticated checks.
             await trustedRun();
             await currentTarget(receipt);
             // These are runner-owned needs results from same-commit trusted reusable jobs,

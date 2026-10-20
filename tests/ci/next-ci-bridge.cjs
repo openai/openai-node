@@ -95,7 +95,10 @@ function fixture(kind = 'pull_request') {
   f.github = {
     rest: {
       repos: {
-        get: async () => ({ data: { full_name: repository, default_branch: 'main' } }),
+        get: async () => {
+          f.beforePublish?.();
+          return { data: { full_name: repository, default_branch: 'main' } };
+        },
         getCommit: async (x) => {
           assert.equal(x.ref, 'refs/pull/7/merge');
           return { data: f.merge };
@@ -137,7 +140,7 @@ function fixture(kind = 'pull_request') {
         return f.rules;
       }
       if (method === f.github.rest.repos.listCommitStatusesForRef) {
-        f.duringPagination?.();
+        f.beforePublish?.();
         return f.prior;
       }
       return f.pulls;
@@ -231,34 +234,27 @@ test('matrix failure conservatively fails both CodeQL contexts', async () => {
     ['failure', 'failure', 'success'],
   );
 });
-test('newer completed bridge result cannot be overwritten', async () => {
-  const f = fixture();
-  await f.authorize();
-  f.prior = [
-    {
-      context: 'Next CI / detect-breaking-changes',
-      creator: { login: 'github-actions[bot]' },
-      description: '[next-ci:v1:51:1]',
-      target_url: `https://github.com/${repository}/actions/runs/51`,
-    },
-  ];
-  await f.execute(1);
-  assert.equal(f.writes.length, 0);
-});
-test('same run newer attempt cannot be overwritten', async () => {
-  const f = fixture();
-  await f.authorize();
-  f.prior = [
-    {
-      context: 'Next CI / CodeQL (actions)',
-      creator: { login: 'github-actions[bot]' },
-      description: '[next-ci:v1:50:2]',
-      target_url: `https://github.com/${repository}/actions/runs/50`,
-    },
-  ];
-  await f.execute(1);
-  assert.equal(f.writes.length, 0);
-});
+for (const phase of ['pending', 'result']) {
+  test(`forged newer Actions marker cannot skip ${phase} publication`, async () => {
+    const f = fixture();
+    await f.authorize();
+    f.prior = [
+      {
+        context: 'Next CI / detect-breaking-changes',
+        creator: { login: 'github-actions[bot]' },
+        state: 'success',
+        description: '[next-ci:v1:999999:99]',
+        target_url: `https://github.com/${repository}/actions/runs/999999`,
+      },
+    ];
+    f.env.STATUS_PHASE = phase;
+    f.env.DETECTOR_RESULT = 'failure';
+    await f.execute(phase === 'pending' ? 2 : 1);
+    assert.equal(f.writes.length, 3);
+    assert.equal(f.writes[2].state, phase === 'pending' ? 'pending' : 'failure');
+    assert.equal(f.outputs.ready, 'true');
+  });
+}
 test('other CI workflow is ignored instead of recursively evaluated', async () => {
   const f = fixture();
   f.source.path = '.github/workflows/detect-breaking-changes.yml';
@@ -326,10 +322,10 @@ for (const [name, mutate, kind] of [
   ['base moves', (f) => (f.base = 'c'.repeat(40)), 'pull_request'],
   ['queue removed', (f) => (f.queue = []), 'merge_group'],
 ]) {
-  test(`pagination race: ${name}`, async () => {
+  test(`final validation race: ${name}`, async () => {
     const f = fixture(kind);
     await f.authorize();
-    f.duringPagination = () => mutate(f);
+    f.beforePublish = () => mutate(f);
     await assert.rejects(() => f.execute(1));
     assert.equal(f.writes.length, 0);
   });
@@ -474,9 +470,9 @@ reject(
   1,
 );
 reject(
-  'merge ref change during status pagination prevents publication',
+  'merge ref change before final validation prevents publication',
   (f) => {
-    f.duringPagination = () => {
+    f.beforePublish = () => {
       f.pull.merge_commit_sha = 'e'.repeat(40);
       f.merge.sha = 'e'.repeat(40);
     };
@@ -573,9 +569,9 @@ reject(
   1,
 );
 reject(
-  'main advance during pagination prevents publication',
+  'main advance before final validation prevents publication',
   (f) => {
-    f.duringPagination = () => {
+    f.beforePublish = () => {
       f.main = 'e'.repeat(40);
     };
   },
