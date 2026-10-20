@@ -93,11 +93,6 @@ function fixture(kind = 'pull_request') {
     DETECTOR_RESULT: 'success',
   };
   f.github = {
-    request: async (route, args) => {
-      assert.equal(route, 'GET /repos/{owner}/{repo}/rules/branches/{branch}');
-      assert.equal(args.branch, 'next');
-      return { data: f.rules };
-    },
     rest: {
       repos: {
         get: async () => ({ data: { full_name: repository, default_branch: 'main' } }),
@@ -135,7 +130,12 @@ function fixture(kind = 'pull_request') {
         },
       },
     }),
-    paginate: async (method) => {
+    paginate: async (method, args) => {
+      if (method === 'GET /repos/{owner}/{repo}/rules/branches/{branch}') {
+        assert.equal(args.branch, 'next');
+        assert.equal(args.per_page, 100);
+        return f.rules;
+      }
       if (method === f.github.rest.repos.listCommitStatusesForRef) {
         f.duringPagination?.();
         return f.prior;
@@ -589,6 +589,16 @@ reject(
   },
   1,
 );
+test('effective queue rule on a later page is accepted', async () => {
+  const f = fixture();
+  f.rules = [
+    ...Array.from({ length: 100 }, () => ({ type: 'required_status_checks' })),
+    { type: 'merge_queue' },
+  ];
+  await f.authorize();
+  await f.execute(1);
+  assert.equal(f.writes.length, 3);
+});
 test('all contexts become pending before either scan may start', async () => {
   const f = fixture();
   await f.authorize();
@@ -623,6 +633,102 @@ test('interrupted result publication retains blocking pending detector', async (
   await assert.rejects(() => f.execute(1));
   const latest = new Map(f.writes.map((x) => [x.context, x.state]));
   assert.equal(latest.get('Next CI / detect-breaking-changes'), 'pending');
+});
+test('hosted validation covers every guarded tooling path and retargeting', async () => {
+  const validation = fs.readFileSync(
+    path.join(__dirname, '../../.github/workflows/next-ci-validation.yml'),
+    'utf-8',
+  );
+  assert(validation.includes('types: [opened, synchronize, reopened, ready_for_review, edited]'));
+  const detector = fs.readFileSync(
+    path.join(__dirname, '../../.github/workflows/detect-breaking-changes.yml'),
+    'utf-8',
+  );
+  const [, guardStep] = detector.split('          git diff');
+  const [guard] = guardStep.split('      - name: Set up pnpm');
+  for (const [, spec] of guard.matchAll(/'(?<path>[^']+)'/gu)) {
+    let pattern = spec.replace(/^:\([^)]*\)/u, '');
+    if (pattern === 'scripts' || pattern === 'node_modules') {
+      pattern += '/**';
+    }
+    assert(validation.includes(`- '${pattern}'`), `Missing validation trigger: ${pattern}`);
+  }
+});
+test('frozen baseline consumers expose API breaks masked by ambient ts and declaration files', async () => {
+  const detector = fs.readFileSync(
+    path.join(__dirname, '../../.github/workflows/detect-breaking-changes.yml'),
+    'utf-8',
+  );
+  const restore = detector.match(
+    /rm -rf tests examples\n\s+git archive "\$BASE_SHA" tests examples \| tar -x/u,
+  )?.[0];
+  assert(restore);
+  assert(detector.indexOf(restore) > detector.indexOf('./scripts/bootstrap'));
+  assert(detector.indexOf(restore) < detector.lastIndexOf('./scripts/detect-breaking-changes "$BASE_SHA"'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'next-consumer-fixtures-'));
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: directory, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const write = (file, value) => {
+    fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
+    fs.writeFileSync(path.join(directory, file), value);
+  };
+  const compile = () =>
+    spawnSync(
+      process.execPath,
+      [
+        require.resolve('typescript/bin/tsc'),
+        '--pretty',
+        'false',
+        '--project',
+        path.join(directory, 'tsconfig.json'),
+      ],
+      { cwd: directory, encoding: 'utf-8' },
+    );
+  try {
+    git('init', '-q');
+    git('config', 'user.email', 'test@example.invalid');
+    git('config', 'user.name', 'Test');
+    write('src/index.ts', 'export default class SDK { removed() {} }');
+    write('tests/consumer.ts', "import SDK from 'openai'; new SDK().removed();");
+    write('examples/consumer.ts', 'export const example = true;');
+    write(
+      'tsconfig.json',
+      JSON.stringify({
+        compilerOptions: {
+          noEmit: true,
+          strict: true,
+          types: [],
+          module: 'preserve',
+          moduleResolution: 'bundler',
+          paths: { openai: ['./src/index.ts'] },
+        },
+        include: ['src', 'tests', 'examples'],
+      }),
+    );
+    git('add', '.');
+    git('commit', '-qm', 'trusted consumers');
+    const baseline = git('rev-parse', 'HEAD').trim();
+    assert.equal(compile().status, 0);
+    for (const shim of ['tests/shadow.d.ts', 'examples/shadow.ts']) {
+      write('src/index.ts', 'export default class SDK { present() {} }');
+      write(shim, "declare module 'openai' { const SDK: any; export default SDK; }");
+      git('add', '.');
+      const masked = compile();
+      assert.equal(masked.status, 0, masked.stdout);
+      const restored = spawnSync('bash', ['-euo', 'pipefail', '-c', restore], {
+        cwd: directory,
+        env: { ...process.env, BASE_SHA: baseline },
+        encoding: 'utf-8',
+      });
+      assert.equal(restored.status, 0, restored.stderr);
+      assert(!fs.existsSync(path.join(directory, shim)));
+      const detected = compile();
+      assert.notEqual(detected.status, 0);
+      assert(detected.stdout.includes("Property 'removed' does not exist"), detected.stdout);
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 async function runCases() {
   try {

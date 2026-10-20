@@ -2,7 +2,7 @@
 name: Next CI bridge validation
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
     branches: [main]
     paths:
       - '.github/workflows/next-ci*.yml'
@@ -13,6 +13,24 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.nvmrc'
+      - '.npmrc'
+      - '.pnpmfile.cjs'
+      - 'pnpm-workspace.yaml'
+      - '*.json'
+      - '*.ts'
+      - '*.mts'
+      - '*.cts'
+      - '*.js'
+      - '*.mjs'
+      - '*.cjs'
+      - '**/package.json'
+      - '**/.npmrc'
+      - '**/.pnpmfile.*'
+      - '**/oxfmt.config.*'
+      - '**/oxlint.config.*'
+      - '**/tsconfig*.json'
+      - 'node_modules/**'
+      - '**/node_modules/**'
 permissions: {}
 
 jobs:

@@ -45,7 +45,7 @@ jobs:
               if (sha(own.head_sha) !== sha(main.object.sha) || sha(process.env.WORKFLOW_SHA) !== main.object.sha) fail('Bridge workflow is superseded');
               // Queue-only merging is required: PR-head statuses alone cannot bind a
               // future merge to this base after next advances. Do not relax this gate.
-              const {data: rules} = await github.request('GET /repos/{owner}/{repo}/rules/branches/{branch}', {...context.repo, branch: 'next'});
+              const rules = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}', {...context.repo, branch: 'next', per_page: 100});
               if (!rules.some(rule => rule.type === 'merge_queue')) fail('Next must require merge queue enforcement');
             }
             async function nextBase() {
@@ -177,7 +177,7 @@ jobs:
               if (sha(own.head_sha) !== sha(main.object.sha) || sha(process.env.WORKFLOW_SHA) !== main.object.sha) fail('Bridge workflow is superseded');
               // Queue-only merging is required: PR-head statuses alone cannot bind a
               // future merge to this base after next advances. Do not relax this gate.
-              const {data: rules} = await github.request('GET /repos/{owner}/{repo}/rules/branches/{branch}', {...context.repo, branch: 'next'});
+              const rules = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}', {...context.repo, branch: 'next', per_page: 100});
               if (!rules.some(rule => rule.type === 'merge_queue')) fail('Next must require merge queue enforcement');
             }
             async function nextBase() {
@@ -319,7 +319,7 @@ jobs:
               if (sha(own.head_sha) !== sha(main.object.sha) || sha(process.env.WORKFLOW_SHA) !== main.object.sha) fail('Bridge workflow is superseded');
               // Queue-only merging is required: PR-head statuses alone cannot bind a
               // future merge to this base after next advances. Do not relax this gate.
-              const {data: rules} = await github.request('GET /repos/{owner}/{repo}/rules/branches/{branch}', {...context.repo, branch: 'next'});
+              const rules = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}', {...context.repo, branch: 'next', per_page: 100});
               if (!rules.some(rule => rule.type === 'merge_queue')) fail('Next must require merge queue enforcement');
             }
             async function nextBase() {
