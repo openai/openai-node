@@ -16,6 +16,13 @@ function resolveResourceRequestOptions(
   return Promise.resolve(options).then(buildOptions);
 }
 
+function withBodyFinalization<T extends RequestOptions>(
+  options: T,
+  finalization: { streamFromBody?: true; finalizeMultipart?: true },
+): T {
+  return { ...options, __metadata: { ...options.__metadata, ...finalization } };
+}
+
 /**
  * Turn audio into text or text into audio.
  */
@@ -56,7 +63,10 @@ export class Transcriptions extends APIResource {
       '/audio/transcriptions',
       resolveResourceRequestOptions(options, (options) =>
         multipartFormRequestOptions(
-          { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
+          withBodyFinalization(
+            { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
+            { streamFromBody: true },
+          ),
           this._client,
         ),
       ),

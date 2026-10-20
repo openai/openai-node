@@ -53,13 +53,19 @@ export class SidebandWS extends SidebandWSBase<NodeWebSocket> {
 
   protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
     const capturedAuthHeaders = { ...authHeaders };
-    const socketOptions = this._credentials.build(
+    const socketOptions: WS.ClientOptions = this._credentials.build(
       this._client,
       capturedAuthHeaders,
       this._wsOptions,
       !this.socket ? this._usesSDKAPIKey(capturedAuthHeaders) : undefined,
     );
-    return new NodeWebSocket(new WS.WebSocket(url, socketOptions));
+    return new NodeWebSocket(
+      new WS.WebSocket(url, {
+        ...socketOptions,
+        maxPayload: socketOptions.maxPayload ?? 0,
+        perMessageDeflate: socketOptions.perMessageDeflate ?? false,
+      }),
+    );
   }
 
   protected override async _prepareReconnectSocket(): Promise<(url: URL) => NodeWebSocket> {

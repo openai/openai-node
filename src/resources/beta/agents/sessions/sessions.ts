@@ -39,6 +39,13 @@ function resolveResourceRequestOptions(
   return Promise.resolve(options).then(buildOptions);
 }
 
+function withBodyFinalization<T extends RequestOptions>(
+  options: T,
+  finalization: { streamFromBody?: true; finalizeMultipart?: true },
+): T {
+  return { ...options, __metadata: { ...options.__metadata, ...finalization } };
+}
+
 // Recognizable options across SDK runtime versions. Keep this independent of
 // private RequestOptions fields so older handwritten runtimes still compile.
 const normalizeRequestOptionsForQueryKeys = new Set([
@@ -182,13 +189,18 @@ export class Sessions extends APIResource {
   ): APIPromise<AgentsAPI.AgentSession> | APIPromise<Stream<AgentsAPI.AgentSessionEvent>> {
     return this._client.post(
       '/agents/sessions',
-      resolveResourceRequestOptions(options, (options) => ({
-        body,
-        ...options,
-        headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-        stream: body.stream ?? false,
-        __security: { bearerAuth: true },
-      })),
+      resolveResourceRequestOptions(options, (options) =>
+        withBodyFinalization(
+          {
+            body,
+            ...options,
+            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+            stream: body.stream ?? false,
+            __security: { bearerAuth: true },
+          },
+          { streamFromBody: true },
+        ),
+      ),
     ) as APIPromise<AgentsAPI.AgentSession> | APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
   }
 
