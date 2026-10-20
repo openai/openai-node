@@ -6983,6 +6983,11 @@ export namespace BetaResponseInputItem {
     type: 'compaction_trigger';
 
     /**
+     * The unique ID of this compaction trigger.
+     */
+    id?: string | null;
+
+    /**
      * The agent that produced this item.
      */
     agent?: CompactionTrigger.Agent | null;
