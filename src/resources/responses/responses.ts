@@ -5578,6 +5578,11 @@ export namespace ResponseInputItem {
      * The type of the item. Always `compaction_trigger`.
      */
     type: 'compaction_trigger';
+
+    /**
+     * The unique ID of this compaction trigger.
+     */
+    id?: string | null;
   }
 
   /**
