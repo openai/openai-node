@@ -231,6 +231,21 @@ Methods:
 
 - <code title="post /audio/voices">client.audio.voices.<a href="./src/resources/audio/voices.ts">create</a>({ ...params }) -> Voice</code>
 
+## VoiceConsents
+
+Types:
+
+- <code><a href="./src/resources/audio/voice-consents.ts">VoiceConsent</a></code>
+- <code><a href="./src/resources/audio/voice-consents.ts">VoiceConsentDeleted</a></code>
+
+Methods:
+
+- <code title="post /audio/voice_consents">client.audio.voiceConsents.<a href="./src/resources/audio/voice-consents.ts">create</a>({ ...params }) -> VoiceConsent</code>
+- <code title="get /audio/voice_consents/{consent_id}">client.audio.voiceConsents.<a href="./src/resources/audio/voice-consents.ts">retrieve</a>(consentID) -> VoiceConsent</code>
+- <code title="post /audio/voice_consents/{consent_id}">client.audio.voiceConsents.<a href="./src/resources/audio/voice-consents.ts">update</a>(consentID, { ...params }) -> VoiceConsent</code>
+- <code title="get /audio/voice_consents">client.audio.voiceConsents.<a href="./src/resources/audio/voice-consents.ts">list</a>({ ...params }) -> VoiceConsentsPage</code>
+- <code title="delete /audio/voice_consents/{consent_id}">client.audio.voiceConsents.<a href="./src/resources/audio/voice-consents.ts">delete</a>(consentID) -> VoiceConsentDeleted</code>
+
 # Moderations
 
 Types:
