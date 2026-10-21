@@ -13,7 +13,7 @@ from typing import Any, cast
 from unittest import mock
 
 import custom_code_report as report
-from custom_code_test_support import GitTestCase, source_run
+from custom_code_test_support import GitTestCase, source_head, source_run
 
 WORKFLOW = (
     Path(__file__).resolve().parents[2] / ".github/workflows/castiron-custom-code-comment.yml"
@@ -43,7 +43,12 @@ class WorkflowTests(unittest.TestCase):
     def test_trusted_failure_publisher_updates_one_current_comment(self) -> None:
         head = "a" * 40
         run = {**source_run(head), "id": 20}
-        current = {"state": "open", "head": {"sha": head}}
+        current = {
+            "number": 3,
+            "state": "open",
+            "head": source_head(head),
+            "base": {"ref": "main", "repo": {"full_name": "openai/example"}},
+        }
         previous = {
             "id": 42,
             "user": {"type": "Bot", "login": "github-actions[bot]"},
@@ -72,6 +77,7 @@ class WorkflowTests(unittest.TestCase):
                                 "repo": {"owner": "openai", "repo": "example"},
                                 "serverUrl": "https://github.com",
                             },
+                            "run": event,
                             "current": pull,
                             "comments": comments,
                             "fallback_pulls": [{"number": 3}],
@@ -161,10 +167,11 @@ class CommentTests(GitTestCase):
         result, _ = report.build_report(self.repo, base, base)
         pull: dict[str, Any] = {
             "state": "open",
-            "head": {"sha": base},
+            "head": source_head(base),
             "base": {"sha": base, "ref": "main", "repo": {"full_name": "openai/example"}},
         }
         run = {
+            **source_run(base),
             "event": "pull_request",
             "path": ".github/workflows/castiron-custom-code.yml",
             "head_sha": base,
@@ -172,7 +179,7 @@ class CommentTests(GitTestCase):
             "pull_requests": [{"number": 1}],
         }
         with mock.patch.object(
-            report, "api", side_effect=[pull, run, [], pull, {"html_url": "published"}]
+            report, "api", side_effect=[pull, run, pull, [], pull, {"html_url": "published"}]
         ) as api:
             self.assertEqual(
                 report.publish_comment(
@@ -201,11 +208,12 @@ class CommentTests(GitTestCase):
             if "/pulls/" in path:
                 return {
                     "state": "open",
-                    "head": {"sha": base},
+                    "head": source_head(base),
                     "base": {"sha": base, "ref": "main", "repo": {"full_name": "openai/example"}},
                 }
             if "/actions/runs/" in path:
                 return {
+                    **source_run(base),
                     "event": "pull_request",
                     "path": ".github/workflows/castiron-custom-code.yml",
                     "head_sha": base,
@@ -239,17 +247,16 @@ class CommentTests(GitTestCase):
         result, _ = report.build_report(self.repo, base, base)
         pull: dict[str, Any] = {
             "state": "open",
-            "head": {"sha": base},
+            "head": source_head(base),
             "base": {"sha": base, "ref": "main", "repo": {"full_name": "openai/example"}},
         }
         run = {
+            **source_run(base),
             "event": "pull_request",
             "path": ".github/workflows/castiron-custom-code.yml",
             "head_sha": base,
             "run_attempt": 2,
             "pull_requests": [{"number": 1}],
-            "head_repository": {"owner": {"login": "contributor"}},
-            "head_branch": "fix/branch",
         }
         comment = {
             "id": 8,
@@ -262,11 +269,11 @@ class CommentTests(GitTestCase):
                 report.publish_comment(result, "openai/example", 1, 2, 1), "Skipped stale report"
             )
             self.assertEqual(api.call_count, 2)
-        with mock.patch.object(report, "api", side_effect=[pull, run, [comment]]) as api:
+        with mock.patch.object(report, "api", side_effect=[pull, run, pull, [comment]]) as api:
             self.assertEqual(
                 report.publish_comment(result, "openai/example", 1, 2, 2), "Skipped stale report"
             )
-            self.assertEqual(api.call_count, 3)
+            self.assertEqual(api.call_count, 4)
         with (
             mock.patch.object(
                 report, "api", side_effect=[pull, {**run, "pull_requests": []}, [], []]
@@ -282,24 +289,24 @@ class CommentTests(GitTestCase):
         with mock.patch.object(
             report,
             "api",
-            side_effect=[pull, {**run, "pull_requests": []}, [{"number": 1}], [comment]],
+            side_effect=[pull, {**run, "pull_requests": []}, [{"number": 1}], pull, [comment]],
         ) as api:
             self.assertEqual(
                 report.publish_comment(result, "openai/example", 1, 2, 2), "Skipped stale report"
             )
             self.assertIn(f"/commits/{base}/pulls", api.call_args_list[2].args[1])
         changed = {**pull, "head": {"sha": "f" * 40}}
-        with mock.patch.object(report, "api", side_effect=[pull, run, [], changed]) as api:
+        with mock.patch.object(report, "api", side_effect=[pull, run, pull, [], changed]) as api:
             self.assertEqual(
                 report.publish_comment(result, "openai/example", 1, 2, 2), "Skipped stale report"
             )
-            self.assertEqual(api.call_count, 4)
+            self.assertEqual(api.call_count, 5)
         for target in (
             {**pull["base"], "ref": "other"},
             {**pull["base"], "repo": {"full_name": "other/repo"}},
         ):
             with mock.patch.object(
-                report, "api", side_effect=[pull, run, [], {**pull, "base": target}]
+                report, "api", side_effect=[pull, run, pull, [], {**pull, "base": target}]
             ):
                 self.assertEqual(
                     report.publish_comment(result, "openai/example", 1, 2, 2),
@@ -353,7 +360,7 @@ class StatusPublisherTests(unittest.TestCase):
             "current": {
                 "number": 3,
                 "state": "open",
-                "head": {"sha": "c" * 40 if head_changed else head},
+                "head": source_head("c" * 40 if head_changed else head),
                 "base": {
                     "sha": "c" * 40 if base_changed else base,
                     "ref": branch,
@@ -561,6 +568,93 @@ class StatusPublisherTests(unittest.TestCase):
                 self.assertEqual(len(results), 2)
                 self.assertTrue(all(r["state"] == "success" for r in results))
                 self.assertTrue(all(len(r["description"]) <= 140 for r in results))
+
+
+@unittest.skipUnless(shutil.which("node"), "GitHub Actions JavaScript runtime")
+class SourcePublicationTests(unittest.TestCase):
+    def test_publishers_select_the_source_pull_request(self) -> None:
+        head = "b" * 40
+        run = {**source_run(head), "pull_requests": []}
+        current = {
+            "number": 3,
+            "state": "open",
+            "head": source_head(head),
+            "base": {"ref": "main", "repo": {"full_name": "openai/example"}},
+        }
+        for source_state in ("open", "closed"):
+            for other_head in (
+                {**source_head(head), "repo": {"id": 43}},
+                {**source_head(head), "ref": "other"},
+            ):
+                for step in (
+                    "Publish a trusted failure status",
+                    "Publish exact-head statuses after checking freshness",
+                ):
+                    with self.subTest(state=source_state, head=other_head, step=step):
+                        writes = run_publisher(
+                            step,
+                            {
+                                "run": run,
+                                "context": {
+                                    "payload": {"workflow_run": run},
+                                    "runId": 124,
+                                    "repo": {"owner": "openai", "repo": "example"},
+                                    "serverUrl": "https://github.com",
+                                },
+                                "current": current,
+                                "pulls_by_number": {
+                                    3: {**current, "state": source_state},
+                                    4: {**current, "number": 4, "head": other_head},
+                                },
+                                "associated_pulls": [{"number": 3}, {"number": 4}],
+                                "env": {"PUBLISH_ATTEMPT": "1"},
+                            },
+                        )
+                        if source_state == "closed":
+                            self.assertEqual(writes, [])
+                        elif step == "Publish a trusted failure status":
+                            self.assertEqual([w["issue_number"] for w in writes], [3])
+                        else:
+                            self.assertEqual(len(writes), 2)
+                            self.assertTrue(all(w["state"] == "failure" for w in writes))
+
+    def test_publishers_require_source_identity_and_accept_repository_renames(self) -> None:
+        head = "b" * 40
+        for source, branch, expected in (
+            ({"id": 42, "full_name": "renamed/example"}, "sdk", True),
+            (None, "sdk", False),
+            ({"id": None}, "sdk", False),
+            ({"id": "42"}, "sdk", False),
+            ({"id": 42}, None, False),
+            ({"id": 42}, "", False),
+        ):
+            run = {**source_run(head), "head_repository": source, "head_branch": branch}
+            current = {
+                "number": 3,
+                "state": "open",
+                "head": source_head(head),
+                "base": {"ref": "main", "repo": {"full_name": "openai/example"}},
+            }
+            for step in (
+                "Publish a trusted failure status",
+                "Publish exact-head statuses after checking freshness",
+            ):
+                with self.subTest(source=source, branch=branch, step=step):
+                    writes = run_publisher(
+                        step,
+                        {
+                            "run": run,
+                            "context": {
+                                "payload": {"workflow_run": run},
+                                "runId": 124,
+                                "repo": {"owner": "openai", "repo": "example"},
+                                "serverUrl": "https://github.com",
+                            },
+                            "current": current,
+                            "env": {"PUBLISH_ATTEMPT": "1"},
+                        },
+                    )
+                    self.assertEqual(bool(writes), expected)
 
 
 if __name__ == "__main__":

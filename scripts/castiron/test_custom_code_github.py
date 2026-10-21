@@ -14,7 +14,7 @@ from unittest import mock
 
 import custom_code_budget as budget
 import custom_code_report as report
-from custom_code_test_support import GENERATION, GitTestCase, source_run
+from custom_code_test_support import GENERATION, GitTestCase, source_head, source_run
 
 REPOSITORY = "openai/example"
 
@@ -28,7 +28,7 @@ class GitHubAPI:
         self.run = source_run(head, event)
         self.pull: dict[str, Any] = {
             "state": "open",
-            "head": {"sha": head},
+            "head": source_head(head),
             "base": {"sha": base, "ref": "main", "repo": {"full_name": REPOSITORY}},
         }
         self.associations = [{"number": 3}]
@@ -68,11 +68,12 @@ class GitHubReportTests(GitTestCase):
         run["pull_requests"] = []
         main: dict[str, Any] = {
             "state": "open",
-            "head": {"sha": head},
+            "head": source_head(head),
             "base": {"ref": "main", "repo": {"full_name": REPOSITORY}},
         }
         next_pull: dict[str, Any] = {**main, "base": {**main["base"], "ref": "next"}}
         for numbers in ([3, 4], [4, 3]):
+
             def api_response(_method: str, path: str, numbers: list[int] = numbers) -> Any:
                 if "/commits/" in path:
                     return [{"number": number} for number in numbers]
@@ -90,6 +91,61 @@ class GitHubReportTests(GitTestCase):
                 with self.assertRaisesRegex(report.ReportError, "multiple current"):
                     report.current_pull(REPOSITORY, run)
                 next_pull["base"]["ref"] = "next"
+
+    def test_current_pull_matches_source_repository_and_branch(self) -> None:
+        head = "b" * 40
+        run = {**source_run(head), "pull_requests": []}
+        current = {
+            "state": "open",
+            "head": source_head(head),
+            "base": {"ref": "main", "repo": {"full_name": REPOSITORY}},
+        }
+        for other_head in (
+            {**source_head(head), "repo": {"id": 43}},
+            {**source_head(head), "ref": "other"},
+        ):
+            for state in ("open", "closed"):
+
+                def api_response(
+                    _method: str,
+                    path: str,
+                    state: str = state,
+                    other_head: dict[str, Any] = other_head,
+                ) -> Any:
+                    if "/commits/" in path:
+                        return [{"number": 3}, {"number": 4}]
+                    return {
+                        "3": {**current, "state": state},
+                        "4": {**current, "head": other_head},
+                    }[path.rsplit("/", 1)[1]]
+
+                with (
+                    self.subTest(head=other_head, state=state),
+                    mock.patch.object(report, "api", side_effect=api_response),
+                ):
+                    self.assertEqual(
+                        report.current_pull(REPOSITORY, run),
+                        (3, "main") if state == "open" else None,
+                    )
+        for source, branch, expected in (
+            ({"id": 42, "full_name": "renamed/example"}, "sdk", (3, "main")),
+            (None, "sdk", None),
+            ({"id": None}, "sdk", None),
+            ({"id": "42"}, "sdk", None),
+            ({"id": 42}, None, None),
+            ({"id": 42}, "", None),
+        ):
+            candidate = {
+                **run,
+                "pull_requests": [{"number": 3}],
+                "head_repository": source,
+                "head_branch": branch,
+            }
+            with (
+                self.subTest(source=source, branch=branch),
+                mock.patch.object(report, "api", return_value=current),
+            ):
+                self.assertEqual(report.current_pull(REPOSITORY, candidate), expected)
 
     def test_trusted_report_recomputes_pr_output_in_a_bare_repository(self) -> None:
         generated, _ = self.baseline()

@@ -48,7 +48,7 @@ const github = {
   paginate: async (method, params) => {
     if (method === 'statuses') return data.previous_statuses || [];
     if (method === 'comments') return data.comments || [];
-    if (method === 'associations') return [];
+    if (method === 'associations') return data.associated_pulls || [];
     if (method === 'pulls' && params.head === 'contributor:sdk' && params.state === 'open') {
       return data.fallback_pulls || [];
     }

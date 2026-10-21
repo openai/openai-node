@@ -953,6 +953,22 @@ def associated_pulls(repository: str, run: dict[str, Any]) -> list[dict[str, Any
     raise ReportError("too many pull requests for source branch")
 
 
+def matches_source(pull: dict[str, Any], run: dict[str, Any]) -> bool:
+    """Commit associations are hints; publication belongs to the run's source."""
+    source = run.get("head_repository") or {}
+    branch = run.get("head_branch")
+    head = pull["head"]
+    return (
+        type(source.get("id")) is int
+        and source["id"] > 0
+        and isinstance(branch, str)
+        and bool(branch)
+        and (head.get("repo") or {}).get("id") == source["id"]
+        and head.get("ref") == branch
+        and head["sha"] == run["head_sha"]
+    )
+
+
 def current_pull(repository: str, run: dict[str, Any]) -> tuple[int, str] | None:
     """Resolve one live supported target; association metadata is discovery only."""
     current: list[tuple[int, str]] = []
@@ -962,7 +978,7 @@ def current_pull(repository: str, run: dict[str, Any]) -> tuple[int, str] | None
         pull = api("GET", f"repos/{repository}/pulls/{number}")
         if (
             pull["state"] == "open"
-            and pull["head"]["sha"] == run["head_sha"]
+            and matches_source(pull, run)
             and pull["base"]["repo"]["full_name"] == repository
             and pull["base"]["ref"] in TARGET_BRANCHES
         ):
@@ -1005,11 +1021,10 @@ def publish_comment(
         or run["head_sha"] != report["head_sha"]
     ):
         raise ReportError("workflow run does not match report PR/head")
-    associated = associated_pulls(repository, run)
-    if not any(pr["number"] == number for pr in associated):
-        raise ReportError("workflow run does not match report PR/head")
     if run["run_attempt"] != run_attempt:
         return "Skipped stale report"
+    if current_pull(repository, run) != (number, pull["base"]["ref"]):
+        raise ReportError("workflow run does not match report PR/head")
     artifact_run_id = artifact_run_id or run_id
     artifact_run_attempt = artifact_run_attempt or run_attempt
     body = render_report(
@@ -1041,6 +1056,7 @@ def publish_comment(
     pull = api("GET", f"{root}/pulls/{number}")
     if (
         pull["state"] != "open"
+        or not matches_source(pull, run)
         or pull["head"]["sha"] != report["head_sha"]
         or pull["base"]["ref"] != report.get("target_branch", "main")
         or pull["base"]["ref"] not in TARGET_BRANCHES
