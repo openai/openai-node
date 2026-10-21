@@ -86,13 +86,13 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
       'OpenAI-Beta': 'realtime=v1',
     };
 
+    const { maxPayload, ...nativeOptions } = props.options ?? {};
     const socketOptions: WS.ClientOptions = {
-      maxPayload: 0,
       perMessageDeflate: false,
-      ...props.options,
+      ...nativeOptions,
+      maxPayload: maxPayload ?? 0,
       headers,
     };
-    socketOptions.maxPayload ??= 0;
     socketOptions.perMessageDeflate ??= false;
     this.socket = new WS.WebSocket(this.url, protectWebSocketOptionsFromCredentialRedirects(socketOptions));
 

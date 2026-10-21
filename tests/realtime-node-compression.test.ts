@@ -1,5 +1,6 @@
 import { once } from 'node:events';
 import { createServer } from 'node:https';
+import { vi } from 'vitest';
 import { OpenAI } from 'openai';
 import { OpenAIRealtimeWS } from 'openai/realtime/ws';
 import { OpenAIRealtimeWS as BetaRealtimeWS } from 'openai/beta/realtime/ws';
@@ -113,6 +114,36 @@ describe.each([
       realtime.close();
     }
   });
+
+  test.each(['inherited', 'non-enumerable'] as const)(
+    'preserves an existing %s payload setting',
+    async (placement) => {
+      const readMaxPayload = vi.fn(() => 4096);
+      const options = { ca: lab.certificateAuthority };
+      const target = placement === 'inherited' ? {} : options;
+      Object.defineProperty(target, 'maxPayload', { get: readMaxPayload });
+      if (placement === 'inherited') {
+        Object.setPrototypeOf(options, target);
+      }
+      const incoming = once(peers, 'connection');
+      const realtime = new Realtime(
+        { model: 'gpt-realtime', options },
+        new OpenAI({ apiKey: 'synthetic-client-key', baseURL }),
+      );
+      const opened = once(realtime.socket, 'open');
+      try {
+        const [peer] = await incoming;
+        await opened;
+        const received =
+          realtime instanceof OpenAIRealtimeWS ? realtime.emitted('event') : realtime.emitted('event');
+        peer.send(JSON.stringify(message));
+        expect(await received).toEqual(message);
+        expect(readMaxPayload).toHaveBeenCalledTimes(1);
+      } finally {
+        realtime.close();
+      }
+    },
+  );
 });
 
 test.each([
@@ -148,3 +179,49 @@ test.each([
     realtime.close();
   }
 });
+
+test.each(['inherited', 'non-enumerable'] as const)(
+  'GA reconnect preserves an existing %s payload setting at each attempt',
+  async (placement) => {
+    const readMaxPayload = vi.fn(() => 4096);
+    const readHeaders = vi.fn(() => ({ 'X-Ordinary-Setting': 'preserved' }));
+    const options = { ca: lab.certificateAuthority };
+    const target = placement === 'inherited' ? {} : options;
+    Object.defineProperties(target, { maxPayload: { get: readMaxPayload }, headers: { get: readHeaders } });
+    if (placement === 'inherited') {
+      Object.setPrototypeOf(options, target);
+    }
+    const incoming = once(peers, 'connection');
+    const realtime = new OpenAIRealtimeWS(
+      {
+        model: 'gpt-realtime',
+        options,
+        reconnect: true,
+        maxReconnectAttempts: 1,
+        reconnectInitialDelay: 1,
+      },
+      new OpenAI({ apiKey: 'synthetic-client-key', baseURL }),
+    );
+    const opened = once(realtime.socket, 'open');
+    try {
+      const [first, firstRequest] = await incoming;
+      await opened;
+      expect(firstRequest.headers['x-ordinary-setting']).toBe('preserved');
+      expect(readMaxPayload).toHaveBeenCalledTimes(1);
+      expect(readHeaders).toHaveBeenCalledTimes(1);
+      const incomingAgain = once(peers, 'connection');
+      const recovered = realtime.emitted('reconnected');
+      first.close(1012);
+      const [replacement, secondRequest] = await incomingAgain;
+      await recovered;
+      expect(secondRequest.headers['x-ordinary-setting']).toBe('preserved');
+      const received = realtime.emitted('event');
+      replacement.send(JSON.stringify(message));
+      expect(await received).toEqual(message);
+      expect(readMaxPayload).toHaveBeenCalledTimes(2);
+      expect(readHeaders).toHaveBeenCalledTimes(2);
+    } finally {
+      realtime.close();
+    }
+  },
+);

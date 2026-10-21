@@ -242,6 +242,70 @@ describe('realtime translation WebSocket', () => {
     }, true);
   });
 
+  test.each([
+    { label: 'undefined defaults', maxPayload: undefined, perMessageDeflate: undefined },
+    { label: 'explicit zero and disabled', maxPayload: 0, perMessageDeflate: false },
+    { label: 'finite and enabled', maxPayload: 4096, perMessageDeflate: true },
+    {
+      label: 'finite and configured',
+      maxPayload: 4096,
+      perMessageDeflate: { clientNoContextTakeover: true },
+    },
+  ])('reads native connection options once: $label', async ({ maxPayload, perMessageDeflate }) => {
+    await withServer(async (server, baseURL) => {
+      server.on('connection', (peer) => peer.on('message', () => peer.send(JSON.stringify(terminal))));
+      const readMaxPayload = vi.fn(() => maxPayload);
+      const readPerMessageDeflate = vi.fn(() => perMessageDeflate);
+      const connection = await OpenAIRealtimeTranslationWS.create(
+        new OpenAI({ apiKey: 'synthetic-key', baseURL }),
+        {
+          model: 'translation-test',
+          options: {
+            ca: lab.certificateAuthority,
+            get maxPayload() {
+              return readMaxPayload();
+            },
+            get perMessageDeflate() {
+              return readPerMessageDeflate();
+            },
+          },
+        },
+      );
+      await once(connection.socket.platformSocket, 'open');
+      await expect(connection.finish({ timeoutMs: 5000 })).resolves.toBeUndefined();
+      expect(readMaxPayload).toHaveBeenCalledTimes(1);
+      expect(readPerMessageDeflate).toHaveBeenCalledTimes(1);
+    }, true);
+  });
+
+  test.each(['inherited', 'non-enumerable'] as const)(
+    'preserves existing %s payload and compression settings',
+    async (placement) => {
+      await withServer(async (server, baseURL) => {
+        server.on('connection', (peer) => peer.on('message', () => peer.send(JSON.stringify(terminal))));
+        const readMaxPayload = vi.fn(() => 4096);
+        const readPerMessageDeflate = vi.fn(() => false);
+        const options = { ca: lab.certificateAuthority };
+        const target = placement === 'inherited' ? {} : options;
+        Object.defineProperties(target, {
+          maxPayload: { get: readMaxPayload },
+          perMessageDeflate: { get: readPerMessageDeflate },
+        });
+        if (placement === 'inherited') {
+          Object.setPrototypeOf(options, target);
+        }
+        const connection = await OpenAIRealtimeTranslationWS.create(
+          new OpenAI({ apiKey: 'synthetic-key', baseURL }),
+          { model: 'translation-test', options },
+        );
+        await once(connection.socket.platformSocket, 'open');
+        await expect(connection.finish({ timeoutMs: 5000 })).resolves.toBeUndefined();
+        expect(readMaxPayload).toHaveBeenCalledTimes(1);
+        expect(readPerMessageDeflate).toHaveBeenCalledTimes(1);
+      }, true);
+    },
+  );
+
   test.each([false, true])(
     'closing while connecting is intentional cleanup (SDK error listener: %s)',
     async (observeErrors) => {
