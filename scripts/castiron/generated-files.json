@@ -3,19 +3,19 @@
   "files": {
     ".github/workflows/castiron-custom-code-comment.yml": {
       "mode": "100644",
-      "sha256": "c51faae4a106b873852075c369847719f3f99e59fa3e1cf32ce02f8f9d697afc"
+      "sha256": "f164e936ae81f10a505dccf6b67d61f6e601446a02b6def760b2f68df1784da3"
     },
     ".github/workflows/castiron-custom-code.yml": {
       "mode": "100644",
-      "sha256": "ba6d4c8bcd35481bd88245f60a566b223dc5272fc1bcc1e6834e4a8db9c52baf"
+      "sha256": "402da2fd16cc575eef7f4bf6bb1cff25272ee350452cb776f17c1589c036a3a1"
     },
     "api.md": {
       "mode": "100644",
-      "sha256": "08e48281c441689bf377d1c82f8831ae1e38819ba1a47104a04d0cfc758c1b63"
+      "sha256": "1cbb7a06d0e3305a81d13886eb635c246f94b6074faa07113525d89ebeabf11b"
     },
     "scripts/castiron/CUSTOM_CODE.md": {
       "mode": "100644",
-      "sha256": "129df1ca35b0f9a2e35ebf083f484aa714d54aa320b01c381e6c1778a1209fa0"
+      "sha256": "848aa1924023e8589cd7e75f039c4236805e08a6599f44353176fd6f0947ce12"
     },
     "scripts/castiron/README.md": {
       "mode": "100644",
@@ -23,7 +23,11 @@
     },
     "scripts/castiron/custom_code_budget.py": {
       "mode": "100644",
-      "sha256": "2beaac2eb0a963e717bf2bba93f52d6aea28fa7c4961591d4c2c4749945dbb7c"
+      "sha256": "4e0f6d1405f643bc5d589b4dc38dc7edde839e48761a0df0c720d83b76129328"
+    },
+    "scripts/castiron/custom_code_policy.py": {
+      "mode": "100644",
+      "sha256": "4c37b5efd0d30dab9b7a6e2d79625d3dfa83da65793b1776c5919a75ea1767ec"
     },
     "scripts/castiron/custom_code_report.py": {
       "mode": "100644",
@@ -35,7 +39,7 @@
     },
     "scripts/castiron/fixtures/github_publisher.cjs": {
       "mode": "100644",
-      "sha256": "114a35f8ed075f20d7fbcfab6dbbf16383866497a9d6e8290cf0928bba753468"
+      "sha256": "3c39971b4371f2dd547f0dfa692e2980f1e7a14844799fe1834f7d8d1ab0a60b"
     },
     "scripts/castiron/ruff.toml": {
       "mode": "100644",
@@ -43,19 +47,23 @@
     },
     "scripts/castiron/test_custom_code_budget.py": {
       "mode": "100644",
-      "sha256": "f355e1cb0ed88aa5a344cd6c68388802f5ed814d638b500e271b008cf07e0106"
+      "sha256": "71527f2e594989bb3f7f94a723322714bf9bd2669aa861719f29f462b925a4b6"
     },
     "scripts/castiron/test_custom_code_github.py": {
       "mode": "100644",
-      "sha256": "f3df0d260edd990532b32f15ed9cb4071834634bbb08a87d0077481e09128f98"
+      "sha256": "203acb9491117d6fb7e3c7fd3379055aa42d7e4884be4dcbef364c9f13ea4c7c"
+    },
+    "scripts/castiron/test_custom_code_policy.py": {
+      "mode": "100644",
+      "sha256": "14cc036ca21d6cdc271cce93027e7b90636d780d9550bf119f70a2316fab782d"
     },
     "scripts/castiron/test_custom_code_publication.py": {
       "mode": "100644",
-      "sha256": "1d93757664a6ffd26f21df2a4c07ac635393f5da1ab0283df75bad66faa2ef2e"
+      "sha256": "8ad786909e5206cd3232d24c7baac84c2a9d87cb57f8d1e189ecb165b5aa6044"
     },
     "scripts/castiron/test_custom_code_report.py": {
       "mode": "100644",
-      "sha256": "4429459798fd4cd57f6bbc6c0a9bbe88d76304cba07d2d2d4bfc22b5d403bdda"
+      "sha256": "f8f6b883c545963b4f82d8b078734298294607a9371e70e01fb0c3a37304be61"
     },
     "src/client.ts": {
       "mode": "100644",
@@ -275,11 +283,11 @@
     },
     "src/resources/audio/audio.ts": {
       "mode": "100644",
-      "sha256": "086a7de4f49968cd9e72e8be0aa39ffdd19d7358c97ce6bb60dbbe4d7a903af2"
+      "sha256": "9498f6e960c66d723d01355c8a27b49bf63f1a39a363411c1459bf266f60d501"
     },
     "src/resources/audio/index.ts": {
       "mode": "100644",
-      "sha256": "8d89ab2cef79a4c371a52c2f9afb7b829c127db153aa2b51039bee2e3515c6e1"
+      "sha256": "72b9c681ba668c18e96cc9f00fda5a094e4c99a84854550b1b7a546463a0d5d3"
     },
     "src/resources/audio/speech.ts": {
       "mode": "100644",
@@ -299,7 +307,7 @@
     },
     "src/resources/audio/voices.ts": {
       "mode": "100644",
-      "sha256": "b3d3d11c60d90db5e63531f07f2acfd7f7a22db625ca23752a59095189a7d244"
+      "sha256": "d1fbc87fc02c984f534203a739fa1272b11a4ee8ccc5cf40a990b44d6b2795d9"
     },
     "src/resources/batches.ts": {
       "mode": "100644",
@@ -1167,7 +1175,7 @@
     },
     "tests/api-resources/audio/voices.test.ts": {
       "mode": "100644",
-      "sha256": "8d972e2f9dc54fdcf5b3d0463a39de72c08a35069bf1aed52555f4cd431c5060"
+      "sha256": "c048d8f1bb907d91d02e837c725133ac927cd368b8c89ee4666d3b07f26e128a"
     },
     "tests/api-resources/batches.test.ts": {
       "mode": "100644",
