@@ -2249,10 +2249,8 @@ export class OpenAI {
         options.__metadata?.['preserveMultipartFilenames'] === true ? { stripFilenames: false } : undefined,
       );
       inputOptions.body = options.body = finalized.body;
-      inputOptions.headers = options.headers = finalized.headers;
-      if (x509Headers) {
-        Object.assign(x509Headers.requestHeaders, buildHeaders([finalized.headers]));
-      }
+      // Encoding headers belong to this body; keep caller headers for a replacement on retry.
+      options.headers = finalized.headers;
       inputOptions.__metadata = options.__metadata = {
         ...finalized.__metadata,
         finalizedMultipart: {
