@@ -59,7 +59,7 @@
     },
     "src/client.ts": {
       "mode": "100644",
-      "sha256": "a94feaa24513b145090e9ae59fcefc1dca888203a1d79286313f02968a284b80"
+      "sha256": "b3b2b1eb2f13a7f108bf6053485a2c5232a5a946eb1dca4d0ca8066bcc1215ee"
     },
     "src/internal/data-residency.ts": {
       "mode": "100644",
