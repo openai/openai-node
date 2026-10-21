@@ -273,7 +273,12 @@ import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
 import { mergeWebSocketAuthHeaders, webSocketHeaderRemovals } from './internal/ws';
-import { configureProvider, type Provider, type ProviderRuntime } from './internal/provider';
+import {
+  configureProvider,
+  isProviderTimeoutError,
+  type Provider,
+  type ProviderRuntime,
+} from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import {
   finalizeStreamingFormRequestOptions,
@@ -1638,7 +1643,11 @@ export class OpenAI {
           options.__metadata = { ...options.__metadata, hasStreamingBody: true };
         }
         await this.prepareRequest(built.req, { url: built.url, options });
-        await this._provider?.prepareRequest?.(built.req, { url: built.url, options });
+        await this._provider?.prepareRequest?.(built.req, {
+          url: built.url,
+          options,
+          timeout: built.timeout,
+        });
         x509Authentication.beginRequestPlanning();
         x509Authentication.authorizePlannedRequest(built.url, built.req, built.timeout, true);
         if (X509WorkloadIdentityAuth.isStreamingRequestBody(built.req.body)) {
@@ -1689,9 +1698,21 @@ export class OpenAI {
     x509Authentication?.bindRequest(options, req, this.adminAPIKey);
     let hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
+    let providerAuthStartedAt: { wallTime: number; monotonicTime: number } | undefined;
+    let providerAuthTimeout: Errors.APIConnectionTimeoutError | undefined;
     if (!x509Authentication) {
       await this.prepareRequest(req, { url, options });
-      await this._provider?.prepareRequest?.(req, { url, options });
+      if (this._provider?.timeoutIncludesAuth) {
+        providerAuthStartedAt = { wallTime: Date.now(), monotonicTime: performance.now() };
+      }
+      try {
+        await this._provider?.prepareRequest?.(req, { url, options, timeout });
+      } catch (error) {
+        if (!providerAuthStartedAt || !isProviderTimeoutError(error)) {
+          throw error;
+        }
+        providerAuthTimeout = error;
+      }
     }
     x509Authentication?.adoptRequestHeaders(req);
     if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
@@ -1701,7 +1722,8 @@ export class OpenAI {
     /** Not an API request ID, just for correlating local log entries. */
     const requestLogID = 'log_' + ((Math.random() * (1 << 24)) | 0).toString(16).padStart(6, '0');
     const retryLogStr = retryOfRequestLogID === undefined ? '' : `, retryOf: ${retryOfRequestLogID}`;
-    const startTime = x509Authentication?.requestStartedAt(options) ?? Date.now();
+    const startTime =
+      x509Authentication?.requestStartedAt(options) ?? providerAuthStartedAt?.wallTime ?? Date.now();
 
     if (this.logLevel === 'debug') {
       // Summarize serialized strings without reparsing or re-running caller serialization hooks.
@@ -1733,12 +1755,17 @@ export class OpenAI {
             x509Authentication ? callerSignal : undefined,
           )
         : new AbortController();
-    const remainingTimeout = x509Authentication?.remainingTimeout(options, timeout) ?? timeout;
+    const remainingTimeout =
+      x509Authentication?.remainingTimeout(options, timeout) ??
+      (providerAuthStartedAt ? timeout - (performance.now() - providerAuthStartedAt.monotonicTime) : timeout);
+    if (providerAuthStartedAt && remainingTimeout <= 0) {
+      providerAuthTimeout ??= new Errors.APIConnectionTimeoutError();
+    }
     const fetchWithAuth = x509Authentication ? OpenAI.prototype.fetchWithAuth : this.fetchWithAuth;
     x509Authentication?.releaseRequestBody(req.body);
-    const response = await fetchWithAuth
-      .call(this, url, req, remainingTimeout, controller, security)
-      .catch(castToError);
+    const response =
+      providerAuthTimeout ??
+      (await fetchWithAuth.call(this, url, req, remainingTimeout, controller, security).catch(castToError));
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
