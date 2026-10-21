@@ -46,6 +46,11 @@ export function validateAgentFilePath(path: string): void {
   }
 }
 
+interface FilePathNode {
+  children: Map<string, FilePathNode>;
+  file?: true;
+}
+
 function preflight(files: Record<string, Uploadable>, options: RequestOptions): [string, Uploadable][] {
   const entries = Object.entries(files);
   const headers = buildHeaders([options.headers]);
@@ -56,14 +61,26 @@ function preflight(files: Record<string, Uploadable>, options: RequestOptions): 
   ) {
     throw new OpenAIError('Do not reuse an Idempotency-Key across multiple file uploads');
   }
-  const paths = new Set(entries.map(([path]) => path));
+  const paths: FilePathNode = { children: new Map() };
   for (const [path] of entries) {
     validateAgentFilePath(path);
-    for (let slash = path.lastIndexOf('/'); slash > 0; slash = path.lastIndexOf('/', slash - 1)) {
-      if (paths.has(path.slice(0, slash))) {
+    // Index components once instead of repeatedly hashing overlapping ancestor prefixes.
+    let node = paths;
+    for (const part of path.split('/')) {
+      if (node.file) {
         throw new OpenAIError('Agent file destinations conflict');
       }
+      let child = node.children.get(part);
+      if (!child) {
+        child = { children: new Map() };
+        node.children.set(part, child);
+      }
+      node = child;
     }
+    if (node.children.size > 0) {
+      throw new OpenAIError('Agent file destinations conflict');
+    }
+    node.file = true;
   }
   return entries;
 }
