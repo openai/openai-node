@@ -5,10 +5,6 @@ import { APIPromise } from '../core/api-promise';
 import { RequestOptions } from '../internal/request-options';
 import { createEmbedding } from '../lib/embeddings';
 
-type Base64EmbeddingResponse = Omit<CreateEmbeddingResponse, 'data'> & {
-  data: Array<Omit<Embedding, 'embedding'> & { embedding: string }>;
-};
-
 /**
  * Get a vector representation of a given input that can be easily consumed by machine learning models and algorithms.
  */
@@ -143,6 +139,10 @@ export interface EmbeddingCreateParams {
    */
   user?: string;
 }
+
+type Base64EmbeddingResponse = Omit<CreateEmbeddingResponse, 'data'> & {
+  data: Array<Omit<Embedding, 'embedding'> & { embedding: string }>;
+};
 
 export declare namespace Embeddings {
   export {

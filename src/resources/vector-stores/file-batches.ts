@@ -87,8 +87,8 @@ export class FileBatches extends APIResource {
     body: FileBatchCreateParams,
     options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFileBatch> {
-    const batch = await this.create(vectorStoreId, body, options);
-    return await this.poll(vectorStoreId, batch.id, options);
+    const created = await this.create(vectorStoreId, body, options);
+    return await this.poll(vectorStoreId, created.id, options);
   }
 
   /**

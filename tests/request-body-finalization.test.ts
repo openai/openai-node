@@ -58,6 +58,10 @@ async function expectCompletion(result: unknown, stream: boolean) {
   }
 }
 
+async function* multipartAudioBytes() {
+  yield new TextEncoder().encode('audio');
+}
+
 describe('request body finalization', () => {
   test('observes immediate image-edit body mutations before normalization', async () => {
     const body = { image: new File(['image'], 'image.png'), prompt: 'old', safety_identifier: null };
@@ -468,6 +472,28 @@ describe('request body finalization', () => {
       : client.audio.transcriptions.create(body);
     body.stream = stream;
     await expectCompletion(await pending, stream);
+  });
+
+  test.each([
+    { label: 'boxed true', stream: new Object(true), encoded: null, streaming: false },
+    { label: 'boxed false', stream: new Object(false), encoded: null, streaming: false },
+    { label: 'string true', stream: 'true', encoded: 'true', streaming: true },
+  ])('selects the parser from the emitted multipart $label field', async ({ stream, encoded, streaming }) => {
+    const file = toStreamingFile(multipartAudioBytes(), 'audio.wav');
+    const client = clientFor(
+      vi.fn<typeof globalThis.fetch>(async (input, init) => {
+        const form = await new Request(input, init).formData();
+        expect(form.get('stream')).toBe(encoded);
+        return completionResponse(streaming);
+      }),
+    );
+    await expectCompletion(
+      await client.audio.transcriptions.create(
+        { model: 'gpt-4o-transcribe', file, stream: false },
+        { body: { model: 'gpt-4o-transcribe', file, stream } },
+      ),
+      streaming,
+    );
   });
 
   test.each([false, true])(

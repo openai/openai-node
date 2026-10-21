@@ -484,7 +484,8 @@ const createStreamingFormRequestOptions = (
       multipartEntries = preservedFilenames
         ? snapshotPreservedUploadEntries(capturedEntries, preservedFilenames)
         : capturedEntries;
-      return String('stream' in capturedBody ? capturedBody.stream : undefined) === 'true';
+      const stream: unknown = Object.getOwnPropertyDescriptor(capturedBody, 'stream')?.value;
+      return stream === true || stream === 'true';
     });
   }
 
