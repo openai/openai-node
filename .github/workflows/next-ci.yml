@@ -26,6 +26,7 @@ jobs:
         env:
           BRIDGE_ATTEMPT: ${{ github.run_attempt }}
           WORKFLOW_SHA: ${{ github.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
         with:
           script: |
             const repository = 'openai/openai-node';
@@ -41,12 +42,23 @@ jobs:
               if (own.repository.full_name !== repository || own.path?.split('@')[0] !== '.github/workflows/next-ci.yml' ||
                   own.head_branch !== 'main' || !['workflow_dispatch', 'workflow_run'].includes(own.event) ||
                   own.run_attempt !== positive(process.env.BRIDGE_ATTEMPT)) fail('Unexpected bridge execution');
-              const {data: main} = await github.rest.git.getRef({...context.repo, ref: 'heads/main'});
-              if (sha(own.head_sha) !== sha(main.object.sha) || sha(process.env.WORKFLOW_SHA) !== main.object.sha) fail('Bridge workflow is superseded');
+              if (sha(own.head_sha) !== sha(process.env.WORKFLOW_SHA)) fail('Bridge workflow identity changed');
               // Queue-only merging is required: PR-head statuses alone cannot bind a
               // future merge to this base after next advances. Do not relax this gate.
               const rules = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}', {...context.repo, branch: 'next', per_page: 100});
               if (!rules.some(rule => rule.type === 'merge_queue')) fail('Next must require merge queue enforcement');
+            }
+            async function selectedPolicy(receipt, expected) {
+              const file = '.github/scripts/next-ci-policy.cjs';
+              const {data} = await github.rest.repos.getContent({...context.repo, path: file, ref: sha(process.env.WORKFLOW_SHA)});
+              if (data.type !== 'file' || data.encoding !== 'base64') fail('Trusted selector helper is unavailable');
+              const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
+              const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'next-ci-helper-'));
+              try {
+                const filename = path.join(directory, 'helper.cjs');
+                fs.writeFileSync(filename, Buffer.from(data.content, 'base64'));
+                return await require(filename).selectPolicy({github, repository, workflowSha: sha(process.env.WORKFLOW_SHA), receipt, expected});
+              } finally { fs.rmSync(directory, {recursive: true, force: true}); }
             }
             async function nextBase() {
               const {data} = await github.rest.git.getRef({...context.repo, ref: 'heads/next'});
@@ -105,6 +117,10 @@ jobs:
               const number = positive(context.payload.inputs?.pull_number);
               const {data: pull} = await github.rest.pulls.get({...context.repo, pull_number: number});
               receipt = {repository, kind: 'pull_request', pull: number, head: sha(pull.head.sha), base: await nextBase()};
+              const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {...context.repo, workflow_id: 'ci.yml', head_sha: receipt.head, event: 'pull_request', status: 'completed', per_page: 100});
+              const source = runs.filter(run => run.path?.split('@')[0] === '.github/workflows/ci.yml').sort((a,b) => b.id-a.id)[0];
+              if (!source) fail('No completed native CI source exists for this PR head');
+              receipt.source = {id: positive(source.id), head_sha: sha(source.head_sha), event: source.event, run_attempt: positive(source.run_attempt)};
             } else if (context.eventName === 'workflow_run') {
               const signal = context.payload.workflow_run;
               const {data: source} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: positive(signal.id)});
@@ -129,8 +145,11 @@ jobs:
                 if (source.head_repository.full_name !== repository) fail('Foreign queue source');
                 receipt = {repository, kind: source.event, head, base};
               }
+              receipt.source = {id: positive(source.id), head_sha: sha(source.head_sha), event: source.event, run_attempt: positive(source.run_attempt)};
             } else fail('Unsupported bridge event');
             receipt.scan = receipt.kind === 'pull_request' ? await mergeTree(receipt.pull, receipt.head, receipt.base) : receipt.head;
+            await currentTarget(receipt);
+            receipt.policy = await selectedPolicy(receipt);
             await currentTarget(receipt);
             core.setOutput('receipt', JSON.stringify(receipt));
 
@@ -156,6 +175,7 @@ jobs:
         env:
           BRIDGE_ATTEMPT: ${{ github.run_attempt }}
           WORKFLOW_SHA: ${{ github.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
           STATUS_PHASE: pending
           RECEIPT: ${{ needs.authorize.outputs.receipt }}
         with:
@@ -173,12 +193,23 @@ jobs:
               if (own.repository.full_name !== repository || own.path?.split('@')[0] !== '.github/workflows/next-ci.yml' ||
                   own.head_branch !== 'main' || !['workflow_dispatch', 'workflow_run'].includes(own.event) ||
                   own.run_attempt !== positive(process.env.BRIDGE_ATTEMPT)) fail('Unexpected bridge execution');
-              const {data: main} = await github.rest.git.getRef({...context.repo, ref: 'heads/main'});
-              if (sha(own.head_sha) !== sha(main.object.sha) || sha(process.env.WORKFLOW_SHA) !== main.object.sha) fail('Bridge workflow is superseded');
+              if (sha(own.head_sha) !== sha(process.env.WORKFLOW_SHA)) fail('Bridge workflow identity changed');
               // Queue-only merging is required: PR-head statuses alone cannot bind a
               // future merge to this base after next advances. Do not relax this gate.
               const rules = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}', {...context.repo, branch: 'next', per_page: 100});
               if (!rules.some(rule => rule.type === 'merge_queue')) fail('Next must require merge queue enforcement');
+            }
+            async function selectedPolicy(receipt, expected) {
+              const file = '.github/scripts/next-ci-policy.cjs';
+              const {data} = await github.rest.repos.getContent({...context.repo, path: file, ref: sha(process.env.WORKFLOW_SHA)});
+              if (data.type !== 'file' || data.encoding !== 'base64') fail('Trusted selector helper is unavailable');
+              const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
+              const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'next-ci-helper-'));
+              try {
+                const filename = path.join(directory, 'helper.cjs');
+                fs.writeFileSync(filename, Buffer.from(data.content, 'base64'));
+                return await require(filename).selectPolicy({github, repository, workflowSha: sha(process.env.WORKFLOW_SHA), receipt, expected});
+              } finally { fs.rmSync(directory, {recursive: true, force: true}); }
             }
             async function nextBase() {
               const {data} = await github.rest.git.getRef({...context.repo, ref: 'heads/next'});
@@ -236,9 +267,9 @@ jobs:
             const receipt = JSON.parse(process.env.RECEIPT);
             const run = positive(context.runId), attempt = positive(process.env.BRIDGE_ATTEMPT);
             if (process.env.STATUS_PHASE === 'result' && positive(process.env.INITIALIZATION_ATTEMPT) !== attempt) fail('Pending initialization must be from this attempt');
-            // Commit statuses share an Actions bot identity across workflows.
-            // Never use their markers to skip this run's authenticated checks.
+            // Status markers are not authority: other Actions share this bot identity.
             await trustedRun();
+            await selectedPolicy(receipt, receipt.policy);
             await currentTarget(receipt);
             // These are runner-owned needs results from same-commit trusted reusable jobs,
             // never candidate artifacts, job outputs, or source workflow conclusions.
@@ -271,6 +302,7 @@ jobs:
     with:
       candidate_sha: ${{ fromJSON(needs.authorize.outputs.receipt).scan }}
       comparison_base: ${{ fromJSON(needs.authorize.outputs.receipt).base }}
+      tooling_sha: ${{ fromJSON(needs.authorize.outputs.receipt).policy.policy_sha }}
 
   publish:
     needs: [authorize, initialize, codeql, detector]
@@ -290,6 +322,7 @@ jobs:
         env:
           BRIDGE_ATTEMPT: ${{ github.run_attempt }}
           WORKFLOW_SHA: ${{ github.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
           STATUS_PHASE: result
           INITIALIZATION_ATTEMPT: ${{ needs.initialize.outputs.attempt }}
           RECEIPT: ${{ needs.authorize.outputs.receipt }}
@@ -310,12 +343,23 @@ jobs:
               if (own.repository.full_name !== repository || own.path?.split('@')[0] !== '.github/workflows/next-ci.yml' ||
                   own.head_branch !== 'main' || !['workflow_dispatch', 'workflow_run'].includes(own.event) ||
                   own.run_attempt !== positive(process.env.BRIDGE_ATTEMPT)) fail('Unexpected bridge execution');
-              const {data: main} = await github.rest.git.getRef({...context.repo, ref: 'heads/main'});
-              if (sha(own.head_sha) !== sha(main.object.sha) || sha(process.env.WORKFLOW_SHA) !== main.object.sha) fail('Bridge workflow is superseded');
+              if (sha(own.head_sha) !== sha(process.env.WORKFLOW_SHA)) fail('Bridge workflow identity changed');
               // Queue-only merging is required: PR-head statuses alone cannot bind a
               // future merge to this base after next advances. Do not relax this gate.
               const rules = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}', {...context.repo, branch: 'next', per_page: 100});
               if (!rules.some(rule => rule.type === 'merge_queue')) fail('Next must require merge queue enforcement');
+            }
+            async function selectedPolicy(receipt, expected) {
+              const file = '.github/scripts/next-ci-policy.cjs';
+              const {data} = await github.rest.repos.getContent({...context.repo, path: file, ref: sha(process.env.WORKFLOW_SHA)});
+              if (data.type !== 'file' || data.encoding !== 'base64') fail('Trusted selector helper is unavailable');
+              const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
+              const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'next-ci-helper-'));
+              try {
+                const filename = path.join(directory, 'helper.cjs');
+                fs.writeFileSync(filename, Buffer.from(data.content, 'base64'));
+                return await require(filename).selectPolicy({github, repository, workflowSha: sha(process.env.WORKFLOW_SHA), receipt, expected});
+              } finally { fs.rmSync(directory, {recursive: true, force: true}); }
             }
             async function nextBase() {
               const {data} = await github.rest.git.getRef({...context.repo, ref: 'heads/next'});
@@ -373,9 +417,9 @@ jobs:
             const receipt = JSON.parse(process.env.RECEIPT);
             const run = positive(context.runId), attempt = positive(process.env.BRIDGE_ATTEMPT);
             if (process.env.STATUS_PHASE === 'result' && positive(process.env.INITIALIZATION_ATTEMPT) !== attempt) fail('Pending initialization must be from this attempt');
-            // Commit statuses share an Actions bot identity across workflows.
-            // Never use their markers to skip this run's authenticated checks.
+            // Status markers are not authority: other Actions share this bot identity.
             await trustedRun();
+            await selectedPolicy(receipt, receipt.policy);
             await currentTarget(receipt);
             // These are runner-owned needs results from same-commit trusted reusable jobs,
             // never candidate artifacts, job outputs, or source workflow conclusions.

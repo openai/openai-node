@@ -7,6 +7,9 @@ on:
       candidate_sha:
         type: string
         required: true
+      tooling_sha:
+        type: string
+        required: false
       comparison_base:
         type: string
         required: true
@@ -27,6 +30,8 @@ jobs:
       contents: read
     env:
       BASE_SHA: ${{ inputs.comparison_base || github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+      TOOLING_SHA: ${{ inputs.tooling_sha || github.workflow_sha }}
+      CANDIDATE_SHA: ${{ inputs.candidate_sha || github.sha }}
       FETCH_DEPTH: 0
     steps:
       - name: Calculate fetch-depth
@@ -46,20 +51,9 @@ jobs:
       - name: Fetch comparison base
         run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
 
-      - name: Reject untrusted detector tooling changes
+      - name: Fetch authenticated detector tooling
         if: inputs.candidate_sha != ''
-        env:
-          TRUSTED_WORKFLOW_SHA: ${{ github.workflow_sha }}
-        run: |
-          # workflow_sha is runner-owned: trusted main for the bridge, the proposed
-          # workflow merge for its readonly PR validation. Never supplied by a candidate.
-          git fetch --no-tags --depth=1 origin "$TRUSTED_WORKFLOW_SHA"
-          git diff --exit-code "$TRUSTED_WORKFLOW_SHA" HEAD -- \
-            scripts node_modules ':(glob)**/node_modules/**' package.json pnpm-lock.yaml pnpm-workspace.yaml .nvmrc .npmrc .pnpmfile.cjs \
-            ':(top,glob)*.json' ':(top,glob)*.ts' ':(top,glob)*.mts' ':(top,glob)*.cts' \
-            ':(top,glob)*.js' ':(top,glob)*.mjs' ':(top,glob)*.cjs' \
-            ':(glob)**/package.json' ':(glob)**/.npmrc' ':(glob)**/.pnpmfile.*' \
-            ':(glob)**/oxfmt.config.*' ':(glob)**/oxlint.config.*' ':(glob)**/tsconfig*.json'
+        run: git fetch --no-tags --depth=1 origin "$TOOLING_SHA"
 
       - name: Set up pnpm
         if: inputs.candidate_sha == ''
@@ -94,10 +88,24 @@ jobs:
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
             --tmpfs /tmp:rw,exec,mode=1777 \
             --env HOME=/tmp/home --env CI=true --env "BASE_SHA=$BASE_SHA" \
+            --env "TOOLING_SHA=$TOOLING_SHA" --env "CANDIDATE_SHA=$CANDIDATE_SHA" \
             "$NODE_IMAGE" bash -euo pipefail <<'CANDIDATE'
               mkdir -p "$HOME" /tmp/candidate
-              cp -a /source/. /tmp/candidate/
+              cp -a /source/.git /tmp/candidate/.git
               cd /tmp/candidate
+              git config core.hooksPath /dev/null
+              git checkout --detach --force "$TOOLING_SHA"
+              # Archive raw committed bytes, ignoring candidate export attributes.
+              mkdir -p .git/info
+              printf '* -export-ignore -export-subst\n' > .git/info/attributes
+              # Exact candidate source is compiled, but it cannot replace executable tooling.
+              git diff --no-ext-diff --no-textconv --quiet "$TOOLING_SHA" "$CANDIDATE_SHA" -- \
+                ':(glob)src/**/package.json' ':(glob)src/**/.npmrc' ':(glob)src/**/.pnpm*' \
+                ':(glob)src/**/tsconfig*.json' ':(glob)src/**/oxlint*' ':(glob)src/**/oxfmt*' \
+                ':(glob)src/**/node_modules/**'
+              rm -rf src
+              git archive --worktree-attributes --output=.git/next-source.tar "$CANDIDATE_SHA" src
+              tar -xf .git/next-source.tar
               test "$(cat .nvmrc)" = 24
               export PATH="$HOME/.local/bin:$PATH"
               version=$(node -e 'const fs=require("fs"); const pm=JSON.parse(fs.readFileSync("package.json")).packageManager; if(!/^pnpm@[0-9]+\.[0-9]+\.[0-9]+$/.test(pm)) process.exit(1); process.stdout.write(pm);')
@@ -105,7 +113,10 @@ jobs:
               # Compatibility consumers come only from the authenticated target base.
               # Remove candidate extras, including ambient .ts/.d.ts module shims.
               rm -rf tests examples
-              git archive "$BASE_SHA" tests examples | tar -x
+              git archive --worktree-attributes --output=.git/next-consumers.tar "$BASE_SHA" tests examples
+              tar -xf .git/next-consumers.tar
+              # Installers and compiler configuration remain pinned, not baseline-selected.
+              git restore --source "$TOOLING_SHA" --worktree -- examples/package.json examples/tsconfig.json
               ./scripts/bootstrap
               ./scripts/detect-breaking-changes "$BASE_SHA"
           CANDIDATE

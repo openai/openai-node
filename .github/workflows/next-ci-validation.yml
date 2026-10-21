@@ -6,9 +6,10 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/next-ci*.yml'
+      - '.github/scripts/next-ci-policy.cjs'
       - '.github/workflows/codeql.yml'
       - '.github/workflows/detect-breaking-changes.yml'
-      - 'tests/ci/next-ci-bridge.cjs'
+      - 'tests/ci/next-ci-*.cjs'
       - 'scripts/**'
       - 'package.json'
       - 'pnpm-lock.yaml'

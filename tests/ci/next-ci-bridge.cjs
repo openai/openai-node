@@ -1,3 +1,4 @@
+const builtinRequire = require;
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -29,7 +30,7 @@ assert.equal(
 );
 const AsyncFunction = Object.getPrototypeOf(async () => null).constructor;
 const runScript = [scripts[0], scripts[2], scripts[1]].map(
-  (code) => new AsyncFunction('github', 'context', 'core', 'process', code),
+  (code) => new AsyncFunction('github', 'context', 'core', 'process', 'require', code),
 );
 const repository = 'openai/openai-node';
 const head = 'a'.repeat(40);
@@ -48,6 +49,34 @@ function fixture(kind = 'pull_request') {
     prior: [],
     comparisonBase: base,
   };
+  f.policy = {
+    schema_version: 1,
+    target_branch: 'next',
+    head_sha: head,
+    base_sha: base,
+    policy_sha: main,
+    bootstrap: false,
+    policy_reviews: [],
+  };
+  f.require = (name) =>
+    name.startsWith('node:')
+      ? builtinRequire(name)
+      : {
+          selectPolicy: async ({ receipt, expected }) => {
+            assert.equal(receipt.source.id, f.source.id);
+            assert.equal(receipt.source.head_sha, f.source.head_sha);
+            if (f.policyFailure) {
+              throw new Error('Canonical policy selection rejected live state');
+            }
+            assert.equal(receipt.base, f.policy.base_sha);
+            assert.equal(receipt.head, f.policy.head_sha);
+            if (expected) {
+              assert.deepEqual(f.policy, expected);
+            }
+            f.duringSelection?.();
+            return structuredClone(f.policy);
+          },
+        };
   f.pull = {
     number: 7,
     state: 'open',
@@ -95,6 +124,17 @@ function fixture(kind = 'pull_request') {
   f.github = {
     rest: {
       repos: {
+        getContent: async (x) => {
+          assert.equal(x.ref, main);
+          assert.equal(x.path, '.github/scripts/next-ci-policy.cjs');
+          return {
+            data: {
+              type: 'file',
+              encoding: 'base64',
+              content: Buffer.from('// trusted helper').toString('base64'),
+            },
+          };
+        },
         get: async () => {
           f.beforePublish?.();
           return { data: { full_name: repository, default_branch: 'main' } };
@@ -119,7 +159,12 @@ function fixture(kind = 'pull_request') {
           f.writes.push(x);
         },
       },
-      actions: { getWorkflowRun: async (x) => ({ data: x.run_id === 50 ? f.own : f.source }) },
+      actions: {
+        listWorkflowRuns: () => {
+          throw new Error('Use pagination');
+        },
+        getWorkflowRun: async (x) => ({ data: x.run_id === 50 ? f.own : f.source }),
+      },
       git: { getRef: async (x) => ({ data: { object: { sha: x.ref === 'heads/main' ? f.main : f.base } } }) },
       pulls: { get: async (x) => ({ data: f.pulls.find((p) => p.number === x.pull_number) }) },
     },
@@ -139,6 +184,9 @@ function fixture(kind = 'pull_request') {
         assert.equal(args.per_page, 100);
         return f.rules;
       }
+      if (method === f.github.rest.actions.listWorkflowRuns) {
+        return [f.source];
+      }
       if (method === f.github.rest.repos.listCommitStatusesForRef) {
         f.beforePublish?.();
         return f.prior;
@@ -147,7 +195,13 @@ function fixture(kind = 'pull_request') {
     },
   };
   f.execute = async (which) =>
-    runScript[which](f.github, f.context, { setOutput: (k, v) => (f.outputs[k] = v) }, { env: f.env });
+    runScript[which](
+      f.github,
+      f.context,
+      { setOutput: (k, v) => (f.outputs[k] = v) },
+      { env: f.env },
+      f.require,
+    );
   f.authorize = async () => {
     await f.execute(0);
     if (f.outputs.receipt) {
@@ -388,7 +442,7 @@ test('candidate execution cannot access runner cache authority', async () => {
   assert(isolated.includes('target=/source,readonly'));
   assert.equal((isolated.match(/--mount/gu) || []).length, 1);
   assert(isolated.includes('--tmpfs /tmp:rw,exec,mode=1777'));
-  assert(isolated.includes('cp -a /source/. /tmp/candidate/'));
+  assert(isolated.includes('cp -a /source/.git /tmp/candidate/.git'));
   for (const forbidden of [
     '--env-file',
     'ACTIONS_RUNTIME',
@@ -483,67 +537,11 @@ test('edited PR events trigger the ordinary CI signal', async () => {
   const ci = fs.readFileSync(path.join(__dirname, '../../.github/workflows/ci.yml'), 'utf-8');
   assert(/pull_request:\n\s+types: \[[^\]]*edited/u.test(ci));
 });
-test('real tooling guard rejects candidate detector and toolchain substitution', async () => {
-  const detector = fs.readFileSync(
-    path.join(__dirname, '../../.github/workflows/detect-breaking-changes.yml'),
-    'utf-8',
-  );
-  const [, guardStep] = detector.split('      - name: Reject untrusted detector tooling changes');
-  const [guard] = guardStep.split('      - name: Set up pnpm');
-  assert(guard.includes('github.workflow_sha'));
-  // Execute the actual workflow diff command over real Git trees; never candidate code.
-  const command = guard.slice(guard.indexOf('          git diff')).trim();
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'next-detector-trust-'));
-  const git = (...args) =>
-    execFileSync('git', args, { cwd: directory, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
-  const write = (file, contents) => {
-    fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
-    fs.writeFileSync(path.join(directory, file), contents);
-  };
-  try {
-    git('init', '-q');
-    git('config', 'user.email', 'test@example.invalid');
-    git('config', 'user.name', 'Test');
-    write('scripts/detect-breaking-changes', 'exit 1');
-    write('src/index.ts', 'export const value = 1');
-    git('add', '.');
-    git('commit', '-qm', 'trusted');
-    const trusted = git('rev-parse', 'HEAD').trim();
-    const check = () =>
-      spawnSync('bash', ['-euc', command], {
-        cwd: directory,
-        env: { ...process.env, TRUSTED_WORKFLOW_SHA: trusted },
-      }).status;
-    for (const file of [
-      'scripts/detect-breaking-changes',
-      'scripts/lint',
-      'package.json',
-      'pnpm-lock.yaml',
-      'pnpm-workspace.yaml',
-      'tsconfig.json',
-      '.npmrc',
-      '.pnpmfile.cjs',
-      'oxlint.config.ts',
-      'node_modules/.bin/tsc',
-      'examples/node_modules/.bin/tsc',
-      'examples/package.json',
-      'examples/.npmrc',
-      'src/oxfmt.config.ts',
-    ]) {
-      git('reset', '--hard', trusted);
-      write(file, 'exit 0');
-      git('add', '.');
-      git('commit', '-qm', 'candidate tooling');
-      assert.notEqual(check(), 0, file);
-    }
-    git('reset', '--hard', trusted);
-    write('src/index.ts', 'export const value = 2');
-    git('add', '.');
-    git('commit', '-qm', 'candidate SDK');
-    assert.equal(check(), 0);
-  } finally {
-    fs.rmSync(directory, { recursive: true, force: true });
-  }
+test('canonical helper preserves the old base policy across a reviewed wrapper upgrade', async () => {
+  execFileSync(process.execPath, [path.join(__dirname, 'next-ci-policy.cjs')], { stdio: 'pipe' });
+});
+test('real pinned tree checks legacy source without executing candidate tooling', async () => {
+  execFileSync(process.execPath, [path.join(__dirname, 'next-ci-analysis.cjs')], { stdio: 'pipe' });
 });
 reject('loose next checks without merge queue are rejected', (f) => {
   f.rules = [{ type: 'required_status_checks' }];
@@ -555,24 +553,50 @@ reject(
   },
   1,
 );
-reject('old main bridge rerun rejected at authorization', (f) => {
-  f.main = 'e'.repeat(40);
-});
 reject('workflow SHA mismatch rejected at authorization', (f) => {
   f.env.WORKFLOW_SHA = 'e'.repeat(40);
 });
+for (const phase of ['authorize', 'compute', 'final-validation']) {
+  test(`unchanged reviewed pin permits unrelated main advance at ${phase}`, async () => {
+    const f = fixture();
+    if (phase === 'authorize') {
+      f.main = 'e'.repeat(40);
+    }
+    await f.authorize();
+    if (phase === 'compute') {
+      f.main = 'e'.repeat(40);
+    }
+    if (phase === 'final-validation') {
+      f.beforePublish = () => {
+        f.main = 'e'.repeat(40);
+      };
+    }
+    await f.execute(1);
+    assert.equal(f.writes.length, 3);
+  });
+}
 reject(
-  'main advance during compute prevents publication',
+  'dismissed live policy approval prevents result publication',
   (f) => {
-    f.main = 'e'.repeat(40);
+    f.policyFailure = true;
   },
   1,
 );
 reject(
-  'main advance before final validation prevents publication',
+  'changed selected pin prevents result publication',
   (f) => {
-    f.beforePublish = () => {
-      f.main = 'e'.repeat(40);
+    f.policy.policy_sha = 'e'.repeat(40);
+  },
+  1,
+);
+reject('missing canonical capability fails before status writes', (f) => {
+  f.policyFailure = true;
+});
+reject(
+  'target base changing during final selector blocks result publication',
+  (f) => {
+    f.duringSelection = () => {
+      f.base = 'e'.repeat(40);
     };
   },
   1,
@@ -636,18 +660,17 @@ test('hosted validation covers every guarded tooling path and retargeting', asyn
     'utf-8',
   );
   assert(validation.includes('types: [opened, synchronize, reopened, ready_for_review, edited]'));
-  const detector = fs.readFileSync(
-    path.join(__dirname, '../../.github/workflows/detect-breaking-changes.yml'),
-    'utf-8',
-  );
-  const [, guardStep] = detector.split('          git diff');
-  const [guard] = guardStep.split('      - name: Set up pnpm');
-  for (const [, spec] of guard.matchAll(/'(?<path>[^']+)'/gu)) {
-    let pattern = spec.replace(/^:\([^)]*\)/u, '');
-    if (pattern === 'scripts' || pattern === 'node_modules') {
-      pattern += '/**';
-    }
-    assert(validation.includes(`- '${pattern}'`), `Missing validation trigger: ${pattern}`);
+  for (const pattern of [
+    '.github/scripts/next-ci-policy.cjs',
+    'scripts/**',
+    'package.json',
+    'pnpm-lock.yaml',
+    'pnpm-workspace.yaml',
+    '**/tsconfig*.json',
+    '**/oxlint.config.*',
+    '**/oxfmt.config.*',
+  ]) {
+    assert(validation.includes(`- '${pattern}'`), pattern);
   }
 });
 test('frozen baseline consumers expose API breaks masked by ambient ts and declaration files', async () => {
@@ -656,11 +679,10 @@ test('frozen baseline consumers expose API breaks masked by ambient ts and decla
     'utf-8',
   );
   const restore = detector.match(
-    /rm -rf tests examples\n\s+git archive "\$BASE_SHA" tests examples \| tar -x/u,
+    /rm -rf tests examples\n\s+git archive --worktree-attributes --output=\.git\/next-consumers\.tar "\$BASE_SHA" tests examples\n\s+tar -xf \.git\/next-consumers\.tar/u,
   )?.[0];
   assert(restore);
   assert(detector.indexOf(restore) < detector.lastIndexOf('./scripts/bootstrap'));
-  // Restoring after installation deletes examples/node_modules and breaks pnpm verification.
   assert(detector.indexOf(restore) < detector.lastIndexOf('./scripts/detect-breaking-changes "$BASE_SHA"'));
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'next-consumer-fixtures-'));
   const git = (...args) =>
