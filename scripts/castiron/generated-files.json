@@ -59,7 +59,7 @@
     },
     "src/client.ts": {
       "mode": "100644",
-      "sha256": "36321162cb1e4b6e96d791ccb6f2c31d412132b365fd1249246a754ec95c7e8c"
+      "sha256": "a94feaa24513b145090e9ae59fcefc1dca888203a1d79286313f02968a284b80"
     },
     "src/internal/data-residency.ts": {
       "mode": "100644",
@@ -251,7 +251,7 @@
     },
     "src/resources/admin/organization/usage.ts": {
       "mode": "100644",
-      "sha256": "75b759955b3a6e42eb5896206528110611ed82a6548ec782d15d19d9e3253f4b"
+      "sha256": "77153aaa3e5eefc2a26af244174b883ff3269aacd7266d058066b046a56b85eb"
     },
     "src/resources/admin/organization/users.ts": {
       "mode": "100644",
