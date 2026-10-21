@@ -1039,8 +1039,24 @@ export class OpenAI {
 
   #isSensitiveLogKey(key: string): boolean {
     const normalized = key.replace(/[^a-z0-9]/gi, '').toLowerCase();
-    return /authorization|authentication|cookie|session|signature|assertion|connectionstring|devicecode|codeverifier|accountkey|mtlskey|proxyauth|(?:api|access|secret|private|security|refresh|id|bearer|aws|azure|openai|admin|client|proxy|auth)[a-z0-9]*(?:key|token|secret|password|passwd|pwd|credential|auth)|^(?:auth|key|sig|sas|jwt|bearer|pfx|p12)$|(?:sid|token|secret|password|passwd|pwd|credential|passphrase|apikey|accesskey|privatekey|username)s?$/.test(
-      normalized,
+    if (
+      /authorization|authentication|cookie|session|signature|assertion|connectionstring|devicecode|codeverifier|accountkey|mtlskey|proxyauth|^(?:auth|key|sig|sas|jwt|bearer|pfx|p12)$|(?:sid|token|secret|password|passwd|pwd|credential|passphrase|apikey|accesskey|privatekey|username)s?$/.test(
+        normalized,
+      )
+    ) {
+      return true;
+    }
+    // Search the normalized alphanumeric key once per part, rather than retrying
+    // a greedy suffix search at every occurrence of a credential prefix.
+    const prefix =
+      /api|access|secret|private|security|refresh|id|bearer|aws|azure|openai|admin|client|proxy|auth/.exec(
+        normalized,
+      );
+    return (
+      prefix !== null &&
+      /key|token|secret|password|passwd|pwd|credential|auth/.test(
+        normalized.slice(prefix.index + prefix[0].length),
+      )
     );
   }
 
@@ -1049,8 +1065,21 @@ export class OpenAI {
     const maxValues = 4096;
     const redactString = (entry: string): string =>
       entry
-        .replace(/((?:[a-z][a-z0-9+.-]*:)?\/\/)([^/\s?#]*@)(?=[^/\s?#]+)/gi, '$1[REDACTED]@')
-        .replace(/(^|[\s(=])([^/\s]+:[^/\s]*@)(?=[^/\s@]+)/gi, '$1[REDACTED]@')
+        // Leave the scheme outside the match: an optional scheme retries its
+        // entire tail at every letter in a long resource ID.
+        .replace(/(\/\/)([^/\s?#]*@)(?=[^/\s?#]+)/g, '$1[REDACTED]@')
+        .replace(/(^|[\s/])([^/\s]+)/g, (match, prefix: string, token: string) => {
+          // Scan each bare proxy token once. A slash only permits a later '(' or
+          // '=' boundary; otherwise the token must start the string or follow whitespace.
+          const start = prefix === '/' ? token.search(/[=(]/) + 1 : 0;
+          if (prefix === '/' && start === 0) return match;
+          const colon = token.indexOf(':', start + 1);
+          let at = token.length - 2;
+          while (at >= 0 && (token[at] !== '@' || token[at + 1] === '@')) at--;
+          return colon >= 0 && at > colon
+            ? `${prefix}${token.slice(0, start)}[REDACTED]${token.slice(at)}`
+            : match;
+        })
         .replace(/(^|[\s,;])([a-z][a-z0-9_-]*)(\s*:\s*)([^\r\n,;]+)/gi, (match, prefix, key, separator) =>
           this.#isSensitiveLogKey(key) ? `${prefix}${key}${separator}[REDACTED]` : match,
         )
