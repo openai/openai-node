@@ -75,6 +75,10 @@ const packedPackagePath = require('node:path');
   const readPackage = (file: string): PackageMetadata =>
     // SAFETY: This reads the package manifest produced by the local pack step; the checks below validate its engine and peer metadata.
     JSON.parse(fs.readFileSync(file, 'utf-8')) as PackageMetadata;
+  const assertVertexPeer = (metadata: PackageMetadata): void => {
+    assert.equal(metadata.peerDependencies?.['google-auth-library'], '>=9.15.1 <11');
+    assert.equal(metadata.peerDependenciesMeta?.['google-auth-library']?.optional, true);
+  };
   const findSourceMaps = (directory: string): string[] => {
     const maps: string[] = [];
     // SAFETY: withFileTypes requests native Dirent entries; the dynamically required fs module does not retain that overload in its inferred type.
@@ -103,6 +107,7 @@ const packedPackagePath = require('node:path');
     source === 'helpers/beta/agents/filesystem.ts' ||
     source === 'helpers/audio.ts' ||
     source === 'providers/bedrock/aws.ts' ||
+    source === 'providers/vertex.ts' ||
     source === 'auth/x509-transport.ts' ||
     source === 'internal/auth/x509-transport-capability.ts' ||
     source === 'internal/auth/x509-token-exchange.ts' ||
@@ -132,6 +137,8 @@ const packedPackagePath = require('node:path');
         "const OpenAI = require('openai');",
         "const pagination = require('openai/core/pagination');",
         "const { bedrock } = require('openai/providers/bedrock');",
+        "const { vertex } = require('openai/providers/vertex');",
+        "const checkVertex = require('./vertex-packed-consumer.cjs');",
         "const auth = require('openai/auth');",
         "if (typeof OpenAI !== 'function') throw new Error('CommonJS default export is not constructable');",
         "if (typeof bedrock !== 'function') throw new Error('CommonJS Bedrock export is unavailable');",
@@ -144,6 +151,7 @@ const packedPackagePath = require('node:path');
             `if (typeof OpenAI.${name} !== 'function' || OpenAI.${name} !== pagination.${name}) throw new Error('CommonJS pagination static ${name} does not match its public export');`,
         ),
         "new OpenAI({ apiKey: 'test' });",
+        'checkVertex(OpenAI, vertex).catch((error) => { console.error(error); process.exitCode = 1; });',
       ].join('\n'),
     );
     fs.writeFileSync(
@@ -152,6 +160,8 @@ const packedPackagePath = require('node:path');
         "import OpenAI from 'openai';",
         "import * as pagination from 'openai/core/pagination';",
         "import { bedrock } from 'openai/providers/bedrock';",
+        "import { vertex } from 'openai/providers/vertex';",
+        "import checkVertex from './vertex-packed-consumer.cjs';",
         `import { ${authExportNames.join(', ')} } from 'openai/auth';`,
         "if (typeof OpenAI !== 'function') throw new Error('ESM default export is not constructable');",
         "if (typeof bedrock !== 'function') throw new Error('ESM Bedrock export is unavailable');",
@@ -164,12 +174,14 @@ const packedPackagePath = require('node:path');
             `if (typeof OpenAI.${name} !== 'function' || OpenAI.${name} !== pagination.${name}) throw new Error('ESM pagination static ${name} does not match its public export');`,
         ),
         "new OpenAI({ apiKey: 'test' });",
+        'await checkVertex(OpenAI, vertex);',
       ].join('\n'),
     );
     fs.writeFileSync(
       path.join(temporaryDirectory, 'consumer.ts'),
       [
         "import OpenAI, { AzureOpenAI } from 'openai';",
+        "import { vertex } from 'openai/providers/vertex';",
         `import { ${authExportNames.join(', ')} } from 'openai/auth';`,
         "import type { WorkloadIdentity } from 'openai/auth';",
         "import type { ResponsesWS } from 'openai/resources/responses/ws';",
@@ -177,6 +189,7 @@ const packedPackagePath = require('node:path');
         "import type { OpenAIRealtimeWS as RealtimeWS } from 'openai/realtime/ws';",
         "import type { OpenAIRealtimeWS as BetaRealtimeWS } from 'openai/beta/realtime/ws';",
         "new OpenAI({ apiKey: 'test', dangerouslyAllowBrowser: true });",
+        "new OpenAI({ provider: vertex({ baseURL: 'https://vertex.example/v1', tokenProvider: () => 'test' }) });",
         'void AzureOpenAI;',
         ...authExportNames.map((name) => `void ${name};`),
         'void (null as unknown as WorkloadIdentity);',
@@ -187,8 +200,10 @@ const packedPackagePath = require('node:path');
       path.join(temporaryDirectory, 'consumer.cts'),
       [
         `import { ${authExportNames.join(', ')} } from 'openai/auth';`,
+        "import { vertex } from 'openai/providers/vertex';",
         "import type { WorkloadIdentity } from 'openai/auth';",
         ...authExportNames.map((name) => `void ${name};`),
+        'void vertex;',
         'void (null as unknown as WorkloadIdentity);',
       ].join('\n'),
     );
@@ -307,7 +322,10 @@ const packedPackagePath = require('node:path');
       { env: isolatedEnvironment },
     );
     const browserConsumer = path.join(temporaryDirectory, 'browser-consumer.mjs');
-    fs.writeFileSync(browserConsumer, "import OpenAI from 'openai';\nexport default OpenAI;\n");
+    fs.writeFileSync(
+      browserConsumer,
+      "import OpenAI from 'openai';\nexport default OpenAI;\nexport { vertex } from 'openai/providers/vertex';\n",
+    );
     const browserConfig = path.join(temporaryDirectory, 'browser.vite.config.mjs');
     fs.writeFileSync(
       browserConfig,
@@ -603,7 +621,7 @@ const packedPackagePath = require('node:path');
       }
     }
 
-    // Zod/AWS helpers require optional peers; Node-only helpers require @types/node.
+    // Zod/AWS/Google helpers require optional peers; Node-only helpers require @types/node.
     // Validate every other mapped source without installing either in this consumer.
     const browserSafeSources = [...mappedSources.entries()]
       .filter(([source]) => !requiresOptionalPeer(source))
@@ -651,8 +669,73 @@ const packedPackagePath = require('node:path');
       { concurrency: 2, stopOnError: false },
     );
 
-    run(process.execPath, ['consumer.cjs']);
-    run(process.execPath, ['consumer.mjs']);
+    fs.copyFileSync(
+      path.join(root, 'scripts/fixtures/vertex-packed-consumer.cjs'),
+      path.join(temporaryDirectory, 'vertex-packed-consumer.cjs'),
+    );
+    run(process.execPath, ['consumer.cjs'], { env: isolatedEnvironment });
+    run(process.execPath, ['consumer.mjs'], { env: isolatedEnvironment });
+    run(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        "import OpenAI, { vertex } from './dist/browser-bundle.mjs'; import checkVertex from './vertex-packed-consumer.cjs'; await checkVertex(OpenAI, vertex);",
+      ],
+      { env: isolatedEnvironment },
+    );
+
+    fs.copyFileSync(
+      path.join(root, 'scripts/fixtures/vertex-packed-timeout.cjs'),
+      path.join(temporaryDirectory, 'vertex-packed-timeout.cjs'),
+    );
+    run(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        [
+          "import OpenAI from 'openai';",
+          "import { vertex } from 'openai/providers/vertex';",
+          "import { createRequire } from 'node:module';",
+          "import checkVertexTimeout from './vertex-packed-timeout.cjs';",
+          'const require = createRequire(import.meta.url);',
+          "await checkVertexTimeout(require('openai'), vertex);",
+          "await checkVertexTimeout(OpenAI, require('openai/providers/vertex').vertex);",
+        ].join('\n'),
+      ],
+      { env: isolatedEnvironment },
+    );
+
+    // ADC must resolve the installed peer at runtime, including from the token-provider bundle.
+    fs.symlinkSync(
+      fs.realpathSync(path.join(root, 'node_modules/google-auth-library')),
+      path.join(temporaryDirectory, 'node_modules/google-auth-library'),
+      'junction',
+    );
+    fs.copyFileSync(
+      path.join(root, 'scripts/fixtures/vertex-packed-adc.cjs'),
+      path.join(temporaryDirectory, 'vertex-packed-adc.cjs'),
+    );
+    run(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        [
+          "import OpenAI from 'openai';",
+          "import { vertex } from 'openai/providers/vertex';",
+          "import BundledOpenAI, { vertex as bundledVertex } from './dist/browser-bundle.mjs';",
+          "import checkVertexADC from './vertex-packed-adc.cjs';",
+          "import { createRequire } from 'node:module';",
+          'const require = createRequire(import.meta.url);',
+          "await checkVertexADC(require('openai'), require('openai/providers/vertex').vertex);",
+          'await checkVertexADC(OpenAI, vertex);',
+          'await checkVertexADC(BundledOpenAI, bundledVertex);',
+        ].join('\n'),
+      ],
+      { env: isolatedEnvironment },
+    );
 
     const sourcePackage = readPackage(path.join(root, 'package.json'));
     const installedPackage = readPackage(path.join(temporaryDirectory, 'node_modules/openai/package.json'));
@@ -673,6 +756,7 @@ const packedPackagePath = require('node:path');
     assert.equal(installedPackage.peerDependenciesMeta?.['undici']?.optional, true);
     assert.equal(installedPackage.peerDependencies?.['ws'], '^8.21.0');
     assert.equal(installedPackage.peerDependenciesMeta?.['ws']?.optional, true);
+    assertVertexPeer(installedPackage);
     assert(!fs.existsSync(optionalUndici), 'Undici must remain optional for ordinary SDK consumers');
     run(process.execPath, [
       '--conditions=browser',

@@ -1,5 +1,20 @@
 import type { FinalRequestOptions } from './request-options';
 import type { FinalizedRequestInit } from './types';
+import { APIConnectionTimeoutError } from '../core/error';
+
+const providerTimeoutKey = Symbol.for('openai.node.providerTimeout.v1');
+
+/** Preserve timeout classification across SDK copies and CJS/ESM entrypoints. */
+export function createProviderTimeoutError(): APIConnectionTimeoutError {
+  return Object.defineProperty(new APIConnectionTimeoutError(), providerTimeoutKey, { value: true });
+}
+
+export function isProviderTimeoutError(error: unknown): error is APIConnectionTimeoutError {
+  return (
+    error instanceof APIConnectionTimeoutError ||
+    (error instanceof Error && providerTimeoutKey in error && error[providerTimeoutKey] === true)
+  );
+}
 
 declare const providerBrand: unique symbol;
 
@@ -16,6 +31,8 @@ export interface ProviderRequestContext {
 
   /** Final SDK request options, including the HTTP method and resource path. */
   options: FinalRequestOptions;
+  /** Effective timeout for this attempt, in milliseconds. */
+  timeout?: number;
 }
 
 /** Provider configuration instantiated separately for each OpenAI client. */
@@ -25,6 +42,9 @@ export interface ProviderRuntime {
 
   /** Absolute API root used to resolve the client's resource paths. */
   baseURL: string;
+
+  /** Include provider authentication in the timeout for each request attempt. */
+  timeoutIncludesAuth?: boolean;
 
   /**
    * Updates a request immediately before each attempt, including retries.
