@@ -28,13 +28,4 @@ export {
   type TranslationCreateResponse,
   type TranslationCreateParams,
 } from './translations';
-export {
-  VoiceConsents,
-  type VoiceConsent,
-  type VoiceConsentDeleted,
-  type VoiceConsentCreateParams,
-  type VoiceConsentUpdateParams,
-  type VoiceConsentListParams,
-  type VoiceConsentsPage,
-} from './voice-consents';
 export { Voices, type Voice, type VoiceCreateParams } from './voices';
