@@ -325,9 +325,10 @@ export class Files extends APIResource {
     body: FileCreateParams,
     options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFile> {
-    const file = await this.create(vectorStoreId, body, options);
-    return await this.poll(vectorStoreId, file.id, options);
+    const created = await this.create(vectorStoreId, body, options);
+    return await this.poll(vectorStoreId, created.id, options);
   }
+
   /**
    * Wait for the vector store file to finish processing.
    *

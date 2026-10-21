@@ -18,3 +18,8 @@ oidc
 /benchmark-environment.json
 
 /scripts/steady/.cache/
+
+# Python validation artifacts
+__pycache__/
+*.pyc
+*.pyo

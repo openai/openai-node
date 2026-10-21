@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { Agent } from 'undici';
 import { vi } from 'vitest';
 
-import OpenAI, { APIConnectionTimeoutError, APIUserAbortError } from 'openai';
+import OpenAI, { APIConnectionTimeoutError, APIUserAbortError, toStreamingFile } from 'openai';
 import type { ClientOptions } from 'openai';
 import { createX509Transport } from 'openai/auth/x509-transport';
 import type { X509Transport } from 'openai/auth/x509-transport';
@@ -26,6 +26,10 @@ const TOKEN_RESPONSE = {
   issued_token_type: 'urn:ietf:params:oauth:token-type:access_token',
   expires_in: 3600,
 };
+
+async function* skillChunks() {
+  yield 'synthetic skill';
+}
 
 let dispatcher: Agent;
 let transport: X509Transport;
@@ -60,6 +64,38 @@ afterEach(async () => {
 });
 
 describe('X.509 review regressions', () => {
+  test('preserves multipart boundaries for uploads added by prepareOptions', async () => {
+    const client = new OpenAI(options());
+    Object.defineProperty(client, 'prepareOptions', {
+      value: async (request: { body?: unknown }) => {
+        request.body = {
+          files: [toStreamingFile(skillChunks(), 'SKILL.md')],
+        };
+      },
+    });
+    let uploaded: FormData | undefined;
+    let contentType: string | null = null;
+    vi.spyOn(transportCapability, 'sendX509Request').mockImplementation(async (_transport, url, request) => {
+      if (url.origin === 'https://mtls.auth.openai.com') {
+        return Response.json(TOKEN_RESPONSE);
+      }
+      const headers = new Headers(request.headers);
+      contentType = headers.get('content-type');
+      if (contentType?.startsWith('multipart/form-data; boundary=')) {
+        uploaded = await new Response(request.body, { headers }).formData();
+      }
+      return Response.json({ id: 'synthetic-skill' });
+    });
+
+    await expect(client.skills.create()).resolves.toMatchObject({ id: 'synthetic-skill' });
+    expect(contentType).toMatch(/^multipart\/form-data; boundary=/u);
+    const file = uploaded?.get('files[]');
+    expect(file).toBeInstanceOf(File);
+    if (file instanceof File) {
+      expect(await file.text()).toBe('synthetic skill');
+    }
+  });
+
   test('documents the public X.509 authentication flow alongside workload-identity guidance', () => {
     const authenticationGuide = readFileSync('docs/authentication.md', 'utf-8');
 
