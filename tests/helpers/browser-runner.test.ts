@@ -8779,85 +8779,99 @@ describe('ResponsesToolRunner iteration', () => {
     },
   );
 
-  test('supplies permitted native results without changing call IDs, mixed order or pending arguments', async () => {
-    const effects: string[] = [];
-    const browser = new BrowserToolset(
-      {
-        state,
-        click: ({ target }) => {
-          effects.push(target);
-        },
-      },
-      { confirm: () => true },
-    );
-    const execute = vi.fn(() => 'automatic');
-    const runner = new ResponsesToolRunner({
-      browser,
-      functions: [
+  test.each([undefined, '30m', '12h'] as const)(
+    'supplies native results with TTL %s without changing call IDs or order',
+    async (ttl) => {
+      const effects: string[] = [];
+      const browser = new BrowserToolset(
         {
-          tool: { type: 'function', name: 'record', parameters: {}, strict: false },
-          execute,
-          allowOutputOverride: true,
+          state,
+          click: ({ target }) => {
+            effects.push(target);
+          },
         },
-      ],
-    });
-    const h = harness([
-      { output: [wireCall('record', {}), wireCall('browser_click', { target: 'original', tab_id: null })] },
-      { output: [message] },
-    ]);
-    const iterator = runner.iterate(h.client, input);
-    const first = await iterator.next();
-    expect(first.done).toBe(false);
-    if (first.done) {
-      throw new Error('Missing turn');
-    }
-    const supplied = [
-      {
-        type: 'input_text' as const,
-        text: 'human result',
-        prompt_cache_breakpoint: { mode: 'explicit' as const },
-      },
-      {
-        type: 'input_image' as const,
-        image_url: 'https://fixture.invalid/image',
-        detail: 'original' as const,
-      },
-      { type: 'input_file' as const, file_id: 'file_fixture' },
-    ];
-    first.value.supplyOutputs([{ type: 'function_call_output', call_id: 'call_record', output: supplied }]);
-    const [text] = supplied;
-    if (text?.type !== 'input_text') {
-      throw new Error('Missing text output');
-    }
-    text.text = 'changed later';
-    const [, pending] = first.value.response.output;
-    if (pending?.type !== 'function_call') {
-      throw new Error('Missing pending call');
-    }
-    pending.arguments = JSON.stringify({ target: 'retargeted', tab_id: null });
-    pending.call_id = 'changed';
-    const final = await iterator.next();
-    expect(final.value).toMatchObject({
-      step: 2,
-      final: true,
-      attemptedCallIds: ['call_record', 'call_browser_click'],
-      completedCallIds: ['call_record', 'call_browser_click'],
-    });
-    expect(execute).not.toHaveBeenCalled();
-    expect(effects).toEqual(['original']);
-    expect(h.bodies[1]?.['input']).toContainEqual({
-      type: 'function_call_output',
-      call_id: 'call_record',
-      output: [
-        { type: 'input_text', text: 'human result', prompt_cache_breakpoint: { mode: 'explicit' } },
-        { type: 'input_image', image_url: 'https://fixture.invalid/image', detail: 'original' },
-        { type: 'input_file', file_id: 'file_fixture' },
-      ],
-    });
-    expect(JSON.stringify(h.bodies[1]?.['input'])).not.toContain('retargeted');
-    expect(() => first.value.supplyOutputs([])).toThrow('does not accept');
-    await iterator.return();
-  });
+        { confirm: () => true },
+      );
+      const execute = vi.fn(() => 'automatic');
+      const runner = new ResponsesToolRunner({
+        browser,
+        functions: [
+          {
+            tool: { type: 'function', name: 'record', parameters: {}, strict: false },
+            execute,
+            allowOutputOverride: true,
+          },
+        ],
+      });
+      const h = harness([
+        { output: [wireCall('record', {}), wireCall('browser_click', { target: 'original', tab_id: null })] },
+        { output: [message] },
+      ]);
+      const iterator = runner.iterate(h.client, input);
+      const first = await iterator.next();
+      expect(first.done).toBe(false);
+      if (first.done) {
+        throw new Error('Missing turn');
+      }
+      const breakpoint = { mode: 'explicit' as const, ...(ttl === undefined ? {} : { ttl }) };
+      const expectedBreakpoint = { ...breakpoint };
+      const supplied = [
+        {
+          type: 'input_text' as const,
+          text: 'human result',
+          prompt_cache_breakpoint: breakpoint,
+        },
+        {
+          type: 'input_image' as const,
+          image_url: 'https://fixture.invalid/image',
+          detail: 'original' as const,
+          prompt_cache_breakpoint: breakpoint,
+        },
+        { type: 'input_file' as const, file_id: 'file_fixture', prompt_cache_breakpoint: breakpoint },
+      ];
+      first.value.supplyOutputs([{ type: 'function_call_output', call_id: 'call_record', output: supplied }]);
+      const [text] = supplied;
+      if (text?.type !== 'input_text') {
+        throw new Error('Missing text output');
+      }
+      text.text = 'changed later';
+      if (ttl !== undefined) {
+        breakpoint.ttl = ttl === '12h' ? '30m' : '12h';
+      }
+      const [, pending] = first.value.response.output;
+      if (pending?.type !== 'function_call') {
+        throw new Error('Missing pending call');
+      }
+      pending.arguments = JSON.stringify({ target: 'retargeted', tab_id: null });
+      pending.call_id = 'changed';
+      const final = await iterator.next();
+      expect(final.value).toMatchObject({
+        step: 2,
+        final: true,
+        attemptedCallIds: ['call_record', 'call_browser_click'],
+        completedCallIds: ['call_record', 'call_browser_click'],
+      });
+      expect(execute).not.toHaveBeenCalled();
+      expect(effects).toEqual(['original']);
+      expect(h.bodies[1]?.['input']).toContainEqual({
+        type: 'function_call_output',
+        call_id: 'call_record',
+        output: [
+          { type: 'input_text', text: 'human result', prompt_cache_breakpoint: expectedBreakpoint },
+          {
+            type: 'input_image',
+            image_url: 'https://fixture.invalid/image',
+            detail: 'original',
+            prompt_cache_breakpoint: expectedBreakpoint,
+          },
+          { type: 'input_file', file_id: 'file_fixture', prompt_cache_breakpoint: expectedBreakpoint },
+        ],
+      });
+      expect(JSON.stringify(h.bodies[1]?.['input'])).not.toContain('retargeted');
+      expect(() => first.value.supplyOutputs([])).toThrow('does not accept');
+      await iterator.return();
+    },
+  );
 
   test.each(['executor', 'supplied'] as const)('rejects hidden output fields from %s', async (source) => {
     const block = Object.defineProperty(
@@ -8942,6 +8956,29 @@ describe('ResponsesToolRunner iteration', () => {
       [allowed, { ...allowed, call_id: 'unknown' }],
       [{ ...allowed, output: [{ type: 'input_text', text: 42 }] }],
       [{ ...allowed, output: [{ type: 'input_image', image_url: { private: true } }] }],
+      ...[null, 42, 'invalid'].map((ttl) => [
+        {
+          ...allowed,
+          output: [
+            { type: 'input_text', text: 'fixture', prompt_cache_breakpoint: { mode: 'explicit', ttl } },
+          ],
+        },
+      ]),
+      [
+        {
+          ...allowed,
+          output: [
+            {
+              type: 'input_text',
+              text: 'fixture',
+              prompt_cache_breakpoint: Object.defineProperty({ mode: 'explicit' }, 'ttl', {
+                get: getter,
+                enumerable: true,
+              }),
+            },
+          ],
+        },
+      ],
       [{ ...allowed, output: cyclic }],
       [{ ...allowed, toJSON: () => ({}) }],
       [accessor],
