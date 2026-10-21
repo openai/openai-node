@@ -10,6 +10,8 @@ import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { pollVectorStoreFileBatch } from '../../lib/vector-store-polling';
 import { path } from '../../internal/utils/path';
+import { uploadAndPollVectorStoreFileBatch } from '../../lib/vector-store-upload';
+import { Uploadable } from '../../core/uploads';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
@@ -122,6 +124,26 @@ export class FileBatches extends APIResource {
     options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFileBatch> {
     return await pollVectorStoreFileBatch(this, vectorStoreID, batchID, options);
+  }
+
+  /**
+   * Uploads the given files concurrently and then creates a vector store file batch.
+   *
+   * The concurrency limit is configurable using the `maxConcurrency` parameter.
+   */
+  async uploadAndPoll(
+    vectorStoreId: string,
+    { files, fileIds = [] }: { files: Uploadable[]; fileIds?: string[] },
+    options?: RequestOptions & { pollIntervalMs?: number; maxConcurrency?: number },
+  ): Promise<VectorStoreFileBatch> {
+    return await uploadAndPollVectorStoreFileBatch(
+      this,
+      this._client,
+      vectorStoreId,
+      files,
+      fileIds,
+      options,
+    );
   }
 }
 

@@ -8,6 +8,7 @@ import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { pollVectorStoreFile } from '../../lib/vector-store-polling';
 import { path } from '../../internal/utils/path';
+import { Uploadable } from '../../core/uploads';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
@@ -340,6 +341,29 @@ export class Files extends APIResource {
     options?: RequestOptions & { pollIntervalMs?: number },
   ): Promise<VectorStoreFile> {
     return await pollVectorStoreFile(this, vectorStoreID, fileID, options);
+  }
+
+  /**
+   * Upload a file to the `files` API and then attach it to the given vector store.
+   *
+   * Note the file will be asynchronously processed (you can use the alternative
+   * polling helper method to wait for processing to complete).
+   */
+  async upload(vectorStoreId: string, file: Uploadable, options?: RequestOptions): Promise<VectorStoreFile> {
+    const fileInfo = await this._client.files.create({ file: file, purpose: 'assistants' }, options);
+    return this.create(vectorStoreId, { file_id: fileInfo.id }, options);
+  }
+
+  /**
+   * Add a file to a vector store and poll until processing is complete.
+   */
+  async uploadAndPoll(
+    vectorStoreId: string,
+    file: Uploadable,
+    options?: RequestOptions & { pollIntervalMs?: number },
+  ): Promise<VectorStoreFile> {
+    const fileInfo = await this.upload(vectorStoreId, file, options);
+    return await this.poll(vectorStoreId, fileInfo.id, options);
   }
 
   /**

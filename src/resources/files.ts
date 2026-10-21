@@ -7,6 +7,7 @@ import { type Uploadable } from '../core/uploads';
 import { buildHeaders } from '../internal/headers';
 import { RequestOptions } from '../internal/request-options';
 import { multipartFormRequestOptions } from '../internal/uploads';
+import { waitForFileProcessing } from '../lib/file-processing';
 import { path } from '../internal/utils/path';
 
 function resolveResourceRequestOptions(
@@ -308,6 +309,16 @@ export class Files extends APIResource {
         __binaryResponse: true,
       })),
     );
+  }
+
+  /**
+   * Waits for the given file to be processed, default timeout is 30 mins.
+   */
+  async waitForProcessing(
+    id: string,
+    { pollInterval = 5000, maxWait = 30 * 60 * 1000 }: { pollInterval?: number; maxWait?: number } = {},
+  ): Promise<FileObject> {
+    return await waitForFileProcessing(this, id, pollInterval, maxWait);
   }
 }
 
