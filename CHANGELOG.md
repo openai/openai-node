@@ -1,5 +1,47 @@
 # Changelog
 
+## [7.40.0](https://github.com/openai/openai-node/compare/v7.39.0...v7.40.0) (2026-10-21)
+
+
+### Features
+
+* **api:** add 30-minute cache-write usage counts ([#2984](https://github.com/openai/openai-node/issues/2984)) ([70afb2a](https://github.com/openai/openai-node/commit/70afb2a46ba3dfa34cc38b8d5e4a8a7f07de0381))
+* **api:** add compaction trigger IDs ([#2991](https://github.com/openai/openai-node/issues/2991)) ([e8c295c](https://github.com/openai/openai-node/commit/e8c295c97159d56738d69aa18522f1acd4a1d093))
+* **api:** add custom voice consent management ([#3004](https://github.com/openai/openai-node/issues/3004)) ([d0be2f1](https://github.com/openai/openai-node/commit/d0be2f11ef90a6e7606212f5ca4603531ac3d28a))
+
+
+### Bug Fixes
+
+* **api:** align request encoding and response parsing ([#2996](https://github.com/openai/openai-node/issues/2996)) ([b4e8176](https://github.com/openai/openai-node/commit/b4e8176a7a9c598fee0615548c77d637a6990f40))
+* **api:** preserve large WebSocket messages and default compression off ([#2990](https://github.com/openai/openai-node/issues/2990)) ([bea84d7](https://github.com/openai/openai-node/commit/bea84d74ba62ac3e5c51071d59764427c1d90a1d))
+* **api:** preserve multipart headers and clarify cache-write totals ([#3002](https://github.com/openai/openai-node/issues/3002)) ([6209f8d](https://github.com/openai/openai-node/commit/6209f8d920f735ec45c6f4c951ba912bd2b099ac))
+* **audio:** use named DirectShow inputs on Windows ([#2989](https://github.com/openai/openai-node/issues/2989)) ([e7059d9](https://github.com/openai/openai-node/commit/e7059d91f23193a231c226700ed538f83b1be136))
+* **deps-dev:** bump @cloudflare/workers-types from 5.20261005.1 to 5.20261011.1 in /ecosystem-tests/cloudflare-worker ([#2974](https://github.com/openai/openai-node/issues/2974)) ([381f801](https://github.com/openai/openai-node/commit/381f8013d5cf0e65a7408e27fc58175fc4d91e92))
+* **deps-dev:** bump @swc/core from 1.16.2 to 1.16.18 ([#2975](https://github.com/openai/openai-node/issues/2975)) ([d5b147c](https://github.com/openai/openai-node/commit/d5b147c01c530b49cfcecf55371823cf6d7791f6))
+* **deps-dev:** bump publint from 0.3.24 to 0.3.25 ([#2976](https://github.com/openai/openai-node/issues/2976)) ([839e6d8](https://github.com/openai/openai-node/commit/839e6d85a06ec9b9a435abb4ba7d484a733982f3))
+* **deps-dev:** bump puppeteer from 25.12.0 to 25.13.0 in /ecosystem-tests/browser-direct-import ([#2972](https://github.com/openai/openai-node/issues/2972)) ([fee7dee](https://github.com/openai/openai-node/commit/fee7dee9673526b4acddaac0d3add46a7165acbc))
+* **deps-dev:** bump puppeteer from 25.12.0 to 25.13.0 in /ecosystem-tests/ts-browser-webpack ([#2977](https://github.com/openai/openai-node/issues/2977)) ([142fe60](https://github.com/openai/openai-node/commit/142fe6023faab0f3537e3544bf3f8ceec10b3d14))
+* **deps-dev:** bump vercel from 56.2.1 to 56.5.0 in /ecosystem-tests/vercel-edge ([#2979](https://github.com/openai/openai-node/issues/2979)) ([e9a29ea](https://github.com/openai/openai-node/commit/e9a29ea0f2e30f02e555728ed5fbaf54ef105610))
+* **deps-dev:** bump wrangler from 4.147.0 to 4.149.0 in /ecosystem-tests/cloudflare-worker ([#2973](https://github.com/openai/openai-node/issues/2973)) ([3da70cb](https://github.com/openai/openai-node/commit/3da70cb8ccaada690c294bbe09dea82f1c3e87d3))
+* **deps-dev:** bump ws and @types/ws ([#2978](https://github.com/openai/openai-node/issues/2978)) ([aa7194e](https://github.com/openai/openai-node/commit/aa7194e16550906ad2ad132a752662baf4102099))
+* **deps:** bump dotenv from 18.0.1 to 18.0.7 ([#2981](https://github.com/openai/openai-node/issues/2981)) ([431e969](https://github.com/openai/openai-node/commit/431e969b99fbeae5b349411edb2cd3efec8f9bcd))
+* preserve Realtime and Translation WebSocket option overrides ([#2995](https://github.com/openai/openai-node/issues/2995)) ([cfadff0](https://github.com/openai/openai-node/commit/cfadff039f54925209852579d5cdb1a6bcd24323))
+* preserve WebSocket lifecycle state when observers throw ([#2993](https://github.com/openai/openai-node/issues/2993)) ([95cf948](https://github.com/openai/openai-node/commit/95cf9481b75db3d2c37be2fad17df2e8767ca77e))
+* **realtime:** receive large websocket messages by default ([#2988](https://github.com/openai/openai-node/issues/2988)) ([b808b0b](https://github.com/openai/openai-node/commit/b808b0b0bd1f78491ed081cf1f6750df5d264ef6))
+* **realtime:** refresh factory URLs for each connection attempt ([#2982](https://github.com/openai/openai-node/issues/2982)) ([da45c41](https://github.com/openai/openai-node/commit/da45c4174a5fa4ed74d6a47f27607d763dba306c))
+* **test:** preserve compiled example workspace dependencies ([#2983](https://github.com/openai/openai-node/issues/2983)) ([9b67bdb](https://github.com/openai/openai-node/commit/9b67bdb7c4543e7195e25aee9cbfe9c2f2accc53))
+
+
+### Chores
+
+* **api:** preserve embeddings and polling helper compatibility ([#3001](https://github.com/openai/openai-node/issues/3001)) ([95e8fde](https://github.com/openai/openai-node/commit/95e8fdef313b59d1b49a74665b8c87196d17bd5c))
+
+
+### Documentation
+
+* deduplicate Safety references while preserving links ([#2987](https://github.com/openai/openai-node/issues/2987)) ([8581390](https://github.com/openai/openai-node/commit/8581390b323ebb40b61a7814f5738d8d60e86ce0))
+* plan removal of mixed Castiron customizations ([#2985](https://github.com/openai/openai-node/issues/2985)) ([bd036b4](https://github.com/openai/openai-node/commit/bd036b4c3d9ae78982ed0c632d54da6f9cd7f6d3))
+
 ## [7.39.0](https://github.com/openai/openai-node/compare/v7.38.0...v7.39.0) (2026-10-18)
 
 
