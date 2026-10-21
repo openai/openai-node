@@ -547,7 +547,7 @@
     },
     "src/resources/chat/completions/index.ts": {
       "mode": "100644",
-      "sha256": "7120a4847a89f92d5b9edf824d1b6072b8f5cbbebe5453a5f7f53a2f434bc5f7"
+      "sha256": "afbc17ef0c05d93fb0713a5de26fa5f3f970f4d2bdc02aef22e703578f53e621"
     },
     "src/resources/chat/completions/messages.ts": {
       "mode": "100644",
@@ -607,7 +607,7 @@
     },
     "src/resources/conversations/index.ts": {
       "mode": "100644",
-      "sha256": "2c062390f21fc5693c364fd2179edabe29b78033be975a8f9c005ae41d3c81fd"
+      "sha256": "6611efdb0377d10ea47148747b6f799d8acedf863c288e55de2e235cc33f85a0"
     },
     "src/resources/conversations/items.ts": {
       "mode": "100644",
@@ -651,7 +651,7 @@
     },
     "src/resources/files.ts": {
       "mode": "100644",
-      "sha256": "3df5f9e75ab59eac67c1321bccbbec6006b7e2e6073c8b9773a1b09c2bec00e4"
+      "sha256": "ca78d34f73bef9a683b5fb2bbeb57af219478027b54ee243b611a1d4a12e04d7"
     },
     "src/resources/fine-tuning.ts": {
       "mode": "100644",
@@ -987,11 +987,11 @@
     },
     "src/resources/vector-stores/file-batches.ts": {
       "mode": "100644",
-      "sha256": "51528591a4ad410db39e634ad9322fbac4c2f60a76c85c478d3fcffe8a2f4112"
+      "sha256": "6bf7f8d32ecebb25dbf490e9ea193ae845240021aec4b977e3f333c7a63a8638"
     },
     "src/resources/vector-stores/files.ts": {
       "mode": "100644",
-      "sha256": "8f6d9cd127baed1a705ea5a5b87d6614db15ca86f51cbacb0e686f35da6bccb7"
+      "sha256": "66a73e8d347b3058eaeb1055eaa0cb9a7bf66e0414031039ecd583febf8ffc6e"
     },
     "src/resources/vector-stores/index.ts": {
       "mode": "100644",
@@ -1019,7 +1019,7 @@
     },
     "src/resources/webhooks/index.ts": {
       "mode": "100644",
-      "sha256": "bec9a2012ba2ef87cb15534f5a3b9296c00ede465b20a4bb7cd56c1d9f5ee2ab"
+      "sha256": "893728a29c33f14605f33ab586a2774814444d74510966ce498ed488f7383ea5"
     },
     "src/resources/webhooks/webhooks.ts": {
       "mode": "100644",
