@@ -6,9 +6,9 @@ import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, Page, PagePromise } from '../../core/pagination';
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
-import { Uploadable } from '../../uploads';
 import { pollVectorStoreFile } from '../../lib/vector-store-polling';
 import { path } from '../../internal/utils/path';
+import { Uploadable } from '../../core/uploads';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
@@ -342,6 +342,7 @@ export class Files extends APIResource {
   ): Promise<VectorStoreFile> {
     return await pollVectorStoreFile(this, vectorStoreID, fileID, options);
   }
+
   /**
    * Upload a file to the `files` API and then attach it to the given vector store.
    *
@@ -352,6 +353,7 @@ export class Files extends APIResource {
     const fileInfo = await this._client.files.create({ file: file, purpose: 'assistants' }, options);
     return this.create(vectorStoreId, { file_id: fileInfo.id }, options);
   }
+
   /**
    * Add a file to a vector store and poll until processing is complete.
    */
