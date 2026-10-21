@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.41.0](https://github.com/openai/openai-node/compare/v7.40.0...v7.41.0) (2026-10-21)
+
+
+### Features
+
+* add Vertex AI support for the Responses API ([#3005](https://github.com/openai/openai-node/issues/3005)) ([04b1ac4](https://github.com/openai/openai-node/commit/04b1ac4db17601405ee00b9dea79f4a5514047b5))
+
 ## [7.40.0](https://github.com/openai/openai-node/compare/v7.39.0...v7.40.0) (2026-10-21)
 
 
