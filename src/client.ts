@@ -1579,14 +1579,24 @@ export class OpenAI {
     if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
     options.timeout = options.timeout ?? this.timeout;
     if (options.__metadata?.['finalizeMultipart'] === true && hasUploadableValue(options.body)) {
+      // Multipart encoding owns its Content-Type; retain all other caller headers.
+      const multipartHeaders = buildHeaders([options.headers]);
+      multipartHeaders.values.delete('content-type');
+      multipartHeaders.nulls.delete('content-type');
       const finalized = await maybeMultipartFormRequestOptions(
-        options,
+        { ...options, headers: multipartHeaders },
         this,
         options.__metadata?.['preserveMultipartFilenames'] === true ? { stripFilenames: false } : undefined,
       );
       inputOptions.body = options.body = finalized.body;
       inputOptions.headers = options.headers = finalized.headers;
-      inputOptions.__metadata = options.__metadata = { ...finalized.__metadata };
+      inputOptions.__metadata = options.__metadata = {
+        ...finalized.__metadata,
+        finalizedMultipart: {
+          body: finalized.body,
+          contentType: buildHeaders([finalized.headers]).values.get('content-type'),
+        },
+      };
     }
     if (options.__metadata?.['streamFromBody'] === true) {
       finalizeStreamingFormRequestOptions(options);
@@ -1659,7 +1669,28 @@ export class OpenAI {
       };
     }
 
+    // Retain encoding ownership on retries, but never transfer it to a replacement body.
+    let finalizedContentType: string | null | undefined;
+    const finalizedMultipart = options.__metadata?.['finalizedMultipart'];
+    if (
+      typeof finalizedMultipart === 'object' &&
+      finalizedMultipart !== null &&
+      'body' in finalizedMultipart &&
+      'contentType' in finalizedMultipart
+    ) {
+      const { body: multipartBody, contentType } = finalizedMultipart;
+      if (multipartBody === body) {
+        if (typeof contentType === 'string') {
+          finalizedContentType = contentType;
+        } else if (contentType === null) {
+          finalizedContentType = null;
+        }
+      }
+    }
     const reqHeaders = await this.buildHeaders({ options: inputOptions, method, bodyHeaders, retryCount });
+    // Apply the encoding header after authentication has composed its request snapshot.
+    if (finalizedContentType === null) reqHeaders.delete('content-type');
+    else if (finalizedContentType !== undefined) reqHeaders.set('content-type', finalizedContentType);
 
     const req: FinalizedRequestInit = {
       method,
