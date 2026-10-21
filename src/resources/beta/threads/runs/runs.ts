@@ -36,6 +36,7 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core
 import { Stream } from '../../../../core/streaming';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
+import { pollAssistantRun } from '../../../../lib/assistant-run-polling';
 import { path } from '../../../../internal/utils/path';
 
 function resolveResourceRequestOptions(
@@ -374,6 +375,19 @@ export class Runs extends APIResource {
         __security: { bearerAuth: true },
       })),
     );
+  }
+
+  /**
+   * A helper to poll a run status until it reaches a terminal state. More
+   * information on Run lifecycles can be found here:
+   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
+   */
+  async poll(
+    runId: string,
+    params: RunRetrieveParams,
+    options?: RequestOptions & { pollIntervalMs?: number },
+  ): Promise<Run> {
+    return await pollAssistantRun(this, runId, params, options);
   }
 
   /**

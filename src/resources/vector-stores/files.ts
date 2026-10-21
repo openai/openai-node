@@ -317,6 +317,18 @@ export class Files extends APIResource {
   }
 
   /**
+   * Attach a file to the given vector store and wait for it to be processed.
+   */
+  async createAndPoll(
+    vectorStoreId: string,
+    body: FileCreateParams,
+    options?: RequestOptions & { pollIntervalMs?: number },
+  ): Promise<VectorStoreFile> {
+    const created = await this.create(vectorStoreId, body, options);
+    return await this.poll(vectorStoreId, created.id, options);
+  }
+
+  /**
    * Wait for the vector store file to finish processing.
    *
    * Note: this will return even if the file failed to process, you need to check

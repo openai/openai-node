@@ -10,6 +10,13 @@ export type { WebSocketStreamOptions } from '../../../internal/ws';
 
 export type { SidebandWSParameters, SidebandWSReconnectOptions } from './ws-base';
 
+/**
+ * Native Node WebSocket options.
+ *
+ * `maxPayload` defaults to 0 (unlimited). Set a byte limit supported by `ws` to cap incoming messages.
+ * `perMessageDeflate` defaults to false, including with a finite payload limit.
+ * Set it to true or a `ws` configuration object to enable compression.
+ */
 export interface SidebandWSClientOptions extends WS.ClientOptions, SidebandWSBaseOptions {
   /** Basic authentication forwarded by the Node `ws` transport. */
   auth?: string;
@@ -53,19 +60,19 @@ export class SidebandWS extends SidebandWSBase<NodeWebSocket> {
 
   protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
     const capturedAuthHeaders = { ...authHeaders };
-    const socketOptions: WS.ClientOptions = this._credentials.build(
-      this._client,
-      capturedAuthHeaders,
-      this._wsOptions,
-      !this.socket ? this._usesSDKAPIKey(capturedAuthHeaders) : undefined,
-    );
-    return new NodeWebSocket(
-      new WS.WebSocket(url, {
-        ...socketOptions,
-        maxPayload: socketOptions.maxPayload ?? 0,
-        perMessageDeflate: socketOptions.perMessageDeflate ?? false,
-      }),
-    );
+    const socketOptions: WS.ClientOptions = {
+      maxPayload: 0,
+      perMessageDeflate: false,
+      ...this._credentials.build(
+        this._client,
+        capturedAuthHeaders,
+        this._wsOptions,
+        !this.socket ? this._usesSDKAPIKey(capturedAuthHeaders) : undefined,
+      ),
+    };
+    socketOptions.maxPayload ??= 0;
+    socketOptions.perMessageDeflate ??= false;
+    return new NodeWebSocket(new WS.WebSocket(url, socketOptions));
   }
 
   protected override async _prepareReconnectSocket(): Promise<(url: URL) => NodeWebSocket> {

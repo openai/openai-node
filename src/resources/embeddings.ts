@@ -3,13 +3,7 @@
 import { APIResource } from '../core/resource';
 import { APIPromise } from '../core/api-promise';
 import { RequestOptions } from '../internal/request-options';
-
-function resolveResourceRequestOptions(
-  options: RequestOptions | undefined,
-  buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
-): Promise<RequestOptions> {
-  return Promise.resolve(options).then(buildOptions);
-}
+import { createEmbedding } from '../lib/embeddings';
 
 /**
  * Get a vector representation of a given input that can be easily consumed by machine learning models and algorithms.
@@ -27,15 +21,16 @@ export class Embeddings extends APIResource {
    *   });
    * ```
    */
-  create(body: EmbeddingCreateParams, options?: RequestOptions): APIPromise<CreateEmbeddingResponse> {
-    return this._client.post(
-      '/embeddings',
-      resolveResourceRequestOptions(options, (options) => ({
-        body,
-        ...options,
-        __security: { bearerAuth: true },
-      })),
-    );
+  create(
+    body: EmbeddingCreateParams & { encoding_format: 'base64' },
+    options?: RequestOptions,
+  ): APIPromise<Base64EmbeddingResponse>;
+  create(body: EmbeddingCreateParams, options?: RequestOptions): APIPromise<CreateEmbeddingResponse>;
+  create(
+    body: EmbeddingCreateParams,
+    options?: RequestOptions,
+  ): APIPromise<CreateEmbeddingResponse | Base64EmbeddingResponse> {
+    return createEmbedding(this._client, body, options);
   }
 }
 
@@ -144,6 +139,10 @@ export interface EmbeddingCreateParams {
    */
   user?: string;
 }
+
+type Base64EmbeddingResponse = Omit<CreateEmbeddingResponse, 'data'> & {
+  data: Array<Omit<Embedding, 'embedding'> & { embedding: string }>;
+};
 
 export declare namespace Embeddings {
   export {

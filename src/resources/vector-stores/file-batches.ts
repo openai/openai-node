@@ -78,6 +78,18 @@ export class FileBatches extends APIResource {
   }
 
   /**
+   * Create a vector store batch and poll until all files have been processed.
+   */
+  async createAndPoll(
+    vectorStoreId: string,
+    body: FileBatchCreateParams,
+    options?: RequestOptions & { pollIntervalMs?: number },
+  ): Promise<VectorStoreFileBatch> {
+    const created = await this.create(vectorStoreId, body, options);
+    return await this.poll(vectorStoreId, created.id, options);
+  }
+
+  /**
    * Returns a list of vector store files in a batch.
    */
   listFiles(
