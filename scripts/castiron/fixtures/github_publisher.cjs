@@ -11,7 +11,6 @@ const github = {
         data: data.current_sequence?.shift() || data.pulls_by_number?.[pull_number] || data.current,
       }),
       list: 'pulls',
-      listReviews: 'reviews',
     },
     git: {
       getRef: async ({ ref }) => ({
@@ -47,7 +46,6 @@ const github = {
     };
   },
   paginate: async (method, params) => {
-    if (method === 'reviews') return data.reviews_by_number?.[params.pull_number] || data.reviews || [];
     if (method === 'statuses') return data.previous_statuses || [];
     if (method === 'comments') return data.comments || [];
     if (method === 'associations') return [];

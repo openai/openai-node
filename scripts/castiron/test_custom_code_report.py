@@ -242,13 +242,10 @@ class CustomCodeTests(GitTestCase):
                     measured["checks"]["budget"]["state"],
                     "success" if target == "next" else "failure",
                 )
-                if target == "next":
-                    output = self.repo / "budget-output"
-                    budget.write_result(output, measured)
-                    self.assertEqual(
-                        json.loads((output / "budget.json").read_text())["target_branch"], "next"
-                    )
-                    self.assertIn("Target next:", (output / "summary.md").read_text())
+        output = self.repo / "budget-output"
+        budget.write_result(output, measured)
+        self.assertEqual(json.loads((output / "budget.json").read_text())["target_branch"], "next")
+        self.assertIn("Target next:", (output / "summary.md").read_text())
         snapshot = report.create_public_snapshot(
             self.repo,
             self.git("rev-parse", f"{checkpoint}^{{tree}}"),
