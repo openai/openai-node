@@ -122,6 +122,7 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
   }
 
   /** Creates a platform-specific WebSocket for the given URL and auth headers. */
+
   protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
 
   send(event: LiveAPI.ClientEvent) {

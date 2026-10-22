@@ -122,6 +122,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
   }
 
   /** Creates a platform-specific WebSocket for the given URL and auth headers. */
+
   protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
 
   send(event: ResponsesAPI.BetaResponsesClientEvent) {

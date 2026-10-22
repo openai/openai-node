@@ -132,6 +132,7 @@ export abstract class SidebandWSBase<TSocket extends WebSocketLike> extends Side
   }
 
   /** Creates a platform-specific WebSocket for the given URL and auth headers. */
+
   protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
 
   send(event: SidebandAPI.ConnectClientEvent) {

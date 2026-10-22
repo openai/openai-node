@@ -153,6 +153,7 @@ describe('data residency', () => {
       endpoint: 'https://test.openai.azure.com',
     });
     const bedrock = new BedrockOpenAI({ apiKey: 'bedrock-key', awsRegion: 'us-east-1' });
+    // @ts-expect-error OpenAI residency is not a valid Azure clone option.
     expect(() => azure.withOptions({ dataResidency: 'eu' })).toThrow('does not support `dataResidency`');
     // Exercise JavaScript callers that do not receive the provider-specific type error.
     expect(() => (bedrock as OpenAI).withOptions({ dataResidency: 'eu' })).toThrow(

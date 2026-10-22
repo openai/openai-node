@@ -126,6 +126,7 @@ export abstract class ForksWSBase<TSocket extends WebSocketLike> extends ForksEm
   }
 
   /** Creates a platform-specific WebSocket for the given URL and auth headers. */
+
   protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
 
   send(event: ForksAPI.ForkClientEvent) {
