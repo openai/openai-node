@@ -147,7 +147,7 @@
     },
     "src/resources/admin/organization/projects/api-keys.ts": {
       "mode": "100644",
-      "sha256": "dce1cef58ab46425647487a9803cc01f38e534f803a4fc81c3dfff0e5ec869e7"
+      "sha256": "5597d0d7a130481a1f77e642037d33871acc5eaa4a0241881b67a9f6b53e1324"
     },
     "src/resources/admin/organization/projects/certificates.ts": {
       "mode": "100644",
