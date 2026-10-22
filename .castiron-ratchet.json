@@ -1,4 +1,8 @@
 {
   "schema_version": 1,
-  "max_custom_patch_lines": 4000
+  "max_custom_patch_lines": 4000,
+  "next_policy": {
+    "repository": "openai/openai-node",
+    "main_sha": "7a970a75e18b2dce834b25743863cfcf52396a1c"
+  }
 }
