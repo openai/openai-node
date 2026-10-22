@@ -118,11 +118,14 @@ function fixture(kind = 'pull_request') {
     STATUS_PHASE: 'result',
     INITIALIZATION_ATTEMPT: '1',
     BRIDGE_ATTEMPT: '1',
+    PUBLISHER_APP_ID: '123456',
+    PUBLISHER_APP_SLUG: 'synthetic-next-ci',
     CODEQL_RESULT: 'success',
     DETECTOR_RESULT: 'success',
   };
   f.github = {
     rest: {
+      apps: { getBySlug: async () => ({ data: { id: 123_456 } }) },
       repos: {
         getContent: async (x) => {
           assert.equal(x.ref, main);
@@ -309,6 +312,52 @@ for (const phase of ['pending', 'result']) {
     assert.equal(f.outputs.ready, 'true');
   });
 }
+for (const phase of ['pending', 'result']) {
+  for (const identity of ['', '15368', '999999']) {
+    test(`reject unconfigured, shared or mismatched App ${identity} at ${phase}`, async () => {
+      const f = fixture();
+      await f.authorize();
+      f.env.PUBLISHER_APP_ID = identity;
+      f.env.STATUS_PHASE = phase;
+      await assert.rejects(f.execute(phase === 'pending' ? 2 : 1));
+      assert.equal(f.writes.length, 0);
+    });
+  }
+  for (const integration of [null, 15_368, 999_999]) {
+    test(`reject ambiguous required source ${integration} at ${phase}`, async () => {
+      const f = fixture();
+      await f.authorize();
+      f.rules.push({
+        type: 'required_status_checks',
+        parameters: {
+          required_status_checks: [
+            { context: 'Next CI / detect-breaking-changes', integration_id: integration },
+          ],
+        },
+      });
+      f.env.STATUS_PHASE = phase;
+      await assert.rejects(f.execute(phase === 'pending' ? 2 : 1), /dedicated publisher App/u);
+      assert.equal(f.writes.length, 0);
+    });
+  }
+  test(`accept complete dedicated required source at ${phase}`, async () => {
+    const f = fixture();
+    await f.authorize();
+    f.rules.push({
+      type: 'required_status_checks',
+      parameters: {
+        required_status_checks: [
+          'CodeQL (actions)',
+          'CodeQL (javascript-typescript)',
+          'detect-breaking-changes',
+        ].map((name) => ({ context: `Next CI / ${name}`, integration_id: 123_456 })),
+      },
+    });
+    f.env.STATUS_PHASE = phase;
+    await f.execute(phase === 'pending' ? 2 : 1);
+    assert.equal(f.writes.length, 3);
+  });
+}
 test('other CI workflow is ignored instead of recursively evaluated', async () => {
   const f = fixture();
   f.source.path = '.github/workflows/detect-breaking-changes.yml';
@@ -404,7 +453,17 @@ test('publication has no checkout, scripts or candidate outputs', async () => {
   assert(publish.includes('${{ needs.detector.result }}'));
   const [authorize, initialize] = before.split('  initialize:');
   assert(!authorize.includes('statuses: write'));
-  assert(initialize.includes('statuses: write'));
+  assert(!initialize.includes('      statuses: write'));
+  assert(initialize.includes('permission-statuses: write'));
+  for (const job of [initialize, publish]) {
+    assert(job.includes('environment: ci'));
+    // oxlint-disable-next-line no-template-curly-in-string -- Literal GitHub Actions expression.
+    assert(job.includes('github-token: ${{ steps.publisher.outputs.token }}'));
+    // oxlint-disable-next-line no-template-curly-in-string -- Literal GitHub Actions expression.
+    assert(job.includes('private-key: ${{ secrets.NEXT_CI_APP_PRIVATE_KEY }}'));
+    // oxlint-disable-next-line no-template-curly-in-string -- Literal GitHub Actions expression.
+    assert(!job.includes('GH_TOKEN: ${{ github.token }}'));
+  }
   assert(!initialize.includes('checkout@'));
   assert(!initialize.includes('run:'));
   assert(!initialize.includes('download-artifact'));
@@ -544,7 +603,7 @@ test('real pinned tree checks legacy source without executing candidate tooling'
   execFileSync(process.execPath, [path.join(__dirname, 'next-ci-analysis.cjs')], { stdio: 'pipe' });
 });
 reject('loose next checks without merge queue are rejected', (f) => {
-  f.rules = [{ type: 'required_status_checks' }];
+  f.rules = [{ type: 'required_status_checks', parameters: { required_status_checks: [] } }];
 });
 reject(
   'merge queue removal prevents publication',
@@ -612,7 +671,10 @@ reject(
 test('effective queue rule on a later page is accepted', async () => {
   const f = fixture();
   f.rules = [
-    ...Array.from({ length: 100 }, () => ({ type: 'required_status_checks' })),
+    ...Array.from({ length: 100 }, () => ({
+      type: 'required_status_checks',
+      parameters: { required_status_checks: [] },
+    })),
     { type: 'merge_queue' },
   ];
   await f.authorize();

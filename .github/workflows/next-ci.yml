@@ -168,17 +168,31 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
-      statuses: write
+    environment: ci
     steps:
+      # The ci environment permits only main. Never expose this key as a repository secret.
+      - name: Create dedicated status publisher token
+        id: publisher
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.NEXT_CI_APP_CLIENT_ID }}
+          private-key: ${{ secrets.NEXT_CI_APP_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
+          permission-pull-requests: read
+          permission-statuses: write
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         id: status
         env:
           BRIDGE_ATTEMPT: ${{ github.run_attempt }}
           WORKFLOW_SHA: ${{ github.workflow_sha }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.publisher.outputs.token }}
+          PUBLISHER_APP_SLUG: ${{ steps.publisher.outputs.app-slug }}
+          PUBLISHER_APP_ID: ${{ vars.NEXT_CI_APP_ID }}
           STATUS_PHASE: pending
           RECEIPT: ${{ needs.authorize.outputs.receipt }}
         with:
+          github-token: ${{ steps.publisher.outputs.token }}
           script: |
             const repository = 'openai/openai-node';
             const names = ['Next CI / CodeQL (actions)', 'Next CI / CodeQL (javascript-typescript)', 'Next CI / detect-breaking-changes'];
@@ -267,7 +281,18 @@ jobs:
             const receipt = JSON.parse(process.env.RECEIPT);
             const run = positive(context.runId), attempt = positive(process.env.BRIDGE_ATTEMPT);
             if (process.env.STATUS_PHASE === 'result' && positive(process.env.INITIALIZATION_ATTEMPT) !== attempt) fail('Pending initialization must be from this attempt');
-            // Status markers are not authority: other Actions share this bot identity.
+            // Native required checks must distinguish this App from candidate Actions.
+            const appId = positive(process.env.PUBLISHER_APP_ID);
+            if (appId === 15368 || !process.env.PUBLISHER_APP_SLUG) fail('Dedicated publisher App is not configured');
+            const {data: app} = await github.rest.apps.getBySlug({app_slug: process.env.PUBLISHER_APP_SLUG});
+            if (app.id !== appId) fail('Publisher App identity does not match configuration');
+            const rules = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}', {...context.repo, branch: 'next', per_page: 100});
+            const required = rules.filter(rule => rule.type === 'required_status_checks').flatMap(rule => rule.parameters.required_status_checks);
+            // With no Next CI requirements, publish only for pre-activation qualification.
+            // Once activated, require every context to be pinned to this App, never Actions.
+            if (required.some(check => names.includes(check.context)) &&
+                names.some(name => !required.some(check => check.context === name && check.integration_id === appId) ||
+                  required.some(check => check.context === name && check.integration_id !== appId))) fail('Next CI required checks must all use the dedicated publisher App');
             await trustedRun();
             await selectedPolicy(receipt, receipt.policy);
             await currentTarget(receipt);
@@ -316,19 +341,33 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
-      statuses: write
+    environment: ci
     steps:
+      # The ci environment permits only main. Never expose this key as a repository secret.
+      - name: Create dedicated status publisher token
+        id: publisher
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.NEXT_CI_APP_CLIENT_ID }}
+          private-key: ${{ secrets.NEXT_CI_APP_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
+          permission-pull-requests: read
+          permission-statuses: write
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           BRIDGE_ATTEMPT: ${{ github.run_attempt }}
           WORKFLOW_SHA: ${{ github.workflow_sha }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.publisher.outputs.token }}
+          PUBLISHER_APP_SLUG: ${{ steps.publisher.outputs.app-slug }}
+          PUBLISHER_APP_ID: ${{ vars.NEXT_CI_APP_ID }}
           STATUS_PHASE: result
           INITIALIZATION_ATTEMPT: ${{ needs.initialize.outputs.attempt }}
           RECEIPT: ${{ needs.authorize.outputs.receipt }}
           CODEQL_RESULT: ${{ needs.codeql.result }}
           DETECTOR_RESULT: ${{ needs.detector.result }}
         with:
+          github-token: ${{ steps.publisher.outputs.token }}
           script: |
             const repository = 'openai/openai-node';
             const names = ['Next CI / CodeQL (actions)', 'Next CI / CodeQL (javascript-typescript)', 'Next CI / detect-breaking-changes'];
@@ -417,7 +456,18 @@ jobs:
             const receipt = JSON.parse(process.env.RECEIPT);
             const run = positive(context.runId), attempt = positive(process.env.BRIDGE_ATTEMPT);
             if (process.env.STATUS_PHASE === 'result' && positive(process.env.INITIALIZATION_ATTEMPT) !== attempt) fail('Pending initialization must be from this attempt');
-            // Status markers are not authority: other Actions share this bot identity.
+            // Native required checks must distinguish this App from candidate Actions.
+            const appId = positive(process.env.PUBLISHER_APP_ID);
+            if (appId === 15368 || !process.env.PUBLISHER_APP_SLUG) fail('Dedicated publisher App is not configured');
+            const {data: app} = await github.rest.apps.getBySlug({app_slug: process.env.PUBLISHER_APP_SLUG});
+            if (app.id !== appId) fail('Publisher App identity does not match configuration');
+            const rules = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}', {...context.repo, branch: 'next', per_page: 100});
+            const required = rules.filter(rule => rule.type === 'required_status_checks').flatMap(rule => rule.parameters.required_status_checks);
+            // With no Next CI requirements, publish only for pre-activation qualification.
+            // Once activated, require every context to be pinned to this App, never Actions.
+            if (required.some(check => names.includes(check.context)) &&
+                names.some(name => !required.some(check => check.context === name && check.integration_id === appId) ||
+                  required.some(check => check.context === name && check.integration_id !== appId))) fail('Next CI required checks must all use the dedicated publisher App');
             await trustedRun();
             await selectedPolicy(receipt, receipt.policy);
             await currentTarget(receipt);
