@@ -7,6 +7,10 @@ Types:
 - <code><a href="./src/resources/shared.ts">ComparisonFilter</a></code>
 - <code><a href="./src/resources/shared.ts">CompoundFilter</a></code>
 - <code><a href="./src/resources/shared.ts">CustomToolInputFormat</a></code>
+- <code><a href="./src/resources/shared.ts">DecisionInputJSON</a></code>
+- <code><a href="./src/resources/shared.ts">DecisionQuestionInputImage</a></code>
+- <code><a href="./src/resources/shared.ts">DecisionQuestionInputPart</a></code>
+- <code><a href="./src/resources/shared.ts">DecisionQuestionInputText</a></code>
 - <code><a href="./src/resources/shared.ts">ErrorObject</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionDefinition</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionParameters</a></code>
@@ -31,6 +35,10 @@ Types:
 - <code><a href="./src/resources/decisions.ts">DecisionInputPart</a></code>
 - <code><a href="./src/resources/decisions.ts">DecisionInputText</a></code>
 - <code><a href="./src/resources/decisions.ts">DecisionPromptCacheBreakpoint</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionInputJson</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionQuestionInputImage</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionQuestionInputPart</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionQuestionInputText</a></code>
 
 Methods:
 

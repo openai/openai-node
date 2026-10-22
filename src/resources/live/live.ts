@@ -2,6 +2,7 @@
 
 import { APIResource } from '../../core/resource';
 import * as LiveAPI from './live';
+import * as Shared from '../shared';
 import * as DecisionsAPI from '../decisions';
 import * as SessionsAPI from './sessions';
 import {
@@ -539,7 +540,7 @@ export namespace DecisionTrigger {
      * Estimate how likely it is that a statement about the input is true.
      */
     export interface QuestionParamPredicate {
-      instructions: string;
+      instructions: string | Array<Shared.DecisionQuestionInputPart>;
 
       /**
        * The type of the object. Always `predicate`.
@@ -558,7 +559,7 @@ export namespace DecisionTrigger {
        */
       choices: Array<QuestionParamChoice.Choice>;
 
-      instructions: string;
+      instructions: string | Array<Shared.DecisionQuestionInputPart>;
 
       /**
        * The type of the object. Always `choice`.
@@ -583,7 +584,7 @@ export namespace DecisionTrigger {
      * Rate the input against the supplied ordered levels.
      */
     export interface QuestionParamScore {
-      instructions: string;
+      instructions: string | Array<Shared.DecisionQuestionInputPart>;
 
       levels: Array<QuestionParamScore.Level>;
 
@@ -623,7 +624,7 @@ export namespace DecisionsDelegationConfig {
    * Estimate how likely it is that a statement about the input is true.
    */
   export interface QuestionParamPredicate {
-    instructions: string;
+    instructions: string | Array<Shared.DecisionQuestionInputPart>;
 
     /**
      * The type of the object. Always `predicate`.
@@ -642,7 +643,7 @@ export namespace DecisionsDelegationConfig {
      */
     choices: Array<QuestionParamChoice.Choice>;
 
-    instructions: string;
+    instructions: string | Array<Shared.DecisionQuestionInputPart>;
 
     /**
      * The type of the object. Always `choice`.
@@ -667,7 +668,7 @@ export namespace DecisionsDelegationConfig {
    * Rate the input against the supplied ordered levels.
    */
   export interface QuestionParamScore {
-    instructions: string;
+    instructions: string | Array<Shared.DecisionQuestionInputPart>;
 
     levels: Array<QuestionParamScore.Level>;
 
@@ -706,7 +707,7 @@ export namespace DecisionsDelegationUpdateConfig {
    * Estimate how likely it is that a statement about the input is true.
    */
   export interface QuestionParamPredicate {
-    instructions: string;
+    instructions: string | Array<Shared.DecisionQuestionInputPart>;
 
     /**
      * The type of the object. Always `predicate`.
@@ -725,7 +726,7 @@ export namespace DecisionsDelegationUpdateConfig {
      */
     choices: Array<QuestionParamChoice.Choice>;
 
-    instructions: string;
+    instructions: string | Array<Shared.DecisionQuestionInputPart>;
 
     /**
      * The type of the object. Always `choice`.
@@ -750,7 +751,7 @@ export namespace DecisionsDelegationUpdateConfig {
    * Rate the input against the supplied ordered levels.
    */
   export interface QuestionParamScore {
-    instructions: string;
+    instructions: string | Array<Shared.DecisionQuestionInputPart>;
 
     levels: Array<QuestionParamScore.Level>;
 
