@@ -2798,9 +2798,6 @@ export declare namespace OpenAI {
     type DecisionInputText as DecisionInputText,
     type DecisionPromptCacheBreakpoint as DecisionPromptCacheBreakpoint,
     type DecisionInputJson as DecisionInputJson,
-    type DecisionQuestionInputImage as DecisionQuestionInputImage,
-    type DecisionQuestionInputPart as DecisionQuestionInputPart,
-    type DecisionQuestionInputText as DecisionQuestionInputText,
     type DecisionCreateParams as DecisionCreateParams,
   };
 
