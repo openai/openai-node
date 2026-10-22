@@ -1,5 +1,24 @@
 # Changelog
 
+## [7.42.0](https://github.com/openai/openai-node/compare/v7.41.0...v7.42.0) (2026-10-22)
+
+
+### Features
+
+* **api:** add voice deletion ([#3014](https://github.com/openai/openai-node/issues/3014)) ([2a88010](https://github.com/openai/openai-node/commit/2a880100d82ab92f6c82caeb5830494595bb5d00))
+
+
+### Bug Fixes
+
+* **agents:** avoid repeated ancestor-path hashing ([#3010](https://github.com/openai/openai-node/issues/3010)) ([e352050](https://github.com/openai/openai-node/commit/e35205033764ec2a2adc7fc71f3d2df9b0ea8679))
+* **api:** avoid excessive work when redacting long log values ([#3012](https://github.com/openai/openai-node/issues/3012)) ([e310fe0](https://github.com/openai/openai-node/commit/e310fe08633e496b495b318eed3dd7a71929b3d9))
+
+
+### Chores
+
+* **api:** clarify service-account API key deletion ([#3015](https://github.com/openai/openai-node/issues/3015)) ([ab6d626](https://github.com/openai/openai-node/commit/ab6d6262d03852c839cd5d03e272cbfc1d4eea59))
+* **api:** preserve file helpers and resource exports ([#3007](https://github.com/openai/openai-node/issues/3007)) ([94c0c1b](https://github.com/openai/openai-node/commit/94c0c1ba4ac01c919bafcd325b8a2f4470e2f2d8))
+
 ## [7.41.0](https://github.com/openai/openai-node/compare/v7.40.0...v7.41.0) (2026-10-21)
 
 
