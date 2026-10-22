@@ -109,6 +109,7 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
         emitReconnected: () => this._emit('reconnected'),
         emitClose: (code, reason, unsent) => this._emit('close', code, reason, unsent),
         requeueFailed: false,
+        prepareReconnectSocket: () => this._prepareReconnectSocket(),
       },
       options,
     );
@@ -121,6 +122,7 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
   }
 
   /** Creates a platform-specific WebSocket for the given URL and auth headers. */
+
   protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
 
   send(event: LiveAPI.ClientEvent) {
@@ -227,9 +229,15 @@ export abstract class LiveWSBase<TSocket extends WebSocketLike> extends LiveEmit
     }
   }
 
-  protected _authHeaders(): Record<string, string> {
-    if (this._client.apiKey) {
-      return { Authorization: `Bearer ${this._client.apiKey}` };
+  protected _prepareReconnectSocket(): Promise<(url: URL) => TSocket> {
+    const authHeaders = this._authHeaders();
+    return Promise.resolve((url) => this._createSocket(url, authHeaders));
+  }
+
+  protected _authHeaders(apiKey = this._client.apiKey): Record<string, string> {
+    if (typeof apiKey !== 'string' || !apiKey) return {};
+    if (apiKey) {
+      return { Authorization: `Bearer ${apiKey}` };
     }
     return {};
   }

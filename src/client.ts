@@ -47,12 +47,6 @@ import {
 } from './core/pagination';
 import * as Uploads from './core/uploads';
 import * as API from './resources/index';
-import { APIPromise } from './core/api-promise';
-import {
-  getDeferredRealtimeAPIKeyCache,
-  resolveRealtimeAPIKey,
-  validateCapturedAPIKey,
-} from './internal/realtime-credentials';
 import {
   Batch,
   BatchCreateParams,
@@ -255,6 +249,7 @@ import {
   ChatCompletionModality,
   ChatCompletionNamedToolChoice,
   ChatCompletionNamedToolChoiceCustom,
+  ChatCompletionParseParams,
   ChatCompletionPredictionContent,
   ChatCompletionReasoningEffort,
   ChatCompletionRole,
@@ -268,7 +263,19 @@ import {
   ChatCompletionUpdateParams,
   ChatCompletionUserMessageParam,
   ChatCompletionsPage,
+  ParsedChatCompletion,
+  ParsedChatCompletionMessage,
+  ParsedChatCompletionMessageToolCall,
+  ParsedChoice,
+  ParsedFunction,
+  ParsedFunctionToolCall,
 } from './resources/chat/completions/completions';
+import { APIPromise } from './core/api-promise';
+import {
+  getDeferredRealtimeAPIKeyCache,
+  resolveRealtimeAPIKey,
+  validateCapturedAPIKey,
+} from './internal/realtime-credentials';
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
@@ -2841,12 +2848,19 @@ export declare namespace OpenAI {
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
     type ChatCompletionAllowedTools as ChatCompletionAllowedTools,
     type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
+    type ParsedFunction as ParsedFunction,
+    type ParsedFunctionToolCall as ParsedFunctionToolCall,
+    type ParsedChatCompletionMessageToolCall as ParsedChatCompletionMessageToolCall,
+    type ParsedChatCompletionMessage as ParsedChatCompletionMessage,
+    type ParsedChoice as ParsedChoice,
+    type ParsedChatCompletion as ParsedChatCompletion,
     type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
     type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
     type ChatCompletionListParams as ChatCompletionListParams,
+    type ChatCompletionParseParams as ChatCompletionParseParams,
   };
 
   export {

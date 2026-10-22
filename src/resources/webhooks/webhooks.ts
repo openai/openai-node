@@ -1,15 +1,14 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../../core/resource';
-import { buildHeaders, HeadersLike } from '../../internal/headers';
-import { verifyWebhookSignature, webhookSignatureRequiresSigning } from '../../lib/webhook-signature';
-
 import * as EventTypesAPI from './event-types';
 import { EventTypes } from './event-types';
 import { APIPromise } from '../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagination';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
+import { buildHeaders, HeadersLike } from '../../internal/headers';
+import { verifyWebhookSignature, webhookSignatureRequiresSigning } from '../../lib/webhook-signature';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,

@@ -1,13 +1,14 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
-import { AgentResultArtifacts } from '../../../../lib/beta/agents/result-artifacts';
-import type { AgentTurnResult } from '../../../../lib/beta/agents/agent-turn-result';
 import { APIResource } from '../../../../core/resource';
 import { APIPromise } from '../../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core/pagination';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
+
+import { AgentResultArtifacts } from '../../../../lib/beta/agents/result-artifacts';
+import type { AgentTurnResult } from '../../../../lib/beta/agents/agent-turn-result';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
@@ -124,11 +125,6 @@ function normalizeRequestOptionsForQuery(
 }
 
 export class Artifacts extends APIResource {
-  /** Beta: bind artifact lookup and downloads to a completed result's exact session and turn. */
-  forResult(result: AgentTurnResult): AgentResultArtifacts {
-    return new AgentResultArtifacts(this, result);
-  }
-
   /**
    * Retrieves immutable metadata for one durable session artifact. See
    * [session artifacts](https://developers.openai.com/api/docs/guides/agents-api/environments/files#openai-hosted-artifacts).
@@ -344,6 +340,11 @@ export class Artifacts extends APIResource {
         __binaryResponse: true,
       })),
     );
+  }
+
+  /** Beta: bind artifact lookup and downloads to a completed result's exact session and turn. */
+  forResult(result: AgentTurnResult): AgentResultArtifacts {
+    return new AgentResultArtifacts(this, result);
   }
 }
 

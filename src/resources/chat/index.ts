@@ -44,6 +44,13 @@ export {
   type ChatCompletionCreateParamsStreaming,
   type ChatCompletionUpdateParams,
   type ChatCompletionListParams,
+  type ParsedFunction,
+  type ParsedFunctionToolCall,
+  type ParsedChatCompletionMessageToolCall,
+  type ParsedChatCompletionMessage,
+  type ParsedChoice,
+  type ParsedChatCompletion,
+  type ChatCompletionParseParams,
   type ChatCompletionStoreMessagesPage,
   type ChatCompletionsPage,
 } from './completions/index';

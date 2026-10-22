@@ -1,12 +1,5 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
-import {
-  type ExtractParsedContentFromParams,
-  parseResponse,
-  type ResponseCreateParamsWithTools,
-  addOutputText,
-} from '../../lib/ResponsesParser';
-import { ResponseStream, ResponseStreamParams } from '../../lib/responses/ResponseStream';
 import { APIResource } from '../../core/resource';
 import * as ResponsesAPI from './responses';
 import * as Shared from '../shared';
@@ -21,57 +14,13 @@ import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
-export interface ParsedResponseOutputText<ParsedT> extends ResponseOutputText {
-  parsed: ParsedT | null;
-}
-
-export type ParsedContent<ParsedT> = ParsedResponseOutputText<ParsedT> | ResponseOutputRefusal;
-
-export interface ParsedResponseOutputMessage<ParsedT> extends ResponseOutputMessage {
-  content: ParsedContent<ParsedT>[];
-}
-
-export interface ParsedResponseFunctionToolCall extends ResponseFunctionToolCall {
-  parsed_arguments: any;
-}
-
-export type ParsedResponseOutputItem<ParsedT> =
-  | ParsedResponseOutputMessage<ParsedT>
-  | ParsedResponseFunctionToolCall
-  | ResponseFileSearchToolCall
-  | ResponseFunctionToolCallOutputItem
-  | ResponseFunctionWebSearch
-  | ResponseComputerToolCall
-  | ResponseComputerToolCallOutputItem
-  | ResponseOutputItem.Program
-  | ResponseOutputItem.ProgramOutput
-  | ResponseToolSearchCall
-  | ResponseToolSearchOutputItem
-  | ResponseOutputItem.AdditionalTools
-  | ResponseReasoningItem
-  | ResponseCompactionItem
-  | ResponseOutputItem.ImageGenerationCall
-  | ResponseCodeInterpreterToolCall
-  | ResponseOutputItem.LocalShellCall
-  | ResponseOutputItem.LocalShellCallOutput
-  | ResponseFunctionShellToolCall
-  | ResponseFunctionShellToolCallOutput
-  | ResponseApplyPatchToolCall
-  | ResponseApplyPatchToolCallOutput
-  | ResponseOutputItem.McpCall
-  | ResponseOutputItem.McpListTools
-  | ResponseOutputItem.McpApprovalRequest
-  | ResponseOutputItem.McpApprovalResponse
-  | ResponseCustomToolCall
-  | ResponseCustomToolCallOutputItem;
-
-export interface ParsedResponse<ParsedT> extends Response {
-  output: Array<ParsedResponseOutputItem<ParsedT>>;
-
-  output_parsed: ParsedT | null;
-}
-
-export type ResponseParseParams = ResponseCreateParamsNonStreaming;
+import {
+  type ExtractParsedContentFromParams,
+  parseResponse,
+  type ResponseCreateParamsWithTools,
+  addOutputText,
+} from '../../lib/ResponsesParser';
+import { ResponseStream, ResponseStreamParams } from '../../lib/responses/ResponseStream';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
@@ -237,12 +186,7 @@ export class Responses extends APIResource {
         '/responses',
         resolveResourceRequestOptions(options, (options) =>
           withBodyFinalization(
-            {
-              body,
-              ...options,
-              stream: body.stream ?? false,
-              __security: { bearerAuth: true },
-            },
+            { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
             { streamFromBody: true },
           ),
         ),
@@ -251,7 +195,6 @@ export class Responses extends APIResource {
       if ('object' in rsp && rsp.object === 'response') {
         addOutputText(rsp as Response);
       }
-
       return rsp;
     }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
@@ -440,7 +383,6 @@ export class Responses extends APIResource {
       if ('object' in rsp && rsp.object === 'response') {
         addOutputText(rsp as Response);
       }
-
       return rsp;
     }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
@@ -464,25 +406,6 @@ export class Responses extends APIResource {
         __security: { bearerAuth: true },
       })),
     );
-  }
-
-  parse<Params extends ResponseCreateParamsWithTools, ParsedT = ExtractParsedContentFromParams<Params>>(
-    body: Params,
-    options?: RequestOptions,
-  ): APIPromise<ParsedResponse<ParsedT>> {
-    return this._client.responses
-      .create(body, options)
-      ._thenUnwrap((response) => parseResponse(response as Response, body));
-  }
-
-  /**
-   * Creates a model response stream
-   */
-  stream<Params extends ResponseStreamParams, ParsedT = ExtractParsedContentFromParams<Params>>(
-    body: Params,
-    options?: RequestOptions,
-  ): ResponseStream<ParsedT> {
-    return ResponseStream.createResponse<ParsedT>(this._client, body, options);
   }
 
   /**
@@ -528,6 +451,25 @@ export class Responses extends APIResource {
         __security: { bearerAuth: true },
       })),
     );
+  }
+
+  parse<Params extends ResponseCreateParamsWithTools, ParsedT = ExtractParsedContentFromParams<Params>>(
+    body: Params,
+    options?: RequestOptions,
+  ): APIPromise<ParsedResponse<ParsedT>> {
+    return this._client.responses
+      .create(body, options)
+      ._thenUnwrap((response) => parseResponse(response as Response, body));
+  }
+
+  /**
+   * Creates a model response stream
+   */
+  stream<Params extends ResponseStreamParams, ParsedT = ExtractParsedContentFromParams<Params>>(
+    body: Params,
+    options?: RequestOptions,
+  ): ResponseStream<ParsedT> {
+    return ResponseStream.createResponse<ParsedT>(this._client, body, options);
   }
 }
 
@@ -1332,12 +1274,12 @@ export interface Response {
 
   access_programs: Response.AccessPrograms | null;
 
+  output_text: string;
+
   /**
    * Unix timestamp (in seconds) of when this Response was created.
    */
   created_at: number;
-
-  output_text: string;
 
   /**
    * An error object returned when the model fails to generate a Response.
@@ -1481,6 +1423,14 @@ export interface Response {
   max_output_tokens?: number | null;
 
   /**
+   * The maximum number of total calls to built-in tools that can be processed in a
+   * response. This maximum number applies across all built-in tool calls, not per
+   * individual tool. Any further attempts to call a tool by the model will be
+   * ignored.
+   */
+  max_tool_calls?: number | null;
+
+  /**
    * Moderation results for the response input and output, if moderated completions
    * were requested.
    */
@@ -1560,8 +1510,7 @@ export interface Response {
   safety_identifier?: string | null;
 
   /**
-   * Specifies the latency tier to use for processing the request. This parameter is
-   * relevant for customers subscribed to the scale tier service:
+   * Specifies the processing type used for serving the request.
    *
    * - If set to 'auto', then the request will be processed with the service tier
    *   configured in the Project settings. Unless otherwise configured, the Project
@@ -1583,8 +1532,10 @@ export interface Response {
    *   `service_tier=ultrafast`.
    * - When not set, the default behavior is 'auto'.
    *
-   * When this parameter is set, the response body will include the `service_tier`
-   * utilized.
+   * When the `service_tier` parameter is set, the response body will include the
+   * `service_tier` value based on the processing mode actually used to serve the
+   * request. This response value may be different from the value set in the
+   * parameter.
    */
   service_tier?: ServiceTier | null;
 
@@ -4338,15 +4289,12 @@ export interface ResponseInProgressEvent {
  * - `file_search_call.results`: Include the search results of the file search tool
  *   call.
  * - `message.input_image.image_url`: Include image urls from the input message.
- * - `computer_call_output.output.image_url`: Include image urls from the computer
- *   call output.
+ * - `message.output_text.logprobs`: Include logprobs with assistant messages.
  * - `reasoning.encrypted_content`: Includes an encrypted version of reasoning
  *   tokens in reasoning item outputs. This enables reasoning items to be used in
  *   multi-turn conversations when using the Responses API statelessly (like when
  *   the `store` parameter is set to `false`, or when an organization is enrolled
  *   in the zero data retention program).
- * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
- *   in code interpreter tool call items.
  */
 export type ResponseIncludable =
   | 'file_search_call.results'
@@ -9510,25 +9458,6 @@ export interface ResponseWebSearchCallSearchingEvent {
 export type ResponsesClientEvent = ResponsesClientEvent.ResponseCreate | ResponseSteerEvent;
 
 export namespace ResponsesClientEvent {
-  // custom code for back compat aliases
-  // Preserve the names exposed before ResponsesClientEvent became a union.
-  export type ContextManagement = ResponseCreate.ContextManagement;
-  export type Moderation = ResponseCreate.Moderation;
-
-  export namespace Moderation {
-    export type Policy = ResponseCreate.Moderation.Policy;
-
-    export namespace Policy {
-      export type Input = ResponseCreate.Moderation.Policy.Input;
-      export type Output = ResponseCreate.Moderation.Policy.Output;
-    }
-  }
-
-  export type PromptCacheOptions = ResponseCreate.PromptCacheOptions;
-  export type StreamOptions = ResponseCreate.StreamOptions;
-  export type SpecificProgrammaticToolCallingParam = ResponseCreate.SpecificProgrammaticToolCallingParam;
-  // end custom code for back compat aliases
-
   /**
    * Client event for creating a response over a persistent WebSocket connection.
    * This payload uses the same top-level fields as `POST /v1/responses`, plus
@@ -10095,11 +10024,11 @@ export type ResponsesServerEvent =
   | ResponsesServerEvent.ResponseWsQueued
   | ResponsesServerEvent.ResponseCustomToolCallInputWsDelta
   | ResponsesServerEvent.ResponseCustomToolCallInputWsDone
-  | ResponsesServerEvent.ResponseWsStreamingError
   | ResponsesServerEvent.ResponseWsError
   | ResponseSteerAcceptedEvent
   | ResponseSteerPendingEvent
-  | ResponseSteerFailedEvent;
+  | ResponseSteerFailedEvent
+  | ResponsesServerEvent.ResponseWsStreamingError;
 
 export namespace ResponsesServerEvent {
   /**
@@ -10750,17 +10679,6 @@ export namespace ResponsesServerEvent {
   }
 
   /**
-   * Emitted when an error occurs while streaming a response over the WebSocket.
-   */
-  export interface ResponseWsStreamingError extends ResponseErrorEvent {
-    /**
-     * The WebSocket lane that emitted this event. This field is present when the
-     * originating `response.create` event supplied a `stream_id`.
-     */
-    stream_id?: string;
-  }
-
-  /**
    * Emitted when an error occurs while processing a Responses WebSocket request.
    */
   export interface ResponseWsError {
@@ -10865,6 +10783,17 @@ export namespace ResponsesServerEvent {
         }
       }
     }
+  }
+
+  /**
+   * Emitted when an error occurs while streaming a response over the WebSocket.
+   */
+  export interface ResponseWsStreamingError extends ResponseErrorEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
   }
 }
 
@@ -11438,7 +11367,6 @@ export interface ToolChoiceTypes {
    * - `computer_use_preview`
    * - `computer_use`
    * - `code_interpreter`
-   * - `mcp`
    * - `image_generation`
    */
   type:
@@ -11736,15 +11664,12 @@ export interface ResponseCreateParamsBase {
    * - `file_search_call.results`: Include the search results of the file search tool
    *   call.
    * - `message.input_image.image_url`: Include image urls from the input message.
-   * - `computer_call_output.output.image_url`: Include image urls from the computer
-   *   call output.
+   * - `message.output_text.logprobs`: Include logprobs with assistant messages.
    * - `reasoning.encrypted_content`: Includes an encrypted version of reasoning
    *   tokens in reasoning item outputs. This enables reasoning items to be used in
    *   multi-turn conversations when using the Responses API statelessly (like when
    *   the `store` parameter is set to `false`, or when an organization is enrolled
    *   in the zero data retention program).
-   * - `code_interpreter_call.outputs`: Includes the outputs of python code execution
-   *   in code interpreter tool call items.
    */
   include?: Array<ResponseIncludable> | null;
 
@@ -11776,6 +11701,14 @@ export interface ResponseCreateParamsBase {
    * [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
    */
   max_output_tokens?: number | null;
+
+  /**
+   * The maximum number of total calls to built-in tools that can be processed in a
+   * response. This maximum number applies across all built-in tool calls, not per
+   * individual tool. Any further attempts to call a tool by the model will be
+   * ignored.
+   */
+  max_tool_calls?: number | null;
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
@@ -11878,8 +11811,7 @@ export interface ResponseCreateParamsBase {
   safety_identifier?: string | null;
 
   /**
-   * Specifies the latency tier to use for processing the request. This parameter is
-   * relevant for customers subscribed to the scale tier service:
+   * Specifies the processing type used for serving the request.
    *
    * - If set to 'auto', then the request will be processed with the service tier
    *   configured in the Project settings. Unless otherwise configured, the Project
@@ -11901,8 +11833,10 @@ export interface ResponseCreateParamsBase {
    *   `service_tier=ultrafast`.
    * - When not set, the default behavior is 'auto'.
    *
-   * When this parameter is set, the response body will include the `service_tier`
-   * utilized.
+   * When the `service_tier` parameter is set, the response body will include the
+   * `service_tier` value based on the processing mode actually used to serve the
+   * request. This response value may be different from the value set in the
+   * parameter.
    */
   service_tier?: ServiceTier | null;
 
@@ -12479,6 +12413,48 @@ export namespace ResponseCompactParams {
   }
 }
 
+export interface ParsedResponseOutputText<ParsedT> extends ResponseOutputText {
+  parsed: ParsedT | null;
+}
+
+export type ParsedContent<ParsedT> = ParsedResponseOutputText<ParsedT> | ResponseOutputRefusal;
+
+export interface ParsedResponseOutputMessage<ParsedT> extends ResponseOutputMessage {
+  content: ParsedContent<ParsedT>[];
+}
+
+export interface ParsedResponseFunctionToolCall extends ResponseFunctionToolCall {
+  parsed_arguments: any;
+}
+
+export type ParsedResponseOutputItem<ParsedT> =
+  | ParsedResponseOutputMessage<ParsedT>
+  | ParsedResponseFunctionToolCall
+  | Exclude<ResponseOutputItem, ResponseOutputMessage | ResponseFunctionToolCall>;
+
+export interface ParsedResponse<ParsedT> extends Response {
+  output: Array<ParsedResponseOutputItem<ParsedT>>;
+
+  output_parsed: ParsedT | null;
+}
+
+export type ResponseParseParams = ResponseCreateParamsNonStreaming;
+
+export namespace ResponsesClientEvent {
+  export type ContextManagement = ResponseCreate.ContextManagement;
+  export type Moderation = ResponseCreate.Moderation;
+  export namespace Moderation {
+    export type Policy = ResponseCreate.Moderation.Policy;
+    export namespace Policy {
+      export type Input = ResponseCreate.Moderation.Policy.Input;
+      export type Output = ResponseCreate.Moderation.Policy.Output;
+    }
+  }
+  export type PromptCacheOptions = ResponseCreate.PromptCacheOptions;
+  export type StreamOptions = ResponseCreate.StreamOptions;
+  export type SpecificProgrammaticToolCallingParam = ResponseCreate.SpecificProgrammaticToolCallingParam;
+}
+
 Responses.InputItems = InputItems;
 Responses.InputTokens = InputTokens;
 
@@ -12652,6 +12628,12 @@ export declare namespace Responses {
     type ToolSearchTool as ToolSearchTool,
     type WebSearchPreviewTool as WebSearchPreviewTool,
     type WebSearchTool as WebSearchTool,
+    type ParsedResponseOutputText as ParsedResponseOutputText,
+    type ParsedContent as ParsedContent,
+    type ParsedResponseOutputMessage as ParsedResponseOutputMessage,
+    type ParsedResponseFunctionToolCall as ParsedResponseFunctionToolCall,
+    type ParsedResponseOutputItem as ParsedResponseOutputItem,
+    type ParsedResponse as ParsedResponse,
     type ResponseCreateParams as ResponseCreateParams,
     type ResponseCreateParamsNonStreaming as ResponseCreateParamsNonStreaming,
     type ResponseCreateParamsStreaming as ResponseCreateParamsStreaming,
@@ -12659,6 +12641,7 @@ export declare namespace Responses {
     type ResponseRetrieveParamsNonStreaming as ResponseRetrieveParamsNonStreaming,
     type ResponseRetrieveParamsStreaming as ResponseRetrieveParamsStreaming,
     type ResponseCompactParams as ResponseCompactParams,
+    type ResponseParseParams as ResponseParseParams,
   };
 
   export {

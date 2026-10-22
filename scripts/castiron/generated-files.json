@@ -11,7 +11,7 @@
     },
     "api.md": {
       "mode": "100644",
-      "sha256": "5695ce961a8b290057ae5d65991a341a9fbf937a2879b2909772918b319ff58d"
+      "sha256": "515a6e5c5ac6e7e2587679b1ca240c9bacb63e48367d99c09348e00026b98592"
     },
     "scripts/castiron/CUSTOM_CODE.md": {
       "mode": "100644",
@@ -59,15 +59,15 @@
     },
     "scripts/castiron/test_custom_code_publication.py": {
       "mode": "100644",
-      "sha256": "960876c3e11be7f8b63bad1753924c8ae67816b8215231ee330f23998bc57e41"
+      "sha256": "38d723f458225eb2d4745aca4044f6e4283f10b2a9d3a5257349b04ecd1c8c75"
     },
     "scripts/castiron/test_custom_code_report.py": {
       "mode": "100644",
-      "sha256": "b4bae67363983a2e06a17dd8e86fccb560f9ca97293ca7874568f045ff81f9e1"
+      "sha256": "f4d90fd38b17aac59096488391b65ef9da5493d2049d4c038d5926a960257ca7"
     },
     "src/client.ts": {
       "mode": "100644",
-      "sha256": "b3b2b1eb2f13a7f108bf6053485a2c5232a5a946eb1dca4d0ca8066bcc1215ee"
+      "sha256": "c2af0642618a40efe96648ed9ff1d80b35f8fef92b9e3b97732f644c423ac06b"
     },
     "src/internal/data-residency.ts": {
       "mode": "100644",
@@ -259,7 +259,7 @@
     },
     "src/resources/admin/organization/usage.ts": {
       "mode": "100644",
-      "sha256": "77153aaa3e5eefc2a26af244174b883ff3269aacd7266d058066b046a56b85eb"
+      "sha256": "f13c6dffb08329a06b90095b849dd8e221d1ad1f22925c548fdcf2110fa1de84"
     },
     "src/resources/admin/organization/users.ts": {
       "mode": "100644",
@@ -295,11 +295,11 @@
     },
     "src/resources/audio/transcriptions.ts": {
       "mode": "100644",
-      "sha256": "738127a15bc22388ee0ce83a4da5328e307beae988a7d6aa4a80e9a2277d0a13"
+      "sha256": "8a81d4cb4c975cf027f78b8d86feb2fb39e7860b265433a91ebf13bef9f61d80"
     },
     "src/resources/audio/translations.ts": {
       "mode": "100644",
-      "sha256": "6a8a7b0a389c41dcc170ddf3c2e0527592c9552ef7d57f4836c366fb771d0042"
+      "sha256": "7bf24e88987cbe340cc36eab6dd3bea51e0a9c3f7e81dfc807b184ecf520ad18"
     },
     "src/resources/audio/voice-consents.ts": {
       "mode": "100644",
@@ -323,7 +323,7 @@
     },
     "src/resources/beta/agents/agents.ts": {
       "mode": "100644",
-      "sha256": "87d43bc59e02b73315a4df786e45f97d7df17ceb47fcb0ec257dd202122217ee"
+      "sha256": "1e5e5c580f3d9b928f5bad05f145ccd9ac4f4ceeec1d34cf3ff0c8936a33d2ca"
     },
     "src/resources/beta/agents/environments.ts": {
       "mode": "100644",
@@ -331,11 +331,11 @@
     },
     "src/resources/beta/agents/environments/environments.ts": {
       "mode": "100644",
-      "sha256": "b3897b77cf329726c20222eb2f3c33dce8ef1f8eef7d47852e39578012bdacc7"
+      "sha256": "eef84545debc7175199b5c3b06360d0dfab7464892a4ee3214a4e6e88ca69e1b"
     },
     "src/resources/beta/agents/environments/files.ts": {
       "mode": "100644",
-      "sha256": "aeb211ec3cb65108c86357d52eb7d4888e2b33eaa222c7bb0631a644cf29100f"
+      "sha256": "eada52ed68bcbd187119aa8450b71f2218c0387dd58fefa2d2c33baf4bae540e"
     },
     "src/resources/beta/agents/environments/index.ts": {
       "mode": "100644",
@@ -355,7 +355,7 @@
     },
     "src/resources/beta/agents/sessions/artifacts.ts": {
       "mode": "100644",
-      "sha256": "3c686882be5655520d4fa09a81fcf61fe817a2985a2e85648116ac63490c9966"
+      "sha256": "caf511144b7aebaefc99c9fea9d409934adaf851e56d3bab52b3332ec1954213"
     },
     "src/resources/beta/agents/sessions/events.ts": {
       "mode": "100644",
@@ -371,7 +371,7 @@
     },
     "src/resources/beta/agents/sessions/sessions.ts": {
       "mode": "100644",
-      "sha256": "9f7f4a0a3b95054521f7fea030f6545af892ae4f7541eacb56d9868a4193761e"
+      "sha256": "9ba36d2ffec97b6aeaf1b7b3ede5bf6eefa06f2e8d427610613aea8fbe340011"
     },
     "src/resources/beta/agents/sessions/subagents.ts": {
       "mode": "100644",
@@ -443,11 +443,11 @@
     },
     "src/resources/beta/assistants.ts": {
       "mode": "100644",
-      "sha256": "44b60a856be29af70b140c761f4375ffbd3787663129d613ac1cc1f5f2cf5f99"
+      "sha256": "8d3d6b04baade1f5d3c597c1b49915e3e2387dac5ab106e5d0f54b95ea4d4716"
     },
     "src/resources/beta/beta.ts": {
       "mode": "100644",
-      "sha256": "8b227af1278f902e4dbc0c8384f4e775007754d45b0eda13219b182fe4af8fa5"
+      "sha256": "140112f7b7a79c92b7e62846afa374dcfb97b913d5f863ed8b5744c96cfa7e7e"
     },
     "src/resources/beta/chatkit.ts": {
       "mode": "100644",
@@ -471,7 +471,7 @@
     },
     "src/resources/beta/index.ts": {
       "mode": "100644",
-      "sha256": "4b65bbd17b40faa562cdf1a6f3e65e819b72d3bedc8a152d1c9f3707357028b3"
+      "sha256": "d0e216d151648b2bbcb465c6b6cadbc1593af21f84628d59e783c81c89cc4c81"
     },
     "src/resources/beta/responses.ts": {
       "mode": "100644",
@@ -491,19 +491,19 @@
     },
     "src/resources/beta/responses/internal-base.ts": {
       "mode": "100644",
-      "sha256": "e729b38ca169d6b9e0442b314e97d7b0bbece4efac20fb2f2e58ec474615fd45"
+      "sha256": "d504da40ced436f36dcfd0539369e8bd40518314d2e803877f603331236fde57"
     },
     "src/resources/beta/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "4c3a108bf896423a533940ebd0c7ba528400e9ebcc27080d8713ef4e4bad2ab0"
+      "sha256": "0703481b89557b35549b81e5be3e885c533d085523a9e059b98c981e1f48ba27"
     },
     "src/resources/beta/responses/ws-base.ts": {
       "mode": "100644",
-      "sha256": "32b9569e5559354a2b361624297e8c95d07f049d12ff21c348c469789a7d8320"
+      "sha256": "aa3ce6134773924112e7ffa9591dd373c57cfa05e22a0e1f3b8f189e5eedbbc8"
     },
     "src/resources/beta/responses/ws.ts": {
       "mode": "100644",
-      "sha256": "f5fa3d73ffabfec4606baaf5efe1f247035ef1193ec1370a268f9d999e6881e4"
+      "sha256": "7f6b742d81daa6dc9d6e9e709794c40c361a99fde58b0f32821b39845d2628d0"
     },
     "src/resources/beta/threads.ts": {
       "mode": "100644",
@@ -511,7 +511,7 @@
     },
     "src/resources/beta/threads/index.ts": {
       "mode": "100644",
-      "sha256": "8a0d0ddca1072e45dae36b56d4c6bf7d05b9dbaa4d23778966bb9521609bf6e2"
+      "sha256": "03107f69fd297a4d02ac030ef8013a12b7e5bfd9c41611880a8631c98e62c8d0"
     },
     "src/resources/beta/threads/messages.ts": {
       "mode": "100644",
@@ -523,11 +523,11 @@
     },
     "src/resources/beta/threads/runs/index.ts": {
       "mode": "100644",
-      "sha256": "5859b26c810a9e9947311b7998854df279d978984cd6e6f4926ad8a80e874adb"
+      "sha256": "40c68f5fb2bab22f5a1caf242d13d9b4962d473982aefde9864da03dcd5a6ef0"
     },
     "src/resources/beta/threads/runs/runs.ts": {
       "mode": "100644",
-      "sha256": "83ddb89b215f1de176fb0739a69b5dd8e00938a941ab2405afdc2b8d8be2af50"
+      "sha256": "403a56368e5bb683896caaa3cf9ae13967b20d1a28105df17aa954b9368734a9"
     },
     "src/resources/beta/threads/runs/steps.ts": {
       "mode": "100644",
@@ -535,7 +535,7 @@
     },
     "src/resources/beta/threads/threads.ts": {
       "mode": "100644",
-      "sha256": "6738b6cd35c7650f74d0fced0b01c48096e2b0629593e188eda138c80af1f8b1"
+      "sha256": "73e2e924fb0285385c8032c62de7f3dec6ff64c4ea8cadb3791c57d7ab69e335"
     },
     "src/resources/chat.ts": {
       "mode": "100644",
@@ -543,7 +543,7 @@
     },
     "src/resources/chat/chat.ts": {
       "mode": "100644",
-      "sha256": "d33765402cc72828442e91e2f23bbe3c5ca6d546d52f62ee2b48f72ab70d9601"
+      "sha256": "d58185a84eb15f13ff6524b083442165c7fc1df2b5fb9fcd7019227a7d0f5218"
     },
     "src/resources/chat/completions.ts": {
       "mode": "100644",
@@ -551,7 +551,7 @@
     },
     "src/resources/chat/completions/completions.ts": {
       "mode": "100644",
-      "sha256": "49ad2a0698ce2ae458e0094cc924dc771013f196a64c6cbd2ba974a10b6dd6d1"
+      "sha256": "a3a03f20a836ffd33fd6403f324bfbe5447c565fdabbc178f8121c91bfe80f60"
     },
     "src/resources/chat/completions/index.ts": {
       "mode": "100644",
@@ -563,7 +563,7 @@
     },
     "src/resources/chat/index.ts": {
       "mode": "100644",
-      "sha256": "1cde3fc8b89ec0ea25e379d30fb41e5ea43c15d0dc18477e760e1235e50c5ca4"
+      "sha256": "19c7fadf8ed2fed6bad836bfeaece16b3ebd44d8f179acfb0304c594aa586f93"
     },
     "src/resources/completions.ts": {
       "mode": "100644",
@@ -695,7 +695,7 @@
     },
     "src/resources/fine-tuning/checkpoints/permissions.ts": {
       "mode": "100644",
-      "sha256": "54401a2ef922ce3755a100cab830c015cd9a4a35558102e67cbb00ac90a32ecc"
+      "sha256": "947fb1dc6c867e8fe6acc175da9297fd1cbeac786f70643d1235a318fbff3965"
     },
     "src/resources/fine-tuning/fine-tuning.ts": {
       "mode": "100644",
@@ -743,7 +743,7 @@
     },
     "src/resources/images.ts": {
       "mode": "100644",
-      "sha256": "0cd53591e80810284295f9524dd7f7a096e865c5c724cb9d7a8f606e2da64c86"
+      "sha256": "155bf955c61b1b71b2abebed110fd11625a21997e5b8329fa3f90d8b5281f511"
     },
     "src/resources/index.ts": {
       "mode": "100644",
@@ -903,19 +903,19 @@
     },
     "src/resources/responses/internal-base.ts": {
       "mode": "100644",
-      "sha256": "4fcabba7250cac2ecc3fd9f1cc0e18a35c725ea0f2c64eefe7ca167706067979"
+      "sha256": "3c4303538118e6e2804ddd6d5572090c611c1368a89bd50c74d92d93b5ca90ef"
     },
     "src/resources/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "cc1e32bc79fa0b52bcb24013b9646a9f2b587eac23b9244815fcd7ac99945f7f"
+      "sha256": "c3c9fd497fc25c9df8ee9750beeb002b6d116fdcf3ab57bcf900ab3b5df2e768"
     },
     "src/resources/responses/ws-base.ts": {
       "mode": "100644",
-      "sha256": "3fb3b0ac97607ae6e18cad49134534c9617e645b5ef3069bf75c4b3b7f8cb61f"
+      "sha256": "63d87ead2d5d55d065920a21d6d8e4c70ce5130e5051d7fbe290b25ce938f165"
     },
     "src/resources/responses/ws.ts": {
       "mode": "100644",
-      "sha256": "f9903f26aa6525d4564c638d02c0f6775ef754e15a2127c80b639049a198908b"
+      "sha256": "4b9f17243c9d19feaba061bcdc5ec41b3c8d6892c343307e416a0c6eb2fe1f0d"
     },
     "src/resources/safety.ts": {
       "mode": "100644",
@@ -955,7 +955,7 @@
     },
     "src/resources/skills/skills.ts": {
       "mode": "100644",
-      "sha256": "60bad43758686b75bf340d0752b7b3f6fd96b468a5660e533d3507a06c844b16"
+      "sha256": "fab398edc9136c3360874ed00d1d3300b19039ceae37a8205584593921d16f3f"
     },
     "src/resources/skills/versions.ts": {
       "mode": "100644",
@@ -971,7 +971,7 @@
     },
     "src/resources/skills/versions/versions.ts": {
       "mode": "100644",
-      "sha256": "902868a222ba52ee196f9ca79243308cfbdae0d7bd1d04b6374a2ae473b4301d"
+      "sha256": "d979ceee6ad776b592e3b2ab6c82c5c100580e0c42c20f7a98c7a87288c402ef"
     },
     "src/resources/uploads.ts": {
       "mode": "100644",
@@ -1163,7 +1163,7 @@
     },
     "tests/api-resources/audio/transcriptions.test.ts": {
       "mode": "100644",
-      "sha256": "961df5fbad69b0b2d0acb36d220ecaa46be664ba43e6c41ddb00c1b00cd6d25f"
+      "sha256": "24a542e774e7cf93fb476a7597b245e85a4ca51f9104334751e3948b1220e9c6"
     },
     "tests/api-resources/audio/translations.test.ts": {
       "mode": "100644",
@@ -1191,7 +1191,7 @@
     },
     "tests/api-resources/beta/agents/environments/files.test.ts": {
       "mode": "100644",
-      "sha256": "ac7aa15869a7942f0d140dab31a4068dc30829a690269f73f17cbdbc639d7d57"
+      "sha256": "0aa8524029a2b6c80a4fd373c1d4ac886143dfbfd2698e5f85473a80a158c772"
     },
     "tests/api-resources/beta/agents/environments/templates.test.ts": {
       "mode": "100644",
@@ -1243,7 +1243,7 @@
     },
     "tests/api-resources/beta/agents/vaults/credentials.test.ts": {
       "mode": "100644",
-      "sha256": "f3060d7d7aa70fa2760eb1f9789a1d7b1b990f59a5914310d25d4d3592d806a5"
+      "sha256": "07dae8670c6e8640f9e6310fda1ef8946e0aec0c458424715e76d144d2bb7d3e"
     },
     "tests/api-resources/beta/agents/vaults/vaults.test.ts": {
       "mode": "100644",
