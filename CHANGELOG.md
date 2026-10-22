@@ -1,5 +1,25 @@
 # Changelog
 
+## [7.43.0](https://github.com/openai/openai-node/compare/v7.42.0...v7.43.0) (2026-10-22)
+
+
+### Features
+
+* **api:** **Breaking change in a minor release.** A Live response's Decisions question `instructions` can now be a string or an array of text, image, or JSON parts. Code such as `question.instructions.trim()` can fail when it receives an array; check `typeof question.instructions === 'string'` and handle the array case. Decisions request inputs also accept new message roles and tool-history items, so update code that assumes it knows every input type. `DecisionInputMessage` is now a union: code that extends or implements the old interface must use `DecisionInputMessage.DecisionInputUserMessage` instead. Existing string instructions and user-message inputs still work. ([21a056d](https://github.com/openai/openai-node/commit/21a056dc61ceca96aceda58a845353b3c1b13efc))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump follow-redirects from 1.16.0 to 1.16.1 in /ecosystem-tests/vercel-edge ([#2998](https://github.com/openai/openai-node/issues/2998)) ([1c69ab8](https://github.com/openai/openai-node/commit/1c69ab88e6f44fa983cae7936726b611cb851260))
+* **deps-dev:** bump launch-editor from 2.14.1 to 2.14.2 in /ecosystem-tests/ts-browser-webpack ([#2997](https://github.com/openai/openai-node/issues/2997)) ([0e1bedc](https://github.com/openai/openai-node/commit/0e1bedc564439017f96fa20b691042f359462723))
+* **deps:** bump next from 15.5.27 to 15.5.28 in /ecosystem-tests/vercel-edge ([#3021](https://github.com/openai/openai-node/issues/3021)) ([482f73e](https://github.com/openai/openai-node/commit/482f73ecfb4c727e1678bf0a9cb439546c43347f))
+
+
+### Chores
+
+* **api:** preserve client and helper compatibility ([#3016](https://github.com/openai/openai-node/issues/3016)) ([17e0f08](https://github.com/openai/openai-node/commit/17e0f08e83e2381efa075b1bbe9ed5eb7b63a6e1))
+* refresh trusted next policy tooling ([#3017](https://github.com/openai/openai-node/issues/3017)) ([7a970a7](https://github.com/openai/openai-node/commit/7a970a75e18b2dce834b25743863cfcf52396a1c))
+
 ## [7.42.0](https://github.com/openai/openai-node/compare/v7.41.0...v7.42.0) (2026-10-22)
 
 
