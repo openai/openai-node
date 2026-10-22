@@ -12,6 +12,26 @@ import { Stream } from '../../../core/streaming';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
+import { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
+import { ChatCompletionStreamingRunner } from '../../../lib/ChatCompletionStreamingRunner';
+import { RunnerOptions } from '../../../lib/AbstractChatCompletionRunner';
+import {
+  ChatCompletionToolRunnerParamsWithContext,
+  ChatCompletionToolRunnerParamsWithoutContext,
+} from '../../../lib/ChatCompletionRunner';
+import {
+  ChatCompletionStreamingToolRunnerParamsWithContext,
+  ChatCompletionStreamingToolRunnerParamsWithoutContext,
+} from '../../../lib/ChatCompletionStreamingRunner';
+import { type RunnableToolFunctionWithContext } from '../../../lib/RunnableFunction';
+import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
+import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
+
+import {
+  normalizeChatCompletionStream,
+  type ChatCompletionWireChunk,
+} from '../../../lib/chat-completions/streaming';
+
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
   buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
@@ -184,15 +204,21 @@ export class Completions extends APIResource {
     body: ChatCompletionCreateParams,
     options?: RequestOptions,
   ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
-    return this._client.post(
-      '/chat/completions',
-      resolveResourceRequestOptions(options, (options) =>
-        withBodyFinalization(
-          { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
-          { streamFromBody: true },
+    return this._client
+      .post<ChatCompletion | Stream<ChatCompletionWireChunk>>(
+        '/chat/completions',
+        resolveResourceRequestOptions(options, (options) =>
+          withBodyFinalization(
+            { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
+            { streamFromBody: true },
+          ),
         ),
-      ),
-    ) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
+      )
+      ._thenUnwrap((result, props) =>
+        props.options.stream
+          ? normalizeChatCompletionStream(result as Stream<ChatCompletionWireChunk>)
+          : result,
+      ) as APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>>;
   }
 
   /**
@@ -375,7 +401,129 @@ export class Completions extends APIResource {
       resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
     );
   }
+
+  parse<Params extends ChatCompletionParseParams, ParsedT = ExtractParsedContentFromParams<Params>>(
+    body: Params,
+    options?: RequestOptions,
+  ): APIPromise<ParsedChatCompletion<ParsedT>> {
+    validateInputTools(body.tools);
+
+    return this._client.chat.completions
+      .create(body, {
+        ...options,
+        __metadata: { ...options?.__metadata, helperMethod: 'chat.completions.parse' },
+      })
+      ._thenUnwrap((completion) => parseChatCompletion(completion, body));
+  }
+
+  /**
+   * A convenience helper for using tool calls with the /chat/completions endpoint
+   * which automatically calls the JavaScript functions you provide and sends their
+   * results back to the /chat/completions endpoint, looping as long as the model
+   * requests function calls.
+   *
+   * For more details and examples, see
+   * [the docs](https://github.com/openai/openai-node#automated-function-calls)
+   */
+  runTools<
+    ToolContext,
+    Params extends Omit<
+      ChatCompletionToolRunnerParamsWithContext<any, ToolContext>,
+      'toolContext' | 'tools'
+    > = Omit<ChatCompletionToolRunnerParamsWithContext<any, ToolContext>, 'toolContext' | 'tools'>,
+    ParsedT = ExtractParsedContentFromParams<
+      Params & ChatCompletionToolRunnerParamsWithContext<any, ToolContext>
+    >,
+  >(
+    body: Params & {
+      toolContext: ToolContext;
+      tools: readonly RunnableToolFunctionWithContext<ToolContext>[];
+    },
+    options?: RunnerOptions,
+  ): ChatCompletionRunner<ParsedT>;
+
+  runTools<
+    ToolContext,
+    Params extends Omit<
+      ChatCompletionStreamingToolRunnerParamsWithContext<any, ToolContext>,
+      'toolContext' | 'tools'
+    > = Omit<ChatCompletionStreamingToolRunnerParamsWithContext<any, ToolContext>, 'toolContext' | 'tools'>,
+    ParsedT = ExtractParsedContentFromParams<
+      Params & ChatCompletionStreamingToolRunnerParamsWithContext<any, ToolContext>
+    >,
+  >(
+    body: Params & {
+      toolContext: ToolContext;
+      tools: readonly RunnableToolFunctionWithContext<ToolContext>[];
+    },
+    options?: RunnerOptions,
+  ): ChatCompletionStreamingRunner<ParsedT>;
+
+  runTools<
+    Params extends ChatCompletionToolRunnerParamsWithoutContext<any>,
+    ParsedT = ExtractParsedContentFromParams<Params>,
+  >(body: Params, options?: RunnerOptions): ChatCompletionRunner<ParsedT>;
+
+  runTools<
+    Params extends ChatCompletionStreamingToolRunnerParamsWithoutContext<any>,
+    ParsedT = ExtractParsedContentFromParams<Params>,
+  >(body: Params, options?: RunnerOptions): ChatCompletionStreamingRunner<ParsedT>;
+
+  runTools<
+    Params extends
+      | ChatCompletionToolRunnerParamsWithoutContext<any>
+      | ChatCompletionToolRunnerParamsWithContext<any, any>
+      | ChatCompletionStreamingToolRunnerParamsWithoutContext<any>
+      | ChatCompletionStreamingToolRunnerParamsWithContext<any, any>,
+    ParsedT = ExtractParsedContentFromParams<Params>,
+  >(
+    body: Params,
+    options?: RunnerOptions,
+  ): ChatCompletionRunner<ParsedT> | ChatCompletionStreamingRunner<ParsedT> {
+    if (body.stream) {
+      return ChatCompletionStreamingRunner.runTools(
+        this._client,
+        body as ChatCompletionStreamingToolRunnerParamsWithContext<any, any>,
+        options,
+      );
+    }
+
+    return ChatCompletionRunner.runTools(
+      this._client,
+      body as ChatCompletionToolRunnerParamsWithContext<any, any>,
+      options,
+    );
+  }
+
+  /**
+   * Creates a chat completion stream
+   */
+  stream<Params extends ChatCompletionStreamParams, ParsedT = ExtractParsedContentFromParams<Params>>(
+    body: Params,
+    options?: RequestOptions,
+  ): ChatCompletionStream<ParsedT> {
+    return ChatCompletionStream.createChatCompletion(this._client, body, options);
+  }
 }
+
+export { ChatCompletionStreamingRunner } from '../../../lib/ChatCompletionStreamingRunner';
+export {
+  type RunnableFunctionWithParse,
+  type RunnableFunctionWithoutParse,
+  ParsingToolFunction,
+} from '../../../lib/RunnableFunction';
+export {
+  type ChatCompletionToolRunnerParams,
+  type ChatCompletionToolRunnerParamsWithContext,
+  type ChatCompletionToolRunnerParamsWithoutContext,
+} from '../../../lib/ChatCompletionRunner';
+export {
+  type ChatCompletionStreamingToolRunnerParams,
+  type ChatCompletionStreamingToolRunnerParamsWithContext,
+  type ChatCompletionStreamingToolRunnerParamsWithoutContext,
+} from '../../../lib/ChatCompletionStreamingRunner';
+export { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
+export { ChatCompletionRunner } from '../../../lib/ChatCompletionRunner';
 
 export type ChatCompletionsPage = CursorPage<ChatCompletion>;
 
@@ -973,7 +1121,7 @@ export namespace ChatCompletionChunk {
      * function. Omitted from the final audio update containing only
      * `delta.audio.expires_at`.
      */
-    finish_reason?: 'stop' | 'length' | 'tool_calls' | 'content_filter' | 'function_call' | null;
+    finish_reason: 'stop' | 'length' | 'tool_calls' | 'content_filter' | 'function_call' | null;
 
     /**
      * Log probability information for the choice.
@@ -1074,15 +1222,29 @@ export namespace ChatCompletionChunk {
          */
         id?: string;
 
+        custom?: ToolCall.Custom;
+
         function?: ToolCall.Function;
 
         /**
-         * The type of the tool. Currently, only `function` is supported.
+         * The type of the tool.
          */
-        type?: 'function';
+        type?: 'function' | 'custom';
       }
 
       export namespace ToolCall {
+        export interface Custom {
+          /**
+           * The input for the custom tool call generated by the model.
+           */
+          input?: string;
+
+          /**
+           * The name of the custom tool to call.
+           */
+          name?: string;
+        }
+
         export interface Function {
           /**
            * The arguments to call the function with, as generated by the model in JSON
@@ -1696,7 +1858,7 @@ export interface ChatCompletionMessage {
    * @deprecated Deprecated and replaced by `tool_calls`. The name and arguments of a
    * function that should be called, as generated by the model.
    */
-  function_call?: ChatCompletionMessage.FunctionCall;
+  function_call?: ChatCompletionMessage.FunctionCall | null;
 
   /**
    * The tool calls generated by the model, such as function calls.
@@ -2762,6 +2924,39 @@ export interface ChatCompletionListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
+export interface ParsedFunction extends ChatCompletionMessageFunctionToolCall.Function {
+  parsed_arguments?: unknown;
+}
+
+export interface ParsedFunctionToolCall extends ChatCompletionMessageFunctionToolCall {
+  function: ParsedFunction;
+}
+
+/**
+ * A tool call on a parsed chat completion message.
+ *
+ * Function tool calls are augmented with `function.parsed_arguments`, custom tool
+ * calls are returned as-is because they have no arguments schema to parse against.
+ */
+export type ParsedChatCompletionMessageToolCall =
+  | ParsedFunctionToolCall
+  | ChatCompletionMessageCustomToolCall;
+
+export interface ParsedChatCompletionMessage<ParsedT> extends ChatCompletionMessage {
+  parsed: ParsedT | null;
+  tool_calls?: Array<ParsedChatCompletionMessageToolCall>;
+}
+
+export interface ParsedChoice<ParsedT> extends ChatCompletion.Choice {
+  message: ParsedChatCompletionMessage<ParsedT>;
+}
+
+export interface ParsedChatCompletion<ParsedT> extends ChatCompletion {
+  choices: Array<ParsedChoice<ParsedT>>;
+}
+
+export type ChatCompletionParseParams = ChatCompletionCreateParamsNonStreaming;
+
 Completions.Messages = Messages;
 
 export declare namespace Completions {
@@ -2803,12 +2998,19 @@ export declare namespace Completions {
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
     type ChatCompletionAllowedTools as ChatCompletionAllowedTools,
     type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
+    type ParsedFunction as ParsedFunction,
+    type ParsedFunctionToolCall as ParsedFunctionToolCall,
+    type ParsedChatCompletionMessageToolCall as ParsedChatCompletionMessageToolCall,
+    type ParsedChatCompletionMessage as ParsedChatCompletionMessage,
+    type ParsedChoice as ParsedChoice,
+    type ParsedChatCompletion as ParsedChatCompletion,
     type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
     type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
     type ChatCompletionListParams as ChatCompletionListParams,
+    type ChatCompletionParseParams as ChatCompletionParseParams,
   };
 
   export { Messages as Messages, type MessageListParams as MessageListParams };

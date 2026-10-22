@@ -4,6 +4,7 @@ import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../../client';
 import { EventEmitter } from '../../../core/EventEmitter';
 import { OpenAIError } from '../../../core/error';
+import { assertX509WebSocketSupported } from '../../../internal/auth/x509-workload-identity-auth';
 
 import type { RawWebSocketData, ReconnectingEvent, UnsentMessage } from '../../../internal/ws';
 
@@ -21,6 +22,8 @@ export type ResponsesStreamMessage =
   | { type: 'raw'; data: RawWebSocketData }
   | { type: 'error'; error: WebSocketError };
 
+type WebSocketErrorEvent = Extract<ResponsesAPI.BetaResponsesServerEvent, { type: 'error' }>;
+
 export class WebSocketError extends OpenAIError {
   /**
    * The error data that the API sent back in an error event.
@@ -28,9 +31,9 @@ export class WebSocketError extends OpenAIError {
    * This property is non-enumerable to avoid exposing the event through
    * JSON serialization, object spread, or Object.assign.
    */
-  error?: ResponsesAPI.BetaResponsesServerEvent.BetaResponseWsError | undefined;
+  error?: WebSocketErrorEvent | undefined;
 
-  constructor(message: string, event: ResponsesAPI.BetaResponsesServerEvent.BetaResponseWsError | null) {
+  constructor(message: string, event: WebSocketErrorEvent | null) {
     super(message);
 
     Object.defineProperty(this, 'error', {
@@ -80,15 +83,8 @@ export abstract class ResponsesEmitter extends EventEmitter<WebSocketEvents> {
   abstract close(props?: { code: number; reason: string }): void;
 
   protected _onError(event: null, message: string, cause: any): void;
-  protected _onError(
-    event: ResponsesAPI.BetaResponsesServerEvent.BetaResponseWsError,
-    message?: string | undefined,
-  ): void;
-  protected _onError(
-    event: ResponsesAPI.BetaResponsesServerEvent.BetaResponseWsError | null,
-    message?: string | undefined,
-    cause?: any,
-  ): void {
+  protected _onError(event: WebSocketErrorEvent, message?: string | undefined): void;
+  protected _onError(event: WebSocketErrorEvent | null, message?: string | undefined, cause?: any): void {
     const safeMessage = safeWebSocketErrorMessage(event, message);
     message = safeMessage ?? 'unknown error';
 
@@ -113,6 +109,7 @@ export abstract class ResponsesEmitter extends EventEmitter<WebSocketEvents> {
 }
 
 export function buildURL(client: OpenAI, parameters: Record<string, unknown>): URL {
+  assertX509WebSocketSupported(client);
   const { ...query } = parameters;
   const endpoint = '/responses';
   const url = new URL(client.buildURL(endpoint, query, undefined));

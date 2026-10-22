@@ -31,6 +31,18 @@ import { Stream } from '../../../../core/streaming';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
+import {
+  AgentSessionStream,
+  type AgentSessionStreamParams,
+  type AgentToolHandler,
+} from '../../../../lib/agents/agent-session-stream';
+import {
+  type AgentSessionCreateStream,
+  withAgentTurnResult,
+  captureCreationTools,
+} from '../../../../lib/beta/agents/agent-session-create-stream';
+import type { AgentOutputFormat } from '../../../../lib/beta/agents/output-format-types';
+import { captureAgentOutput } from '../../../../lib/beta/agents/parse-result';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
@@ -174,34 +186,50 @@ export class Sessions extends APIResource {
    *   });
    * ```
    */
-  create(body: SessionCreateParamsNonStreaming, options?: RequestOptions): APIPromise<AgentsAPI.AgentSession>;
-  create(
-    body: SessionCreateParamsStreaming,
+  create<T>(
+    body: SessionCreateParamsStreaming & { agent: { text: { format: AgentOutputFormat<T> } } },
     options?: RequestOptions,
-  ): APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
+  ): APIPromise<AgentSessionCreateStream<T>>;
+  create(body: SessionCreateParamsNonStreaming, options?: RequestOptions): APIPromise<AgentsAPI.AgentSession>;
+  create(body: SessionCreateParamsStreaming, options?: RequestOptions): APIPromise<AgentSessionCreateStream>;
   create(
     body: SessionCreateParamsBase,
     options?: RequestOptions,
-  ): APIPromise<Stream<AgentsAPI.AgentSessionEvent> | AgentsAPI.AgentSession>;
+  ): APIPromise<AgentSessionCreateStream | AgentsAPI.AgentSession>;
   create(
     body: SessionCreateParams,
     options?: RequestOptions,
-  ): APIPromise<AgentsAPI.AgentSession> | APIPromise<Stream<AgentsAPI.AgentSessionEvent>> {
-    return this._client.post(
-      '/agents/sessions',
-      resolveResourceRequestOptions(options, (options) =>
-        withBodyFinalization(
-          {
-            body,
-            ...options,
-            headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
-            stream: body.stream ?? false,
-            __security: { bearerAuth: true },
-          },
-          { streamFromBody: true },
+  ): APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream> {
+    const creation = captureCreationTools(body, options);
+    const output = captureAgentOutput(creation.body, creation.options);
+    const request = (body: typeof output.body, options?: RequestOptions) =>
+      this._client.post<AgentsAPI.AgentSession | Stream<AgentsAPI.AgentSessionEvent>>(
+        '/agents/sessions',
+        resolveResourceRequestOptions(options, (options) =>
+          withBodyFinalization(
+            {
+              body,
+              ...options,
+              headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
+              stream: body.stream ?? false,
+              __security: { bearerAuth: true },
+            },
+            { streamFromBody: true },
+          ),
         ),
-      ),
-    ) as APIPromise<AgentsAPI.AgentSession> | APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
+      );
+    return request(output.body, output.options)._thenUnwrap((data, { options }) =>
+      // SAFETY: defaultParseResponse uses this same resolved flag to return the configured stream instance.
+      options.stream
+        ? withAgentTurnResult(
+            data as Stream<AgentsAPI.AgentSessionEvent>,
+            output.format,
+            creation.handlers
+              ? { sessions: this, handlers: creation.handlers, options: output.options }
+              : undefined,
+          )
+        : data,
+    ) as APIPromise<AgentsAPI.AgentSession> | APIPromise<AgentSessionCreateStream>;
   }
 
   /**
@@ -395,6 +423,15 @@ export class Sessions extends APIResource {
         __security: { bearerAuth: true },
       })),
     );
+  }
+
+  /** Stream one turn on an idle session with a single input writer. See AgentSessionStream for lifecycle and tool handling. */
+  stream<T = never>(
+    sessionID: string,
+    params: AgentSessionStreamParams<T>,
+    options?: RequestOptions,
+  ): AgentSessionStream<T> {
+    return new AgentSessionStream(this, sessionID, params, options);
   }
 }
 
@@ -617,6 +654,14 @@ export interface SessionListParams extends CursorPageParams {
    * - `desc` - Returns resources in descending order.
    */
   order?: 'asc' | 'desc';
+}
+
+export interface SessionCreateParamsNonStreaming {
+  toolHandlers?: never;
+}
+export interface SessionCreateParamsStreaming {
+  /** Beta: local function handlers run during iteration and are never sent to the API. */
+  toolHandlers?: Record<string, AgentToolHandler>;
 }
 
 Sessions.Subagents = Subagents;

@@ -329,4 +329,7 @@ export {
   type ThreadCreateAndRunParams,
   type ThreadCreateAndRunParamsNonStreaming,
   type ThreadCreateAndRunParamsStreaming,
+  type ThreadCreateAndRunPollParams,
+  type ThreadCreateAndRunStreamParams,
 } from './threads/index';
+export { Realtime } from './realtime/index';

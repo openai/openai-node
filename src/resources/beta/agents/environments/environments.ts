@@ -20,6 +20,9 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+import type { OpenAI } from '../../../../client';
+import type { FinalRequestOptions } from '../../../../internal/request-options';
+
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
   buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
@@ -303,7 +306,7 @@ export class Environments extends APIResource {
     query = query as EnvironmentListParams | null | undefined;
     return this._client.getAPIList(
       '/agents/environments',
-      CursorPage<EnvironmentInfo>,
+      EnvironmentInfosPage,
       resolveResourceRequestOptions(options, (options) => ({
         query,
         ...options,
@@ -314,7 +317,29 @@ export class Environments extends APIResource {
   }
 }
 
-export type EnvironmentInfosPage = CursorPage<EnvironmentInfo>;
+export class EnvironmentInfosPage extends CursorPage<EnvironmentInfo> {
+  object: 'list';
+  first_id: string | null;
+  last_id: string | null;
+
+  constructor(
+    client: OpenAI,
+    response: Response,
+    body: {
+      data: EnvironmentInfo[];
+      has_more: boolean;
+      object: 'list';
+      first_id: string | null;
+      last_id: string | null;
+    },
+    options: FinalRequestOptions,
+  ) {
+    super(client, response, body, options);
+    this.object = body.object;
+    this.first_id = body.first_id;
+    this.last_id = body.last_id;
+  }
+}
 
 /**
  * Safe metadata for a first-class execution environment.

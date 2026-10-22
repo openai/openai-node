@@ -7,6 +7,13 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+import {
+  prepareAgentFiles,
+  uploadAgentFile,
+  type PreparedAgentFiles,
+} from '../../../../lib/beta/agents/files';
+import type { Uploadable } from '../../../../internal/uploads';
+
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
   buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
@@ -26,6 +33,11 @@ export class Files extends APIResource {
    * const environmentFile =
    *   await client.beta.agents.environments.files.create(
    *     'environment_id',
+   *     {
+   *       type: 'inline',
+   *       path: '/workspace/example.txt',
+   *       data: 'SGVsbG8K',
+   *     },
    *   );
    * ```
    */
@@ -75,6 +87,16 @@ export class Files extends APIResource {
         __security: { bearerAuth: true },
       })),
     );
+  }
+
+  /** Beta: prepare initial hosted file references; uploaded Files API objects remain caller-owned. */
+  prepare(files: Record<string, Uploadable>, options?: RequestOptions): Promise<PreparedAgentFiles> {
+    return prepareAgentFiles(this._client, files, options);
+  }
+
+  /** Beta: upload one local file and stage its reference in a live environment. */
+  upload(environmentID: string, params: { file: Uploadable; path: string }, options?: RequestOptions) {
+    return uploadAgentFile(this._client, this, environmentID, params, options);
   }
 }
 

@@ -8,9 +8,27 @@ import {
   type RawWebSocketData,
   type ReconnectingEvent,
   type ReconnectingOverrides,
+  recordWebSocketError,
+  rawByteLength,
 } from '../../internal/ws';
 import * as ResponsesAPI from './responses';
 import { OpenAI } from '../../client';
+
+const webSocketEventPayloads = new WeakMap<ResponsesAPI.ResponsesServerEvent, string>();
+const webSocketEventBytes = new WeakMap<ResponsesAPI.ResponsesServerEvent, number>();
+
+/** Uses immutable wire size, or JSON accounting for a custom emitter. @internal */
+export function getWebSocketEventBytes(event: ResponsesAPI.ResponsesServerEvent): number {
+  return webSocketEventBytes.get(event) ?? rawByteLength(JSON.stringify(event));
+}
+
+/** Original JSON, available only during synchronous event notification.
+ * @internal
+ */
+
+export function getWebSocketEventPayload(event: ResponsesAPI.ResponsesServerEvent): string | undefined {
+  return webSocketEventPayloads.get(event);
+}
 
 export interface ResponsesWSReconnectOptions {
   /**
@@ -108,7 +126,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
         emitReconnecting: (event) => this._emit('reconnecting', event),
         emitReconnected: () => this._emit('reconnected'),
         emitClose: (code, reason, unsent) => this._emit('close', code, reason, unsent),
-        requeueFailed: false,
+        onSocketError: recordWebSocketError,
         prepareReconnectSocket: () => this._prepareReconnectSocket(),
       },
       options,
@@ -121,7 +139,11 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     this.socket = this.#connection.connect();
   }
 
-  /** Creates a platform-specific WebSocket for the given URL and auth headers. */
+  /**
+   * Creates a platform-specific WebSocket for the given URL and captured client auth headers.
+   * The transport must supply or validate its final credentials before connecting;
+   * these headers may be empty when authentication is managed by the transport.
+   */
 
   protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
 
@@ -206,6 +228,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
     }
 
     const eventType: string = event.type;
+    const errorEvent = event.type === 'error' ? event : undefined;
     const reservedEventType =
       eventType === 'raw' ||
       eventType === 'close' ||
@@ -219,13 +242,19 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
       return;
     }
 
-    this._emit('event', event);
+    webSocketEventBytes.set(event, rawByteLength(data));
+    webSocketEventPayloads.set(event, text);
+    try {
+      this._emit('event', event);
+    } finally {
+      webSocketEventPayloads.delete(event);
+    }
 
-    if (event.type === 'error') {
-      this._onError(event);
+    if (errorEvent) {
+      this._onError(errorEvent);
     } else {
       // @ts-ignore TS isn't smart enough to get the relationship right here
-      this._emit(event.type, event);
+      this._emit(eventType, event);
     }
   }
 
@@ -235,10 +264,6 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
   }
 
   protected _authHeaders(apiKey = this._client.apiKey): Record<string, string> {
-    if (typeof apiKey !== 'string' || !apiKey) return {};
-    if (apiKey) {
-      return { Authorization: `Bearer ${apiKey}` };
-    }
-    return {};
+    return typeof apiKey === 'string' && apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
   }
 }

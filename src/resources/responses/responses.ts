@@ -14,6 +14,14 @@ import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
 
+import {
+  type ExtractParsedContentFromParams,
+  parseResponse,
+  type ResponseCreateParamsWithTools,
+  addOutputText,
+} from '../../lib/ResponsesParser';
+import { ResponseStream, ResponseStreamParams } from '../../lib/responses/ResponseStream';
+
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
   buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
@@ -173,15 +181,22 @@ export class Responses extends APIResource {
     body: ResponseCreateParams,
     options?: RequestOptions,
   ): APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>> {
-    return this._client.post(
-      '/responses',
-      resolveResourceRequestOptions(options, (options) =>
-        withBodyFinalization(
-          { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
-          { streamFromBody: true },
+    return (
+      this._client.post(
+        '/responses',
+        resolveResourceRequestOptions(options, (options) =>
+          withBodyFinalization(
+            { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
+            { streamFromBody: true },
+          ),
         ),
-      ),
-    ) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
+      ) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
+    )._thenUnwrap((rsp) => {
+      if ('object' in rsp && rsp.object === 'response') {
+        addOutputText(rsp as Response);
+      }
+      return rsp;
+    }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
   /**
@@ -354,15 +369,22 @@ export class Responses extends APIResource {
       query = {};
     }
     query = query as ResponseRetrieveParams | undefined;
-    return this._client.get(
-      path`/responses/${responseID}`,
-      resolveResourceRequestOptions(options, (options) => ({
-        query,
-        ...options,
-        stream: query?.stream ?? false,
-        __security: { bearerAuth: true },
-      })),
-    ) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
+    return (
+      this._client.get(
+        path`/responses/${responseID}`,
+        resolveResourceRequestOptions(options, (options) => ({
+          query,
+          ...options,
+          stream: query?.stream ?? false,
+          __security: { bearerAuth: true },
+        })),
+      ) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>
+    )._thenUnwrap((rsp) => {
+      if ('object' in rsp && rsp.object === 'response') {
+        addOutputText(rsp as Response);
+      }
+      return rsp;
+    }) as APIPromise<Response> | APIPromise<Stream<ResponseStreamEvent>>;
   }
 
   /**
@@ -429,6 +451,25 @@ export class Responses extends APIResource {
         __security: { bearerAuth: true },
       })),
     );
+  }
+
+  parse<Params extends ResponseCreateParamsWithTools, ParsedT = ExtractParsedContentFromParams<Params>>(
+    body: Params,
+    options?: RequestOptions,
+  ): APIPromise<ParsedResponse<ParsedT>> {
+    return this._client.responses
+      .create(body, options)
+      ._thenUnwrap((response) => parseResponse(response as Response, body));
+  }
+
+  /**
+   * Creates a model response stream
+   */
+  stream<Params extends ResponseStreamParams, ParsedT = ExtractParsedContentFromParams<Params>>(
+    body: Params,
+    options?: RequestOptions,
+  ): ResponseStream<ParsedT> {
+    return ResponseStream.createResponse<ParsedT>(this._client, body, options);
   }
 }
 
@@ -1232,6 +1273,8 @@ export interface Response {
   id: string;
 
   access_programs: Response.AccessPrograms | null;
+
+  output_text: string;
 
   /**
    * Unix timestamp (in seconds) of when this Response was created.
@@ -3986,7 +4029,7 @@ export interface ResponseFunctionWebSearch {
   action:
     | ResponseFunctionWebSearch.Search
     | ResponseFunctionWebSearch.OpenPage
-    | ResponseFunctionWebSearch.FindInPage;
+    | ResponseFunctionWebSearch.Find;
 
   /**
    * The status of the web search tool call.
@@ -4060,7 +4103,7 @@ export namespace ResponseFunctionWebSearch {
   /**
    * Action type "find_in_page": Searches for a pattern within a loaded page.
    */
-  export interface FindInPage {
+  export interface Find {
     /**
      * The pattern or text to search for within the page.
      */
@@ -9984,7 +10027,8 @@ export type ResponsesServerEvent =
   | ResponsesServerEvent.ResponseWsError
   | ResponseSteerAcceptedEvent
   | ResponseSteerPendingEvent
-  | ResponseSteerFailedEvent;
+  | ResponseSteerFailedEvent
+  | ResponsesServerEvent.ResponseWsStreamingError;
 
 export namespace ResponsesServerEvent {
   /**
@@ -10740,6 +10784,17 @@ export namespace ResponsesServerEvent {
       }
     }
   }
+
+  /**
+   * Emitted when an error occurs while streaming a response over the WebSocket.
+   */
+  export interface ResponseWsStreamingError extends ResponseErrorEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
+  }
 }
 
 /**
@@ -11322,7 +11377,8 @@ export interface ToolChoiceTypes {
     | 'computer_use'
     | 'web_search_preview_2025_03_11'
     | 'image_generation'
-    | 'code_interpreter';
+    | 'code_interpreter'
+    | 'mcp';
 }
 
 /**
@@ -12357,6 +12413,48 @@ export namespace ResponseCompactParams {
   }
 }
 
+export interface ParsedResponseOutputText<ParsedT> extends ResponseOutputText {
+  parsed: ParsedT | null;
+}
+
+export type ParsedContent<ParsedT> = ParsedResponseOutputText<ParsedT> | ResponseOutputRefusal;
+
+export interface ParsedResponseOutputMessage<ParsedT> extends ResponseOutputMessage {
+  content: ParsedContent<ParsedT>[];
+}
+
+export interface ParsedResponseFunctionToolCall extends ResponseFunctionToolCall {
+  parsed_arguments: any;
+}
+
+export type ParsedResponseOutputItem<ParsedT> =
+  | ParsedResponseOutputMessage<ParsedT>
+  | ParsedResponseFunctionToolCall
+  | Exclude<ResponseOutputItem, ResponseOutputMessage | ResponseFunctionToolCall>;
+
+export interface ParsedResponse<ParsedT> extends Response {
+  output: Array<ParsedResponseOutputItem<ParsedT>>;
+
+  output_parsed: ParsedT | null;
+}
+
+export type ResponseParseParams = ResponseCreateParamsNonStreaming;
+
+export namespace ResponsesClientEvent {
+  export type ContextManagement = ResponseCreate.ContextManagement;
+  export type Moderation = ResponseCreate.Moderation;
+  export namespace Moderation {
+    export type Policy = ResponseCreate.Moderation.Policy;
+    export namespace Policy {
+      export type Input = ResponseCreate.Moderation.Policy.Input;
+      export type Output = ResponseCreate.Moderation.Policy.Output;
+    }
+  }
+  export type PromptCacheOptions = ResponseCreate.PromptCacheOptions;
+  export type StreamOptions = ResponseCreate.StreamOptions;
+  export type SpecificProgrammaticToolCallingParam = ResponseCreate.SpecificProgrammaticToolCallingParam;
+}
+
 Responses.InputItems = InputItems;
 Responses.InputTokens = InputTokens;
 
@@ -12530,6 +12628,12 @@ export declare namespace Responses {
     type ToolSearchTool as ToolSearchTool,
     type WebSearchPreviewTool as WebSearchPreviewTool,
     type WebSearchTool as WebSearchTool,
+    type ParsedResponseOutputText as ParsedResponseOutputText,
+    type ParsedContent as ParsedContent,
+    type ParsedResponseOutputMessage as ParsedResponseOutputMessage,
+    type ParsedResponseFunctionToolCall as ParsedResponseFunctionToolCall,
+    type ParsedResponseOutputItem as ParsedResponseOutputItem,
+    type ParsedResponse as ParsedResponse,
     type ResponseCreateParams as ResponseCreateParams,
     type ResponseCreateParamsNonStreaming as ResponseCreateParamsNonStreaming,
     type ResponseCreateParamsStreaming as ResponseCreateParamsStreaming,
@@ -12537,6 +12641,7 @@ export declare namespace Responses {
     type ResponseRetrieveParamsNonStreaming as ResponseRetrieveParamsNonStreaming,
     type ResponseRetrieveParamsStreaming as ResponseRetrieveParamsStreaming,
     type ResponseCompactParams as ResponseCompactParams,
+    type ResponseParseParams as ResponseParseParams,
   };
 
   export {

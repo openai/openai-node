@@ -34,6 +34,7 @@ import {
   ChatCompletionModality,
   ChatCompletionNamedToolChoice,
   ChatCompletionNamedToolChoiceCustom,
+  ChatCompletionParseParams,
   ChatCompletionPredictionContent,
   ChatCompletionReasoningEffort,
   ChatCompletionRole,
@@ -48,6 +49,12 @@ import {
   ChatCompletionUserMessageParam,
   ChatCompletionsPage,
   Completions,
+  ParsedChatCompletion,
+  ParsedChatCompletionMessage,
+  ParsedChatCompletionMessageToolCall,
+  ParsedChoice,
+  ParsedFunction,
+  ParsedFunctionToolCall,
 } from './completions/completions';
 
 export class Chat extends APIResource {
@@ -100,11 +107,18 @@ export declare namespace Chat {
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
     type ChatCompletionAllowedTools as ChatCompletionAllowedTools,
     type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
+    type ParsedFunction as ParsedFunction,
+    type ParsedFunctionToolCall as ParsedFunctionToolCall,
+    type ParsedChatCompletionMessageToolCall as ParsedChatCompletionMessageToolCall,
+    type ParsedChatCompletionMessage as ParsedChatCompletionMessage,
+    type ParsedChoice as ParsedChoice,
+    type ParsedChatCompletion as ParsedChatCompletion,
     type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
     type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
     type ChatCompletionListParams as ChatCompletionListParams,
+    type ChatCompletionParseParams as ChatCompletionParseParams,
   };
 }

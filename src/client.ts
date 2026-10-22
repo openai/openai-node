@@ -18,6 +18,22 @@ import { resolveDataResidency, type DataResidency } from './internal/data-reside
 export type { DataResidency } from './internal/data-residency';
 import * as Errors from './core/error';
 import * as Pagination from './core/pagination';
+import type { WorkloadIdentity, X509Credential, X509WorkloadIdentity } from './auth/types';
+import { WorkloadIdentityAuth } from './auth/workload-identity-auth';
+import { X509_API_BASE_URL, assertX509APIOrigin } from './internal/auth/x509-api-origin';
+import {
+  X509WorkloadIdentityAuth,
+  assertX509RequestOptions,
+  isX509WorkloadIdentity,
+  snapshotX509RequestOptions,
+} from './internal/auth/x509-workload-identity-auth';
+import type { X509Transport } from './internal/auth/x509-transport-registry';
+import {
+  normalizeX509CredentialOptions,
+  prepareX509ClientClone,
+} from './internal/auth/x509-credential-options';
+import { isTransientX509ConnectionError, markApprovedX509Client } from '#x509-transport-state';
+import { OAuthError, SubjectTokenProviderError } from './core/error';
 import {
   type ConversationCursorPageParams,
   ConversationCursorPageResponse,
@@ -31,7 +47,6 @@ import {
 } from './core/pagination';
 import * as Uploads from './core/uploads';
 import * as API from './resources/index';
-import { APIPromise } from './core/api-promise';
 import {
   Batch,
   BatchCreateParams,
@@ -234,6 +249,7 @@ import {
   ChatCompletionModality,
   ChatCompletionNamedToolChoice,
   ChatCompletionNamedToolChoiceCustom,
+  ChatCompletionParseParams,
   ChatCompletionPredictionContent,
   ChatCompletionReasoningEffort,
   ChatCompletionRole,
@@ -247,10 +263,29 @@ import {
   ChatCompletionUpdateParams,
   ChatCompletionUserMessageParam,
   ChatCompletionsPage,
+  ParsedChatCompletion,
+  ParsedChatCompletionMessage,
+  ParsedChatCompletionMessageToolCall,
+  ParsedChoice,
+  ParsedFunction,
+  ParsedFunctionToolCall,
 } from './resources/chat/completions/completions';
+import { APIPromise } from './core/api-promise';
+import {
+  getDeferredRealtimeAPIKeyCache,
+  resolveRealtimeAPIKey,
+  validateCapturedAPIKey,
+} from './internal/realtime-credentials';
 import { type Fetch } from './internal/builtin-types';
 import { isRunningInBrowser } from './internal/detect-platform';
 import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
+import { mergeWebSocketAuthHeaders, webSocketHeaderRemovals } from './internal/ws';
+import {
+  configureProvider,
+  isProviderTimeoutError,
+  type Provider,
+  type ProviderRuntime,
+} from './internal/provider';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
 import {
   finalizeStreamingFormRequestOptions,
@@ -264,6 +299,7 @@ import {
   formatRequestDetails,
   loggerFor,
   parseLogLevel,
+  redactURL,
 } from './internal/utils/log';
 import { isEmptyObj } from './internal/utils/values';
 
@@ -286,14 +322,27 @@ function isRunningInBrowserOrBrowserWorker(): boolean {
   );
 }
 
+const WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER = 'workload-identity-auth';
 const inheritedDataResidencySelection = Symbol('inheritedDataResidencySelection');
 type InternalClientOptions = ClientOptions & { [inheritedDataResidencySelection]?: boolean };
 
+export type ApiKeySetter = () => Promise<string>;
+
 export interface ClientOptions {
   /**
-   * Defaults to process.env['OPENAI_API_KEY'].
+   * API key used for authentication.
+   *
+   * - Accepts either a static string or an async function that resolves to a string.
+   * - Defaults to process.env['OPENAI_API_KEY'].
+   * - When a function is provided, it is invoked when building bearer authentication
+   *   headers for each attempt, including retries and direct `buildRequest()` calls.
+   *   Each invocation's result is used for its own request.
+   * - The function must return a non-empty string; otherwise an OpenAIError is thrown.
+   * - If the function throws, the error is wrapped in an OpenAIError with the original
+   *   error available as `cause`.
+   * - Mutually exclusive with `workloadIdentity`.
    */
-  apiKey?: string | null | undefined;
+  apiKey?: string | ApiKeySetter | null | undefined;
 
   /**
    * Defaults to process.env['OPENAI_ADMIN_KEY'].
@@ -357,6 +406,7 @@ export interface ClientOptions {
    * @unit milliseconds
    */
   timeout?: number | undefined;
+
   /**
    * Additional `RequestInit` options to be passed to `fetch` calls.
    * Properties will be overridden by per-request `fetchOptions`.
@@ -413,6 +463,24 @@ export interface ClientOptions {
    * Defaults to globalThis.console.
    */
   logger?: Logger | undefined;
+
+  /**
+   * Workload identity configuration for OAuth2 token exchange authentication.
+   * Mutually exclusive with `apiKey`.
+   */
+  workloadIdentity?: WorkloadIdentity | X509WorkloadIdentity | undefined;
+
+  /** Approved, frozen Node.js certificate transport required only for X.509 workload identity. */
+  x509Transport?: X509Transport | undefined;
+
+  /** First-class certificate credential created with `fromX509` from `openai/auth/x509-transport`. */
+  credential?: X509Credential | undefined;
+
+  /**
+   * Configure this client to use a third-party API provider.
+   * Mutually exclusive with top-level authentication and `baseURL` options.
+   */
+  provider?: Provider | undefined;
 }
 
 /**
@@ -434,15 +502,29 @@ export class OpenAI {
 
   private fetch: Fetch;
   #encoder: Opts.RequestEncoder;
+  #x509Authentication: X509WorkloadIdentityAuth | undefined;
+  #x509Credential: X509Credential | undefined;
+  #x509Fetch: Fetch | undefined;
   // Preserve an explicit global selection without storing a second routing URL.
   #explicitDataResidency = false;
   #responseAttempts = new WeakMap<
     AbortController,
-    { timeout: number; retriesRemaining: number; hasStreamingBody: boolean }
+    {
+      timeout: number;
+      retriesRemaining: number;
+      hasStreamingBody: boolean;
+      authentication?: X509WorkloadIdentityAuth;
+      helperMethod?: unknown;
+      continueRequest?: <T>(operation: () => Promise<T>) => Promise<T>;
+    }
   >();
   static #sanitizedLoggers = new globalThis.WeakSet<Logger>();
   protected idempotencyHeader?: string;
-  private _options: ClientOptions;
+  protected _options: ClientOptions;
+  private _provider: ProviderRuntime | undefined;
+  private _apiKeyInvocation = 0;
+  private _lastCachedAPIKeyInvocation = 0;
+  private _workloadIdentityAuth?: WorkloadIdentityAuth | X509WorkloadIdentityAuth;
 
   /**
    * API Client for interfacing with the OpenAI API.
@@ -453,6 +535,7 @@ export class OpenAI {
    * @param {string | null | undefined} [opts.project=process.env['OPENAI_PROJECT_ID'] ?? null]
    * @param {string | null | undefined} [opts.webhookSecret=process.env['OPENAI_WEBHOOK_SECRET'] ?? null]
    * @param {string} [opts.baseURL=process.env['OPENAI_BASE_URL'] ?? https://api.openai.com/v1] - Override the default base URL for the API.
+   * @param {Provider} [opts.provider] - Configure a third-party API provider. Mutually exclusive with top-level authentication and base URL options.
    * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
    * @param {MergedRequestInit} [opts.fetchOptions] - Additional `RequestInit` options to be passed to `fetch` calls.
    * @param {Fetch} [opts.fetch] - Specify a custom `fetch` function implementation.
@@ -462,27 +545,92 @@ export class OpenAI {
    * @param {boolean} [opts.dangerouslyAllowBrowser=false] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
    */
   constructor(clientOptions: ClientOptions = {}) {
+    const { credential, options: normalizedOptions } = normalizeX509CredentialOptions(clientOptions);
+    clientOptions = normalizedOptions;
     const residencyBaseURL = resolveDataResidency(clientOptions);
+    const provider = clientOptions.provider;
     const {
+      baseURL = provider ? null : readEnv('OPENAI_BASE_URL'),
       dataResidency: _dataResidency,
       [inheritedDataResidencySelection]: inheritedResidencySelection = false,
-      baseURL = readEnv('OPENAI_BASE_URL'),
-      apiKey = readEnv('OPENAI_API_KEY') ?? null,
-      adminAPIKey = readEnv('OPENAI_ADMIN_KEY') ?? null,
-      organization = readEnv('OPENAI_ORG_ID') ?? null,
-      project = readEnv('OPENAI_PROJECT_ID') ?? null,
+      apiKey = provider ? null : (readEnv('OPENAI_API_KEY') ?? null),
+      adminAPIKey = provider ? null : (readEnv('OPENAI_ADMIN_KEY') ?? null),
+      organization = provider ? null : (readEnv('OPENAI_ORG_ID') ?? null),
+      project = provider ? null : (readEnv('OPENAI_PROJECT_ID') ?? null),
       webhookSecret = readEnv('OPENAI_WEBHOOK_SECRET') ?? null,
+      workloadIdentity,
+      x509Transport,
+      credential: _credential,
       ...opts
     } = clientOptions as InternalClientOptions;
+    if (provider) {
+      const conflictingOptions = (
+        ['apiKey', 'adminAPIKey', 'workloadIdentity', 'x509Transport', 'baseURL', 'dataResidency'] as const
+      ).filter((key) => (key === 'workloadIdentity' ? workloadIdentity : clientOptions[key]) != null);
+      if (conflictingOptions.length) {
+        throw new Errors.OpenAIError(
+          `The \`provider\` option cannot be used with ${conflictingOptions
+            .map((key) => `\`${key}\``)
+            .join(', ')}. Configure authentication and the base URL through the provider instead.`,
+        );
+      }
+    }
+    const identity = isX509WorkloadIdentity(workloadIdentity)
+      ? { x509: workloadIdentity, legacy: undefined }
+      : { x509: undefined, legacy: workloadIdentity };
+    const x509Identity = identity.x509;
+    const usesX509Identity = x509Identity !== undefined;
+    const providerRuntime = provider ? configureProvider(provider) : undefined;
     const options: ClientOptions = {
       apiKey,
       adminAPIKey,
       organization,
       project,
       webhookSecret,
+      workloadIdentity,
+      x509Transport,
+      provider,
       ...opts,
-      baseURL: residencyBaseURL ?? (baseURL || `https://api.openai.com/v1`),
+      baseURL:
+        providerRuntime?.baseURL ??
+        residencyBaseURL ??
+        (baseURL || (usesX509Identity ? X509_API_BASE_URL : `https://api.openai.com/v1`)),
     };
+
+    if (x509Transport && !usesX509Identity) {
+      throw new Errors.OpenAIError('An X.509 transport requires an X.509 workload identity.');
+    }
+
+    if (usesX509Identity) {
+      if (residencyBaseURL !== undefined || inheritedResidencySelection) {
+        throw new Errors.OpenAIError('X.509 workload identity does not support data residency selection.');
+      }
+      if (clientOptions.fetch !== undefined) {
+        throw new Errors.OpenAIError(
+          'X.509 workload identity does not support a custom fetch implementation.',
+        );
+      }
+      assertX509APIOrigin(options.baseURL!);
+      assertX509RequestOptions(options.fetchOptions);
+      if (
+        this.fetchWithAuth !== OpenAI.prototype.fetchWithAuth ||
+        this.fetchWithTimeout !== OpenAI.prototype.fetchWithTimeout
+      ) {
+        throw new Errors.OpenAIError(
+          'X.509 workload identity does not support overridden fetch dispatch hooks.',
+        );
+      }
+    }
+
+    if (apiKey && workloadIdentity) {
+      throw new Errors.OpenAIError('The `apiKey` and `workloadIdentity` options are mutually exclusive');
+    }
+
+    if (!providerRuntime && !apiKey && !adminAPIKey && !workloadIdentity) {
+      throw new Errors.OpenAIError(
+        'Missing credentials. Please pass an `apiKey`, `workloadIdentity`, `adminAPIKey`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.',
+      );
+    }
 
     if (!options.dangerouslyAllowBrowser && isRunningInBrowserOrBrowserWorker()) {
       throw new Errors.OpenAIError(
@@ -506,7 +654,7 @@ export class OpenAI {
     this.fetch = options.fetch ?? Shims.getDefaultFetch();
     this.#encoder = Opts.FallbackEncoder;
 
-    const customHeadersEnv = readEnv('OPENAI_CUSTOM_HEADERS');
+    const customHeadersEnv = provider || credential ? undefined : readEnv('OPENAI_CUSTOM_HEADERS');
     if (customHeadersEnv) {
       const parsed: Record<string, string> = {};
       for (const line of customHeadersEnv.split('\n')) {
@@ -515,12 +663,25 @@ export class OpenAI {
           parsed[line.substring(0, colon).trim()] = line.substring(colon + 1).trim();
         }
       }
-      options.defaultHeaders = { ...parsed, ...options.defaultHeaders };
+      options.defaultHeaders = buildHeaders([parsed, options.defaultHeaders]);
     }
 
     this._options = options;
+    this._provider = providerRuntime;
 
-    this.apiKey = apiKey;
+    if (x509Identity) {
+      const authentication = new X509WorkloadIdentityAuth(x509Identity, x509Transport, organization, project);
+      this._workloadIdentityAuth = authentication;
+      this.#x509Authentication = authentication;
+      this.#x509Credential = credential;
+      this.#x509Fetch = authentication.fetch();
+      this.fetch = this.#x509Fetch;
+      markApprovedX509Client(this);
+    } else if (identity.legacy) {
+      this._workloadIdentityAuth = new WorkloadIdentityAuth(identity.legacy, this.fetch);
+    }
+
+    this.apiKey = typeof apiKey === 'string' ? apiKey : null;
     this.adminAPIKey = adminAPIKey;
     this.organization = organization;
     this.project = project;
@@ -532,6 +693,7 @@ export class OpenAI {
    */
   withOptions(options: Partial<ClientOptions>): this {
     const residencyBaseURL = resolveDataResidency(options);
+    const x509Authentication = this.#x509Authentication;
     const inheritedOptions: ClientOptions = {
       ...this._options,
       baseURL: this.baseURL,
@@ -539,61 +701,147 @@ export class OpenAI {
       timeout: this.timeout,
       logger: this.logger,
       logLevel: this.logLevel,
-      fetch: this.fetch,
+      fetch: this.#x509Authentication ? undefined : this.fetch,
       fetchOptions: this.fetchOptions,
-      apiKey: this.apiKey,
+      apiKey: this._options.apiKey,
       adminAPIKey: this.adminAPIKey,
+      workloadIdentity: x509Authentication?.identitySnapshot() ?? this._options.workloadIdentity,
+      x509Transport: this._options.x509Transport,
       organization: this.organization,
       project: this.project,
       webhookSecret: this.webhookSecret,
     };
+    const { credential, provider } = prepareX509ClientClone(
+      inheritedOptions,
+      options,
+      this.#x509Credential,
+      x509Authentication !== undefined,
+    );
     if (residencyBaseURL !== undefined) {
       delete inheritedOptions.baseURL;
     }
+
     const clientOptions: InternalClientOptions = {
       ...inheritedOptions,
       ...options,
+      credential,
+      provider,
       [inheritedDataResidencySelection]:
-        this.#explicitDataResidency && residencyBaseURL === undefined && !hasOwn(options, 'baseURL'),
+        this.#explicitDataResidency &&
+        residencyBaseURL === undefined &&
+        !hasOwn(options, 'baseURL') &&
+        options.credential === undefined &&
+        !provider,
     };
-    return new (this.constructor as any as new (props: ClientOptions) => typeof this)(clientOptions);
+    const client = new (this.constructor as any as new (props: ClientOptions) => typeof this)(clientOptions);
+    if (provider && new URL(client.baseURL).origin !== new URL(this.baseURL).origin) {
+      Object.assign(client._options, {
+        defaultHeaders: options.defaultHeaders,
+        defaultQuery: options.defaultQuery,
+        fetchOptions: options.fetchOptions,
+        fetch: options.fetch,
+      });
+      client.fetchOptions = options.fetchOptions;
+      client.fetch = options.fetch ?? Shims.getDefaultFetch();
+      client.organization = options.organization ?? null;
+      client.project = options.project ?? null;
+    }
+    if (
+      this.#x509Authentication &&
+      client.#x509Authentication &&
+      this.baseURL === client.baseURL &&
+      this.#x509Authentication.matches(client.#x509Authentication)
+    ) {
+      client._workloadIdentityAuth = this.#x509Authentication;
+      client.#x509Authentication = this.#x509Authentication;
+      client.#x509Fetch = this.#x509Fetch;
+    }
+    return client;
   }
 
   /**
    * Check whether the base URL is set to its default.
    */
   #baseURLOverridden(): boolean {
-    return this.#explicitDataResidency || this.baseURL !== 'https://api.openai.com/v1';
+    return (
+      this.#explicitDataResidency ||
+      this._provider !== undefined ||
+      this.baseURL !== 'https://api.openai.com/v1'
+    );
   }
 
   protected defaultQuery(): Record<string, string | undefined> | undefined {
     return this._options.defaultQuery;
   }
 
-  protected validateHeaders({ values, nulls }: NullableHeaders) {
-    if (this.apiKey && values.get('authorization')) {
+  /** @internal Client request headers for each new WebSocket handshake. */
+  _buildWebSocketHeaders(
+    authHeaders: Record<string, string>,
+    removedHeaders?: Set<string>,
+  ): Record<string, string> {
+    const context = webSocketHeaderRemovals.get(this);
+    if (context?.baseHeaders) {
+      return mergeWebSocketAuthHeaders(
+        { headers: context.baseHeaders },
+        authHeaders,
+        context.removedHeaders ?? new Set(),
+      ).headers;
+    }
+    const headers = buildHeaders([
+      {
+        'User-Agent': this.getUserAgent(),
+        'OpenAI-Organization': this.organization,
+        'OpenAI-Project': this.project,
+      },
+      authHeaders,
+      this._options.defaultHeaders,
+    ]);
+    headers.nulls.forEach((name) => (removedHeaders ?? context?.removedHeaders)?.add(name));
+    const result = Object.fromEntries(headers.values);
+    if (context) {
+      context.baseHeaders = { ...result };
+    }
+    return result;
+  }
+
+  protected validateHeaders(
+    { values, nulls }: NullableHeaders,
+    schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean } = {
+      bearerAuth: true,
+      adminAPIKeyAuth: true,
+    },
+  ) {
+    if (values.get('authorization') || values.get('api-key')) {
       return;
     }
-    if (nulls.has('authorization')) {
+    if (nulls.has('authorization') || nulls.has('api-key')) {
       return;
     }
 
-    if (this.adminAPIKey && values.get('authorization')) {
-      return;
-    }
-    if (nulls.has('authorization')) {
+    if (this._workloadIdentityAuth && schemes.bearerAuth) {
       return;
     }
 
     throw new Error(
-      'Could not resolve authentication method. Expected either apiKey or adminAPIKey to be set. Or for one of the "Authorization" or "Authorization" headers to be explicitly omitted',
+      'Could not resolve authentication method. Expected either apiKey or adminAPIKey to be set. Or for one of the "Authorization" or "api-key" headers to be explicitly omitted',
     );
   }
 
   protected async authHeaders(
     opts: FinalRequestOptions,
-    schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean },
+    schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean } = {
+      bearerAuth: true,
+      adminAPIKeyAuth: true,
+    },
   ): Promise<NullableHeaders | undefined> {
+    const authentication = this.#x509Authentication ?? this._workloadIdentityAuth;
+    if (
+      authentication instanceof X509WorkloadIdentityAuth &&
+      schemes.adminAPIKeyAuth &&
+      this.adminAPIKey !== null
+    ) {
+      return await this.adminAPIKeyAuth(opts);
+    }
     return buildHeaders([
       schemes.bearerAuth ? await this.bearerAuth(opts) : null,
       schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null,
@@ -601,10 +849,46 @@ export class OpenAI {
   }
 
   protected async bearerAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
-    if (this.apiKey == null) {
+    const authentication = this.#x509Authentication ?? this._workloadIdentityAuth;
+    if (authentication) {
+      if (authentication instanceof X509WorkloadIdentityAuth) {
+        if (
+          authentication === this._workloadIdentityAuth &&
+          (this.fetchWithAuth !== OpenAI.prototype.fetchWithAuth ||
+            this.fetchWithTimeout !== OpenAI.prototype.fetchWithTimeout)
+        ) {
+          throw new Errors.OpenAIError(
+            'X.509 workload identity does not support overridden fetch dispatch hooks.',
+          );
+        }
+        const snapshots = authentication.headerSnapshots();
+        if (
+          !X509WorkloadIdentityAuth.shouldAuthenticate(
+            opts,
+            snapshots.defaultHeaders,
+            snapshots.requestHeaders,
+          )
+        ) {
+          return undefined;
+        }
+      }
+      const token =
+        authentication instanceof X509WorkloadIdentityAuth
+          ? await authentication.getToken(opts, {
+              apiURL: authentication.requestAPIURL(),
+              ...authentication.headerSnapshots(),
+              ...authentication.requestSnapshot(),
+              signal: authentication.effectiveSignal(),
+              ...authentication.tenantSnapshot(),
+            })
+          : await authentication.getToken();
+      return buildHeaders([{ Authorization: `Bearer ${token}` }]);
+    }
+    const { apiKey } = await resolveRealtimeAPIKey(this);
+    if (apiKey == null) {
       return undefined;
     }
-    return buildHeaders([{ Authorization: `Bearer ${this.apiKey}` }]);
+    return buildHeaders([{ Authorization: `Bearer ${apiKey}` }]);
   }
 
   protected async adminAPIKeyAuth(opts: FinalRequestOptions): Promise<NullableHeaders | undefined> {
@@ -635,6 +919,66 @@ export class OpenAI {
     const normalizedError =
       error && typeof error === 'object' && (error as { error?: unknown }).error == null ? { error } : error;
     return Errors.APIError.generate(status, normalizedError, message, headers);
+  }
+
+  _hasApiKeyProvider(): boolean {
+    return typeof this._options.apiKey === 'function';
+  }
+
+  /**
+   * Resolves and retains a provider key, returning whether a provider was invoked.
+   * Overrides should forward `capture` (or call it with their resolved key) for local credentials.
+   * @internal
+   */
+  async _callApiKey(capture?: (apiKey: string | null) => void): Promise<boolean> {
+    if (this._provider) {
+      capture?.(this.apiKey);
+      return false;
+    }
+
+    const apiKey = this._options.apiKey;
+    if (typeof apiKey !== 'function') {
+      capture?.(this.apiKey);
+      return false;
+    }
+
+    const deferredCache = getDeferredRealtimeAPIKeyCache(this);
+    const invocation = ++this._apiKeyInvocation;
+    let token: unknown;
+    try {
+      token = await apiKey();
+    } catch (err: any) {
+      if (err instanceof Errors.OpenAIError) throw err;
+      throw new Errors.OpenAIError(
+        `Failed to get token from 'apiKey' function: ${err.message}`,
+        // @ts-ignore
+        { cause: err },
+      );
+    }
+
+    if (typeof token !== 'string' || !token) {
+      throw new Errors.OpenAIError(
+        `Expected 'apiKey' function argument to return a string but it returned ${token}`,
+      );
+    }
+    const resolvedToken = token;
+    const commit = () => {
+      if (capture) validateCapturedAPIKey(this, resolvedToken);
+      if (invocation < this._lastCachedAPIKeyInvocation) {
+        return resolvedToken;
+      }
+      this.apiKey = resolvedToken;
+      const cached = capture ? this.apiKey : resolvedToken;
+      this._lastCachedAPIKeyInvocation = invocation;
+      return cached;
+    };
+    if (deferredCache) {
+      deferredCache.providerKey = resolvedToken;
+      deferredCache.commit = commit;
+    }
+    const cached = deferredCache ? validateCapturedAPIKey(this, resolvedToken) : commit();
+    capture?.(cached);
+    return true;
   }
 
   buildURL(
@@ -1062,6 +1406,9 @@ export class OpenAI {
 
   /**
    * Used as a callback for mutating the given `FinalRequestOptions` object.
+   * Function-based credentials are resolved later, when building authentication
+   * headers, including for direct `buildRequest()` calls. Overriding this hook
+   * does not bypass that resolution.
    */
   protected async prepareOptions(options: FinalRequestOptions): Promise<void> {}
 
@@ -1112,7 +1459,14 @@ export class OpenAI {
     options: PromiseOrValue<FinalRequestOptions>,
     remainingRetries: number | null = null,
   ): APIPromise<Rsp> {
-    return this.responsePromise<Rsp>(this.makeRequest(options, remainingRetries, undefined));
+    const authentication = this.#x509Authentication ?? this._workloadIdentityAuth;
+    const request =
+      authentication instanceof X509WorkloadIdentityAuth
+        ? Promise.resolve(options).then((resolved) =>
+            authentication.runRequest(() => this.makeRequest(resolved, remainingRetries, undefined), this),
+          )
+        : this.makeRequest(options, remainingRetries, undefined);
+    return this.responsePromise<Rsp>(request);
   }
 
   private responsePromise<Rsp>(
@@ -1120,7 +1474,10 @@ export class OpenAI {
     parse: (client: OpenAI, props: APIResponseProps) => Promise<any> = (client, props) =>
       this.parseResponseWithTimeout<Rsp>(client, props),
   ): APIPromise<Rsp> {
-    const promise = new APIPromise<Rsp>(this, request, parse);
+    const promise = new APIPromise<Rsp>(this, request, (client, props) => {
+      const resume = this.#responseAttempts.get(props.controller)?.continueRequest;
+      return resume ? resume(() => parse(client, props)) : parse(client, props);
+    });
 
     // A body timeout can retry after the original raw response has arrived. Wait for
     // parsing before selecting the response so withResponse() reports the retry.
@@ -1150,15 +1507,31 @@ export class OpenAI {
     while (true) {
       const attempt = this.#responseAttempts.get(props.controller);
       const timeout = attempt?.timeout ?? props.options.timeout ?? this.timeout;
-      const remaining = Math.max(0, props.startTime + timeout - Date.now());
-      const callerSignal = props.options.signal;
+      const x509Authentication = attempt?.authentication;
+      const callerSignal = x509Authentication ? props.controller.signal : props.options.signal;
+      const abortError = () =>
+        x509Authentication && callerSignal
+          ? this._makeUserAbortError(callerSignal)
+          : new Errors.APIUserAbortError();
+      let remaining: number;
+      try {
+        remaining =
+          x509Authentication?.remainingTimeout(props.options, timeout) ??
+          Math.max(0, props.startTime + timeout - Date.now());
+      } catch (error) {
+        const cancellation = callerSignal?.aborted ? abortError() : undefined;
+        props.controller.abort();
+        void Shims.CancelReadableStream(props.response.body).catch(() => undefined);
+        throw cancellation ?? error;
+      }
       let timer: ReturnType<typeof setTimeout> | undefined;
       let abortListener: (() => void) | undefined;
       let timedOut = false;
 
       try {
-        if (callerSignal?.aborted) {
-          throw new Errors.APIUserAbortError();
+        // Tool runners preserve a completed buffered turn before cancellation stops the next request.
+        if (callerSignal?.aborted && attempt?.helperMethod !== 'runTools') {
+          throw abortError();
         }
 
         const timeoutPromise = new Promise<never>((_, reject) => {
@@ -1169,17 +1542,27 @@ export class OpenAI {
           }, remaining);
 
           if (callerSignal) {
-            abortListener = () => reject(new Errors.APIUserAbortError());
+            abortListener = () => {
+              if (!timedOut) reject(abortError());
+            };
             callerSignal.addEventListener('abort', abortListener, { once: true });
           }
         });
 
         return await Promise.race([defaultParseResponse<Rsp>(client, props), timeoutPromise]);
       } catch (error) {
-        if (callerSignal?.aborted) {
-          throw new Errors.APIUserAbortError();
+        if (callerSignal?.aborted && !timedOut) {
+          throw abortError();
         }
         if (!timedOut) {
+          if (x509Authentication && error instanceof SyntaxError) {
+            throw new SyntaxError('X.509 workload identity API response contains invalid JSON.');
+          }
+          if (x509Authentication && !(error instanceof Errors.OpenAIError)) {
+            throw new Errors.APIConnectionError({
+              message: 'X.509 workload identity API response body could not be read.',
+            });
+          }
           throw error;
         }
 
@@ -1219,6 +1602,52 @@ export class OpenAI {
     }
   }
 
+  /** Keeps terminal X.509 error-body consumption inside the original logical request deadline. */
+  private async readX509ResponseError(
+    response: Response,
+    options: FinalRequestOptions,
+    timeout: number,
+    controller: AbortController,
+    authentication: X509WorkloadIdentityAuth,
+  ): Promise<string> {
+    const deadline = new AbortController();
+    const callerSignal = controller.signal;
+    let timedOut = false;
+    const cancel = () => deadline.abort(callerSignal.reason);
+    callerSignal.addEventListener('abort', cancel, { once: true });
+    if (callerSignal.aborted) {
+      cancel();
+    }
+
+    try {
+      const remaining = authentication.remainingTimeout(options, timeout);
+      const expiration = authentication.waitForRetry(remaining, deadline.signal).then(() => {
+        throw new Errors.APIConnectionTimeoutError();
+      });
+      const body = await Promise.race([
+        response.text().catch(() => 'X.509 workload identity API response body could not be read.'),
+        expiration,
+      ]);
+      if (callerSignal.aborted) {
+        throw this._makeUserAbortError(callerSignal);
+      }
+      return body;
+    } catch (error) {
+      if (error instanceof Errors.APIConnectionTimeoutError) {
+        timedOut = !callerSignal.aborted;
+        controller.abort();
+        void Shims.CancelReadableStream(response.body).catch(() => undefined);
+      }
+      if (callerSignal.aborted && !timedOut) {
+        throw this._makeUserAbortError(callerSignal);
+      }
+      throw error;
+    } finally {
+      callerSignal.removeEventListener('abort', cancel);
+      deadline.abort();
+    }
+  }
+
   private async makeRequest(
     optionsInput: PromiseOrValue<FinalRequestOptions>,
     retriesRemaining: number | null,
@@ -1232,48 +1661,153 @@ export class OpenAI {
       retriesRemaining = Math.min(this.#normalizeRetries(retriesRemaining), maxRetries);
     }
 
+    const x509Authentication = this.#x509Authentication;
+    x509Authentication?.beginRequestPreparation();
     await this.prepareOptions(options);
 
-    const { req, url, timeout } = await this.buildRequest(options, {
-      retryCount: maxRetries - retriesRemaining,
-    });
+    x509Authentication?.beginRequestPlanning();
+    let built: { req: FinalizedRequestInit; url: string; timeout: number };
+    try {
+      const candidate = await this.buildRequest(options, {
+        retryCount: maxRetries - retriesRemaining,
+      });
+      built = { req: candidate.req, url: candidate.url, timeout: candidate.timeout };
+      if (x509Authentication) {
+        validatePositiveInteger('timeout', built.timeout);
+        x509Authentication.authorizePlannedRequest(built.url, built.req, built.timeout);
+        if (X509WorkloadIdentityAuth.isStreamingRequestBody(built.req.body)) {
+          options.__metadata = { ...options.__metadata, hasStreamingBody: true };
+        }
+        await this.prepareRequest(built.req, { url: built.url, options });
+        await this._provider?.prepareRequest?.(built.req, {
+          url: built.url,
+          options,
+          timeout: built.timeout,
+        });
+        x509Authentication.beginRequestPlanning();
+        x509Authentication.authorizePlannedRequest(built.url, built.req, built.timeout, true);
+        if (X509WorkloadIdentityAuth.isStreamingRequestBody(built.req.body)) {
+          options.__metadata = { ...options.__metadata, hasStreamingBody: true };
+        }
+        const callerSignal = x509Authentication.requestSnapshot().signal;
+        if (callerSignal?.aborted || built.req.signal?.aborted) {
+          throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : built.req.signal!);
+        }
+        x509Authentication.setEffectiveSignal(
+          built.req.signal || callerSignal
+            ? createRequestController(built.req.signal ?? callerSignal, callerSignal).signal
+            : undefined,
+        );
+        x509Authentication.beginRequestNetwork();
+        const security = options.__security ?? { bearerAuth: true };
+        const authenticationHeaders = await this.authHeaders(options, security);
+        const suppliedHeaders = x509Authentication.headerSnapshots();
+        const supplied = buildHeaders([suppliedHeaders.defaultHeaders, suppliedHeaders.requestHeaders]);
+        for (const [name, value] of authenticationHeaders?.values ?? []) {
+          if (!supplied.nulls.has(name) && !built.req.headers.has(name)) {
+            built.req.headers.set(name, value);
+          }
+        }
+        this.validateHeaders(buildHeaders([supplied, built.req.headers]), security);
+      }
+    } catch (error) {
+      x509Authentication?.retireRequestBody();
+      if (
+        x509Authentication &&
+        retriesRemaining &&
+        !options.__metadata?.['hasStreamingBody'] &&
+        X509WorkloadIdentityAuth.isRetryableFailure(error)
+      ) {
+        return await this.retryRequest(
+          options,
+          retriesRemaining,
+          retryOfRequestLogID ?? 'x509-token-exchange',
+          X509WorkloadIdentityAuth.retryHeaders(error),
+        );
+      }
+      throw error;
+    }
+    const { req, url } = built;
+    const timeout = x509Authentication
+      ? Math.min(built.timeout, x509Authentication.requestSnapshot().timeout)
+      : built.timeout;
+    x509Authentication?.bindRequest(options, req, this.adminAPIKey);
+    let hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
 
-    const hasStreamingBody = options.__metadata?.['hasStreamingBody'] === true;
-
-    await this.prepareRequest(req, { url, options });
+    let providerAuthStartedAt: { wallTime: number; monotonicTime: number } | undefined;
+    let providerAuthTimeout: Errors.APIConnectionTimeoutError | undefined;
+    if (!x509Authentication) {
+      await this.prepareRequest(req, { url, options });
+      if (this._provider?.timeoutIncludesAuth) {
+        providerAuthStartedAt = { wallTime: Date.now(), monotonicTime: performance.now() };
+      }
+      try {
+        await this._provider?.prepareRequest?.(req, { url, options, timeout });
+      } catch (error) {
+        if (!providerAuthStartedAt || !isProviderTimeoutError(error)) {
+          throw error;
+        }
+        providerAuthTimeout = error;
+      }
+    }
+    x509Authentication?.adoptRequestHeaders(req);
+    if (x509Authentication && X509WorkloadIdentityAuth.isStreamingRequestBody(req.body)) {
+      hasStreamingBody = true;
+    }
 
     /** Not an API request ID, just for correlating local log entries. */
     const requestLogID = 'log_' + ((Math.random() * (1 << 24)) | 0).toString(16).padStart(6, '0');
     const retryLogStr = retryOfRequestLogID === undefined ? '' : `, retryOf: ${retryOfRequestLogID}`;
-    const startTime = Date.now();
+    const startTime =
+      x509Authentication?.requestStartedAt(options) ?? providerAuthStartedAt?.wallTime ?? Date.now();
 
-    loggerFor(this).debug(
-      `[${requestLogID}] sending request`,
-      formatRequestDetails({
-        retryOfRequestLogID,
-        method: options.method,
-        url,
-        options,
-        headers: req.headers,
-      }),
-    );
-
-    if (options.signal?.aborted || req.signal?.aborted) {
-      throw this._makeUserAbortError(options.signal?.aborted ? options.signal : req.signal!);
+    if (this.logLevel === 'debug') {
+      // Summarize serialized strings without reparsing or re-running caller serialization hooks.
+      const body = typeof req.body === 'string' ? { type: 'string', length: req.body.length } : req.body;
+      loggerFor(this).debug(
+        `[${requestLogID}] sending request`,
+        formatRequestDetails({
+          retryOfRequestLogID,
+          method: options.method,
+          url,
+          options: x509Authentication
+            ? { body, ...x509Authentication.requestSnapshot() }
+            : { ...options, body },
+          headers: req.headers,
+        }),
+      );
     }
 
+    const callerSignal = x509Authentication ? x509Authentication.requestSnapshot().signal : options.signal;
+    if (callerSignal?.aborted || req.signal?.aborted) {
+      throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : req.signal!);
+    }
+    const security = options.__security ?? { bearerAuth: true };
     // Request hooks may replace the caller signal before it reaches fetch.
     const controller =
-      this.fetchWithTimeout === OpenAI.prototype.fetchWithTimeout
-        ? createRequestController(req.signal)
+      x509Authentication || this.fetchWithTimeout === OpenAI.prototype.fetchWithTimeout
+        ? createRequestController(
+            req.signal ?? (x509Authentication ? callerSignal : undefined),
+            x509Authentication ? callerSignal : undefined,
+          )
         : new AbortController();
-    const response = await this.fetchWithTimeout(url, req, timeout, controller).catch(castToError);
+    const remainingTimeout =
+      x509Authentication?.remainingTimeout(options, timeout) ??
+      (providerAuthStartedAt ? timeout - (performance.now() - providerAuthStartedAt.monotonicTime) : timeout);
+    if (providerAuthStartedAt && remainingTimeout <= 0) {
+      providerAuthTimeout ??= new Errors.APIConnectionTimeoutError();
+    }
+    const fetchWithAuth = x509Authentication ? OpenAI.prototype.fetchWithAuth : this.fetchWithAuth;
+    x509Authentication?.releaseRequestBody(req.body);
+    const response =
+      providerAuthTimeout ??
+      (await fetchWithAuth.call(this, url, req, remainingTimeout, controller, security).catch(castToError));
     const headersTime = Date.now();
 
     if (response instanceof globalThis.Error) {
       const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
-      if (options.signal?.aborted || req.signal?.aborted) {
-        throw this._makeUserAbortError(options.signal?.aborted ? options.signal : req.signal!);
+      if (callerSignal?.aborted || req.signal?.aborted) {
+        throw this._makeUserAbortError(callerSignal?.aborted ? callerSignal : req.signal!);
       }
       // detect native connection timeout errors
       // deno throws "TypeError: error sending request for url (https://example/): client error (Connect): tcp connect error: Operation timed out (os error 60): Operation timed out (os error 60)"
@@ -1282,7 +1816,11 @@ export class OpenAI {
       const isTimeout =
         isAbortError(response) ||
         /timed? ?out/i.test(String(response) + ('cause' in response ? String(response.cause) : ''));
-      if (retriesRemaining && !hasStreamingBody) {
+      if (
+        retriesRemaining &&
+        !hasStreamingBody &&
+        (!x509Authentication || isTransientX509ConnectionError(response))
+      ) {
         loggerFor(this).info(
           `[${requestLogID}] connection ${isTimeout ? 'timed out' : 'failed'} - ${retryMessage}`,
         );
@@ -1292,7 +1830,7 @@ export class OpenAI {
             retryOfRequestLogID,
             url,
             durationMs: headersTime - startTime,
-            message: response.message,
+            message: x509Authentication ? 'X.509 workload identity API connection failed.' : response.message,
           }),
         );
         return this.retryRequest(
@@ -1315,9 +1853,12 @@ export class OpenAI {
           retryOfRequestLogID,
           url,
           durationMs: headersTime - startTime,
-          message: response.message,
+          message: x509Authentication ? 'X.509 workload identity API connection failed.' : response.message,
         }),
       );
+      if (response instanceof OAuthError || response instanceof SubjectTokenProviderError) {
+        throw response;
+      }
       if (isTimeout) {
         const transportCause = 'cause' in response ? response.cause : undefined;
         const isHeadersTimeout =
@@ -1332,7 +1873,13 @@ export class OpenAI {
                 'configure a matching undici fetch and fetchOptions.dispatcher with an Agent whose headersTimeout is at least the SDK timeout.',
             })
           : new Errors.APIConnectionTimeoutError();
+        if (x509Authentication) {
+          throw new Errors.APIConnectionTimeoutError();
+        }
         throw Object.assign(timeoutError, { cause: response });
+      }
+      if (x509Authentication) {
+        throw new Errors.APIConnectionError({ message: 'X.509 workload identity API connection failed.' });
       }
       throw new Errors.APIConnectionError({
         message: getConnectionErrorMessage(response),
@@ -1344,17 +1891,62 @@ export class OpenAI {
       .filter(([name]) => name === 'x-request-id')
       .map(([name, value]) => ', ' + name + ': ' + JSON.stringify(value))
       .join('');
-    const responseInfo = `[${requestLogID}${retryLogStr}${specialHeaders}] ${req.method} ${url} ${
+    const responseInfo = `[${requestLogID}${retryLogStr}${specialHeaders}] ${req.method} ${redactURL(url)} ${
       response.ok ? 'succeeded' : 'failed'
     } with status ${response.status} in ${headersTime - startTime}ms`;
 
     if (!response.ok) {
-      const shouldRetry = await this.shouldRetry(response);
+      const rejectedX509Credential =
+        response.status === 401 &&
+        x509Authentication &&
+        security.bearerAuth &&
+        x509Authentication.usedWorkloadToken(options);
+      if (rejectedX509Credential) {
+        x509Authentication.invalidateToken();
+      }
+      if (
+        response.status === 401 &&
+        (x509Authentication || this._workloadIdentityAuth) &&
+        security.bearerAuth &&
+        (!x509Authentication || x509Authentication.usedWorkloadToken(options)) &&
+        (!x509Authentication || retriesRemaining > 0) &&
+        !hasStreamingBody &&
+        !options.__metadata?.['workloadIdentityTokenRefreshed']
+      ) {
+        if (x509Authentication) {
+          void Shims.CancelReadableStream(response.body).catch(() => undefined);
+        } else {
+          await Shims.CancelReadableStream(response.body);
+          this._workloadIdentityAuth?.invalidateToken();
+        }
+
+        const replayOptions = {
+          ...options,
+          __metadata: {
+            ...options.__metadata,
+            workloadIdentityTokenRefreshed: true,
+          },
+        };
+        return this.makeRequest(
+          replayOptions,
+          x509Authentication ? retriesRemaining - 1 : retriesRemaining,
+          retryOfRequestLogID ?? requestLogID,
+        );
+      }
+
+      const shouldRetry =
+        rejectedX509Credential && options.__metadata?.['workloadIdentityTokenRefreshed']
+          ? false
+          : await this.shouldRetry(response);
       if (retriesRemaining && shouldRetry && !hasStreamingBody) {
         const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
 
         // We don't need the body of this response.
-        await Shims.CancelReadableStream(response.body);
+        if (x509Authentication) {
+          void Shims.CancelReadableStream(response.body).catch(() => undefined);
+        } else {
+          await Shims.CancelReadableStream(response.body);
+        }
         loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
         loggerFor(this).debug(
           `[${requestLogID}] response error (${retryMessage})`,
@@ -1383,7 +1975,9 @@ export class OpenAI {
 
       loggerFor(this).info(`${responseInfo} - ${retryMessage}`);
 
-      const errText = await response.text().catch((err: any) => castToError(err).message);
+      const errText = x509Authentication
+        ? await this.readX509ResponseError(response, options, timeout, controller, x509Authentication)
+        : await response.text().catch((err: any) => castToError(err).message);
       const errJSON = safeJSON(errText) as any;
       const errMessage = errJSON ? undefined : errText;
 
@@ -1415,7 +2009,16 @@ export class OpenAI {
       }),
     );
 
-    this.#responseAttempts.set(controller, { timeout, retriesRemaining, hasStreamingBody });
+    const continueRequest = x509Authentication?.continuation();
+    x509Authentication?.releaseRequestCredentials();
+    this.#responseAttempts.set(controller, {
+      timeout,
+      retriesRemaining,
+      hasStreamingBody,
+      ...(x509Authentication ? { authentication: x509Authentication } : {}),
+      helperMethod: options.__metadata?.['helperMethod'],
+      ...(continueRequest ? { continueRequest } : {}),
+    });
     return {
       response,
       options,
@@ -1447,7 +2050,13 @@ export class OpenAI {
     Page: new (...args: ConstructorParameters<typeof Pagination.AbstractPage>) => PageClass,
     options: PromiseOrValue<FinalRequestOptions>,
   ): Pagination.PagePromise<PageClass, Item> {
-    const request = this.makeRequest(options, null, undefined);
+    const authentication = this.#x509Authentication ?? this._workloadIdentityAuth;
+    const request =
+      authentication instanceof X509WorkloadIdentityAuth
+        ? Promise.resolve(options).then((resolved) =>
+            authentication.runRequest(() => this.makeRequest(resolved, null, undefined), this),
+          )
+        : this.makeRequest(options, null, undefined);
     const page = new Pagination.PagePromise<PageClass, Item>(this as any as OpenAI, request, Page);
     const guarded = this.responsePromise<PageClass>(request, async (client, props) => {
       const body = await this.parseResponseWithTimeout(client, props);
@@ -1459,6 +2068,31 @@ export class OpenAI {
     page.withResponse = guarded.withResponse.bind(guarded);
     page._thenUnwrap = guarded._thenUnwrap.bind(guarded);
     return page;
+  }
+
+  protected async fetchWithAuth(
+    url: RequestInfo,
+    init: RequestInit,
+    timeout: number,
+    controller: AbortController,
+    schemes: { bearerAuth?: boolean; adminAPIKeyAuth?: boolean } = {
+      bearerAuth: true,
+      adminAPIKeyAuth: true,
+    },
+  ): Promise<Response> {
+    if (this._workloadIdentityAuth && !this.#x509Fetch && schemes.bearerAuth) {
+      const headers = init.headers as Headers;
+      const authHeader = headers.get('Authorization');
+      if (authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}`) {
+        const token = await this._workloadIdentityAuth.getToken();
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+    }
+
+    const fetchWithTimeout = this.#x509Fetch ? OpenAI.prototype.fetchWithTimeout : this.fetchWithTimeout;
+    const response = await fetchWithTimeout.call(this, url, init, timeout, controller);
+
+    return response;
   }
 
   async fetchWithTimeout(
@@ -1493,7 +2127,7 @@ export class OpenAI {
 
     try {
       // use undefined this binding; fetch errors if bound to something else in browser/cloudflare
-      const response = await this.fetch.call(undefined, url, fetchOptions);
+      const response = await (this.#x509Fetch ?? this.fetch).call(undefined, url, fetchOptions);
       if (cleanup) {
         retainRequestAbortCallback(response.body ?? response, abort, controller.signal);
       }
@@ -1558,7 +2192,8 @@ export class OpenAI {
       }
     }
 
-    // Honor reasonable server-provided delays, including immediate retries.
+    // If the API asks us to wait a certain amount of time, just do what it
+    // says, but otherwise calculate a default
     if (
       timeoutMillis === undefined ||
       !Number.isFinite(timeoutMillis) ||
@@ -1568,15 +2203,30 @@ export class OpenAI {
       const maxRetries = this.#normalizeRetries(options.maxRetries ?? this.maxRetries);
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
-    const retrySignals = requestSignal === options.signal ? [requestSignal] : [requestSignal, options.signal];
-    try {
-      await sleep(timeoutMillis, ...retrySignals);
-    } catch (error) {
-      const abortedSignal = retrySignals.find((signal) => signal?.aborted);
-      if (abortedSignal) {
-        throw this._makeUserAbortError(abortedSignal);
+    const x509Authentication = this.#x509Authentication;
+    if (x509Authentication) {
+      const remaining = x509Authentication.remainingTimeout(
+        options,
+        x509Authentication.requestSnapshot().timeout,
+      );
+      if (timeoutMillis >= remaining) {
+        throw new Errors.APIConnectionTimeoutError();
       }
-      throw error;
+    }
+    if (x509Authentication) {
+      await x509Authentication.waitForRetry(timeoutMillis, x509Authentication.effectiveSignal());
+    } else {
+      const retrySignals =
+        requestSignal === options.signal ? [requestSignal] : [requestSignal, options.signal];
+      try {
+        await sleep(timeoutMillis, ...retrySignals);
+      } catch (error) {
+        const abortedSignal = retrySignals.find((signal) => signal?.aborted);
+        if (abortedSignal) {
+          throw this._makeUserAbortError(abortedSignal);
+        }
+        throw error;
+      }
     }
 
     return this.makeRequest(options, retriesRemaining - 1, requestLogID);
@@ -1597,16 +2247,60 @@ export class OpenAI {
     return sleepSeconds * jitter * 1000;
   }
 
+  /**
+   * Builds a request, resolving callback credentials when constructing authentication
+   * headers, after any subclass request-option rewrites. Calling this method directly
+   * also resolves credentials. Complete replacement builders own authentication and
+   * can call `this.authHeaders()` to resolve headers with request-local credentials.
+   */
   async buildRequest(
     inputOptions: FinalRequestOptions,
     { retryCount = 0 }: { retryCount?: number } = {},
   ): Promise<{ req: FinalizedRequestInit; url: string; timeout: number }> {
+    if (this.#x509Authentication && !this.#x509Authentication.inRequest(this)) {
+      const authentication = this.#x509Authentication;
+      return await authentication.runRequest(async () => {
+        const built = await OpenAI.prototype.buildRequest.call(this, inputOptions, { retryCount });
+        authentication.releaseRequestBody(built.req.body);
+        return built;
+      }, this);
+    }
     const options = { ...inputOptions };
+    const x509Authentication = this.#x509Authentication;
+    const x509Tenant = x509Authentication?.snapshotTenant(this.organization, this.project);
+    const x509Headers = x509Authentication?.snapshotHeaders(this._options.defaultHeaders, options.headers);
+    if (x509Headers) {
+      options.headers = x509Headers.requestHeaders;
+    }
+    const x509ClientFetchOptions = x509Authentication
+      ? snapshotX509RequestOptions(this.fetchOptions)
+      : undefined;
+    const x509RequestFetchOptions = x509Authentication
+      ? snapshotX509RequestOptions(options.fetchOptions)
+      : undefined;
     const { method, path, query, defaultBaseURL } = options;
 
     const url = this.buildURL(path!, query as Record<string, unknown>, defaultBaseURL);
-    if ('timeout' in options) validatePositiveInteger('timeout', options.timeout);
+    x509Authentication?.snapshotAPIURL(url);
+    const explicitTimeout = 'timeout' in options;
+    if (explicitTimeout) validatePositiveInteger('timeout', options.timeout);
     options.timeout = options.timeout ?? this.timeout;
+    if (x509Authentication && x509RequestFetchOptions) {
+      x509Authentication.snapshotRequest(options.signal, options.timeout, x509RequestFetchOptions);
+    }
+    if (x509Authentication) {
+      const snapshot = x509Authentication.requestSnapshot();
+      options.timeout = snapshot.timeout;
+      if (snapshot.signal === undefined) {
+        delete options.signal;
+      } else {
+        options.signal = snapshot.signal;
+      }
+    }
+    const authenticationHeaders =
+      this._provider || x509Authentication
+        ? undefined
+        : await this.authHeaders(inputOptions, inputOptions.__security ?? { bearerAuth: true });
     if (options.__metadata?.['finalizeMultipart'] === true && hasUploadableValue(options.body)) {
       // Multipart encoding owns its Content-Type; retain all other caller headers.
       const multipartHeaders = buildHeaders([options.headers]);
@@ -1697,6 +2391,7 @@ export class OpenAI {
         ...inputOptions.__metadata,
         hasStreamingBody: true,
       };
+      x509Authentication?.ownRequestBody(body, options.body);
     }
 
     // Retain encoding ownership on retries, but never transfer it to a replacement body.
@@ -1717,7 +2412,16 @@ export class OpenAI {
         }
       }
     }
-    const reqHeaders = await this.buildHeaders({ options: inputOptions, method, bodyHeaders, retryCount });
+    const reqHeaders = await this.buildHeaders({
+      options: inputOptions,
+      method,
+      bodyHeaders,
+      authenticationHeaders,
+      retryCount,
+      x509Headers,
+      x509Timeout: explicitTimeout ? options.timeout : undefined,
+      x509Tenant,
+    });
     // Apply the encoding header after authentication has composed its request snapshot.
     if (finalizedContentType === null) reqHeaders.delete('content-type');
     else if (finalizedContentType !== undefined) reqHeaders.set('content-type', finalizedContentType);
@@ -1729,8 +2433,8 @@ export class OpenAI {
       ...((globalThis as any).ReadableStream &&
         body instanceof (globalThis as any).ReadableStream && { duplex: 'half' }),
       ...(body && { body }),
-      ...((this.fetchOptions as any) ?? {}),
-      ...((options.fetchOptions as any) ?? {}),
+      ...(((x509Authentication ? x509ClientFetchOptions : this.fetchOptions) as any) ?? {}),
+      ...(((x509Authentication ? x509RequestFetchOptions : options.fetchOptions) as any) ?? {}),
     };
 
     return { req, url, timeout: options.timeout };
@@ -1740,12 +2444,20 @@ export class OpenAI {
     options,
     method,
     bodyHeaders,
+    authenticationHeaders,
     retryCount,
+    x509Headers,
+    x509Timeout,
+    x509Tenant,
   }: {
     options: FinalRequestOptions;
     method: HTTPMethod;
     bodyHeaders: HeadersLike;
+    authenticationHeaders: NullableHeaders | undefined;
     retryCount: number;
+    x509Headers?: { defaultHeaders: NullableHeaders; requestHeaders: NullableHeaders } | undefined;
+    x509Timeout: number | undefined;
+    x509Tenant?: { organization: string | null; project: string | null } | undefined;
   }): Promise<Headers> {
     let idempotencyHeaders: HeadersLike = {};
     if (this.idempotencyHeader && method !== 'get') {
@@ -1753,24 +2465,32 @@ export class OpenAI {
       idempotencyHeaders[this.idempotencyHeader] = options.idempotencyKey;
     }
 
+    const helperMethod = options.__metadata?.['helperMethod'];
+    const timeout = x509Headers ? x509Timeout : options.timeout;
     const headers = buildHeaders([
       idempotencyHeaders,
       {
         Accept: 'application/json',
         ...(!isRunningInBrowserOrBrowserWorker() ? { 'User-Agent': this.getUserAgent() } : undefined),
         'X-Stainless-Retry-Count': String(retryCount),
-        ...(options.timeout ? { 'X-Stainless-Timeout': String(Math.trunc(options.timeout / 1000)) } : {}),
+        ...(timeout ? { 'X-Stainless-Timeout': String(Math.trunc(timeout / 1000)) } : {}),
         ...getPlatformHeaders(),
-        'OpenAI-Organization': this.organization,
-        'OpenAI-Project': this.project,
+        ...(typeof helperMethod === 'string' ? { 'X-Stainless-Helper-Method': helperMethod } : {}),
+        'OpenAI-Organization': x509Tenant ? x509Tenant.organization : this.organization,
+        'OpenAI-Project': x509Tenant ? x509Tenant.project : this.project,
       },
-      await this.authHeaders(options, options.__security ?? { bearerAuth: true, adminAPIKeyAuth: true }),
-      this._options.defaultHeaders,
+      // X.509 owns streaming uploads before authentication so it can retire them on failure.
+      this.#x509Authentication && !this.#x509Authentication.isPlanningRequest()
+        ? await this.authHeaders(options, options.__security ?? { bearerAuth: true })
+        : authenticationHeaders,
+      x509Headers?.defaultHeaders ?? this._options.defaultHeaders,
       bodyHeaders,
-      options.headers,
+      x509Headers?.requestHeaders ?? options.headers,
     ]);
 
-    this.validateHeaders(headers);
+    if (!this._provider && !this.#x509Authentication?.isPlanningRequest()) {
+      this.validateHeaders(headers, options.__security ?? { bearerAuth: true });
+    }
 
     return headers.values;
   }
@@ -1798,7 +2518,7 @@ export class OpenAI {
       // request body, even if the caller omitted an optional body param. Keep the
       // content-type for those, and only elide it for operations with no body at
       // all (e.g. GET/DELETE).
-      if (body == null && 'body' in options) {
+      if (body === undefined && 'body' in options) {
         return { ...this.#encoder({ body, headers: buildHeaders([rawHeaders]) }), isStreamingBody: false };
       }
       return { bodyHeaders: undefined, body: undefined, isStreamingBody: false };
@@ -1876,8 +2596,10 @@ export class OpenAI {
   static InternalServerError = Errors.InternalServerError;
   static PermissionDeniedError = Errors.PermissionDeniedError;
   static UnprocessableEntityError = Errors.UnprocessableEntityError;
+  static InvalidWebhookSignatureError = Errors.InvalidWebhookSignatureError;
 
   static toFile = Uploads.toFile;
+  static toStreamingFile = Uploads.toStreamingFile;
 
   decisions: API.Decisions = new API.Decisions(this);
   /**
@@ -1979,7 +2701,10 @@ OpenAI.TokenPage = Pagination.TokenPage;
 
 const composedCallerSignals = new WeakMap<AbortController, AbortSignal>();
 
-function createRequestController(callerSignal: AbortSignal | null | undefined): AbortController {
+function createRequestController(
+  callerSignal: AbortSignal | null | undefined,
+  originalSignal?: AbortSignal | null,
+): AbortController {
   const controller = new AbortController();
   if (!callerSignal) return controller;
 
@@ -1991,7 +2716,11 @@ function createRequestController(callerSignal: AbortSignal | null | undefined): 
   try {
     // Native composition keeps cancellation active after response headers without
     // retaining an abort listener on the caller's signal or changing its reason.
-    const composed = nativeAbortSignal.any([controller.signal, callerSignal]) as AbortSignal;
+    const signals = [controller.signal, callerSignal];
+    if (originalSignal && originalSignal !== callerSignal) {
+      signals.push(originalSignal);
+    }
+    const composed = nativeAbortSignal.any(signals) as AbortSignal;
     Object.defineProperty(controller, 'signal', { value: composed, configurable: true });
     composedCallerSignals.set(controller, callerSignal);
   } catch {
@@ -2119,12 +2848,19 @@ export declare namespace OpenAI {
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
     type ChatCompletionAllowedTools as ChatCompletionAllowedTools,
     type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
+    type ParsedFunction as ParsedFunction,
+    type ParsedFunctionToolCall as ParsedFunctionToolCall,
+    type ParsedChatCompletionMessageToolCall as ParsedChatCompletionMessageToolCall,
+    type ParsedChatCompletionMessage as ParsedChatCompletionMessage,
+    type ParsedChoice as ParsedChoice,
+    type ParsedChatCompletion as ParsedChatCompletion,
     type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
     type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
     type ChatCompletionListParams as ChatCompletionListParams,
+    type ChatCompletionParseParams as ChatCompletionParseParams,
   };
 
   export {

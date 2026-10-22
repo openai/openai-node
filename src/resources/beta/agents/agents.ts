@@ -3862,7 +3862,8 @@ export namespace Environment {
 export type EnvironmentParam =
   | EnvironmentParam.EnvironmentParamNone
   | EnvironmentParam.EnvironmentParamOpenAIHosted
-  | EnvironmentParam.EnvironmentParamSelfHosted;
+  | EnvironmentParam.EnvironmentParamSelfHosted
+  | EnvironmentParam.EnvironmentParamPrewarmed;
 
 export namespace EnvironmentParam {
   /**
@@ -3908,10 +3909,9 @@ export namespace EnvironmentParam {
     env?: { [key: string]: string } | null;
 
     /**
-     * An existing prewarmed environment. Cannot be combined with a template or inline
-     * configuration.
+     * Use EnvironmentParamPrewarmed to attach an existing environment instead.
      */
-    environment_id?: string;
+    environment_id?: never;
 
     /**
      * A reusable hosted template applied before inline session configuration. Omitted
@@ -5567,6 +5567,13 @@ export interface AgentListParams extends CursorPageParams {
    * - `desc` - Returns resources in descending order.
    */
   order?: 'asc' | 'desc';
+}
+
+export namespace EnvironmentParam {
+  /** An existing hosted environment, with no inline or template configuration. */
+  export type EnvironmentParamPrewarmed = { type: 'openai_hosted'; environment_id: string } & {
+    [Field in Exclude<keyof EnvironmentParamOpenAIHosted, 'type' | 'environment_id'>]?: never;
+  };
 }
 
 Agents.Environments = Environments;

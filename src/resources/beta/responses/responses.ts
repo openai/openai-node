@@ -13226,7 +13226,8 @@ export type BetaResponsesServerEvent =
   | BetaResponseSteerPendingEvent
   | BetaResponseSteerFailedEvent
   | BetaResponseInjectCreatedEvent
-  | BetaResponseInjectFailedEvent;
+  | BetaResponseInjectFailedEvent
+  | BetaResponsesServerEvent.BetaResponseWsStreamingError;
 
 export namespace BetaResponsesServerEvent {
   /**
@@ -13996,6 +13997,17 @@ export namespace BetaResponsesServerEvent {
        */
       agent_name: string;
     }
+  }
+
+  /**
+   * Emitted when an error occurs while streaming a response over the WebSocket.
+   */
+  export interface BetaResponseWsStreamingError extends BetaResponseErrorEvent {
+    /**
+     * The WebSocket lane that emitted this event. This field is present when the
+     * originating `response.create` event supplied a `stream_id`.
+     */
+    stream_id?: string;
   }
 }
 

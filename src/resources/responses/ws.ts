@@ -4,7 +4,7 @@ import * as WS from 'ws';
 import { NodeWebSocket, snapshotNodeWebSocketOptions } from '../../internal/ws-adapter-node';
 import { ResponsesWSBase, type ResponsesWSBaseOptions } from './ws-base';
 import { OpenAI } from '../../client';
-import { WebSocketCredentials } from '../../internal/ws-credentials';
+import { ResponsesWebSocketCredentials } from '../../internal/responses-ws-credentials';
 
 export type { WebSocketStreamOptions } from '../../internal/ws';
 
@@ -24,7 +24,7 @@ export interface ResponsesWSClientOptions extends WS.ClientOptions, ResponsesWSB
 
 export class ResponsesWS extends ResponsesWSBase<NodeWebSocket> {
   private _wsOptions: WS.ClientOptions | null | undefined;
-  private _credentials = new WebSocketCredentials('Responses');
+  private _credentials = new ResponsesWebSocketCredentials();
 
   constructor(client: OpenAI, options?: ResponsesWSClientOptions | null | undefined) {
     if (!WS?.WebSocket) {

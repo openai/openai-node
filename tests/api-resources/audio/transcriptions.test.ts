@@ -35,7 +35,6 @@ describe('resource transcriptions', () => {
       language: 'language',
       languages: ['string'],
       prompt: 'prompt',
-      response_format: 'json',
       stream: false,
       temperature: 0,
       timestamp_granularities: ['word'],

@@ -7,6 +7,9 @@ import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
 
+import { AgentResultArtifacts } from '../../../../lib/beta/agents/result-artifacts';
+import type { AgentTurnResult } from '../../../../lib/beta/agents/agent-turn-result';
+
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
   buildOptions: (options: RequestOptions | undefined) => RequestOptions | Promise<RequestOptions>,
@@ -337,6 +340,11 @@ export class Artifacts extends APIResource {
         __binaryResponse: true,
       })),
     );
+  }
+
+  /** Beta: bind artifact lookup and downloads to a completed result's exact session and turn. */
+  forResult(result: AgentTurnResult): AgentResultArtifacts {
+    return new AgentResultArtifacts(this, result);
   }
 }
 
