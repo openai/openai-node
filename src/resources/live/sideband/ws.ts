@@ -1,9 +1,10 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import * as WS from 'ws';
-import { NodeWebSocket } from '../../../internal/ws-adapter-node';
+import { NodeWebSocket, snapshotNodeWebSocketOptions } from '../../../internal/ws-adapter-node';
 import { SidebandWSBase, type SidebandWSBaseOptions, type SidebandWSParameters } from './ws-base';
 import { OpenAI } from '../../../client';
+import { WebSocketCredentials } from '../../../internal/ws-credentials';
 
 export type { WebSocketStreamOptions } from '../../../internal/ws';
 
@@ -16,10 +17,14 @@ export type { SidebandWSParameters, SidebandWSReconnectOptions } from './ws-base
  * `perMessageDeflate` defaults to false, including with a finite payload limit.
  * Set it to true or a `ws` configuration object to enable compression.
  */
-export interface SidebandWSClientOptions extends WS.ClientOptions, SidebandWSBaseOptions {}
+export interface SidebandWSClientOptions extends WS.ClientOptions, SidebandWSBaseOptions {
+  /** Basic authentication forwarded by the Node `ws` transport. */
+  auth?: string;
+}
 
 export class SidebandWS extends SidebandWSBase<NodeWebSocket> {
   private _wsOptions: WS.ClientOptions | null | undefined;
+  private _credentials = new WebSocketCredentials('Sideband');
 
   constructor(
     client: OpenAI,
@@ -31,29 +36,54 @@ export class SidebandWS extends SidebandWSBase<NodeWebSocket> {
         'SidebandWS from "openai/resources/live/sideband/ws" requires the "ws" package but it could not be loaded.',
       );
     }
-
     const { reconnect, maxQueueSize, ...wsOptions } = options ?? {};
     super(client, parameters, { reconnect, maxQueueSize });
     this._wsOptions = wsOptions;
     this._connectInitial();
   }
 
+  protected override _authHeaders(apiKey?: string | null): Record<string, string> {
+    const headers = super._authHeaders(apiKey === undefined ? this._credentials.preparedAPIKey : apiKey);
+    this._credentials.trackInitialHeaders(this._client, headers, () => !!this.socket);
+    return headers;
+  }
+
+  /**
+   * Whether credentials passed to the Node transport use the SDK key.
+   * The SDK recognizes its key, including copies and additions in credential headers.
+   * Override and return true if your socket hook signs or otherwise irreversibly transforms it.
+   * Explicit caller options and header removals still take precedence on reconnect.
+   */
+  protected _usesSDKAPIKey(authHeaders: Record<string, string>): boolean {
+    return this._credentials.usesAPIKey(this._client, authHeaders);
+  }
+
   protected _createSocket(url: URL, authHeaders: Record<string, string>): NodeWebSocket {
+    const capturedAuthHeaders = { ...authHeaders };
     const socketOptions: WS.ClientOptions = {
       maxPayload: 0,
       perMessageDeflate: false,
-      ...this._wsOptions,
-      headers: {
-        ...this._client._buildWebSocketHeaders(authHeaders),
-        ...Object.fromEntries(
-          Object.entries(this._wsOptions?.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]),
-        ),
-      },
-      followRedirects: false,
+      ...this._credentials.build(
+        this._client,
+        capturedAuthHeaders,
+        this._wsOptions,
+        !this.socket ? this._usesSDKAPIKey(capturedAuthHeaders) : undefined,
+      ),
     };
     socketOptions.maxPayload ??= 0;
     socketOptions.perMessageDeflate ??= false;
-    const ws = new WS.WebSocket(url, socketOptions);
-    return new NodeWebSocket(ws);
+    return new NodeWebSocket(new WS.WebSocket(url, socketOptions));
+  }
+
+  protected override async _prepareReconnectSocket(): Promise<(url: URL) => NodeWebSocket> {
+    if (!this._client._hasApiKeyProvider()) {
+      return super._prepareReconnectSocket();
+    }
+    return this._credentials.prepare(
+      this._client,
+      snapshotNodeWebSocketOptions(this._wsOptions),
+      (...args) => this._authHeaders(...args),
+      (url, headers) => this._createSocket(url, headers),
+    );
   }
 }

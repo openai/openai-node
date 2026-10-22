@@ -131,7 +131,6 @@ export {
   type AssistantsPage,
 } from './assistants';
 export { Beta } from './beta';
-export { Realtime } from './realtime/index';
 export { ChatKit, type ChatKitWorkflow } from './chatkit/index';
 export {
   Responses,
@@ -333,3 +332,4 @@ export {
   type ThreadCreateAndRunPollParams,
   type ThreadCreateAndRunStreamParams,
 } from './threads/index';
+export { Realtime } from './realtime/index';

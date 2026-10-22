@@ -1,7 +1,5 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
-import type { OpenAI } from '../../../../client';
-import type { FinalRequestOptions } from '../../../../internal/request-options';
 import { APIResource } from '../../../../core/resource';
 import * as AgentsAPI from '../agents';
 import * as FilesAPI from './files';
@@ -21,6 +19,9 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../../../core
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
+
+import type { OpenAI } from '../../../../client';
+import type { FinalRequestOptions } from '../../../../internal/request-options';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,

@@ -1732,6 +1732,10 @@ export interface AssistantListParams extends CursorPageParams {
 }
 
 export declare namespace Assistants {
+  export { AssistantStream };
+}
+
+export declare namespace Assistants {
   export {
     type Assistant as Assistant,
     type AssistantDeleted as AssistantDeleted,
@@ -1749,6 +1753,4 @@ export declare namespace Assistants {
     type AssistantUpdateParams as AssistantUpdateParams,
     type AssistantListParams as AssistantListParams,
   };
-
-  export { AssistantStream };
 }

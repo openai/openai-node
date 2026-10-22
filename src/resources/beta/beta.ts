@@ -20,59 +20,6 @@ import {
   RunStreamEvent,
   ThreadStreamEvent,
 } from './assistants';
-import * as RealtimeAPI from './realtime/realtime';
-import {
-  ConversationCreatedEvent,
-  ConversationItem,
-  ConversationItemContent,
-  ConversationItemCreateEvent,
-  ConversationItemCreatedEvent,
-  ConversationItemDeleteEvent,
-  ConversationItemDeletedEvent,
-  ConversationItemInputAudioTranscriptionCompletedEvent,
-  ConversationItemInputAudioTranscriptionDeltaEvent,
-  ConversationItemInputAudioTranscriptionFailedEvent,
-  ConversationItemRetrieveEvent,
-  ConversationItemTruncateEvent,
-  ConversationItemTruncatedEvent,
-  ConversationItemWithReference,
-  ErrorEvent,
-  InputAudioBufferAppendEvent,
-  InputAudioBufferClearEvent,
-  InputAudioBufferClearedEvent,
-  InputAudioBufferCommitEvent,
-  InputAudioBufferCommittedEvent,
-  InputAudioBufferSpeechStartedEvent,
-  InputAudioBufferSpeechStoppedEvent,
-  RateLimitsUpdatedEvent,
-  Realtime,
-  RealtimeClientEvent,
-  RealtimeResponse,
-  RealtimeResponseStatus,
-  RealtimeResponseUsage,
-  RealtimeServerEvent,
-  ResponseAudioDeltaEvent,
-  ResponseAudioDoneEvent,
-  ResponseAudioTranscriptDeltaEvent,
-  ResponseAudioTranscriptDoneEvent,
-  ResponseCancelEvent,
-  ResponseContentPartAddedEvent,
-  ResponseContentPartDoneEvent,
-  ResponseCreateEvent,
-  ResponseCreatedEvent,
-  ResponseDoneEvent,
-  ResponseFunctionCallArgumentsDeltaEvent,
-  ResponseFunctionCallArgumentsDoneEvent,
-  ResponseOutputItemAddedEvent,
-  ResponseOutputItemDoneEvent,
-  ResponseTextDeltaEvent,
-  ResponseTextDoneEvent,
-  SessionCreatedEvent,
-  SessionUpdateEvent,
-  SessionUpdatedEvent,
-  TranscriptionSessionUpdate,
-  TranscriptionSessionUpdatedEvent,
-} from './realtime/realtime';
 import * as AgentsAPI from './agents/agents';
 import {
   Agent,
@@ -386,6 +333,59 @@ import {
   ThreadUpdateParams,
   Threads,
 } from './threads/threads';
+import * as RealtimeAPI from './realtime/realtime';
+import {
+  ConversationCreatedEvent,
+  ConversationItem,
+  ConversationItemContent,
+  ConversationItemCreateEvent,
+  ConversationItemCreatedEvent,
+  ConversationItemDeleteEvent,
+  ConversationItemDeletedEvent,
+  ConversationItemInputAudioTranscriptionCompletedEvent,
+  ConversationItemInputAudioTranscriptionDeltaEvent,
+  ConversationItemInputAudioTranscriptionFailedEvent,
+  ConversationItemRetrieveEvent,
+  ConversationItemTruncateEvent,
+  ConversationItemTruncatedEvent,
+  ConversationItemWithReference,
+  ErrorEvent,
+  InputAudioBufferAppendEvent,
+  InputAudioBufferClearEvent,
+  InputAudioBufferClearedEvent,
+  InputAudioBufferCommitEvent,
+  InputAudioBufferCommittedEvent,
+  InputAudioBufferSpeechStartedEvent,
+  InputAudioBufferSpeechStoppedEvent,
+  RateLimitsUpdatedEvent,
+  Realtime,
+  RealtimeClientEvent,
+  RealtimeResponse,
+  RealtimeResponseStatus,
+  RealtimeResponseUsage,
+  RealtimeServerEvent,
+  ResponseAudioDeltaEvent,
+  ResponseAudioDoneEvent,
+  ResponseAudioTranscriptDeltaEvent,
+  ResponseAudioTranscriptDoneEvent,
+  ResponseCancelEvent,
+  ResponseContentPartAddedEvent,
+  ResponseContentPartDoneEvent,
+  ResponseCreateEvent,
+  ResponseCreatedEvent,
+  ResponseDoneEvent,
+  ResponseFunctionCallArgumentsDeltaEvent,
+  ResponseFunctionCallArgumentsDoneEvent,
+  ResponseOutputItemAddedEvent,
+  ResponseOutputItemDoneEvent,
+  ResponseTextDeltaEvent,
+  ResponseTextDoneEvent,
+  SessionCreatedEvent,
+  SessionUpdateEvent,
+  SessionUpdatedEvent,
+  TranscriptionSessionUpdate,
+  TranscriptionSessionUpdatedEvent,
+} from './realtime/realtime';
 
 export class Beta extends APIResource {
   realtime: RealtimeAPI.Realtime = new RealtimeAPI.Realtime(this._client);
@@ -396,13 +396,8 @@ export class Beta extends APIResource {
   threads: ThreadsAPI.Threads = new ThreadsAPI.Threads(this._client);
 }
 
+// Frozen legacy SDK namespace contract; the model definitions remain at their existing owner.
 Beta.Realtime = Realtime;
-Beta.Agents = Agents;
-Beta.Responses = Responses;
-Beta.ChatKit = ChatKit;
-Beta.Assistants = Assistants;
-Beta.Threads = Threads;
-
 export declare namespace Beta {
   export {
     Realtime as Realtime,
@@ -455,6 +450,17 @@ export declare namespace Beta {
     type SessionUpdatedEvent as SessionUpdatedEvent,
     type TranscriptionSessionUpdate as TranscriptionSessionUpdate,
     type TranscriptionSessionUpdatedEvent as TranscriptionSessionUpdatedEvent,
+  };
+}
+
+Beta.Agents = Agents;
+Beta.Responses = Responses;
+Beta.ChatKit = ChatKit;
+Beta.Assistants = Assistants;
+Beta.Threads = Threads;
+
+export declare namespace Beta {
+  export {
     Agents as Agents,
     type Agent as Agent,
     type AgentBrowserAuthenticationCancelParam as AgentBrowserAuthenticationCancelParam,
@@ -782,7 +788,7 @@ export declare namespace Beta {
     type ThreadCreateAndRunParams as ThreadCreateAndRunParams,
     type ThreadCreateAndRunParamsNonStreaming as ThreadCreateAndRunParamsNonStreaming,
     type ThreadCreateAndRunParamsStreaming as ThreadCreateAndRunParamsStreaming,
-    type ThreadCreateAndRunPollParams,
-    type ThreadCreateAndRunStreamParams,
+    type ThreadCreateAndRunPollParams as ThreadCreateAndRunPollParams,
+    type ThreadCreateAndRunStreamParams as ThreadCreateAndRunStreamParams,
   };
 }

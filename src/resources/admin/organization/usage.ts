@@ -147,7 +147,6 @@ export class Usage extends APIResource {
     return this._client.get(
       '/organization/usage/decisions',
       resolveResourceRequestOptions(options, (options) => ({
-        // Null optional filters mean unset; empty query values fail backend parsing.
         query: Object.fromEntries(Object.entries(query).filter(([, value]) => value !== null)),
         ...options,
         __security: { adminAPIKeyAuth: true },

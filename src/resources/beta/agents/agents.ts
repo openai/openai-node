@@ -3862,8 +3862,8 @@ export namespace Environment {
 export type EnvironmentParam =
   | EnvironmentParam.EnvironmentParamNone
   | EnvironmentParam.EnvironmentParamOpenAIHosted
-  | EnvironmentParam.EnvironmentParamPrewarmed
-  | EnvironmentParam.EnvironmentParamSelfHosted;
+  | EnvironmentParam.EnvironmentParamSelfHosted
+  | EnvironmentParam.EnvironmentParamPrewarmed;
 
 export namespace EnvironmentParam {
   /**
@@ -3877,8 +3877,8 @@ export namespace EnvironmentParam {
   }
 
   /**
-   * New inline/template-based hosted configuration. Use EnvironmentParamPrewarmed
-   * to attach an existing environment.
+   * An existing OpenAI-hosted environment or new inline/template-based hosted
+   * configuration.
    */
   export interface EnvironmentParamOpenAIHosted {
     /**
@@ -3908,7 +3908,9 @@ export namespace EnvironmentParam {
      */
     env?: { [key: string]: string } | null;
 
-    /** Use EnvironmentParamPrewarmed to attach an existing environment instead. */
+    /**
+     * Use EnvironmentParamPrewarmed to attach an existing environment instead.
+     */
     environment_id?: never;
 
     /**
@@ -3949,11 +3951,6 @@ export namespace EnvironmentParam {
      */
     skills?: Array<AgentsAPI.HostedSkillParam> | null;
   }
-
-  /** An existing hosted environment, with no inline or template configuration. */
-  export type EnvironmentParamPrewarmed = { type: 'openai_hosted'; environment_id: string } & {
-    [Field in Exclude<keyof EnvironmentParamOpenAIHosted, 'type' | 'environment_id'>]?: never;
-  };
 
   export namespace EnvironmentParamOpenAIHosted {
     /**
@@ -5570,6 +5567,13 @@ export interface AgentListParams extends CursorPageParams {
    * - `desc` - Returns resources in descending order.
    */
   order?: 'asc' | 'desc';
+}
+
+export namespace EnvironmentParam {
+  /** An existing hosted environment, with no inline or template configuration. */
+  export type EnvironmentParamPrewarmed = { type: 'openai_hosted'; environment_id: string } & {
+    [Field in Exclude<keyof EnvironmentParamOpenAIHosted, 'type' | 'environment_id'>]?: never;
+  };
 }
 
 Agents.Environments = Environments;

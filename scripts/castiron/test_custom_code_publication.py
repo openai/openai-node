@@ -648,7 +648,7 @@ class StatusPublisherTests(unittest.TestCase):
                     publish(review_nodes=[{**approval, "fullDatabaseId": identity}]),
                     ["failure"] * 2,
                 )
-        pages = [
+        pages: list[dict[str, Any]] = [
             {
                 "expected_cursor": None,
                 "nodes": [approval],

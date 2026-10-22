@@ -52,12 +52,12 @@ export {
   type RunSubmitToolOutputsParams,
   type RunSubmitToolOutputsParamsNonStreaming,
   type RunSubmitToolOutputsParamsStreaming,
-  type RunsPage,
   type RunCreateAndPollParams,
   type RunCreateAndStreamParams,
   type RunStreamParams,
   type RunSubmitToolOutputsAndPollParams,
   type RunSubmitToolOutputsStreamParams,
+  type RunsPage,
 } from './runs/index';
 export {
   Threads,

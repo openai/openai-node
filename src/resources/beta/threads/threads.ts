@@ -46,9 +46,9 @@ import * as RunsAPI from './runs/runs';
 import {
   RequiredActionFunctionToolCall,
   Run,
+  RunCancelParams,
   RunCreateAndPollParams,
   RunCreateAndStreamParams,
-  RunCancelParams,
   RunCreateParams,
   RunCreateParamsNonStreaming,
   RunCreateParamsStreaming,
@@ -69,8 +69,8 @@ import { APIPromise } from '../../../core/api-promise';
 import { Stream } from '../../../core/streaming';
 import { buildHeaders } from '../../../internal/headers';
 import { RequestOptions } from '../../../internal/request-options';
-import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
 import { path } from '../../../internal/utils/path';
+import { AssistantStream, ThreadCreateAndRunParamsBaseStream } from '../../../lib/AssistantStream';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
@@ -1028,8 +1028,8 @@ export interface ThreadCreateAndRunParamsStreaming extends ThreadCreateAndRunPar
 export interface ThreadCreateAndRunPollParams {
   /**
    * The ID of the
-   * [assistant](https://platform.openai.com/docs/api-reference/assistants) to use to
-   * execute this run.
+   * [assistant](https://developers.openai.com/api/docs/assistants/migration) to use
+   * to execute this run.
    */
   assistant_id: string;
 
@@ -1059,49 +1059,42 @@ export interface ThreadCreateAndRunPollParams {
 
   /**
    * Set of 16 key-value pairs that can be attached to an object. This can be useful
-   * for storing additional information about the object in a structured format. Keys
-   * can be a maximum of 64 characters long and values can be a maxium of 512
-   * characters long.
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
    */
-  metadata?: unknown | null;
+  metadata?: unknown;
 
   /**
-   * The ID of the [Model](https://platform.openai.com/docs/api-reference/models) to
-   * be used to execute this run. If a value is provided here, it will override the
-   * model associated with the assistant. If not, the model associated with the
-   * assistant will be used.
+   * The ID of the
+   * [Model](https://developers.openai.com/api/reference/resources/models) to be used
+   * to execute this run. If a value is provided here, it will override the model
+   * associated with the assistant. If not, the model associated with the assistant
+   * will be used.
    */
-  model?:
-    | (string & {})
-    | 'gpt-4o'
-    | 'gpt-4o-2024-05-13'
-    | 'gpt-4-turbo'
-    | 'gpt-4-turbo-2024-04-09'
-    | 'gpt-4-0125-preview'
-    | 'gpt-4-turbo-preview'
-    | 'gpt-4-1106-preview'
-    | 'gpt-4-vision-preview'
-    | 'gpt-4'
-    | 'gpt-4-0314'
-    | 'gpt-4-0613'
-    | 'gpt-4-32k'
-    | 'gpt-4-32k-0314'
-    | 'gpt-4-32k-0613'
-    | 'gpt-3.5-turbo'
-    | 'gpt-3.5-turbo-16k'
-    | 'gpt-3.5-turbo-0613'
-    | 'gpt-3.5-turbo-1106'
-    | 'gpt-3.5-turbo-0125'
-    | 'gpt-3.5-turbo-16k-0613'
-    | null;
+  model?: (string & {}) | Shared.ChatModel | null;
+
+  /**
+   * Whether to enable
+   * [parallel function calling](https://developers.openai.com/api/docs/guides/function-calling#parallel-function-calling)
+   * during tool use.
+   */
+  parallel_tool_calls?: boolean;
 
   /**
    * Specifies the format that the model must output. Compatible with
-   * [GPT-4o](https://platform.openai.com/docs/models/gpt-4o),
-   * [GPT-4 Turbo](https://platform.openai.com/docs/models/gpt-4-turbo-and-gpt-4),
-   * and all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
+   * [GPT-4o](https://developers.openai.com/api/docs/models/gpt-4o),
+   * [GPT-4 Turbo](https://developers.openai.com/api/docs/models/gpt-4-turbo), and
+   * all GPT-3.5 Turbo models since `gpt-3.5-turbo-1106`.
    *
-   * Setting to `{ "type": "json_object" }` enables JSON mode, which guarantees the
+   * Setting to `{ "type": "json_schema", "json_schema": {...} }` enables Structured
+   * Outputs which ensures the model will match your supplied JSON schema. Learn more
+   * in the
+   * [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
+   *
+   * Setting to `{ "type": "json_object" }` enables JSON mode, which ensures the
    * message the model generates is valid JSON.
    *
    * **Important:** when using JSON mode, you **must** also instruct the model to
@@ -1122,7 +1115,8 @@ export interface ThreadCreateAndRunPollParams {
   temperature?: number | null;
 
   /**
-   * If no thread is provided, an empty thread will be created.
+   * Options to create a new thread. If no thread is provided when running a request,
+   * an empty thread will be created.
    */
   thread?: ThreadCreateAndRunPollParams.Thread;
 
@@ -1149,9 +1143,7 @@ export interface ThreadCreateAndRunPollParams {
    * Override the tools the assistant can use for this run. This is useful for
    * modifying the behavior on a per-run basis.
    */
-  tools?: Array<
-    AssistantsAPI.CodeInterpreterTool | AssistantsAPI.FileSearchTool | AssistantsAPI.FunctionTool
-  > | null;
+  tools?: Array<AssistantsAPI.AssistantTool> | null;
 
   /**
    * An alternative to sampling with temperature, called nucleus sampling, where the
@@ -1164,29 +1156,33 @@ export interface ThreadCreateAndRunPollParams {
 
   /**
    * Controls for how a thread will be truncated prior to the run. Use this to
-   * control the intial context window of the run.
+   * control the initial context window of the run.
    */
   truncation_strategy?: ThreadCreateAndRunPollParams.TruncationStrategy | null;
 }
 
 export namespace ThreadCreateAndRunPollParams {
   /**
-   * If no thread is provided, an empty thread will be created.
+   * Options to create a new thread. If no thread is provided when running a request,
+   * an empty thread will be created.
    */
   export interface Thread {
     /**
-     * A list of [messages](https://platform.openai.com/docs/api-reference/messages) to
-     * start the thread with.
+     * A list of
+     * [messages](https://developers.openai.com/api/docs/assistants/migration) to start
+     * the thread with.
      */
     messages?: Array<Thread.Message>;
 
     /**
      * Set of 16 key-value pairs that can be attached to an object. This can be useful
-     * for storing additional information about the object in a structured format. Keys
-     * can be a maximum of 64 characters long and values can be a maxium of 512
-     * characters long.
+     * for storing additional information about the object in a structured format, and
+     * querying for objects via API or the dashboard.
+     *
+     * Keys are strings with a maximum length of 64 characters. Values are strings with
+     * a maximum length of 512 characters.
      */
-    metadata?: unknown | null;
+    metadata?: unknown;
 
     /**
      * A set of resources that are made available to the assistant's tools in this
@@ -1221,11 +1217,13 @@ export namespace ThreadCreateAndRunPollParams {
 
       /**
        * Set of 16 key-value pairs that can be attached to an object. This can be useful
-       * for storing additional information about the object in a structured format. Keys
-       * can be a maximum of 64 characters long and values can be a maxium of 512
-       * characters long.
+       * for storing additional information about the object in a structured format, and
+       * querying for objects via API or the dashboard.
+       *
+       * Keys are strings with a maximum length of 64 characters. Values are strings with
+       * a maximum length of 512 characters.
        */
-      metadata?: unknown | null;
+      metadata?: unknown;
     }
 
     export namespace Message {
@@ -1257,9 +1255,9 @@ export namespace ThreadCreateAndRunPollParams {
     export namespace ToolResources {
       export interface CodeInterpreter {
         /**
-         * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
-         * available to the `code_interpreter` tool. There can be a maximum of 20 files
-         * associated with the tool.
+         * A list of [file](https://developers.openai.com/api/reference/resources/files)
+         * IDs made available to the `code_interpreter` tool. There can be a maximum of 20
+         * files associated with the tool.
          */
         file_ids?: Array<string>;
       }
@@ -1267,7 +1265,7 @@ export namespace ThreadCreateAndRunPollParams {
       export interface FileSearch {
         /**
          * The
-         * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+         * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
          * attached to this thread. There can be a maximum of 1 vector store attached to
          * the thread.
          */
@@ -1275,7 +1273,7 @@ export namespace ThreadCreateAndRunPollParams {
 
         /**
          * A helper to create a
-         * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+         * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
          * with file_ids and attach it to this thread. There can be a maximum of 1 vector
          * store attached to the thread.
          */
@@ -1285,19 +1283,67 @@ export namespace ThreadCreateAndRunPollParams {
       export namespace FileSearch {
         export interface VectorStore {
           /**
-           * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
-           * add to the vector store. There can be a maximum of 10000 files in a vector
-           * store.
+           * The chunking strategy used to chunk the file(s). If not set, will use the `auto`
+           * strategy.
+           */
+          chunking_strategy?: VectorStore.Auto | VectorStore.Static;
+
+          /**
+           * A list of [file](https://developers.openai.com/api/reference/resources/files)
+           * IDs to add to the vector store. For vector stores created before Nov 2025, there
+           * can be a maximum of 10,000 files in a vector store. For vector stores created
+           * starting in Nov 2025, the limit is 100,000,000 files.
            */
           file_ids?: Array<string>;
 
           /**
-           * Set of 16 key-value pairs that can be attached to a vector store. This can be
-           * useful for storing additional information about the vector store in a structured
-           * format. Keys can be a maximum of 64 characters long and values can be a maxium
-           * of 512 characters long.
+           * Set of 16 key-value pairs that can be attached to an object. This can be useful
+           * for storing additional information about the object in a structured format, and
+           * querying for objects via API or the dashboard.
+           *
+           * Keys are strings with a maximum length of 64 characters. Values are strings with
+           * a maximum length of 512 characters.
            */
           metadata?: unknown;
+        }
+
+        export namespace VectorStore {
+          /**
+           * The default strategy. This strategy currently uses a `max_chunk_size_tokens` of
+           * `800` and `chunk_overlap_tokens` of `400`.
+           */
+          export interface Auto {
+            /**
+             * Always `auto`.
+             */
+            type: 'auto';
+          }
+
+          export interface Static {
+            static: Static.Static;
+
+            /**
+             * Always `static`.
+             */
+            type: 'static';
+          }
+
+          export namespace Static {
+            export interface Static {
+              /**
+               * The number of tokens that overlap between chunks. The default value is `400`.
+               *
+               * Note that the overlap must not exceed half of `max_chunk_size_tokens`.
+               */
+              chunk_overlap_tokens: number;
+
+              /**
+               * The maximum number of tokens in each chunk. The default value is `800`. The
+               * minimum value is `100` and the maximum value is `4096`.
+               */
+              max_chunk_size_tokens: number;
+            }
+          }
         }
       }
     }
@@ -1318,9 +1364,9 @@ export namespace ThreadCreateAndRunPollParams {
   export namespace ToolResources {
     export interface CodeInterpreter {
       /**
-       * A list of [file](https://platform.openai.com/docs/api-reference/files) IDs made
-       * available to the `code_interpreter` tool. There can be a maximum of 20 files
-       * associated with the tool.
+       * A list of [file](https://developers.openai.com/api/reference/resources/files)
+       * IDs made available to the `code_interpreter` tool. There can be a maximum of 20
+       * files associated with the tool.
        */
       file_ids?: Array<string>;
     }
@@ -1328,7 +1374,7 @@ export namespace ThreadCreateAndRunPollParams {
     export interface FileSearch {
       /**
        * The ID of the
-       * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object)
+       * [vector store](https://developers.openai.com/api/reference/resources/vector_stores)
        * attached to this assistant. There can be a maximum of 1 vector store attached to
        * the assistant.
        */
@@ -1338,7 +1384,7 @@ export namespace ThreadCreateAndRunPollParams {
 
   /**
    * Controls for how a thread will be truncated prior to the run. Use this to
-   * control the intial context window of the run.
+   * control the initial context window of the run.
    */
   export interface TruncationStrategy {
     /**
@@ -1359,6 +1405,10 @@ export namespace ThreadCreateAndRunPollParams {
 
 export type ThreadCreateAndRunStreamParams = ThreadCreateAndRunParamsBaseStream;
 
+export declare namespace Threads {
+  export { AssistantStream };
+}
+
 Threads.Runs = Runs;
 Threads.Messages = Messages;
 
@@ -1375,8 +1425,8 @@ export declare namespace Threads {
     type ThreadCreateAndRunParams as ThreadCreateAndRunParams,
     type ThreadCreateAndRunParamsNonStreaming as ThreadCreateAndRunParamsNonStreaming,
     type ThreadCreateAndRunParamsStreaming as ThreadCreateAndRunParamsStreaming,
-    type ThreadCreateAndRunPollParams,
-    type ThreadCreateAndRunStreamParams,
+    type ThreadCreateAndRunPollParams as ThreadCreateAndRunPollParams,
+    type ThreadCreateAndRunStreamParams as ThreadCreateAndRunStreamParams,
   };
 
   export {
@@ -1392,14 +1442,14 @@ export declare namespace Threads {
     type RunUpdateParams as RunUpdateParams,
     type RunListParams as RunListParams,
     type RunCancelParams as RunCancelParams,
-    type RunCreateAndPollParams,
-    type RunCreateAndStreamParams,
-    type RunStreamParams,
     type RunSubmitToolOutputsParams as RunSubmitToolOutputsParams,
     type RunSubmitToolOutputsParamsNonStreaming as RunSubmitToolOutputsParamsNonStreaming,
     type RunSubmitToolOutputsParamsStreaming as RunSubmitToolOutputsParamsStreaming,
-    type RunSubmitToolOutputsAndPollParams,
-    type RunSubmitToolOutputsStreamParams,
+    type RunCreateAndPollParams as RunCreateAndPollParams,
+    type RunCreateAndStreamParams as RunCreateAndStreamParams,
+    type RunStreamParams as RunStreamParams,
+    type RunSubmitToolOutputsAndPollParams as RunSubmitToolOutputsAndPollParams,
+    type RunSubmitToolOutputsStreamParams as RunSubmitToolOutputsStreamParams,
   };
 
   export {
@@ -1439,6 +1489,4 @@ export declare namespace Threads {
     type MessageListParams as MessageListParams,
     type MessageDeleteParams as MessageDeleteParams,
   };
-
-  export { AssistantStream };
 }

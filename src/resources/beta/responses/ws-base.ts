@@ -23,6 +23,7 @@ export function getWebSocketEventBytes(event: object): number | undefined {
 }
 
 /** Original JSON, available only during synchronous event notification. @internal */
+
 export function getWebSocketEventPayload(event: object): string | undefined {
   return webSocketEventPayloads.get(event);
 }
@@ -141,6 +142,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
    * The transport must supply or validate its final credentials before connecting;
    * these headers may be empty when authentication is managed by the transport.
    */
+
   protected abstract _createSocket(url: URL, authHeaders: Record<string, string>): TSocket;
 
   send(event: ResponsesAPI.BetaResponsesClientEvent) {
