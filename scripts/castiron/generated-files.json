@@ -11,7 +11,7 @@
     },
     "api.md": {
       "mode": "100644",
-      "sha256": "08e48281c441689bf377d1c82f8831ae1e38819ba1a47104a04d0cfc758c1b63"
+      "sha256": "1cbb7a06d0e3305a81d13886eb635c246f94b6074faa07113525d89ebeabf11b"
     },
     "scripts/castiron/CUSTOM_CODE.md": {
       "mode": "100644",
@@ -275,11 +275,11 @@
     },
     "src/resources/audio/audio.ts": {
       "mode": "100644",
-      "sha256": "086a7de4f49968cd9e72e8be0aa39ffdd19d7358c97ce6bb60dbbe4d7a903af2"
+      "sha256": "9498f6e960c66d723d01355c8a27b49bf63f1a39a363411c1459bf266f60d501"
     },
     "src/resources/audio/index.ts": {
       "mode": "100644",
-      "sha256": "8d89ab2cef79a4c371a52c2f9afb7b829c127db153aa2b51039bee2e3515c6e1"
+      "sha256": "72b9c681ba668c18e96cc9f00fda5a094e4c99a84854550b1b7a546463a0d5d3"
     },
     "src/resources/audio/speech.ts": {
       "mode": "100644",
@@ -299,7 +299,7 @@
     },
     "src/resources/audio/voices.ts": {
       "mode": "100644",
-      "sha256": "b3d3d11c60d90db5e63531f07f2acfd7f7a22db625ca23752a59095189a7d244"
+      "sha256": "d1fbc87fc02c984f534203a739fa1272b11a4ee8ccc5cf40a990b44d6b2795d9"
     },
     "src/resources/batches.ts": {
       "mode": "100644",
@@ -1167,7 +1167,7 @@
     },
     "tests/api-resources/audio/voices.test.ts": {
       "mode": "100644",
-      "sha256": "8d972e2f9dc54fdcf5b3d0463a39de72c08a35069bf1aed52555f4cd431c5060"
+      "sha256": "c048d8f1bb907d91d02e837c725133ac927cd368b8c89ee4666d3b07f26e128a"
     },
     "tests/api-resources/batches.test.ts": {
       "mode": "100644",
