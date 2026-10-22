@@ -1,6 +1,8 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
 import { APIResource } from '../core/resource';
+import * as DecisionsAPI from './decisions';
+import * as Shared from './shared';
 import { APIPromise } from '../core/api-promise';
 import { RequestOptions } from '../internal/request-options';
 
@@ -186,24 +188,101 @@ export interface DecisionInputImage {
 }
 
 /**
- * A user message containing text or images.
+ * A user message containing input text, images, or JSON.
  */
-export interface DecisionInputMessage {
+export type DecisionInputMessage =
+  | DecisionInputMessage.DecisionInputUserMessage
+  | DecisionInputMessage.DecisionInputDeveloperMessage
+  | DecisionInputMessage.DecisionInputSystemMessage
+  | DecisionInputMessage.DecisionInputAssistantMessage;
+
+export namespace DecisionInputMessage {
   /**
-   * Text evidence or an ordered list of text and image parts.
+   * A user message containing input text, images, or JSON.
    */
-  content: string | Array<DecisionInputPart>;
+  export interface DecisionInputUserMessage {
+    /**
+     * A text string or an ordered list of text, image, and JSON parts.
+     */
+    content: string | Array<DecisionsAPI.DecisionInputPart>;
 
-  role: 'user';
+    role: 'user';
 
-  type?: 'message';
+    type?: 'message';
+  }
+
+  /**
+   * A developer message containing input text.
+   */
+  export interface DecisionInputDeveloperMessage {
+    /**
+     * A text string or an ordered list of input text parts.
+     */
+    content: string | Array<DecisionsAPI.DecisionInputText>;
+
+    role: 'developer';
+
+    type?: 'message';
+  }
+
+  /**
+   * A system message containing input text.
+   */
+  export interface DecisionInputSystemMessage {
+    /**
+     * A text string or an ordered list of input text parts.
+     */
+    content: string | Array<DecisionsAPI.DecisionInputText>;
+
+    role: 'system';
+
+    type?: 'message';
+  }
+
+  /**
+   * An assistant message containing output text or refusals.
+   */
+  export interface DecisionInputAssistantMessage {
+    /**
+     * A text string or an ordered list of output text and refusal parts.
+     */
+    content:
+      | string
+      | Array<
+          | DecisionInputAssistantMessage.DecisionInputOutputText
+          | DecisionInputAssistantMessage.DecisionInputRefusal
+        >;
+
+    role: 'assistant';
+
+    /**
+     * The phase of an assistant message.
+     */
+    phase?: 'commentary' | 'final_answer' | null;
+
+    type?: 'message';
+  }
+
+  export namespace DecisionInputAssistantMessage {
+    export interface DecisionInputOutputText {
+      text: string;
+
+      type: 'output_text';
+    }
+
+    export interface DecisionInputRefusal {
+      refusal: string;
+
+      type: 'refusal';
+    }
+  }
 }
 
 /**
  * An image provided as a base64 data URL or a publicly accessible HTTP(S) URL.
  * File IDs are not supported.
  */
-export type DecisionInputPart = DecisionInputText | DecisionInputImage;
+export type DecisionInputPart = DecisionInputText | DecisionInputImage | Shared.DecisionInputJSON;
 
 export interface DecisionInputText {
   text: string;
@@ -230,14 +309,32 @@ export interface DecisionPromptCacheBreakpoint {
   mode: 'explicit';
 }
 
+export type DecisionInputJson = Shared.DecisionInputJSON;
+
+export type DecisionQuestionInputImage = Shared.DecisionQuestionInputImage;
+
+export type DecisionQuestionInputPart = Shared.DecisionQuestionInputPart;
+
+export type DecisionQuestionInputText = Shared.DecisionQuestionInputText;
+
 export interface DecisionCreateParams {
   /**
-   * The text or images to evaluate for every question. Provide a text string or user
-   * messages containing text and images. Images can be base64 data URLs or publicly
-   * accessible HTTP(S) URLs; at most 128 images are allowed across all messages in
-   * one request. Files, audio, tools, and item references are not supported.
+   * The input to evaluate for every question. Provide a text string or an ordered
+   * array of messages, function calls and outputs, or custom tool calls and outputs.
+   * Each tool output must identify a matching call by call ID.
    */
-  input: string | Array<DecisionInputMessage>;
+  input:
+    | string
+    | Array<
+        | DecisionCreateParams.DecisionInputUserMessage
+        | DecisionCreateParams.DecisionInputDeveloperMessage
+        | DecisionCreateParams.DecisionInputSystemMessage
+        | DecisionCreateParams.DecisionInputAssistantMessage
+        | DecisionCreateParams.DecisionInputFunctionCall
+        | DecisionCreateParams.DecisionInputFunctionCallOutput
+        | DecisionCreateParams.DecisionInputCustomToolCall
+        | DecisionCreateParams.DecisionInputCustomToolCallOutput
+      >;
 
   /**
    * The model to use. Only `gpt-6-luna` is supported.
@@ -245,7 +342,7 @@ export interface DecisionCreateParams {
   model: string;
 
   /**
-   * Ask 1–200 questions about the input. Each question can be a predicate, choice,
+   * Ask 1–400 questions about the input. Each question can be a predicate, choice,
    * or score. Answers come back in the same order.
    */
   questions: Array<
@@ -281,10 +378,152 @@ export interface DecisionCreateParams {
 
 export namespace DecisionCreateParams {
   /**
+   * A user message containing input text, images, or JSON.
+   */
+  export interface DecisionInputUserMessage {
+    /**
+     * A text string or an ordered list of text, image, and JSON parts.
+     */
+    content: string | Array<DecisionsAPI.DecisionInputPart>;
+
+    role: 'user';
+
+    type?: 'message';
+  }
+
+  /**
+   * A developer message containing input text.
+   */
+  export interface DecisionInputDeveloperMessage {
+    /**
+     * A text string or an ordered list of input text parts.
+     */
+    content: string | Array<DecisionsAPI.DecisionInputText>;
+
+    role: 'developer';
+
+    type?: 'message';
+  }
+
+  /**
+   * A system message containing input text.
+   */
+  export interface DecisionInputSystemMessage {
+    /**
+     * A text string or an ordered list of input text parts.
+     */
+    content: string | Array<DecisionsAPI.DecisionInputText>;
+
+    role: 'system';
+
+    type?: 'message';
+  }
+
+  /**
+   * An assistant message containing output text or refusals.
+   */
+  export interface DecisionInputAssistantMessage {
+    /**
+     * A text string or an ordered list of output text and refusal parts.
+     */
+    content:
+      | string
+      | Array<
+          | DecisionInputAssistantMessage.DecisionInputOutputText
+          | DecisionInputAssistantMessage.DecisionInputRefusal
+        >;
+
+    role: 'assistant';
+
+    /**
+     * The phase of an assistant message.
+     */
+    phase?: 'commentary' | 'final_answer' | null;
+
+    type?: 'message';
+  }
+
+  export namespace DecisionInputAssistantMessage {
+    export interface DecisionInputOutputText {
+      text: string;
+
+      type: 'output_text';
+    }
+
+    export interface DecisionInputRefusal {
+      refusal: string;
+
+      type: 'refusal';
+    }
+  }
+
+  export interface DecisionInputFunctionCall {
+    arguments: string;
+
+    call_id: string;
+
+    name: string;
+
+    type: 'function_call';
+
+    id?: string | null;
+
+    namespace?: string | null;
+
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export interface DecisionInputFunctionCallOutput {
+    call_id: string;
+
+    /**
+     * Text evidence or an ordered list of text and image parts.
+     */
+    output: string | Array<DecisionsAPI.DecisionInputText | DecisionsAPI.DecisionInputImage>;
+
+    type: 'function_call_output';
+
+    id?: string | null;
+
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export interface DecisionInputCustomToolCall {
+    call_id: string;
+
+    input: string;
+
+    name: string;
+
+    type: 'custom_tool_call';
+
+    id?: string | null;
+
+    namespace?: string | null;
+
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  export interface DecisionInputCustomToolCallOutput {
+    call_id: string;
+
+    /**
+     * Text evidence or an ordered list of text and image parts.
+     */
+    output: string | Array<DecisionsAPI.DecisionInputText | DecisionsAPI.DecisionInputImage>;
+
+    type: 'custom_tool_call_output';
+
+    id?: string | null;
+
+    status?: 'in_progress' | 'completed' | 'incomplete' | null;
+  }
+
+  /**
    * Estimate how likely it is that a statement about the input is true.
    */
   export interface QuestionParamPredicate {
-    instructions: string;
+    instructions: string | Array<Shared.DecisionQuestionInputPart>;
 
     /**
      * The type of the object. Always `predicate`.
@@ -303,7 +542,7 @@ export namespace DecisionCreateParams {
      */
     choices: Array<QuestionParamChoice.Choice>;
 
-    instructions: string;
+    instructions: string | Array<Shared.DecisionQuestionInputPart>;
 
     /**
      * The type of the object. Always `choice`.
@@ -328,7 +567,7 @@ export namespace DecisionCreateParams {
    * Rate the input against the supplied ordered levels.
    */
   export interface QuestionParamScore {
-    instructions: string;
+    instructions: string | Array<Shared.DecisionQuestionInputPart>;
 
     levels: Array<QuestionParamScore.Level>;
 
@@ -387,6 +626,10 @@ export declare namespace Decisions {
     type DecisionInputPart as DecisionInputPart,
     type DecisionInputText as DecisionInputText,
     type DecisionPromptCacheBreakpoint as DecisionPromptCacheBreakpoint,
+    type DecisionInputJson as DecisionInputJson,
+    type DecisionQuestionInputImage as DecisionQuestionInputImage,
+    type DecisionQuestionInputPart as DecisionQuestionInputPart,
+    type DecisionQuestionInputText as DecisionQuestionInputText,
     type DecisionCreateParams as DecisionCreateParams,
   };
 }
