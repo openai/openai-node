@@ -42,7 +42,7 @@ import {
   VoiceConsentsPage,
 } from './voice-consents';
 import * as VoicesAPI from './voices';
-import { Voice, VoiceCreateParams, Voices } from './voices';
+import { Voice, VoiceCreateParams, VoiceDeleted, Voices } from './voices';
 
 export class Audio extends APIResource {
   transcriptions: TranscriptionsAPI.Transcriptions = new TranscriptionsAPI.Transcriptions(this._client);
@@ -108,7 +108,12 @@ export declare namespace Audio {
 
   export { Speech as Speech, type SpeechModel as SpeechModel, type SpeechCreateParams as SpeechCreateParams };
 
-  export { Voices as Voices, type Voice as Voice, type VoiceCreateParams as VoiceCreateParams };
+  export {
+    Voices as Voices,
+    type Voice as Voice,
+    type VoiceDeleted as VoiceDeleted,
+    type VoiceCreateParams as VoiceCreateParams,
+  };
 
   export {
     VoiceConsents as VoiceConsents,

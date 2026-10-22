@@ -226,10 +226,12 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/audio/voices.ts">Voice</a></code>
+- <code><a href="./src/resources/audio/voices.ts">VoiceDeleted</a></code>
 
 Methods:
 
 - <code title="post /audio/voices">client.audio.voices.<a href="./src/resources/audio/voices.ts">create</a>({ ...params }) -> Voice</code>
+- <code title="delete /audio/voices/{voice_id}">client.audio.voices.<a href="./src/resources/audio/voices.ts">delete</a>(voiceID) -> VoiceDeleted</code>
 
 ## VoiceConsents
 
