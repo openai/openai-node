@@ -75,6 +75,7 @@ import {
   Decision,
   DecisionCreateParams,
   DecisionInputImage,
+  DecisionInputJson,
   DecisionInputMessage,
   DecisionInputPart,
   DecisionInputText,
@@ -2796,6 +2797,10 @@ export declare namespace OpenAI {
     type DecisionInputPart as DecisionInputPart,
     type DecisionInputText as DecisionInputText,
     type DecisionPromptCacheBreakpoint as DecisionPromptCacheBreakpoint,
+    type DecisionInputJson as DecisionInputJson,
+    type DecisionQuestionInputImage as DecisionQuestionInputImage,
+    type DecisionQuestionInputPart as DecisionQuestionInputPart,
+    type DecisionQuestionInputText as DecisionQuestionInputText,
     type DecisionCreateParams as DecisionCreateParams,
   };
 
@@ -3048,6 +3053,10 @@ export declare namespace OpenAI {
   export type ComparisonFilter = API.ComparisonFilter;
   export type CompoundFilter = API.CompoundFilter;
   export type CustomToolInputFormat = API.CustomToolInputFormat;
+  export type DecisionInputJSON = API.DecisionInputJSON;
+  export type DecisionQuestionInputImage = API.DecisionQuestionInputImage;
+  export type DecisionQuestionInputPart = API.DecisionQuestionInputPart;
+  export type DecisionQuestionInputText = API.DecisionQuestionInputText;
   export type ErrorObject = API.ErrorObject;
   export type FunctionDefinition = API.FunctionDefinition;
   export type FunctionParameters = API.FunctionParameters;

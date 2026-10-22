@@ -13,7 +13,7 @@ describe('resource decisions', () => {
     const responsePromise = client.decisions.create({
       input: 'string',
       model: 'model',
-      questions: [{ instructions: 'instructions', type: 'predicate' }],
+      questions: [{ instructions: 'string', type: 'predicate' }],
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -30,7 +30,7 @@ describe('resource decisions', () => {
       model: 'model',
       questions: [
         {
-          instructions: 'instructions',
+          instructions: 'string',
           type: 'predicate',
           name: 'name',
         },

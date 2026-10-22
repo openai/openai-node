@@ -11,7 +11,7 @@
     },
     "api.md": {
       "mode": "100644",
-      "sha256": "515a6e5c5ac6e7e2587679b1ca240c9bacb63e48367d99c09348e00026b98592"
+      "sha256": "7f3ace74d18fd67547db65e2ce65295ffacb6e834096192dd30debfcf9378447"
     },
     "scripts/castiron/CUSTOM_CODE.md": {
       "mode": "100644",
@@ -67,7 +67,7 @@
     },
     "src/client.ts": {
       "mode": "100644",
-      "sha256": "c2af0642618a40efe96648ed9ff1d80b35f8fef92b9e3b97732f644c423ac06b"
+      "sha256": "560fdbdd5ceb34adb679e3a8ed42542e0ca65f78279be6694141c9d32071a520"
     },
     "src/internal/data-residency.ts": {
       "mode": "100644",
@@ -623,7 +623,7 @@
     },
     "src/resources/decisions.ts": {
       "mode": "100644",
-      "sha256": "a70d2d1d18a7ab6289165d456b20293a9a5b063d147ead79909cbec96dab4043"
+      "sha256": "7407fd5f0321091bfaf78fc3ea857d2f5930c4026338259f263f57cf16769a8d"
     },
     "src/resources/embeddings.ts": {
       "mode": "100644",
@@ -747,7 +747,7 @@
     },
     "src/resources/index.ts": {
       "mode": "100644",
-      "sha256": "f559e1790ce7a4c2dccb8f4c3fcdd534eeb285166de6b03f11a0d3399b2bd4d5"
+      "sha256": "0b259d3c5b2fe777d844da283ab234b5d573eb1ce96050ebbafec8e9a693cb95"
     },
     "src/resources/live.ts": {
       "mode": "100644",
@@ -791,7 +791,7 @@
     },
     "src/resources/live/live.ts": {
       "mode": "100644",
-      "sha256": "3d8a6b9aec15284288eaa5ff4ddf2a2ffe969aef5901944f92522ecb418e72d9"
+      "sha256": "a0284e09dd558feaf6abebf7204a20e293b0b3593984875b2f653376fb19d9c9"
     },
     "src/resources/live/sessions.ts": {
       "mode": "100644",
@@ -939,7 +939,7 @@
     },
     "src/resources/shared.ts": {
       "mode": "100644",
-      "sha256": "62bce7cdabbf110ddcfe8b5751030e74617e34909a99081eaa00e58a1a96e0ee"
+      "sha256": "7c1576eb0bdfebe6ba31244aa67484bcf14351c5350af1e540b860078c7910f5"
     },
     "src/resources/skills.ts": {
       "mode": "100644",
@@ -1327,7 +1327,7 @@
     },
     "tests/api-resources/decisions.test.ts": {
       "mode": "100644",
-      "sha256": "a0233dbe83a63f385e567635c9dcb0da74fca53555ae7a7314bab96fb75dd879"
+      "sha256": "f33bc08725a2a067e9b2fd8a4e800e407f25389ea4a082d771257eaf968158b2"
     },
     "tests/api-resources/embeddings.test.ts": {
       "mode": "100644",

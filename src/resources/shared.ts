@@ -272,6 +272,50 @@ export namespace CustomToolInputFormat {
   }
 }
 
+/**
+ * A JSON object or an array of objects rendered as text. Nested values may be any
+ * JSON value. Limited to 32 container levels, 10,000 values, and 256 KiB of
+ * compact UTF-8 JSON.
+ */
+export interface DecisionInputJSON {
+  data: { [key: string]: unknown } | Array<{ [key: string]: unknown }>;
+
+  type: 'input_json';
+}
+
+/**
+ * An image provided as a base64 data URL or a publicly accessible HTTP(S) URL.
+ * File IDs are not supported.
+ */
+export interface DecisionQuestionInputImage {
+  /**
+   * A base64-encoded image in a data URL or a publicly accessible HTTP(S) image URL.
+   */
+  image_url: string;
+
+  type: 'input_image';
+
+  /**
+   * The image detail level, using the selected model's image profile. Defaults to
+   * auto.
+   */
+  detail?: 'low' | 'high' | 'auto' | 'original' | null;
+}
+
+/**
+ * A text, image, or JSON content part in a question instruction.
+ */
+export type DecisionQuestionInputPart =
+  | DecisionQuestionInputText
+  | DecisionQuestionInputImage
+  | DecisionInputJSON;
+
+export interface DecisionQuestionInputText {
+  text: string;
+
+  type: 'input_text';
+}
+
 export interface ErrorObject {
   code: string | null;
 
