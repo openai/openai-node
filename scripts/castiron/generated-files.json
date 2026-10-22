@@ -3,39 +3,43 @@
   "files": {
     ".github/workflows/castiron-custom-code-comment.yml": {
       "mode": "100644",
-      "sha256": "c51faae4a106b873852075c369847719f3f99e59fa3e1cf32ce02f8f9d697afc"
+      "sha256": "2f75276742e4b8b007e29d6ae7bc098a23bd5ef5809ecb328c0e91bf0fb7d9aa"
     },
     ".github/workflows/castiron-custom-code.yml": {
       "mode": "100644",
-      "sha256": "ba6d4c8bcd35481bd88245f60a566b223dc5272fc1bcc1e6834e4a8db9c52baf"
+      "sha256": "2760a19c1e05a2a01d73a679dac9d59ba7cfee2faa2fe426182f740ae1603202"
     },
     "api.md": {
       "mode": "100644",
-      "sha256": "1cbb7a06d0e3305a81d13886eb635c246f94b6074faa07113525d89ebeabf11b"
+      "sha256": "5695ce961a8b290057ae5d65991a341a9fbf937a2879b2909772918b319ff58d"
     },
     "scripts/castiron/CUSTOM_CODE.md": {
       "mode": "100644",
-      "sha256": "129df1ca35b0f9a2e35ebf083f484aa714d54aa320b01c381e6c1778a1209fa0"
+      "sha256": "99b1e22ee8dc17c7fbdd65240e13dd046bc29a73fec551e58d594c7650626c4d"
     },
     "scripts/castiron/README.md": {
       "mode": "100644",
       "sha256": "4aff82cb988d01babde79902ae20de842fdd4b2b447d5f4cb3c5ce0a36d6fab8"
     },
     "scripts/castiron/custom_code_budget.py": {
-      "mode": "100644",
-      "sha256": "2beaac2eb0a963e717bf2bba93f52d6aea28fa7c4961591d4c2c4749945dbb7c"
+      "mode": "100755",
+      "sha256": "ba44999ef44cd80cf1afb9db4013c29969013d6fc8cf78f81220752175d3a539"
+    },
+    "scripts/castiron/custom_code_policy.py": {
+      "mode": "100755",
+      "sha256": "c9c37ea2de771502bc806370362ebf5486e950e50f6fc11ec90b85eb48802c08"
     },
     "scripts/castiron/custom_code_report.py": {
-      "mode": "100644",
-      "sha256": "6b7cfda1f85426daaa2e4f6186e2d1b20ac638dadaa54be8142ecec89fefd880"
+      "mode": "100755",
+      "sha256": "a52a1aabf4047f4c20e96d1d788c25a4aa78c1987b4fa73a13d22c92ef213a3f"
     },
     "scripts/castiron/custom_code_test_support.py": {
       "mode": "100644",
-      "sha256": "27a1c5ee377fa601f896191e3914cb74e4bf65ab814819a408e884332b713bde"
+      "sha256": "15b2c1243f1cbec53b73707e5806a8566d40f78763fe85c4ab7dc48bc1405a6c"
     },
     "scripts/castiron/fixtures/github_publisher.cjs": {
       "mode": "100644",
-      "sha256": "114a35f8ed075f20d7fbcfab6dbbf16383866497a9d6e8290cf0928bba753468"
+      "sha256": "062eb3da63eb0a25cf8de21e9aa0025afb1322eaf4ae59d5d6b3515b3dabda4b"
     },
     "scripts/castiron/ruff.toml": {
       "mode": "100644",
@@ -43,19 +47,23 @@
     },
     "scripts/castiron/test_custom_code_budget.py": {
       "mode": "100644",
-      "sha256": "f355e1cb0ed88aa5a344cd6c68388802f5ed814d638b500e271b008cf07e0106"
+      "sha256": "71527f2e594989bb3f7f94a723322714bf9bd2669aa861719f29f462b925a4b6"
     },
     "scripts/castiron/test_custom_code_github.py": {
       "mode": "100644",
-      "sha256": "f3df0d260edd990532b32f15ed9cb4071834634bbb08a87d0077481e09128f98"
+      "sha256": "f0f3fa6810ef73b0656d722e65125003a5685b61324dda6c93d1d0dbf619df37"
+    },
+    "scripts/castiron/test_custom_code_policy.py": {
+      "mode": "100644",
+      "sha256": "ce6516a7121a494d9e108de2ceddf3344e3835926d70f256c78d25d6c7825e72"
     },
     "scripts/castiron/test_custom_code_publication.py": {
       "mode": "100644",
-      "sha256": "1d93757664a6ffd26f21df2a4c07ac635393f5da1ab0283df75bad66faa2ef2e"
+      "sha256": "960876c3e11be7f8b63bad1753924c8ae67816b8215231ee330f23998bc57e41"
     },
     "scripts/castiron/test_custom_code_report.py": {
       "mode": "100644",
-      "sha256": "4429459798fd4cd57f6bbc6c0a9bbe88d76304cba07d2d2d4bfc22b5d403bdda"
+      "sha256": "b4bae67363983a2e06a17dd8e86fccb560f9ca97293ca7874568f045ff81f9e1"
     },
     "src/client.ts": {
       "mode": "100644",
@@ -491,7 +499,7 @@
     },
     "src/resources/beta/responses/ws-base.ts": {
       "mode": "100644",
-      "sha256": "8abfe22d929ce7f166219d8b82803e9aec1e6d5d8362d5b3b23b0e659358a635"
+      "sha256": "32b9569e5559354a2b361624297e8c95d07f049d12ff21c348c469789a7d8320"
     },
     "src/resources/beta/responses/ws.ts": {
       "mode": "100644",
@@ -767,7 +775,7 @@
     },
     "src/resources/live/forks/ws-base.ts": {
       "mode": "100644",
-      "sha256": "baba3c6a6c7ecb5ab24dc6e024753b18ac1fefb9296cb5546203f91cf02e67ae"
+      "sha256": "db19a9e9124b0876ffce74f0e153bc5cd65883032ea032426a5a4b3bbd8eac30"
     },
     "src/resources/live/forks/ws.ts": {
       "mode": "100644",
@@ -807,7 +815,7 @@
     },
     "src/resources/live/sideband/ws-base.ts": {
       "mode": "100644",
-      "sha256": "1b6c56e55bf8a41216d8a73d8e5ffd0c3a0c1ca3562ff3fea89a6f574746d5d7"
+      "sha256": "800513f5523ecf0a411d9708b907a6683d466f358d05313f43a9e36683e133e8"
     },
     "src/resources/live/sideband/ws.ts": {
       "mode": "100644",
@@ -815,7 +823,7 @@
     },
     "src/resources/live/ws-base.ts": {
       "mode": "100644",
-      "sha256": "d5429b7734406ee0f5867642ab9679a03726bb0e4ac00b457b1184f7b1ecbd7c"
+      "sha256": "c0a180b66c3ca97fc5de7802074d590689cdce20f4b96685ebbfaa3886ac2c61"
     },
     "src/resources/live/ws.ts": {
       "mode": "100644",
@@ -903,7 +911,7 @@
     },
     "src/resources/responses/ws-base.ts": {
       "mode": "100644",
-      "sha256": "d5c375a879847bea9ea6f6bbb273bdcb3e6ccfe41767e3834a6e4a02fe78f1c3"
+      "sha256": "3fb3b0ac97607ae6e18cad49134534c9617e645b5ef3069bf75c4b3b7f8cb61f"
     },
     "src/resources/responses/ws.ts": {
       "mode": "100644",
@@ -1023,7 +1031,7 @@
     },
     "src/resources/webhooks/webhooks.ts": {
       "mode": "100644",
-      "sha256": "71fc92127a1161643011ad4f5ef0fa46db790c63c5a5c73fe9735fddb91c43cd"
+      "sha256": "8bac95c85eeff231315c60c3ba34e297435dd7cbc7e349ebd23e583f8eccf1ad"
     },
     "tests/api-resources/admin/organization/admin-api-keys.test.ts": {
       "mode": "100644",
@@ -1447,7 +1455,7 @@
     },
     "tests/lib/data-residency.test.ts": {
       "mode": "100644",
-      "sha256": "d8d155f994def53f24b14ae10617c8fa83df60ba87fce6061cf3c9cfd097b75c"
+      "sha256": "f418a55b6de238e4063875124a84cc21ca667f946da197cbd6835e68842acbdc"
     },
     "tests/lib/multipart-encoding.test.ts": {
       "mode": "100644",
