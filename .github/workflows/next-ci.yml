@@ -180,6 +180,7 @@ jobs:
           permission-actions: read
           permission-contents: read
           permission-pull-requests: read
+          permission-merge-queues: read
           permission-statuses: write
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         id: status
@@ -353,6 +354,7 @@ jobs:
           permission-actions: read
           permission-contents: read
           permission-pull-requests: read
+          permission-merge-queues: read
           permission-statuses: write
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

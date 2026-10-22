@@ -470,6 +470,22 @@ test('publication has no checkout, scripts or candidate outputs', async () => {
   assert(!yaml.includes('secrets: inherit'));
   assert(yaml.includes('permissions: {}'));
 });
+for (const [job, phase, script] of [
+  ['initialize', 'pending', 2],
+  ['publish', 'result', 1],
+]) {
+  test(`${job} token can read queue membership without queue mutation`, async () => {
+    const [, jobDefinition] = yaml.split(`\n  ${job}:\n`);
+    const [definition] = jobDefinition.split(/\n {2}[a-z]+:\n/u);
+    assert(definition.includes('permission-merge-queues: read'));
+    assert(!definition.includes('permission-merge-queues: write'));
+    const f = fixture('merge_group');
+    await f.authorize();
+    f.env.STATUS_PHASE = phase;
+    await f.execute(script);
+    assert.equal(f.writes.length, 3);
+  });
+}
 test('reusable analysis retains actual scan and detector steps', async () => {
   const codeql = fs.readFileSync(path.join(__dirname, '../../.github/workflows/codeql.yml'), 'utf-8');
   const detector = fs.readFileSync(

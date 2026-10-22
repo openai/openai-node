@@ -7,7 +7,7 @@ refs). Candidate analysis jobs do not receive it. Do not reuse release credentia
 or place the key in repository/organization secrets accessible to candidate jobs.
 
 An administrator must install a dedicated App on this repository with only
-Actions read, Contents read, Pull requests read, and Commit statuses write
+Actions read, Contents read, Pull requests read, Merge queues read, and Commit statuses write
 (metadata read is implicit). Configure these environment-scoped values:
 
 - `NEXT_CI_APP_CLIENT_ID`: the App client ID variable.
