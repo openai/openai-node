@@ -4424,6 +4424,11 @@ export namespace ResponseInputFile {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -4484,6 +4489,11 @@ export namespace ResponseInputFileContent {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -4533,6 +4543,11 @@ export namespace ResponseInputImage {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -4582,6 +4597,11 @@ export namespace ResponseInputImageContent {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -5683,6 +5703,11 @@ export namespace ResponseInputText {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -5719,6 +5744,11 @@ export namespace ResponseInputTextContent {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 

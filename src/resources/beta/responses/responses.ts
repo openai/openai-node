@@ -5355,6 +5355,11 @@ export namespace BetaResponseInputFile {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -5415,6 +5420,11 @@ export namespace BetaResponseInputFileContent {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -5464,6 +5474,11 @@ export namespace BetaResponseInputImage {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -5513,6 +5528,11 @@ export namespace BetaResponseInputImageContent {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -7223,6 +7243,11 @@ export namespace BetaResponseInputText {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -7259,6 +7284,11 @@ export namespace BetaResponseInputTextContent {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -7429,6 +7459,11 @@ export namespace BetaResponseItem {
          * The breakpoint mode. Always `explicit`.
          */
         mode: 'explicit';
+
+        /**
+         * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+         */
+        ttl?: '30m' | '12h';
       }
     }
 
@@ -8716,6 +8751,11 @@ export namespace BetaResponseOutputItem {
          * The breakpoint mode. Always `explicit`.
          */
         mode: 'explicit';
+
+        /**
+         * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+         */
+        ttl?: '30m' | '12h';
       }
     }
 

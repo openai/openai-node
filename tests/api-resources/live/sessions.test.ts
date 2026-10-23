@@ -28,7 +28,7 @@ describe('resource sessions', () => {
         model: 'gpt-live-1',
         type: 'live',
         audio: { output: { voice: 'string' } },
-        delegation: { type: 'client' },
+        delegation: { type: 'client', acknowledgement_delay_ms: 0 },
         input: [
           {
             content: [{ text: 'text', type: 'input_text' }],
@@ -79,6 +79,7 @@ describe('resource sessions', () => {
         client: { data_channel: { allowed_client_events: 'all', allowed_server_events: 'all' } },
         delegation: {
           type: 'responses',
+          acknowledgement_delay_ms: 0,
           responses: {
             instructions: 'instructions',
             max_output_tokens: 16,

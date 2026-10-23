@@ -29,7 +29,7 @@ describe('resource live', () => {
         model: 'gpt-live-1',
         audio: { output: { voice: 'string' } },
         client: { data_channel: { allowed_client_events: 'all', allowed_server_events: 'all' } },
-        delegation: { type: 'client' },
+        delegation: { type: 'client', acknowledgement_delay_ms: 0 },
         input: [
           {
             content: [{ text: 'text', type: 'input_text' }],
