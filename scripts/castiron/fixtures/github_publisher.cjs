@@ -8,7 +8,9 @@ const github = {
     actions: {
       getWorkflowRun: async ({ run_id }) => {
         if (data.run_errors?.[run_id])
-          throw Object.assign(new Error('Workflow run lookup failed'), { status: data.run_errors[run_id] });
+          throw Object.assign(new Error('Workflow run lookup failed'), {
+            status: data.run_errors[run_id],
+          });
         return { data: data.runs_by_id?.[run_id] || data.run };
       },
       getWorkflow: async ({ workflow_id }) => ({
@@ -37,8 +39,8 @@ const github = {
           object: {
             sha: ref.startsWith('pull/')
               ? data.merge_sha
-              : ref === 'heads/main' && data.main_sha
-                ? data.main_sha
+              : ref === 'heads/main' && (data.main_sha_sequence?.length || data.main_sha)
+                ? data.main_sha_sequence?.shift() || data.main_sha
                 : data.current.base.sha,
           },
         },
@@ -46,6 +48,35 @@ const github = {
     },
     repos: {
       getCommit: async () => ({ data: data.merge_commit }),
+      compareCommitsWithBasehead: async ({ basehead }) => ({
+        data: data.comparisons?.[basehead] || {
+          merge_base_commit: { sha: basehead.split('...')[0] },
+        },
+      }),
+      getContent: async ({ path, ref }) => {
+        let source;
+        if (path === 'scripts/castiron/custom_code_policy.py') {
+          if (data.checker_lookup_error)
+            throw Object.assign(new Error('Checker lookup failed'), {
+              status: data.checker_lookup_error,
+            });
+          source = data.checker_sources_by_sha?.[ref];
+          if (typeof source !== 'string') throw Object.assign(new Error('Missing checker'), { status: 404 });
+        } else if (path === '.castiron-ratchet.json' && data.policies_by_sha?.[ref]) {
+          source = JSON.stringify(data.policies_by_sha[ref]);
+        } else {
+          throw new Error('Unexpected policy lookup');
+        }
+        const content = Buffer.from(source);
+        return {
+          data: {
+            type: 'file',
+            encoding: 'base64',
+            size: content.length,
+            content: content.toString('base64'),
+          },
+        };
+      },
       createCommitStatus: async (value) => {
         writes.push(value);
         data.statuses_by_sha ||= {};
