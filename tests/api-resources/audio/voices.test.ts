@@ -10,7 +10,11 @@ const client = new OpenAI({
 
 describe('resource voices', () => {
   test('create: only required params', async () => {
-    const responsePromise = client.audio.voices.create({ name: 'x' });
+    const responsePromise = client.audio.voices.create({
+      audio_sample: await toFile(Buffer.from('Example data'), 'README.md'),
+      consent: 'consent',
+      name: 'x',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -22,12 +26,10 @@ describe('resource voices', () => {
 
   test('create: required and optional params', async () => {
     await client.audio.voices.create({
-      name: 'x',
-      type: 'audio_sample',
-      model: 'auto',
-      script_hint: 'x',
       audio_sample: await toFile(Buffer.from('Example data'), 'README.md'),
       consent: 'consent',
+      name: 'x',
+      type: 'audio_sample',
     });
   });
 

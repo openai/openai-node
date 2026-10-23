@@ -39,7 +39,7 @@
     },
     "scripts/castiron/fixtures/github_publisher.cjs": {
       "mode": "100644",
-      "sha256": "3f77c368ed668bb6ddcde1f2e806e3f307d64cb68cc45fe4c4968adfe1f7c0fe"
+      "sha256": "ae535ab4cdc11e29eb9dd39b932ef5fa59b3d3e3183dbcd6b6989f98308024d8"
     },
     "scripts/castiron/ruff.toml": {
       "mode": "100644",
@@ -1195,7 +1195,7 @@
     },
     "tests/api-resources/audio/voices.test.ts": {
       "mode": "100644",
-      "sha256": "fd6f5d23933d9212e133ae0e05846181ea4ac07de16c4664956fe74a34533a99"
+      "sha256": "c048d8f1bb907d91d02e837c725133ac927cd368b8c89ee4666d3b07f26e128a"
     },
     "tests/api-resources/batches.test.ts": {
       "mode": "100644",
@@ -1207,7 +1207,7 @@
     },
     "tests/api-resources/beta/agents/automations/automations.test.ts": {
       "mode": "100644",
-      "sha256": "bbd66d862387977d7fe00944376b824b4fd769c4d6612b48bc403abdfb42ed05"
+      "sha256": "1e0fb9501bb73e92e5c00fe2d9020dc0017bbdfc6541feec6dad8c906d826e80"
     },
     "tests/api-resources/beta/agents/automations/invocations.test.ts": {
       "mode": "100644",
@@ -1219,7 +1219,7 @@
     },
     "tests/api-resources/beta/agents/environments/files.test.ts": {
       "mode": "100644",
-      "sha256": "0aa8524029a2b6c80a4fd373c1d4ac886143dfbfd2698e5f85473a80a158c772"
+      "sha256": "2deb6814b343eb4644eb20bd0a7d0606c8367c25a776d550b29398da3dd3acb9"
     },
     "tests/api-resources/beta/agents/environments/templates.test.ts": {
       "mode": "100644",
