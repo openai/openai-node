@@ -15,6 +15,7 @@ export class AgentTurnResultCollector {
   #turn: Turn | undefined;
   #messages = new Map<string, { index: number; message: AgentSessionAssistantMessage }>();
   #requiredActions: AgentSession['required_actions'] = [];
+  #checkedActionsFor: ((name: string) => boolean) | undefined;
   #sessionFailed = false;
   #terminal = false;
   #idle = false;
@@ -30,6 +31,7 @@ export class AgentTurnResultCollector {
     if ('session' in event) {
       this.#sessionID ??= event.session.id;
       this.#requiredActions = structuredClone(event.session.required_actions ?? []);
+      this.#checkedActionsFor = undefined;
       this.#sessionFailed ||= event.type === 'agent.session.failed';
       this.#idle ||= event.type === 'agent.session.idle' && this.#terminal;
     }
@@ -98,9 +100,14 @@ export class AgentTurnResultCollector {
     if (this.#turn?.status === 'cancelled') {
       throw this.error('cancelled');
     }
+    // Handler registries are fixed for a stream; recheck only when the snapshot or predicate changes.
+    if (this.#checkedActionsFor === canHandle) {
+      return;
+    }
     if (this.#requiredActions.some((action) => action.type !== 'function_call' || !canHandle(action.name))) {
       throw this.error('requires_action');
     }
+    this.#checkedActionsFor = canHandle;
   }
 
   get ready(): boolean {
@@ -110,6 +117,7 @@ export class AgentTurnResultCollector {
   release(): void {
     this.#messages.clear();
     this.#requiredActions = [];
+    this.#checkedActionsFor = undefined;
   }
 
   finish(): AgentTurnResult {
