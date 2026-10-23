@@ -30,6 +30,8 @@ _spec.loader.exec_module(report)
 
 POLICY = ".castiron-ratchet.json"
 NEXT_POLICY_VERSION = 1
+# Inert capability marker read by trusted review invalidation at this exact revision.
+PIN_REVIEW_POLICY = "effective-policy-v1"
 SELECTION_RECEIPT_VERSION = 1
 
 
@@ -133,6 +135,18 @@ def next_policy_sha(repo: Path, repository: str, base: str, authenticated_main: 
     return cast(str, policy)
 
 
+def supports_effective_pin_review(repo: Path, revision: str) -> bool:
+    """Read the effective checker's inert contract; never execute its source."""
+    revision = report.require_sha(revision)
+    path = "scripts/castiron/custom_code_policy.py"
+    entry = report.git(repo, "ls-tree", revision, "--", path).split()
+    if len(entry) != 4 or entry[0] not in (b"100644", b"100755") or entry[1] != b"blob":
+        return False
+    source = report.git(repo, "show", f"{revision}:{path}")
+    declarations = re.findall(rb"^PIN_REVIEW_POLICY = .*$", source, re.MULTILINE)
+    return declarations == [b'PIN_REVIEW_POLICY = "effective-policy-v1"']
+
+
 class HumanReviewRules(TypedDict):
     version: int
     associations: list[str]
@@ -156,7 +170,7 @@ def has_human_approval(reviews: list[dict[str, Any]], author: str, head: str) ->
     """Versioned review predicate; publisher consumes these same trusted rules."""
     latest: dict[str, dict[str, Any]] = {}
     for review in reviews:
-        if review["state"] != "PENDING":
+        if review["state"] != "PENDING" and review.get("user") is not None:
             login = review["user"]["login"]
             if login not in latest or review["id"] > latest[login]["id"]:
                 latest[login] = review
@@ -256,7 +270,8 @@ def select_policy(
         raise ValueError("next evaluation has no verified constituent PR")
     for candidate in candidates:
         candidate_policy = read_policy(repo, candidate)
-        candidate_base_policy = read_policy(repo, merge_base(repo, base, candidate))
+        candidate_base = merge_base(repo, base, candidate)
+        candidate_base_policy = read_policy(repo, candidate_base)
         pin_changed = candidate_policy.get("next_policy") != candidate_base_policy.get(
             "next_policy"
         )
@@ -267,9 +282,45 @@ def select_policy(
         ratchet_activated = (
             candidate_policy.get("ratchet") == "go" and candidate_base_policy.get("ratchet") != "go"
         )
-        if pin_changed or budget_increased or ratchet_activated:
-            if changed_paths(repo, base, candidate) != {POLICY.encode()}:
-                raise ValueError("each next policy activation or increase must be policy-only")
+        if (pin_changed or budget_increased or ratchet_activated) and changed_paths(
+            repo, base, candidate
+        ) != {POLICY.encode()}:
+            raise ValueError("each next policy activation or increase must be policy-only")
+        pin_requires_human = False
+        if pin_changed:
+            proposed = read_policy(
+                repo, next_policy_sha(repo, repository, candidate, authenticated_main)
+            )
+            # Authored changes come from the merge base, but their safety must be
+            # measured against the active policy: the protected target's pin, or
+            # authenticated main during bootstrap.
+            previous = read_policy(repo, policy)
+            # Bootstrap executes authenticated main; initial adoption must not silently
+            # replace it with older checker code, even when policy fields match.
+            previous_checker = (
+                base_policy["next_policy"]["main_sha"]
+                if "next_policy" in base_policy
+                else authenticated_main
+            )
+            rolled_back = bool(
+                report.git(
+                    repo,
+                    "rev-list",
+                    "--first-parent",
+                    f"{candidate_policy['next_policy']['main_sha']}..{previous_checker}",
+                ).strip()
+            )
+            # Compare effective policies, not the candidate's unchanged local ceiling.
+            # Schema/strictness or ratchet transitions also retain human authorization.
+            pin_requires_human = (
+                not supports_effective_pin_review(repo, previous_checker)
+                or rolled_back
+                or proposed["max_custom_patch_lines"] > previous["max_custom_patch_lines"]
+                or proposed["schema_version"] != previous["schema_version"]
+                or proposed.get("generated_files") != previous.get("generated_files")
+                or proposed.get("ratchet") != previous.get("ratchet")
+            )
+        if budget_increased or ratchet_activated or pin_requires_human:
             number = require_human_policy_review(repository, candidate)
             policy_reviews.append({"number": number, "head_sha": candidate})
     return {
