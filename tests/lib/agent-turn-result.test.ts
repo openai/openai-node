@@ -12,6 +12,7 @@ import { describe, expect, test, vi } from 'vitest';
 import OpenAI, { BadRequestError } from 'openai';
 import type { JSONSchema } from 'openai/lib/jsonschema';
 import { AgentTurnResultError } from 'openai/lib/beta/agents/agent-turn-result-error';
+import { AgentToolDispatcher } from 'openai/lib/beta/agents/tool-dispatcher';
 import { Stream } from 'openai/core/streaming';
 import { AgentSessionStream } from 'openai/lib/agents/agent-session-stream';
 import type { AgentSessionStreamParams } from 'openai/lib/agents/agent-session-stream';
@@ -40,6 +41,19 @@ const created = () => event('agent.session.turn.created', { turn });
 const completed = (status = 'completed') =>
   event(`agent.session.turn.${status}`, { turn: { ...turn, status, completed_at: 2 } });
 const idle = () => event('agent.session.idle', { session: { id: turn.session_id, required_actions: [] } });
+const requiredActions = (names: string[]) =>
+  event('agent.session.requires_action', {
+    session: {
+      id: turn.session_id,
+      required_actions: names.map((name, index) => ({
+        type: 'function_call',
+        name,
+        call_id: `call_${index}`,
+        turn_id: turn.id,
+        arguments: '{}',
+      })),
+    },
+  });
 function message(
   text = 'Final answer',
   phase: string | null = 'final_answer',
@@ -268,6 +282,63 @@ describe('beta Agents finalResult', () => {
     expect(await stream.finalResult()).toBe(result);
     expect(handler).toHaveBeenCalledExactlyOnceWith({ order: 'A123' });
     expect(requests.filter((request) => request.method === 'POST')).toHaveLength(2);
+  });
+
+  test.each([false, true])('checks actions once per snapshot (followup=%s)', async (followup) => {
+    const checks = vi.spyOn(AgentToolDispatcher.prototype, 'canHandle');
+    const handler = vi.fn(() => 'unused');
+    const deltas = Array.from({ length: 200 }, () =>
+      event('agent.session.turn.output_text.delta', {
+        item_id: 'message_test',
+        output_index: 0,
+        content_index: 0,
+        delta: 'x',
+      }),
+    );
+    const { client } = setup(
+      [
+        created(),
+        requiredActions(Array.from({ length: 100 }, () => 'lookup')),
+        ...deltas.slice(0, 100),
+        requiredActions(Array.from({ length: 200 }, () => 'lookup')),
+        ...deltas.slice(100),
+        message(),
+        completed(),
+        idle(),
+      ],
+      { followup },
+    );
+    try {
+      const params = { input: 'Question', toolHandlers: { lookup: handler } };
+      const stream = followup
+        ? client.beta.agents.sessions.stream(turn.session_id, params)
+        : await client.beta.agents.sessions.create({
+            ...params,
+            environment: { type: 'none' },
+            stream: true,
+          });
+      const result = await stream.finalResult();
+      expect(result.output_text).toBe('Final answer');
+      expect(checks).toHaveBeenCalledTimes(300);
+      expect(handler).not.toHaveBeenCalled();
+    } finally {
+      checks.mockRestore();
+    }
+  });
+
+  test.each([
+    { name: 'replacement actions', tail: [requiredActions(['unknown'])], reason: 'requires_action' },
+    { name: 'failed turn', tail: [completed('failed')], reason: 'failed' },
+    { name: 'cancelled turn', tail: [completed('cancelled')], reason: 'cancelled' },
+    { name: 'unfinished stream', tail: [], reason: 'requires_action' },
+  ])('rechecks $name after accepting actions', async ({ tail, reason }) => {
+    const { client } = setup([created(), requiredActions(['lookup']), ...tail], { eof: true });
+    const stream = await client.beta.agents.sessions.create({
+      environment: { type: 'none' },
+      stream: true,
+      toolHandlers: { lookup: () => 'unused' },
+    });
+    await expect(stream.finalResult()).rejects.toMatchObject({ reason });
   });
 
   test('ignores child output, deduplicates done items, and keeps the selected result after later events', async () => {
