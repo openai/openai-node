@@ -890,6 +890,43 @@ describe('explicit browser capabilities', () => {
     expect(Object.getOwnPropertyDescriptor(detail, 'toJSON')).toBeUndefined();
   });
 
+  test.each(['30m', '12h'] as const)('preserves browser breakpoint TTL %s on the wire', async (ttl) => {
+    const breakpoint = { mode: 'explicit' as const, ttl };
+    const image = {
+      type: 'input_image' as const,
+      file_id: 'file_fixture',
+      prompt_cache_breakpoint: breakpoint,
+    };
+    const browser = new BrowserToolset({ state, screenshot: () => image });
+    const output = await browser.execute(call('screenshot', { tab_id: null }));
+    breakpoint.ttl = ttl === '12h' ? '30m' : '12h';
+    const received: unknown[] = [];
+    const client = new OpenAI({
+      apiKey: 'synthetic-test-key',
+      maxRetries: 0,
+      fetch: async (url, init) => {
+        received.push(await new Request(url, init).json());
+        return Response.json({ id: 'resp_fixture', object: 'response', status: 'completed', output: [] });
+      },
+    });
+    await client.responses.create({ model: 'fixture', input: [output] });
+    expect(received).toMatchObject([
+      {
+        input: [
+          {
+            output: expect.arrayContaining([
+              {
+                type: 'input_image',
+                file_id: 'file_fixture',
+                prompt_cache_breakpoint: { mode: 'explicit', ttl },
+              },
+            ]),
+          },
+        ],
+      },
+    ]);
+  });
+
   test.each(['image', 'declined', 'failed'] as const)(
     'direct browser %s output keeps its owned structure through a native Responses request',
     async (kind) => {
@@ -1115,6 +1152,10 @@ describe('explicit browser capabilities', () => {
         { image_url: '  ' },
         { file_id: 'file_ok', prompt_cache_breakpoint: { mode: 'automatic' } },
         { file_id: 'file_ok', prompt_cache_breakpoint: {} },
+        ...[null, 42, 'invalid'].map((ttl) => ({
+          file_id: 'file_ok',
+          prompt_cache_breakpoint: { mode: 'explicit', ttl },
+        })),
         { file_id: 'file_ok', prompt_cache_breakpoint: { mode: 'explicit', private: 'omit' } },
       ].map(async (invalid) => {
         const image = { type: 'input_image' as const, detail: 'auto' as const };
