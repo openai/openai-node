@@ -153,17 +153,17 @@ export declare namespace FileCreateParams {
     /**
      * The standard-base64-encoded file contents.
      */
-    data: string;
+    data?: string;
 
     /**
      * The absolute destination path inside `/workspace`.
      */
-    path: string;
+    path?: string;
 
     /**
      * The type of the object. Always `inline`.
      */
-    type: 'inline';
+    type?: 'inline';
   }
 }
 

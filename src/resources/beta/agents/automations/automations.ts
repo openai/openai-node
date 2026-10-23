@@ -1097,7 +1097,29 @@ export interface AutomationCreateParamsBase {
 
 export interface CreateAutomationParamsPeriodic extends AutomationCreateParamsBase {}
 
-export interface CreateAutomationParamsOnce extends AutomationCreateParamsBase {}
+export interface CreateAutomationParamsOnce {
+  /**
+   * A human-readable name for the automation.
+   */
+  name: string;
+
+  /**
+   * A future Unix timestamp in seconds.
+   */
+  run_at: number;
+
+  /**
+   * The session an automation invocation targets.
+   */
+  target: AutomationTargetParam;
+
+  /**
+   * The type of the object. Always `once`.
+   */
+  type: 'once';
+
+  metadata?: { [key: string]: string };
+}
 
 export interface AutomationUpdateParams {
   /**

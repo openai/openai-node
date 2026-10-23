@@ -11,14 +11,12 @@ const client = new OpenAI({
 describe('resource automations', () => {
   test('create: only required params', async () => {
     const responsePromise = client.beta.agents.automations.create({
-      expression: 'x',
       name: 'x',
       target: {
         environment: { type: 'none' },
         input: [{ content: [{ text: 'text', type: 'input_text' }], role: 'user' }],
         type: 'new_session',
       },
-      timezone: 'x',
       type: 'periodic',
     });
     const rawResponse = await responsePromise.asResponse();
@@ -32,7 +30,6 @@ describe('resource automations', () => {
 
   test('create: required and optional params', async () => {
     await client.beta.agents.automations.create({
-      expression: 'x',
       name: 'x',
       target: {
         environment: { type: 'none' },
@@ -68,9 +65,10 @@ describe('resource automations', () => {
         metadata: { foo: 'string' },
         vault_ids: ['string'],
       },
-      timezone: 'x',
       type: 'periodic',
       metadata: { foo: 'string' },
+      expression: 'x',
+      timezone: 'x',
     });
   });
 

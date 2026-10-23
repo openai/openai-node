@@ -3,7 +3,7 @@
   "files": {
     ".github/workflows/castiron-custom-code-comment.yml": {
       "mode": "100644",
-      "sha256": "e509efc5bc41f8a5b3494ad849af5acfc9fd72ac878589effb8c79dff01b28a3"
+      "sha256": "db521f2e39d1c39ad2edacedc9903954471308e660e6df5b4ba8ca7615e5a5a8"
     },
     ".github/workflows/castiron-custom-code.yml": {
       "mode": "100644",
@@ -39,7 +39,7 @@
     },
     "scripts/castiron/fixtures/github_publisher.cjs": {
       "mode": "100644",
-      "sha256": "32ac621f6f062644c065002289d092b607755e567e4422369a66e7040051741c"
+      "sha256": "3f77c368ed668bb6ddcde1f2e806e3f307d64cb68cc45fe4c4968adfe1f7c0fe"
     },
     "scripts/castiron/ruff.toml": {
       "mode": "100644",
@@ -67,7 +67,7 @@
     },
     "scripts/castiron/test_custom_code_review_revocation.py": {
       "mode": "100644",
-      "sha256": "efc1e3e75fea75f74c1e6acf09ccca2e5ff25c550b576b2435f2edd7508654f8"
+      "sha256": "2ad322e7e7b2cbd425f6647edc1cde98d4354b989dfb0b61f326030292e9c460"
     },
     "src/client.ts": {
       "mode": "100644",
@@ -311,7 +311,7 @@
     },
     "src/resources/audio/voices.ts": {
       "mode": "100644",
-      "sha256": "d1fbc87fc02c984f534203a739fa1272b11a4ee8ccc5cf40a990b44d6b2795d9"
+      "sha256": "c6a233088632dd5820a53e14c27de571b450d6ab05b960c2089697ec098cc603"
     },
     "src/resources/batches.ts": {
       "mode": "100644",
@@ -335,7 +335,7 @@
     },
     "src/resources/beta/agents/automations/automations.ts": {
       "mode": "100644",
-      "sha256": "8d36a82232d97224c669763246cc144ea55c11a2dcd40f6bc51be9ebec45bd0a"
+      "sha256": "f897ac6633a772a6678c3535b4ae10fbe4fb21f0cd016e748c22bf675905552b"
     },
     "src/resources/beta/agents/automations/index.ts": {
       "mode": "100644",
@@ -355,7 +355,7 @@
     },
     "src/resources/beta/agents/environments/files.ts": {
       "mode": "100644",
-      "sha256": "eada52ed68bcbd187119aa8450b71f2218c0387dd58fefa2d2c33baf4bae540e"
+      "sha256": "14970d4c3075bb0d19330baee5ee719704cd76ecfdc5dcd76340701f69cbc3c2"
     },
     "src/resources/beta/agents/environments/index.ts": {
       "mode": "100644",
@@ -1195,7 +1195,7 @@
     },
     "tests/api-resources/audio/voices.test.ts": {
       "mode": "100644",
-      "sha256": "c048d8f1bb907d91d02e837c725133ac927cd368b8c89ee4666d3b07f26e128a"
+      "sha256": "fd6f5d23933d9212e133ae0e05846181ea4ac07de16c4664956fe74a34533a99"
     },
     "tests/api-resources/batches.test.ts": {
       "mode": "100644",
@@ -1207,7 +1207,7 @@
     },
     "tests/api-resources/beta/agents/automations/automations.test.ts": {
       "mode": "100644",
-      "sha256": "9b959cd9adfa8c143806018241250502af7c69f5f9422b29bfad6357a0b4eced"
+      "sha256": "bbd66d862387977d7fe00944376b824b4fd769c4d6612b48bc403abdfb42ed05"
     },
     "tests/api-resources/beta/agents/automations/invocations.test.ts": {
       "mode": "100644",
