@@ -487,38 +487,45 @@ const packedPackagePath = require('node:path');
       { concurrency: 3, stopOnError: false },
     );
 
-    for (const { undiciVersion, transportAssertions, packedUndici } of legacyConsumers) {
-      const consumer = path.join(temporaryDirectory, `legacy-undici-${undiciVersion}`);
-      fs.mkdirSync(consumer);
-      fs.writeFileSync(
-        path.join(consumer, 'package.json'),
-        JSON.stringify({ name: `legacy-undici-${undiciVersion}-consumer`, private: true }),
-      );
-      const installation = childProcess.spawnSync(
-        'npm',
-        [
-          'install',
-          '--offline',
-          '--ignore-scripts',
-          '--no-audit',
-          '--no-fund',
-          '--cache',
-          npmCache,
-          tarball,
-          path.join(temporaryDirectory, packedUndici),
-        ],
-        { cwd: consumer, encoding: 'utf-8' },
-      );
-      assert.equal(
-        installation.status,
-        0,
-        `An existing Undici ${undiciVersion} consumer could not install the SDK: ${installation.stderr}`,
-      );
-      assert.doesNotMatch(
-        installation.stderr,
-        /ERESOLVE/u,
-        `An existing Undici ${undiciVersion} consumer encountered an optional-peer conflict`,
-      );
+    const installedLegacyConsumers = await packedPackageAll(
+      legacyConsumers.map(({ undiciVersion, transportAssertions, packedUndici }) => async () => {
+        const consumer = path.join(temporaryDirectory, `legacy-undici-${undiciVersion}`);
+        fs.mkdirSync(consumer);
+        fs.writeFileSync(
+          path.join(consumer, 'package.json'),
+          JSON.stringify({ name: `legacy-undici-${undiciVersion}-consumer`, private: true }),
+        );
+        const installation = await packedPackageExecFile(
+          'npm',
+          [
+            'install',
+            '--offline',
+            '--ignore-scripts',
+            '--no-audit',
+            '--no-fund',
+            '--cache',
+            npmCache,
+            tarball,
+            path.join(temporaryDirectory, packedUndici),
+          ],
+          { cwd: consumer, encoding: 'utf-8' },
+        ).catch((error: Error) => {
+          throw new Error(
+            `An existing Undici ${undiciVersion} consumer could not install the SDK: ${error.message}`,
+          );
+        });
+        assert.doesNotMatch(
+          installation.stderr,
+          /ERESOLVE/u,
+          `An existing Undici ${undiciVersion} consumer encountered an optional-peer conflict`,
+        );
+        return { consumer, undiciVersion, transportAssertions };
+      }),
+      // Wait for every install before cleanup, including when one fails.
+      { concurrency: 2, stopOnError: false },
+    );
+
+    for (const { consumer, undiciVersion, transportAssertions } of installedLegacyConsumers) {
       run(process.execPath, ['-e', "require('openai')"], { cwd: consumer });
       for (const [inputType, imports] of [
         [
