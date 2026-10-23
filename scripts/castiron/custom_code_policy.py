@@ -135,6 +135,18 @@ def next_policy_sha(repo: Path, repository: str, base: str, authenticated_main: 
     return cast(str, policy)
 
 
+def supports_effective_pin_review(repo: Path, revision: str) -> bool:
+    """Read the effective checker's inert contract; never execute its source."""
+    revision = report.require_sha(revision)
+    path = "scripts/castiron/custom_code_policy.py"
+    entry = report.git(repo, "ls-tree", revision, "--", path).split()
+    if len(entry) != 4 or entry[0] not in (b"100644", b"100755") or entry[1] != b"blob":
+        return False
+    source = report.git(repo, "show", f"{revision}:{path}")
+    declarations = re.findall(rb"^PIN_REVIEW_POLICY = .*$", source, re.MULTILINE)
+    return declarations == [b'PIN_REVIEW_POLICY = "effective-policy-v1"']
+
+
 class HumanReviewRules(TypedDict):
     version: int
     associations: list[str]
@@ -301,7 +313,8 @@ def select_policy(
             # Compare effective policies, not the candidate's unchanged local ceiling.
             # Schema/strictness or ratchet transitions also retain human authorization.
             pin_requires_human = (
-                rolled_back
+                not supports_effective_pin_review(repo, previous_checker)
+                or rolled_back
                 or proposed["max_custom_patch_lines"] > previous["max_custom_patch_lines"]
                 or proposed["schema_version"] != previous["schema_version"]
                 or proposed.get("generated_files") != previous.get("generated_files")

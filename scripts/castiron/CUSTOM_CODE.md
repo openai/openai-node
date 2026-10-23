@@ -284,3 +284,5 @@ handler as their replacement. A failed invalidation or rerun must be investigate
 missing reporter runs remain pending until the normal trusted run is requested.
 Install and validate the review signal on the protected target before activating
 next policy checks, including actual PR and queue revocation after dismissal.
+
+The trusted selector also checks this exact active-checker contract before granting a pin-only review exemption. Legacy or unrecognized contracts retain the required exact-head review in the selection receipt, so the final publisher revalidates it even without a review-change event.
