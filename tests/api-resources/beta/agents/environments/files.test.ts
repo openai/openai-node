@@ -10,7 +10,11 @@ const client = new OpenAI({
 
 describe('resource files', () => {
   test('create: only required params', async () => {
-    const responsePromise = client.beta.agents.environments.files.create('environment_id', {});
+    const responsePromise = client.beta.agents.environments.files.create('environment_id', {
+      type: 'inline',
+      path: '/workspace/example.txt',
+      data: 'SGVsbG8K',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
