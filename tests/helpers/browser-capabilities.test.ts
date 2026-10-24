@@ -1001,14 +1001,19 @@ describe('explicit browser capabilities', () => {
     expect(helper.close()).toEqual({ status: 'closed' });
   });
 
-  test.each(['screenshot', 'zoom'] as const)(
-    'projects the native image breakpoint on %s before reading final state',
-    async (member) => {
+  test.each([
+    ['screenshot', '30m'],
+    ['screenshot', '12h'],
+    ['zoom', '30m'],
+    ['zoom', '12h'],
+  ] as const)(
+    'projects the native image breakpoint on %s with ttl %s before reading final state',
+    async (member, ttl) => {
       const image = {
         type: 'input_image' as const,
         detail: 'auto' as const,
         file_id: 'file_observed',
-        prompt_cache_breakpoint: { mode: 'explicit' as const },
+        prompt_cache_breakpoint: { mode: 'explicit' as const, ttl },
       };
       const original = structuredClone(image);
       let reports = 0;
@@ -1017,6 +1022,7 @@ describe('explicit browser capabilities', () => {
           reports += 1;
           if (reports === 2) {
             Reflect.set(image.prompt_cache_breakpoint, 'mode', 'changed');
+            Reflect.set(image.prompt_cache_breakpoint, 'ttl', 'changed');
           }
           return state();
         },
@@ -1115,6 +1121,8 @@ describe('explicit browser capabilities', () => {
         { image_url: '  ' },
         { file_id: 'file_ok', prompt_cache_breakpoint: { mode: 'automatic' } },
         { file_id: 'file_ok', prompt_cache_breakpoint: {} },
+        { file_id: 'file_ok', prompt_cache_breakpoint: { mode: 'explicit', ttl: '1h' } },
+        { file_id: 'file_ok', prompt_cache_breakpoint: { mode: 'explicit', ttl: null } },
         { file_id: 'file_ok', prompt_cache_breakpoint: { mode: 'explicit', private: 'omit' } },
       ].map(async (invalid) => {
         const image = { type: 'input_image' as const, detail: 'auto' as const };

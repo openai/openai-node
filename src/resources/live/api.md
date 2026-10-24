@@ -74,7 +74,9 @@ Methods:
 Types:
 
 - <code><a href="../../../src/resources/live/sideband.ts">ConnectClientEvent</a></code>
+- <code><a href="../../../src/resources/live/sideband.ts">SidebandClientEvent</a></code>
 - <code><a href="../../../src/resources/live/sideband.ts">ConnectServerEvent</a></code>
+- <code><a href="../../../src/resources/live/sideband.ts">SidebandServerEvent</a></code>
 
 ## Forks
 
