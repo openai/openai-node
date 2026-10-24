@@ -221,6 +221,61 @@ def require_human_policy_review(repository: str, head: str) -> int:
     return int(pull["number"])
 
 
+def requires_human_policy_review(
+    repo: Path, repository: str, base: str, head: str, authenticated_main: str
+) -> bool:
+    """Decide review requirements from Git data using the selector's policy rules."""
+    base_policy = read_policy(repo, base)
+    candidate_policy = read_policy(repo, head)
+    candidate_base_policy = read_policy(repo, merge_base(repo, base, head))
+    budget_increased = (
+        candidate_policy["max_custom_patch_lines"] > candidate_base_policy["max_custom_patch_lines"]
+    )
+    ratchet_activated = (
+        candidate_policy.get("ratchet") == "go" and candidate_base_policy.get("ratchet") != "go"
+    )
+    pin_changed = candidate_policy.get("next_policy") != candidate_base_policy.get("next_policy")
+    if not pin_changed:
+        return budget_increased or ratchet_activated
+    policy = (
+        next_policy_sha(repo, repository, base, authenticated_main)
+        if "next_policy" in base_policy
+        else authenticated_main
+    )
+    candidate = head
+    proposed = read_policy(repo, next_policy_sha(repo, repository, candidate, authenticated_main))
+    # Authored changes come from the merge base, but their safety must be
+    # measured against the active policy: the protected target's pin, or
+    # authenticated main during bootstrap.
+    previous = read_policy(repo, policy)
+    # Bootstrap executes authenticated main; initial adoption must not silently
+    # replace it with older checker code, even when policy fields match.
+    previous_checker = (
+        base_policy["next_policy"]["main_sha"]
+        if "next_policy" in base_policy
+        else authenticated_main
+    )
+    rolled_back = bool(
+        report.git(
+            repo,
+            "rev-list",
+            "--first-parent",
+            f"{candidate_policy['next_policy']['main_sha']}..{previous_checker}",
+        ).strip()
+    )
+    # Compare effective policies, not the candidate's unchanged local ceiling.
+    # Schema/strictness or ratchet transitions also retain human authorization.
+    pin_requires_human = (
+        not supports_effective_pin_review(repo, previous_checker)
+        or rolled_back
+        or proposed["max_custom_patch_lines"] > previous["max_custom_patch_lines"]
+        or proposed["schema_version"] != previous["schema_version"]
+        or proposed.get("generated_files") != previous.get("generated_files")
+        or proposed.get("ratchet") != previous.get("ratchet")
+    )
+    return budget_increased or ratchet_activated or pin_requires_human
+
+
 def select_policy(
     repo: Path,
     repository: str,
@@ -286,41 +341,7 @@ def select_policy(
             repo, base, candidate
         ) != {POLICY.encode()}:
             raise ValueError("each next policy activation or increase must be policy-only")
-        pin_requires_human = False
-        if pin_changed:
-            proposed = read_policy(
-                repo, next_policy_sha(repo, repository, candidate, authenticated_main)
-            )
-            # Authored changes come from the merge base, but their safety must be
-            # measured against the active policy: the protected target's pin, or
-            # authenticated main during bootstrap.
-            previous = read_policy(repo, policy)
-            # Bootstrap executes authenticated main; initial adoption must not silently
-            # replace it with older checker code, even when policy fields match.
-            previous_checker = (
-                base_policy["next_policy"]["main_sha"]
-                if "next_policy" in base_policy
-                else authenticated_main
-            )
-            rolled_back = bool(
-                report.git(
-                    repo,
-                    "rev-list",
-                    "--first-parent",
-                    f"{candidate_policy['next_policy']['main_sha']}..{previous_checker}",
-                ).strip()
-            )
-            # Compare effective policies, not the candidate's unchanged local ceiling.
-            # Schema/strictness or ratchet transitions also retain human authorization.
-            pin_requires_human = (
-                not supports_effective_pin_review(repo, previous_checker)
-                or rolled_back
-                or proposed["max_custom_patch_lines"] > previous["max_custom_patch_lines"]
-                or proposed["schema_version"] != previous["schema_version"]
-                or proposed.get("generated_files") != previous.get("generated_files")
-                or proposed.get("ratchet") != previous.get("ratchet")
-            )
-        if budget_increased or ratchet_activated or pin_requires_human:
+        if requires_human_policy_review(repo, repository, base, candidate, authenticated_main):
             number = require_human_policy_review(repository, candidate)
             policy_reviews.append({"number": number, "head_sha": candidate})
     return {
@@ -509,6 +530,12 @@ def queued_entries(repository: str, branch: str) -> list[tuple[str, str]]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
+    review = commands.add_parser("review-required")
+    review.add_argument("--repo", type=Path, required=True)
+    review.add_argument("--repository", required=True)
+    review.add_argument("--base", required=True)
+    review.add_argument("--head", required=True)
+    review.add_argument("--main", required=True)
     selection = commands.add_parser("select-policy")
     selection.add_argument("--repo", type=Path, required=True)
     selection.add_argument("--repository", required=True)
@@ -521,6 +548,39 @@ def main(argv: list[str] | None = None) -> int:
         default=".github/workflows/castiron-custom-code.yml",
     )
     args = parser.parse_args(argv)
+    if args.command == "review-required":
+        if not report.REPOSITORY.fullmatch(args.repository):
+            raise ValueError("invalid policy repository")
+        base, head, main = map(report.require_sha, (args.base, args.head, args.main))
+        if args.repo.exists():
+            raise ValueError("policy object directory must be fresh")
+        args.repo.mkdir()
+        report.git(args.repo, "init", "--quiet", "--bare")
+        report.git(
+            args.repo, "remote", "add", "origin", f"https://github.com/{args.repository}.git"
+        )
+        report.git(
+            args.repo,
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            "origin",
+            "+refs/heads/main:refs/remotes/origin/main",
+            base,
+            head,
+        )
+        if report.git(args.repo, "rev-parse", "refs/remotes/origin/main").decode().strip() != main:
+            raise ValueError("authenticated main changed during review evaluation; retry")
+        print(
+            json.dumps(
+                {
+                    "requires_human": requires_human_policy_review(
+                        args.repo, args.repository, base, head, main
+                    )
+                }
+            )
+        )
+        return 0
     selected = select_github_policy(
         args.repo,
         args.repository,

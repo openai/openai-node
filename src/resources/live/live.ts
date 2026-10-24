@@ -17,7 +17,14 @@ import * as ResponsesAPI from '../responses/responses';
 import * as ForksAPI from './forks/forks';
 import { ForkClientEvent, ForkServerEvent, Forks } from './forks/forks';
 import * as SidebandAPI from './sideband/sideband';
-import { ConnectClientEvent, ConnectServerEvent, Sideband, SidebandConnectParams } from './sideband/sideband';
+import {
+  ConnectClientEvent,
+  ConnectServerEvent,
+  Sideband,
+  SidebandClientEvent,
+  SidebandConnectParams,
+  SidebandServerEvent,
+} from './sideband/sideband';
 import { APIPromise } from '../../core/api-promise';
 import { RequestOptions } from '../../internal/request-options';
 
@@ -158,6 +165,16 @@ export interface ClientDelegation {
    * The delegation owner. Always `client` for tasks handled by your application.
    */
   type: 'client';
+
+  /**
+   * Milliseconds to wait before requesting an automatic spoken acknowledgement for a
+   * delegation. The model may still speak before this delay. Any commentary or
+   * thinking appended to the session cancels all pending acknowledgements, including
+   * those for other delegations. Defaults to 400 for Decisions sessions and 0
+   * (request immediately) for other sessions. Omission in a session update preserves
+   * the current value. Updates apply to subsequent delegations.
+   */
+  acknowledgement_delay_ms?: number;
 }
 
 /**
@@ -186,7 +203,7 @@ export type ClientEvent =
 
 /**
  * Provide context the Live model can communicate to the user, optionally for an
- * existing client delegation.
+ * existing client delegation. Rejected while an audio fixture is active.
  */
 export interface CommentaryAppendEvent {
   /**
@@ -955,6 +972,16 @@ export namespace ForkSessionConfig {
     type: 'responses';
 
     /**
+     * Milliseconds to wait before requesting an automatic spoken acknowledgement for a
+     * delegation. The model may still speak before this delay. Any commentary or
+     * thinking appended to the session cancels all pending acknowledgements, including
+     * those for other delegations. Defaults to 400 for Decisions sessions and 0
+     * (request immediately) for other sessions. Omission in a session update preserves
+     * the current value. Updates apply to subsequent delegations.
+     */
+    acknowledgement_delay_ms?: number;
+
+    /**
      * Responses backend settings to update. Omitted settings keep their existing
      * values.
      */
@@ -1269,8 +1296,9 @@ export interface InputAudioMuteEvent {
 }
 
 /**
- * Returned when a session.input_audio.mute command is accepted. Input audio is no
- * longer sent to the model; sideband audio reflection continues.
+ * Acknowledges a session.input_audio.mute command. An independent input mute sends
+ * silence to the model and preserves sideband audio reflection. Fixture playback
+ * does not emit this event.
  */
 export interface InputAudioMutedEvent {
   /**
@@ -1292,7 +1320,8 @@ export interface InputAudioMutedEvent {
 
 /**
  * Resume audio input to a Live model after muting it. The server acknowledges with
- * `session.input_audio.unmuted`.
+ * `session.input_audio.unmuted`. An active audio fixture still pauses inference
+ * until playback finishes.
  */
 export interface InputAudioUnmuteEvent {
   /**
@@ -1308,8 +1337,9 @@ export interface InputAudioUnmuteEvent {
 }
 
 /**
- * Returned when a session.input_audio.unmute command is accepted. Input audio is
- * sent to the model again.
+ * Acknowledges a session.input_audio.unmute command, removing the independent
+ * input mute. An active audio fixture still pauses inference until playback
+ * finishes. Fixture playback does not emit this event.
  */
 export interface InputAudioUnmutedEvent {
   /**
@@ -1371,8 +1401,11 @@ export interface InputTranscriptDeltaEvent {
 }
 
 /**
- * Append instructions to the Live conversation while it is running, optionally
- * associating them with an existing client delegation.
+ * Append developer instructions to the Live conversation while it is running,
+ * optionally associating them with an existing client delegation. Rejected while
+ * an audio fixture is active. These instructions remain in conversation history
+ * through compaction and are included in future backend delegations. For external
+ * audio, describe content already delivered so the assistant does not repeat it.
  */
 export interface InstructionsAppendEvent {
   /**
@@ -1541,12 +1574,31 @@ export namespace MediaSessionConfig {
      * The delegation owner. Always `responses` for tasks handled by the Responses API.
      */
     type: 'responses';
+
+    /**
+     * Milliseconds to wait before requesting an automatic spoken acknowledgement for a
+     * delegation. The model may still speak before this delay. Any commentary or
+     * thinking appended to the session cancels all pending acknowledgements, including
+     * those for other delegations. Defaults to 400 for Decisions sessions and 0
+     * (request immediately) for other sessions. Omission in a session update preserves
+     * the current value. Updates apply to subsequent delegations.
+     */
+    acknowledgement_delay_ms?: number;
   }
 
   export interface Decisions {
     decisions: LiveAPI.DecisionsDelegationConfig;
 
     type: 'decisions';
+
+    /**
+     * Milliseconds to wait before requesting an automatic spoken acknowledgement for a
+     * delegation. The model may still speak before this delay. Any commentary or
+     * thinking appended to the session cancels all pending acknowledgements, including
+     * those for other delegations. Defaults to 400. Updates apply to subsequent
+     * delegations.
+     */
+    acknowledgement_delay_ms?: number;
   }
 }
 
@@ -1586,6 +1638,16 @@ export namespace MediaSessionForkConfig {
      * The delegation owner. Always `responses` for tasks handled by the Responses API.
      */
     type: 'responses';
+
+    /**
+     * Milliseconds to wait before requesting an automatic spoken acknowledgement for a
+     * delegation. The model may still speak before this delay. Any commentary or
+     * thinking appended to the session cancels all pending acknowledgements, including
+     * those for other delegations. Defaults to 400 for Decisions sessions and 0
+     * (request immediately) for other sessions. Omission in a session update preserves
+     * the current value. Updates apply to subsequent delegations.
+     */
+    acknowledgement_delay_ms?: number;
 
     /**
      * Responses backend settings to update. Omitted settings keep their existing
@@ -2375,12 +2437,31 @@ export namespace SessionConfig {
      * The delegation owner. Always `responses` for tasks handled by the Responses API.
      */
     type: 'responses';
+
+    /**
+     * Milliseconds to wait before requesting an automatic spoken acknowledgement for a
+     * delegation. The model may still speak before this delay. Any commentary or
+     * thinking appended to the session cancels all pending acknowledgements, including
+     * those for other delegations. Defaults to 400 for Decisions sessions and 0
+     * (request immediately) for other sessions. Omission in a session update preserves
+     * the current value. Updates apply to subsequent delegations.
+     */
+    acknowledgement_delay_ms?: number;
   }
 
   export interface Decisions {
     decisions: LiveAPI.DecisionsDelegationConfig;
 
     type: 'decisions';
+
+    /**
+     * Milliseconds to wait before requesting an automatic spoken acknowledgement for a
+     * delegation. The model may still speak before this delay. Any commentary or
+     * thinking appended to the session cancels all pending acknowledgements, including
+     * those for other delegations. Defaults to 400. Updates apply to subsequent
+     * delegations.
+     */
+    acknowledgement_delay_ms?: number;
   }
 }
 
@@ -2511,12 +2592,31 @@ export namespace SessionResource {
      * The delegation owner. Always `responses` for tasks handled by the Responses API.
      */
     type: 'responses';
+
+    /**
+     * Milliseconds to wait before requesting an automatic spoken acknowledgement for a
+     * delegation. The model may still speak before this delay. Any commentary or
+     * thinking appended to the session cancels all pending acknowledgements, including
+     * those for other delegations. Defaults to 400 for Decisions sessions and 0
+     * (request immediately) for other sessions. Omission in a session update preserves
+     * the current value. Updates apply to subsequent delegations.
+     */
+    acknowledgement_delay_ms?: number;
   }
 
   export interface Decisions {
     decisions: LiveAPI.DecisionsDelegationConfig;
 
     type: 'decisions';
+
+    /**
+     * Milliseconds to wait before requesting an automatic spoken acknowledgement for a
+     * delegation. The model may still speak before this delay. Any commentary or
+     * thinking appended to the session cancels all pending acknowledgements, including
+     * those for other delegations. Defaults to 400. Updates apply to subsequent
+     * delegations.
+     */
+    acknowledgement_delay_ms?: number;
   }
 }
 
@@ -2602,6 +2702,16 @@ export namespace SessionUpdateConfig {
     type: 'responses';
 
     /**
+     * Milliseconds to wait before requesting an automatic spoken acknowledgement for a
+     * delegation. The model may still speak before this delay. Any commentary or
+     * thinking appended to the session cancels all pending acknowledgements, including
+     * those for other delegations. Defaults to 400 for Decisions sessions and 0
+     * (request immediately) for other sessions. Omission in a session update preserves
+     * the current value. Updates apply to subsequent delegations.
+     */
+    acknowledgement_delay_ms?: number;
+
+    /**
      * Responses backend settings to update. Omitted settings keep their existing
      * values.
      */
@@ -2610,6 +2720,16 @@ export namespace SessionUpdateConfig {
 
   export interface Decisions {
     type: 'decisions';
+
+    /**
+     * Milliseconds to wait before requesting an automatic spoken acknowledgement for a
+     * delegation. The model may still speak before this delay. Any commentary or
+     * thinking appended to the session cancels all pending acknowledgements, including
+     * those for other delegations. Defaults to 400 for Decisions sessions and 0
+     * (request immediately) for other sessions. Omission in a session update preserves
+     * the current value. Updates apply to subsequent delegations.
+     */
+    acknowledgement_delay_ms?: number;
 
     decisions?: LiveAPI.DecisionsDelegationUpdateConfig;
   }
@@ -2728,7 +2848,7 @@ export namespace SessionUsageUpdatedEvent {
 
 /**
  * Provide silent reasoning or progress context to the Live model, optionally for
- * an existing client delegation.
+ * an existing client delegation. Rejected while an audio fixture is active.
  */
 export interface ThinkingAppendEvent {
   /**
@@ -2942,7 +3062,9 @@ export declare namespace Live {
   export {
     Sideband as Sideband,
     type ConnectClientEvent as ConnectClientEvent,
+    type SidebandClientEvent as SidebandClientEvent,
     type ConnectServerEvent as ConnectServerEvent,
+    type SidebandServerEvent as SidebandServerEvent,
     type SidebandConnectParams as SidebandConnectParams,
   };
 

@@ -573,14 +573,19 @@ function readText(value: unknown, limit: number, allowEmpty: boolean): string {
   return value;
 }
 
-function validImageBreakpoint(value: unknown): boolean {
-  return (
-    value === undefined ||
-    value === null ||
-    (isObj(value) &&
-      configuredOption(value, 'mode') === 'explicit' &&
-      Object.keys(value).every((key) => key === 'mode'))
-  );
+function snapshotImageBreakpoint(value: unknown): ResponseInputImageContent['prompt_cache_breakpoint'] {
+  if (value === undefined || value === null) {
+    return value;
+  }
+  if (!isObj(value) || Object.keys(value).some((key) => key !== 'mode' && key !== 'ttl')) {
+    throw new TypeError('Invalid browser image breakpoint.');
+  }
+  const mode = configuredOption(value, 'mode');
+  const ttl = configuredOption(value, 'ttl');
+  if (mode !== 'explicit' || (ttl !== undefined && ttl !== '30m' && ttl !== '12h')) {
+    throw new TypeError('Invalid browser image breakpoint.');
+  }
+  return { mode, ...(ttl === undefined ? {} : { ttl }) };
 }
 
 function validImageSource(value: unknown): value is string | null | undefined {
@@ -613,14 +618,15 @@ function snapshotImage(value: unknown, member: 'screenshot' | 'zoom'): ResponseI
     const detail = configuredOption(value, 'detail');
     const image_url = configuredOption(value, 'image_url');
     const file_id = configuredOption(value, 'file_id');
-    const prompt_cache_breakpoint = configuredOption(value, 'prompt_cache_breakpoint');
+    const prompt_cache_breakpoint = snapshotImageBreakpoint(
+      configuredOption(value, 'prompt_cache_breakpoint'),
+    );
     if (
       type !== 'input_image' ||
       !validImageDetail(detail) ||
       !validImageSource(image_url) ||
       !validImageSource(file_id) ||
-      (typeof image_url !== 'string' && typeof file_id !== 'string') ||
-      !validImageBreakpoint(prompt_cache_breakpoint)
+      (typeof image_url !== 'string' && typeof file_id !== 'string')
     ) {
       throw new TypeError('Invalid browser image.');
     }
@@ -629,9 +635,7 @@ function snapshotImage(value: unknown, member: 'screenshot' | 'zoom'): ResponseI
       ...(detail === undefined ? {} : { detail }),
       ...(image_url === undefined ? {} : { image_url }),
       ...(file_id === undefined ? {} : { file_id }),
-      ...(prompt_cache_breakpoint === undefined
-        ? {}
-        : { prompt_cache_breakpoint: prompt_cache_breakpoint === null ? null : { mode: 'explicit' } }),
+      ...(prompt_cache_breakpoint === undefined ? {} : { prompt_cache_breakpoint }),
     };
   } catch {
     throw new OpenAIError(

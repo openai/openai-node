@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import io
 import json
 import sys
 import tempfile
@@ -40,6 +41,52 @@ class ReviewedPinTests(GitTestCase):
         self.git("checkout", "-q", "-b", "next", self.base)
         (self.repo / "sdk.txt").write_text("candidate SDK bytes")
         self.head = self.commit("sdk change")
+
+    def test_review_command_uses_git_policies_and_rejects_stale_main(self) -> None:
+        git: Callable[..., bytes] = selector.report.git
+
+        def local_fetch(repo: Path, *args: str, **kwargs: Any) -> bytes:
+            if args[0] == "fetch":
+                return git(
+                    repo,
+                    "fetch",
+                    "--quiet",
+                    str(self.repo),
+                    f"{self.main}:refs/remotes/origin/main",
+                    self.base,
+                    self.head,
+                )
+            return git(repo, *args, **kwargs)
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            mock.patch.object(selector.report, "git", side_effect=local_fetch),
+        ):
+            for stale in (False, True):
+                with (
+                    self.subTest(stale=stale),
+                    mock.patch("sys.stdout", new_callable=io.StringIO) as output,
+                ):
+                    args = [
+                        "review-required",
+                        "--repo",
+                        str(Path(directory) / str(stale)),
+                        "--repository",
+                        REPO,
+                        "--base",
+                        self.base,
+                        "--head",
+                        self.head,
+                        "--main",
+                        self.base if stale else self.main,
+                    ]
+                    if stale:
+                        with self.assertRaisesRegex(ValueError, "authenticated main changed"):
+                            selector.main(args)
+                        self.assertEqual(output.getvalue(), "")
+                    else:
+                        self.assertEqual(selector.main(args), 0)
+                        self.assertEqual(json.loads(output.getvalue()), {"requires_human": False})
 
     def write_policy(self, value: dict[str, Any]) -> None:
         (self.repo / ".castiron-ratchet.json").write_text(json.dumps(value))

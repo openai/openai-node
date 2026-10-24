@@ -579,6 +579,43 @@ Methods:
 - <code title="get /agents">client.beta.agents.<a href="./src/resources/beta/agents/agents.ts">list</a>({ ...params }) -> AgentsPage</code>
 - <code title="delete /agents/{agent_id}">client.beta.agents.<a href="./src/resources/beta/agents/agents.ts">delete</a>(agentID) -> AgentDeleted</code>
 
+### Automations
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">Automation</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">AutomationAgentConfig</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">AutomationCreatedBy</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">AutomationDeleted</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">AutomationEnvironment</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">AutomationTarget</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">AutomationTargetParam</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">OneTimeAutomation</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">PeriodicAutomation</a></code>
+
+Methods:
+
+- <code title="post /agents/automations">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">create</a>({ ...params }) -> Automation</code>
+- <code title="get /agents/automations/{automation_id}">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">retrieve</a>(automationID) -> Automation</code>
+- <code title="post /agents/automations/{automation_id}">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">update</a>(automationID, { ...params }) -> Automation</code>
+- <code title="get /agents/automations">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">list</a>({ ...params }) -> AutomationsPage</code>
+- <code title="delete /agents/automations/{automation_id}">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">delete</a>(automationID) -> AutomationDeleted</code>
+- <code title="post /agents/automations/{automation_id}/pause">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">pause</a>(automationID) -> Automation</code>
+- <code title="post /agents/automations/{automation_id}/resume">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">resume</a>(automationID) -> Automation</code>
+
+#### Invocations
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/automations/invocations.ts">AutomationInvocation</a></code>
+- <code><a href="./src/resources/beta/agents/automations/invocations.ts">AutomationInvocationSource</a></code>
+
+Methods:
+
+- <code title="post /agents/automations/{automation_id}/invocations">client.beta.agents.automations.invocations.<a href="./src/resources/beta/agents/automations/invocations.ts">create</a>(automationID) -> AutomationInvocation</code>
+- <code title="get /agents/automations/{automation_id}/invocations/{invocation_id}">client.beta.agents.automations.invocations.<a href="./src/resources/beta/agents/automations/invocations.ts">retrieve</a>(invocationID, { ...params }) -> AutomationInvocation</code>
+- <code title="get /agents/automations/{automation_id}/invocations">client.beta.agents.automations.invocations.<a href="./src/resources/beta/agents/automations/invocations.ts">list</a>(automationID, { ...params }) -> AutomationInvocationsPage</code>
+
 ### Environments
 
 Types:

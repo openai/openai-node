@@ -29,8 +29,14 @@ jobs:
       pull-requests: read
       statuses: write
     steps:
-      # Trusted main definition: no candidate checkout, artifacts, or executable inputs.
       - name: Re-evaluate current PR and queue after review changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GIT_CONFIG_COUNT: '2'
+          GIT_CONFIG_KEY_0: credential.helper
+          GIT_CONFIG_VALUE_0: ''
+          GIT_CONFIG_KEY_1: credential.https://github.com.helper
+          GIT_CONFIG_VALUE_1: '!gh auth git-credential'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -56,58 +62,35 @@ jobs:
               if (!/^[0-9a-f]{40}$/.test(sha || '')) throw new Error('Invalid policy merge base');
               return sha;
             }
-            async function readPolicy(ref) {
-              const {data: file} = await github.rest.repos.getContent({
-                ...context.repo, path: '.castiron-ratchet.json', ref,
-              });
-              if (file.type !== 'file' || file.encoding !== 'base64' || !Number.isSafeInteger(file.size) ||
-                  file.size > 4096 || typeof file.content !== 'string') throw new Error('Invalid policy file');
-              const content = Buffer.from(file.content, 'base64');
-              if (content.length !== file.size) throw new Error('Invalid policy content');
-              const policy = JSON.parse(content.toString('utf8'), (key, value, source) =>
-                key === 'max_custom_patch_lines' && typeof value === 'number' ? BigInt(source.source) : value);
-              if (!policy || typeof policy !== 'object' || typeof policy.max_custom_patch_lines !== 'bigint' ||
-                  policy.max_custom_patch_lines < 0n) throw new Error('Invalid policy budget');
-              return policy;
-            }
-            async function supportsEffectivePinReview(ref) {
-              let file;
+            async function requiresHuman(pr, mainSha) {
+              if (!/^[0-9a-f]{40}$/.test(mainSha || '')) throw new Error('Invalid authenticated main');
+              const path = require('node:path');
+              const fs = require('node:fs');
+              const root = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP, 'castiron-review-'));
               try {
-                ({data: file} = await github.rest.repos.getContent({
-                  ...context.repo, path: 'scripts/castiron/custom_code_policy.py', ref,
-                }));
-              } catch (error) {
-                if (error.status === 404) return false;
-                throw error;
+                // Bind executable policy and its dependency to the authenticated
+                // main snapshot for this decision, including after a retry.
+                for (const name of ['custom_code_policy.py', 'custom_code_report.py']) {
+                  const {data: file} = await github.rest.repos.getContent({
+                    ...context.repo, path: `scripts/castiron/${name}`, ref: mainSha,
+                  });
+                  if (file.type !== 'file' || file.encoding !== 'base64' ||
+                      !Number.isSafeInteger(file.size) || file.size <= 0 || file.size > 1048576 ||
+                      typeof file.content !== 'string') throw new Error('Invalid trusted policy file');
+                  const content = Buffer.from(file.content, 'base64');
+                  if (content.length !== file.size) throw new Error('Invalid trusted policy content');
+                  fs.writeFileSync(path.join(root, name), content, {flag: 'wx'});
+                }
+                const result = await exec.getExecOutput('python3', ['-I',
+                  path.join(root, 'custom_code_policy.py'), 'review-required',
+                  '--repository', repo, '--repo', path.join(root, 'objects.git'),
+                  '--base', pr.base.sha, '--head', pr.head.sha, '--main', mainSha], {silent: true});
+                const decision = JSON.parse(result.stdout);
+                if (typeof decision.requires_human !== 'boolean') throw new Error('Invalid review decision');
+                return decision.requires_human;
+              } finally {
+                fs.rmSync(root, {recursive: true, force: true});
               }
-              if (file.type !== 'file' || file.encoding !== 'base64' || !Number.isSafeInteger(file.size) ||
-                  file.size < 0 || typeof file.content !== 'string') throw new Error('Invalid checker contract');
-              const content = Buffer.from(file.content, 'base64');
-              if (content.length !== file.size) throw new Error('Invalid checker content');
-              // Read data only from the effective checker, never import or execute it.
-              const declarations = content.toString('utf8').match(/^PIN_REVIEW_POLICY = .*$/gm) || [];
-              return declarations.length === 1 && declarations[0] === 'PIN_REVIEW_POLICY = "effective-policy-v1"';
-            }
-            async function pinRequiresHuman(pr, headPolicy, mainSha) {
-              const targetPolicy = await readPolicy(pr.base.sha);
-              const pinSha = pin => pin?.repository === repo && /^[0-9a-f]{40}$/.test(pin.main_sha || '')
-                ? pin.main_sha : null;
-              const proposedChecker = pinSha(headPolicy.next_policy);
-              const previousChecker = targetPolicy.next_policy ? pinSha(targetPolicy.next_policy) : mainSha;
-              if (!proposedChecker || !/^[0-9a-f]{40}$/.test(previousChecker || '') ||
-                  !/^[0-9a-f]{40}$/.test(mainSha || '')) return true;
-              // Older checkers require human review for every pin edit. Retain that
-              // requirement until the protected checker explicitly supports the exemption.
-              if (!await supportsEffectivePinReview(previousChecker)) return true;
-              const [previous, proposed, previousBase, proposedBase] = await Promise.all([
-                readPolicy(previousChecker),
-                readPolicy(proposedChecker), mergeBase(previousChecker, proposedChecker),
-                mergeBase(proposedChecker, mainSha),
-              ]);
-              return previousBase !== previousChecker || proposedBase !== proposedChecker ||
-                proposed.max_custom_patch_lines > previous.max_custom_patch_lines ||
-                proposed.schema_version !== previous.schema_version ||
-                proposed.generated_files !== previous.generated_files || proposed.ratchet !== previous.ratchet;
             }
             const dirtyTargets = new Set();
             // Retry discovery within this job timeout while targets are changing.
@@ -146,18 +129,17 @@ jobs:
               const pr = matching[0];
               const files = await github.paginate(github.rest.pulls.listFiles, {...context.repo, pull_number: pr.number});
               if (!files.some(file => file.filename === '.castiron-ratchet.json')) return;
-              const baseline = await mergeBase(pr.base.sha, pr.head.sha);
-              const [basePolicy, headPolicy] = await Promise.all([readPolicy(baseline), readPolicy(pr.head.sha)]);
-              const pinChanged = !require('node:util').isDeepStrictEqual(basePolicy.next_policy ?? null, headPolicy.next_policy ?? null);
-              let requiresHuman = headPolicy.max_custom_patch_lines > basePolicy.max_custom_patch_lines ||
-                (headPolicy.ratchet === 'go' && basePolicy.ratchet !== 'go');
-              let mainSha = null;
-              if (!requiresHuman && pinChanged) {
-                const {data: main} = await github.rest.git.getRef({...context.repo, ref: 'heads/main'});
-                mainSha = main.object.sha;
-                requiresHuman = await pinRequiresHuman(pr, headPolicy, mainSha);
+              const {data: main} = await github.rest.git.getRef({...context.repo, ref: 'heads/main'});
+              const mainSha = main.object.sha;
+              let requiresReview;
+              try {
+                requiresReview = await requiresHuman(pr, mainSha);
+              } catch (error) {
+                const {data: currentMain} = await github.rest.git.getRef({...context.repo, ref: 'heads/main'});
+                if (currentMain.object.sha !== mainSha) continue;
+                throw error;
               }
-              if (!requiresHuman) {
+              if (!requiresReview) {
                 const [{data: current}, {data: target}, main] = await Promise.all([
                   github.rest.pulls.get({...context.repo, pull_number: pr.number}),
                   github.rest.git.getRef({...context.repo, ref: 'heads/next'}),

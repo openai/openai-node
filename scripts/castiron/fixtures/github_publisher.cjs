@@ -47,36 +47,28 @@ const github = {
       }),
     },
     repos: {
-      getCommit: async () => ({ data: data.merge_commit }),
-      compareCommitsWithBasehead: async ({ basehead }) => ({
-        data: data.comparisons?.[basehead] || {
-          merge_base_commit: { sha: basehead.split('...')[0] },
-        },
-      }),
       getContent: async ({ path, ref }) => {
-        let source;
-        if (path === 'scripts/castiron/custom_code_policy.py') {
-          if (data.checker_lookup_error)
-            throw Object.assign(new Error('Checker lookup failed'), {
-              status: data.checker_lookup_error,
-            });
-          source = data.checker_sources_by_sha?.[ref];
-          if (typeof source !== 'string') throw Object.assign(new Error('Missing checker'), { status: 404 });
-        } else if (path === '.castiron-ratchet.json' && data.policies_by_sha?.[ref]) {
-          source = JSON.stringify(data.policies_by_sha[ref]);
-        } else {
-          throw new Error('Unexpected policy lookup');
-        }
-        const content = Buffer.from(source);
+        if (
+          !['scripts/castiron/custom_code_policy.py', 'scripts/castiron/custom_code_report.py'].includes(path)
+        )
+          throw new Error('Unexpected trusted policy path');
+        const content = Buffer.from(JSON.stringify({ ref, path }));
         return {
           data: {
             type: 'file',
             encoding: 'base64',
             size: content.length,
             content: content.toString('base64'),
+            ...(data.policy_file_override || {}),
           },
         };
       },
+      getCommit: async () => ({ data: data.merge_commit }),
+      compareCommitsWithBasehead: async ({ basehead }) => ({
+        data: data.comparisons?.[basehead] || {
+          merge_base_commit: { sha: basehead.split('...')[0] },
+        },
+      }),
       createCommitStatus: async (value) => {
         writes.push(value);
         data.statuses_by_sha ||= {};
@@ -138,12 +130,45 @@ const github = {
     throw new Error(`Unexpected GitHub lookup: ${method}`);
   },
 };
+const exec = {
+  getExecOutput: async (command, args) => {
+    if (
+      command !== 'python3' ||
+      args[0] !== '-I' ||
+      require('node:path').basename(args[1]) !== 'custom_code_policy.py' ||
+      args[2] !== 'review-required' ||
+      args[3] !== '--repository' ||
+      args[4] !== 'openai/example' ||
+      args[5] !== '--repo' ||
+      args[7] !== '--base' ||
+      args[9] !== '--head' ||
+      args[11] !== '--main' ||
+      ![args[8], args[10], args[12]].every((value) => /^[0-9a-f]{40}$/.test(value))
+    ) {
+      throw new Error('Unexpected trusted policy invocation');
+    }
+    for (const name of ['custom_code_policy.py', 'custom_code_report.py']) {
+      const file = require('node:path').join(require('node:path').dirname(args[1]), name);
+      const source = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (source.ref !== args[12] || source.path !== `scripts/castiron/${name}`)
+        throw new Error('Executed stale or mismatched trusted policy');
+    }
+    if (data.policy_error_sequence?.shift() || data.policy_error)
+      throw new Error('Trusted policy evaluation failed');
+    return {
+      stdout: JSON.stringify({
+        requires_human: data.requires_human_by_main?.[args[12]] ?? data.requires_human ?? true,
+      }),
+    };
+  },
+};
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-new AsyncFunction('github', 'context', 'process', 'require', data.script)(
+new AsyncFunction('github', 'context', 'process', 'require', 'exec', data.script)(
   github,
   data.context,
-  { env: data.env || {} },
+  { env: { RUNNER_TEMP: require('node:os').tmpdir(), ...(data.env || {}) } },
   require,
+  exec,
 )
   .then(() => process.stdout.write(JSON.stringify(writes)))
   .catch((error) => {
