@@ -159,7 +159,7 @@ export class Permissions extends APIResource {
         body,
         method: 'post',
         ...options,
-        __security: { adminAPIKeyAuth: true },
+        __security: { bearerAuth: true },
       })),
     );
   }
@@ -277,7 +277,7 @@ export class Permissions extends APIResource {
       resolveResourceRequestOptions(options, (options) => ({
         query,
         ...options,
-        __security: { adminAPIKeyAuth: true },
+        __security: { bearerAuth: true },
       })),
     );
   }
@@ -404,7 +404,7 @@ export class Permissions extends APIResource {
       resolveResourceRequestOptions(options, (options) => ({
         query,
         ...options,
-        __security: { adminAPIKeyAuth: true },
+        __security: { bearerAuth: true },
       })),
     );
   }
@@ -436,10 +436,7 @@ export class Permissions extends APIResource {
     const { fine_tuned_model_checkpoint } = params;
     return this._client.delete(
       path`/fine_tuning/checkpoints/${fine_tuned_model_checkpoint}/permissions/${permissionID}`,
-      resolveResourceRequestOptions(options, (options) => ({
-        ...options,
-        __security: { adminAPIKeyAuth: true },
-      })),
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
     );
   }
 }

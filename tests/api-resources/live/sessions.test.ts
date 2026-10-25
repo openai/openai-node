@@ -45,8 +45,12 @@ describe('resource sessions', () => {
             decisions: {
               questions: [
                 {
+                  choices: [
+                    { value: false, description: 'description' },
+                    { value: true, description: 'description' },
+                  ],
                   instructions: 'instructions',
-                  type: 'predicate',
+                  type: 'choice',
                   name: 'name',
                 },
               ],

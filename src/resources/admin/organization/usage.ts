@@ -147,7 +147,7 @@ export class Usage extends APIResource {
     return this._client.get(
       '/organization/usage/decisions',
       resolveResourceRequestOptions(options, (options) => ({
-        query: Object.fromEntries(Object.entries(query).filter(([, value]) => value !== null)),
+        query,
         ...options,
         __security: { adminAPIKeyAuth: true },
       })),

@@ -11,7 +11,6 @@ import { CursorPage, type CursorPageParams, PagePromise } from '../../core/pagin
 import { buildHeaders } from '../../internal/headers';
 import { RequestOptions } from '../../internal/request-options';
 import { path } from '../../internal/utils/path';
-import { AssistantStream } from '../../lib/AssistantStream';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
@@ -1729,10 +1728,6 @@ export interface AssistantListParams extends CursorPageParams {
    * order and `desc` for descending order.
    */
   order?: 'asc' | 'desc';
-}
-
-export declare namespace Assistants {
-  export { AssistantStream };
 }
 
 export declare namespace Assistants {
