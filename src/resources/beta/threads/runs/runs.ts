@@ -215,6 +215,31 @@ export class Runs extends APIResource {
   }
 
   /**
+   * A helper to create a run and poll until it reaches a terminal state.
+   */
+  async createAndPoll(
+    threadId: string,
+    body: RunCreateParamsNonStreaming,
+    options?: RequestOptions & { pollIntervalMs?: number },
+  ): Promise<Run> {
+    const created = await this.create(threadId, body, options);
+    return await this.poll(created.id, { thread_id: threadId }, options);
+  }
+
+  /**
+   * Create a Run stream
+   *
+   * @deprecated use `stream` instead
+   */
+  createAndStream(
+    threadId: string,
+    body: RunCreateParamsBaseStream,
+    options?: RequestOptions,
+  ): AssistantStream {
+    return AssistantStream.createAssistantStream(threadId, this._client.beta.threads.runs, body, options);
+  }
+
+  /**
    * Retrieves a run.
    *
    * @deprecated The Assistants API is deprecated in favor of the Responses API
@@ -383,33 +408,6 @@ export class Runs extends APIResource {
   }
 
   /**
-   * A helper to create a run an poll for a terminal state. More information on Run
-   * lifecycles can be found here:
-   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
-   */
-  async createAndPoll(
-    threadId: string,
-    body: RunCreateParamsNonStreaming,
-    options?: RequestOptions & { pollIntervalMs?: number },
-  ): Promise<Run> {
-    const created = await this.create(threadId, body, options);
-    return await this.poll(created.id, { thread_id: threadId }, options);
-  }
-
-  /**
-   * Create a Run stream
-   *
-   * @deprecated use `stream` instead
-   */
-  createAndStream(
-    threadId: string,
-    body: RunCreateParamsBaseStream,
-    options?: RequestOptions,
-  ): AssistantStream {
-    return AssistantStream.createAssistantStream(threadId, this._client.beta.threads.runs, body, options);
-  }
-
-  /**
    * A helper to poll a run status until it reaches a terminal state. More
    * information on Run lifecycles can be found here:
    * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
@@ -477,9 +475,7 @@ export class Runs extends APIResource {
   }
 
   /**
-   * A helper to submit a tool output to a run and poll for a terminal run state.
-   * More information on Run lifecycles can be found here:
-   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
+   * A helper to submit tool outputs and poll the run to a terminal state.
    */
   async submitToolOutputsAndPoll(
     runId: string,

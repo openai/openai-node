@@ -46,8 +46,9 @@ describe('resource live', () => {
             decisions: {
               questions: [
                 {
+                  choices: [{ value: false }, { value: true }],
                   instructions: 'instructions',
-                  type: 'predicate',
+                  type: 'choice',
                   name: 'name',
                 },
               ],
