@@ -153,14 +153,13 @@ export class Skills extends APIResource {
   create(body: SkillCreateParams | null | undefined = {}, options?: RequestOptions): APIPromise<Skill> {
     return this._client.post(
       '/skills',
-      resolveResourceRequestOptions(options, (options) =>
-        maybeMultipartFormRequestOptions(
-          withBodyFinalization(
-            { body, ...options, __security: { bearerAuth: true } },
-            { finalizeMultipart: true },
-          ),
-          this._client,
+      maybeMultipartFormRequestOptions(
+        withBodyFinalization(
+          { body, ...options, __security: { bearerAuth: true } },
+          { finalizeMultipart: true },
         ),
+        this._client,
+        { stripFilenames: false },
       ),
     );
   }
