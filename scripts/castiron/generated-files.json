@@ -715,7 +715,7 @@
     },
     "src/resources/fine-tuning/checkpoints/permissions.ts": {
       "mode": "100644",
-      "sha256": "54401a2ef922ce3755a100cab830c015cd9a4a35558102e67cbb00ac90a32ecc"
+      "sha256": "947fb1dc6c867e8fe6acc175da9297fd1cbeac786f70643d1235a318fbff3965"
     },
     "src/resources/fine-tuning/fine-tuning.ts": {
       "mode": "100644",
