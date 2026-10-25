@@ -3331,6 +3331,58 @@ export namespace LiveCreateParams {
   }
 }
 
+// Preserve the published nested types. The event fields still accept all new item variants.
+export namespace DecisionItemCreateEvent {
+  export interface Item extends DecisionUserMessage {}
+  export namespace Item {
+    export type InputText = DecisionUserMessage.InputText;
+    export type InputImage = DecisionUserMessage.InputImage;
+  }
+}
+export namespace DecisionItemCreatedEvent {
+  export interface Item extends DecisionStoredUserMessage {}
+  export namespace Item {
+    export type InputText = DecisionStoredUserMessage.InputText;
+    export type InputImage = DecisionStoredUserMessage.InputImage;
+  }
+}
+
+export namespace DecisionTrigger.Decisions {
+  export interface QuestionParamPredicate extends DecisionQuestion.Predicate {}
+  export interface QuestionParamChoice extends DecisionQuestion.Choice {}
+  export namespace QuestionParamChoice {
+    export type Choice = DecisionChoiceOption;
+  }
+  export interface QuestionParamScore extends DecisionQuestion.Score {}
+  export namespace QuestionParamScore {
+    export type Level = DecisionQuestion.Score.Level;
+  }
+}
+
+export namespace DecisionsDelegationConfig {
+  export interface QuestionParamPredicate extends DecisionQuestion.Predicate {}
+  export interface QuestionParamChoice extends DecisionQuestion.Choice {}
+  export namespace QuestionParamChoice {
+    export type Choice = DecisionChoiceOption;
+  }
+  export interface QuestionParamScore extends DecisionQuestion.Score {}
+  export namespace QuestionParamScore {
+    export type Level = DecisionQuestion.Score.Level;
+  }
+}
+
+export namespace DecisionsDelegationUpdateConfig {
+  export interface QuestionParamPredicate extends DecisionQuestion.Predicate {}
+  export interface QuestionParamChoice extends DecisionQuestion.Choice {}
+  export namespace QuestionParamChoice {
+    export type Choice = DecisionChoiceOption;
+  }
+  export interface QuestionParamScore extends DecisionQuestion.Score {}
+  export namespace QuestionParamScore {
+    export type Level = DecisionQuestion.Score.Level;
+  }
+}
+
 Live.Sideband = Sideband;
 Live.Forks = Forks;
 Live.Sessions = Sessions;

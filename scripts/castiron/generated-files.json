@@ -55,7 +55,7 @@
     },
     "scripts/castiron/test_custom_code_policy.py": {
       "mode": "100644",
-      "sha256": "77b0a63b682d29173a7a40cbdace0106708a5338f374b236af9f8f2d41d2f323"
+      "sha256": "29b8dde7d69cad22fe6757356fa18ef189d7fc8f9349f65aad641005540faa26"
     },
     "scripts/castiron/test_custom_code_publication.py": {
       "mode": "100644",
@@ -811,7 +811,7 @@
     },
     "src/resources/live/live.ts": {
       "mode": "100644",
-      "sha256": "90cde1c7eee2a99c9e2135f6621643d76544c4469077f1ff59962d6a99d09cfd"
+      "sha256": "e7760424f2702bfa87bac151f9301cf97f6fb0d9f44a1c226e0e7afb1140a357"
     },
     "src/resources/live/sessions.ts": {
       "mode": "100644",
