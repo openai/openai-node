@@ -33,11 +33,7 @@ export class Files extends APIResource {
    * const environmentFile =
    *   await client.beta.agents.environments.files.create(
    *     'environment_id',
-   *     {
-   *       type: 'inline',
-   *       path: '/workspace/example.txt',
-   *       data: 'SGVsbG8K',
-   *     },
+   *     { file_id: 'x', path: 'x', type: 'file_id' },
    *   );
    * ```
    */

@@ -451,6 +451,8 @@ export type ImageGenStreamEvent = ImageGenPartialImageEvent | ImageGenCompletedE
 /**
  * Deprecated values:
  *
+ * - "gpt-image-1": GPT Image 1 was shut down on October 23, 2026. Use
+ *   gpt-image-2.5-sunburst or gpt-image-2.5-flare instead.
  * - "dall-e-2", "dall-e-3": This model was retired on May 12, 2026. Use a GPT
  *   image model instead.
  */
@@ -671,11 +673,14 @@ export interface ImageEditParamsBase {
   mask?: Uploadable;
 
   /**
-   * The GPT image model to use for image editing (`gpt-image-1`, `gpt-image-1-mini`,
+   * The GPT image model to use for image editing (`gpt-image-1-mini`,
    * `gpt-image-1.5`, `gpt-image-2`, `gpt-image-2-2026-04-21`,
    * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
    * `gpt-image-2.5-flare`, `gpt-image-2.5-flare-2026-09-08`, or
    * `chatgpt-image-latest`).
+   *
+   * `gpt-image-1` was shut down on October 23, 2026. Use `gpt-image-2.5-sunburst` or
+   * `gpt-image-2.5-flare` instead.
    */
   model?: (string & {}) | ImageModel | null;
 
@@ -810,10 +815,13 @@ export interface ImageGenerateParamsBase {
 
   /**
    * The GPT image model to use for image generation. Specify a model explicitly.
-   * Supported models include `gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`,
-   * `gpt-image-2`, `gpt-image-2-2026-04-21`, `gpt-image-2.5-sunburst`,
+   * Supported models include `gpt-image-1-mini`, `gpt-image-1.5`, `gpt-image-2`,
+   * `gpt-image-2-2026-04-21`, `gpt-image-2.5-sunburst`,
    * `gpt-image-2.5-sunburst-2026-09-08`, `gpt-image-2.5-flare`,
    * `gpt-image-2.5-flare-2026-09-08`, and `chatgpt-image-latest`.
+   *
+   * `gpt-image-1` was shut down on October 23, 2026. Use `gpt-image-2.5-sunburst` or
+   * `gpt-image-2.5-flare` instead.
    */
   model?: (string & {}) | ImageModel | null;
 
