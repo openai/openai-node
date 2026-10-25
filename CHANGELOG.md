@@ -1,5 +1,25 @@
 # Changelog
 
+## [7.44.0](https://github.com/openai/openai-node/compare/v7.43.0...v7.44.0) (2026-10-25)
+
+
+### Features
+
+* **api:** add delegation controls and prompt cache lifetimes ([#3029](https://github.com/openai/openai-node/issues/3029)) ([d8931e7](https://github.com/openai/openai-node/commit/d8931e7facfd0b453cc1683c31c60be8cc1ae37e))
+* **api:** expand Live Decision item and question types ([#3034](https://github.com/openai/openai-node/issues/3034)) ([7562cd2](https://github.com/openai/openai-node/commit/7562cd29af87561ccce4e1ec4b873c2c04c97f87))
+
+
+### Performance Improvements
+
+* **agents:** reuse action checks between stream events ([#3028](https://github.com/openai/openai-node/issues/3028)) ([8e32d2d](https://github.com/openai/openai-node/commit/8e32d2df55d99fdcd5be8862d4815007f7ad076f))
+
+
+### Chores
+
+* **api:** clarify contribution review requirements ([#3027](https://github.com/openai/openai-node/issues/3027)) ([4c11b87](https://github.com/openai/openai-node/commit/4c11b87c3e5e4fcddeeffc85b55502b2296f49fd))
+* **api:** fix links in API reference documentation ([#3026](https://github.com/openai/openai-node/issues/3026)) ([d342603](https://github.com/openai/openai-node/commit/d3426032943f3acdd315f6627d2e459f82fc4e05))
+* refresh customization checks ([#3024](https://github.com/openai/openai-node/issues/3024)) ([3538a74](https://github.com/openai/openai-node/commit/3538a74be53604d4d80a9f6a7a106a7e8b7c69ac))
+
 ## [7.43.0](https://github.com/openai/openai-node/compare/v7.42.0...v7.43.0) (2026-10-22)
 
 
