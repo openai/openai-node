@@ -66,7 +66,7 @@
     "typescript-4-9": "npm:typescript@4.9.5",
     "ultracite": "7.11.1",
     "undici": "8.12.2",
-    "vitest": "5.0.3",
+    "vitest": "5.0.5",
     "ws": "^8.21.0",
     "yargs": "^18.1.0",
     "zod": "^3.25 || ^4.0"
@@ -125,7 +125,7 @@
     "@aws-sdk/credential-provider-node": ">=3.972.0 <4",
     "@smithy/hash-node": ">=4.3.0 <5",
     "@smithy/signature-v4": ">=5.4.0 <6",
-    "google-auth-library": ">=9.15.1 <11",
+    "google-auth-library": ">=9.15.1 <12",
     "undici": ">=5 <9",
     "ws": "^8.21.0",
     "zod": "^3.25 || ^4.0"

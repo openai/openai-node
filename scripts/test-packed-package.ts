@@ -76,7 +76,7 @@ const packedPackagePath = require('node:path');
     // SAFETY: This reads the package manifest produced by the local pack step; the checks below validate its engine and peer metadata.
     JSON.parse(fs.readFileSync(file, 'utf-8')) as PackageMetadata;
   const assertVertexPeer = (metadata: PackageMetadata): void => {
-    assert.equal(metadata.peerDependencies?.['google-auth-library'], '>=9.15.1 <11');
+    assert.equal(metadata.peerDependencies?.['google-auth-library'], '>=9.15.1 <12');
     assert.equal(metadata.peerDependenciesMeta?.['google-auth-library']?.optional, true);
   };
   const findSourceMaps = (directory: string): string[] => {
@@ -705,6 +705,76 @@ const packedPackagePath = require('node:path');
         ].join('\n'),
       ],
       { env: isolatedEnvironment },
+    );
+
+    // Install real peers with strict resolution: symlinks alone cannot catch a rejected peer range.
+    await packedPackageAll(
+      ['9.15.1', '10.0.0', '11.0.0', '11.3.1'].map((version) => async () => {
+        const consumer = path.join(temporaryDirectory, `google-auth-${version}`);
+        fs.mkdirSync(consumer);
+        fs.writeFileSync(path.join(consumer, 'package.json'), JSON.stringify({ private: true }));
+        await runAsync(
+          'npm',
+          [
+            'install',
+            '--strict-peer-deps',
+            '--ignore-scripts',
+            '--no-audit',
+            '--no-fund',
+            '--cache',
+            npmCache,
+            tarball,
+            `google-auth-library@${version}`,
+          ],
+          { cwd: consumer, env: isolatedEnvironment },
+        );
+        for (const fixture of ['vertex-packed-adc.cjs', 'vertex-packed-types.ts']) {
+          fs.copyFileSync(path.join(root, 'scripts/fixtures', fixture), path.join(consumer, fixture));
+        }
+        fs.copyFileSync(
+          path.join(consumer, 'vertex-packed-types.ts'),
+          path.join(consumer, 'vertex-packed-types.mts'),
+        );
+        run(
+          process.execPath,
+          [
+            '--input-type=module',
+            '--eval',
+            [
+              "import assert from 'node:assert/strict';",
+              "import { createRequire } from 'node:module';",
+              "import OpenAI from 'openai';",
+              "import { vertex } from 'openai/providers/vertex';",
+              "import checkVertexADC from './vertex-packed-adc.cjs';",
+              'const require = createRequire(import.meta.url);',
+              `assert.equal(require('google-auth-library/package.json').version, '${version}');`,
+              "await checkVertexADC(require('openai'), require('openai/providers/vertex').vertex);",
+              'await checkVertexADC(OpenAI, vertex);',
+            ].join('\n'),
+          ],
+          { cwd: consumer, env: isolatedEnvironment },
+        );
+        for (const compiler of ['typescript-4-9', 'typescript']) {
+          run(
+            process.execPath,
+            [
+              path.join(root, `node_modules/${compiler}/bin/tsc`),
+              ...(compiler === 'typescript' ? ['--ignoreConfig'] : []),
+              '--strict',
+              '--noEmit',
+              '--skipLibCheck',
+              '--target',
+              'ES2020',
+              '--module',
+              'Node16',
+              'vertex-packed-types.ts',
+              'vertex-packed-types.mts',
+            ],
+            { cwd: consumer, env: isolatedEnvironment },
+          );
+        }
+      }),
+      { concurrency: 2, stopOnError: false },
     );
 
     // ADC must resolve the installed peer at runtime, including from the token-provider bundle.

@@ -5,7 +5,7 @@ Use the standard `OpenAI` client with the Vertex provider to call the Responses 
 For Application Default Credentials (ADC), install the optional Google authentication library alongside the SDK:
 
 ```sh
-npm install openai 'google-auth-library@>=9.15.1 <11'
+npm install openai 'google-auth-library@>=9.15.1 <12'
 ```
 
 ```ts
