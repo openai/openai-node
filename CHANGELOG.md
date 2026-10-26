@@ -1,5 +1,33 @@
 # Changelog
 
+## [7.45.0](https://github.com/openai/openai-node/compare/v7.44.0...v7.45.0) (2026-10-26)
+
+
+### Features
+
+* **api:** add gpt-6.1-terra model identifier ([#3054](https://github.com/openai/openai-node/issues/3054)) ([f8120e5](https://github.com/openai/openai-node/commit/f8120e55e783b367d9195891045e48284bc4659f))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump @cloudflare/workers-types from 5.20261011.1 to 5.20261018.1 in /ecosystem-tests/cloudflare-worker ([#3037](https://github.com/openai/openai-node/issues/3037)) ([5185d2c](https://github.com/openai/openai-node/commit/5185d2c4a2b2f3e0f5bbb43df0d5d49dccf5e81d))
+* **deps-dev:** bump @types/node from 26.6.4 to 26.6.5 ([#3036](https://github.com/openai/openai-node/issues/3036)) ([a768d48](https://github.com/openai/openai-node/commit/a768d48aad7e0271ce8e393f8203ea0b2e523da8))
+* **deps-dev:** bump fast-uri from 3.1.7 to 3.1.9 in /ecosystem-tests/ts-browser-webpack ([#3052](https://github.com/openai/openai-node/issues/3052)) ([369d4fe](https://github.com/openai/openai-node/commit/369d4febf7ccf84b270505420f564f882b01bcb9))
+* **deps-dev:** bump fast-uri from 3.1.7 to 3.1.9 in /ecosystem-tests/vercel-edge ([#3032](https://github.com/openai/openai-node/issues/3032)) ([5c02484](https://github.com/openai/openai-node/commit/5c024840f5a05f14db15fa9c89a129af53ecc6fa))
+* **deps-dev:** bump puppeteer from 25.13.0 to 25.14.0 in /ecosystem-tests/browser-direct-import ([#3035](https://github.com/openai/openai-node/issues/3035)) ([834ba3d](https://github.com/openai/openai-node/commit/834ba3dc7bd2e9374465d9b157f139aa7049a6a8))
+* **deps-dev:** bump puppeteer from 25.13.0 to 25.14.0 in /ecosystem-tests/ts-browser-webpack ([#3048](https://github.com/openai/openai-node/issues/3048)) ([64abe79](https://github.com/openai/openai-node/commit/64abe795b0c2767dc5874e4c564156ac2214aca7))
+* **deps-dev:** bump ts-jest from 29.4.14 to 29.4.15 in /ecosystem-tests/cloudflare-worker ([#3038](https://github.com/openai/openai-node/issues/3038)) ([83cc173](https://github.com/openai/openai-node/commit/83cc1733766c734c415f00fd8a2a1606be4165fa))
+* **deps-dev:** bump ts-jest from 29.4.14 to 29.4.15 in /ecosystem-tests/node-ts-cjs ([#3041](https://github.com/openai/openai-node/issues/3041)) ([a12706d](https://github.com/openai/openai-node/commit/a12706d31c6842bbf00a706bd93a63e2a1b8aa99))
+* **deps-dev:** bump ts-jest from 29.4.14 to 29.4.15 in /ecosystem-tests/node-ts-cjs-web ([#3043](https://github.com/openai/openai-node/issues/3043)) ([c129750](https://github.com/openai/openai-node/commit/c1297503e72e2104dcd41ea9dc15274ae53ce7ce))
+* **deps-dev:** bump ts-jest from 29.4.14 to 29.4.15 in /ecosystem-tests/node-ts-esm ([#3044](https://github.com/openai/openai-node/issues/3044)) ([ac9ee21](https://github.com/openai/openai-node/commit/ac9ee216876d435e864666e3021396d537cc7fee))
+* **deps-dev:** bump ts-jest from 29.4.14 to 29.4.15 in /ecosystem-tests/node-ts-esm-auto ([#3045](https://github.com/openai/openai-node/issues/3045)) ([9489f4d](https://github.com/openai/openai-node/commit/9489f4d618fe2c5d2f9f292532b1ae40ee027466))
+* **deps-dev:** bump ts-jest from 29.4.14 to 29.4.15 in /ecosystem-tests/node-ts-esm-web ([#3047](https://github.com/openai/openai-node/issues/3047)) ([c502053](https://github.com/openai/openai-node/commit/c50205337e0c2e6f2e0074f9546edcead30f0f92))
+* **deps-dev:** bump ts-jest from 29.4.14 to 29.4.15 in /ecosystem-tests/vercel-edge ([#3049](https://github.com/openai/openai-node/issues/3049)) ([b6c7bff](https://github.com/openai/openai-node/commit/b6c7bff31986a6ac66a4e8b601315d0c150a31f6))
+* **deps-dev:** bump vitest from 5.0.3 to 5.0.5 ([#3042](https://github.com/openai/openai-node/issues/3042)) ([d4b8a2d](https://github.com/openai/openai-node/commit/d4b8a2dc01270c4f329413d83846e436638a9d91))
+* **deps-dev:** bump wrangler from 4.149.0 to 4.151.1 in /ecosystem-tests/cloudflare-worker ([#3039](https://github.com/openai/openai-node/issues/3039)) ([24e750e](https://github.com/openai/openai-node/commit/24e750e5dcffd6332f5dae04a7a5610b0f3024c3))
+* **deps:** bump undici from 7.30.0 to 7.30.1 in /ecosystem-tests/node-ts-cjs ([#3053](https://github.com/openai/openai-node/issues/3053)) ([364f0cb](https://github.com/openai/openai-node/commit/364f0cb4809fc933d10e227bbcc17a21de2128eb))
+* **deps:** bump undici from 8.11.2 to 8.12.2 ([#3033](https://github.com/openai/openai-node/issues/3033)) ([e63e09c](https://github.com/openai/openai-node/commit/e63e09ccda4002c007e2d63ee2bd5749e64b89ed))
+
 ## [7.44.0](https://github.com/openai/openai-node/compare/v7.43.0...v7.44.0) (2026-10-25)
 
 
