@@ -579,8 +579,8 @@ async function startProxy() {
   };
 }
 
-function parseArgs() {
-  return yargs(process.argv.slice(2))
+export function createCliParser(argv: string[]) {
+  return yargs(argv)
     .scriptName('ecosystem-tests')
     .usage('run tests using various different project setups')
 
@@ -672,7 +672,11 @@ function parseArgs() {
       }
       return true;
     })
-    .help().argv;
+    .help();
+}
+
+function parseArgs() {
+  return createCliParser(process.argv.slice(2)).argv;
 }
 
 type Args = Awaited<ReturnType<typeof parseArgs>>;
@@ -1251,7 +1255,9 @@ async function fileExists(filePath: string) {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (typeof require !== 'undefined' && require.main === module) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
