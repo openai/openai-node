@@ -1,4 +1,5 @@
 import { compiledFixture } from './utils/compiled-fixtures';
+import { createCliParser } from '../ecosystem-tests/cli';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,6 +28,15 @@ function runCli(args: string[], cwd = root, env: Partial<NodeJS.ProcessEnv> = {}
     },
     timeout: 15_000,
   });
+}
+
+function parseCli(args: string[]) {
+  return createCliParser(args)
+    .exitProcess(false)
+    .fail((message, error) => {
+      throw error ?? new Error(message);
+    })
+    .parseSync();
 }
 
 function workflowJob(workflow: string, name: string) {
@@ -143,40 +153,36 @@ describe('ecosystem test CLI', () => {
   });
 
   test.each([
-    undefined,
-    '0',
-    '-0',
-    '2',
-    '2e0',
-    '1.0000000000000000',
-    '10e-1',
-    '.2e1',
-    '0x2',
-    '0o2',
-    '0b10',
-    '0e-400',
-    '-0.000e-400',
-    ' 2 ',
-    '9007199254740991',
-  ])('permits bounded keyless non-live project checks with retry %s', (retry) => {
+    [undefined, 0],
+    ['0', 0],
+    ['-0', -0],
+    ['2', 2],
+    ['2e0', 2],
+    ['1.0000000000000000', 1],
+    ['10e-1', 1],
+    ['.2e1', 2],
+    ['0x2', 2],
+    ['0o2', 2],
+    ['0b10', 2],
+    ['0e-400', 0],
+    ['-0.000e-400', -0],
+    [' 2 ', 2],
+    ['9007199254740991', Number.MAX_SAFE_INTEGER],
+  ] as const)('parses retry %s as %s', (retry, expected) => {
+    expect(parseCli(retry === undefined ? [] : [`--retry=${retry}`]).retry).toBe(expected);
+  });
+
+  test('permits bounded keyless non-live project checks with the default retry count', () => {
     const fixture = mkdtempSync(path.join(tmpdir(), 'openai-node-ecosystem-cli-'));
 
     try {
       writeFileSync(path.join(fixture, 'package.json'), '{}\n');
 
-      const result = runCli(
-        [
-          'node-ts-cjs',
-          '--skip=node-ts-cjs',
-          '--skipPack',
-          '--noCleanup',
-          ...(retry === undefined ? [] : [`--retry=${retry}`]),
-        ],
-        fixture,
-      );
+      const result = runCli(['node-ts-cjs', '--skip=node-ts-cjs', '--skipPack', '--noCleanup'], fixture);
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
+      expect(result.stderr).toContain('retry: 0');
       expect(result.stderr).toContain('running projects:');
       expect(result.stderr).not.toContain('▶️');
       expect(result.stderr).not.toContain('OPENAI_API_KEY');
@@ -204,14 +210,20 @@ describe('ecosystem test CLI', () => {
     ['1e20', true],
     ['NaN', false],
     ['1.0000000000000001', false],
-  ] as const)('rejects retry %s before ecosystem setup with skipPack=%s', (retry, skipPack) => {
+  ] as const)('rejects retry %s with skipPack=%s', (retry, skipPack) => {
+    expect(() => parseCli([...(skipPack ? ['--skipPack'] : []), `--retry=${retry}`])).toThrow(
+      '--retry must be a non-negative safe integer.',
+    );
+  });
+
+  test('rejects an invalid retry before ecosystem setup with packing enabled', () => {
     const fixture = mkdtempSync(path.join(tmpdir(), 'openai-ecosystem-retry-count-'));
 
     try {
       writeFileSync(path.join(fixture, 'package.json'), '{}\n');
 
       const result = runCli(
-        ['node-js', '--skip=node-js', ...(skipPack ? ['--skipPack'] : []), '--noCleanup', `--retry=${retry}`],
+        ['node-js', '--skip=node-js', '--noCleanup', '--retry=1.0000000000000001'],
         fixture,
         { PATH: path.join(fixture, 'missing-bin') },
       );
