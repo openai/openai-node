@@ -49,7 +49,7 @@
     "execa": "^5.1.1",
     "fast-check": "^4.9.0",
     "fast-glob": "^3.3.2",
-    "google-auth-library": "^9.15.1",
+    "google-auth-library": "^11.3.1",
     "iconv-lite": "^0.7.3",
     "jest": "^30.4.2",
     "oxfmt": "0.72.0",
@@ -125,7 +125,7 @@
     "@aws-sdk/credential-provider-node": ">=3.972.0 <4",
     "@smithy/hash-node": ">=4.3.0 <5",
     "@smithy/signature-v4": ">=5.4.0 <6",
-    "google-auth-library": ">=9.15.1 <11",
+    "google-auth-library": ">=9.15.1 <12",
     "undici": ">=5 <9",
     "ws": "^8.21.0",
     "zod": "^3.25 || ^4.0"
