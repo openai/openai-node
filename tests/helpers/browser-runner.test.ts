@@ -8779,8 +8779,8 @@ describe('ResponsesToolRunner iteration', () => {
     },
   );
 
-  test.each(['30m', '12h'] as const)(
-    'supplies native results with ttl %s without changing call IDs, mixed order or pending arguments',
+  test.each([undefined, '30m', '12h'] as const)(
+    'supplies native results with TTL %s without changing call IDs or order',
     async (ttl) => {
       const effects: string[] = [];
       const browser = new BrowserToolset(
@@ -8813,18 +8813,21 @@ describe('ResponsesToolRunner iteration', () => {
       if (first.done) {
         throw new Error('Missing turn');
       }
+      const breakpoint = { mode: 'explicit' as const, ...(ttl === undefined ? {} : { ttl }) };
+      const expectedBreakpoint = { ...breakpoint };
       const supplied = [
         {
           type: 'input_text' as const,
           text: 'human result',
-          prompt_cache_breakpoint: { mode: 'explicit' as const, ttl },
+          prompt_cache_breakpoint: breakpoint,
         },
         {
           type: 'input_image' as const,
           image_url: 'https://fixture.invalid/image',
           detail: 'original' as const,
+          prompt_cache_breakpoint: breakpoint,
         },
-        { type: 'input_file' as const, file_id: 'file_fixture' },
+        { type: 'input_file' as const, file_id: 'file_fixture', prompt_cache_breakpoint: breakpoint },
       ];
       first.value.supplyOutputs([{ type: 'function_call_output', call_id: 'call_record', output: supplied }]);
       const [text] = supplied;
@@ -8832,7 +8835,9 @@ describe('ResponsesToolRunner iteration', () => {
         throw new Error('Missing text output');
       }
       text.text = 'changed later';
-      Reflect.set(text.prompt_cache_breakpoint, 'ttl', 'changed');
+      if (ttl !== undefined) {
+        breakpoint.ttl = ttl === '12h' ? '30m' : '12h';
+      }
       const [, pending] = first.value.response.output;
       if (pending?.type !== 'function_call') {
         throw new Error('Missing pending call');
@@ -8852,9 +8857,14 @@ describe('ResponsesToolRunner iteration', () => {
         type: 'function_call_output',
         call_id: 'call_record',
         output: [
-          { type: 'input_text', text: 'human result', prompt_cache_breakpoint: { mode: 'explicit', ttl } },
-          { type: 'input_image', image_url: 'https://fixture.invalid/image', detail: 'original' },
-          { type: 'input_file', file_id: 'file_fixture' },
+          { type: 'input_text', text: 'human result', prompt_cache_breakpoint: expectedBreakpoint },
+          {
+            type: 'input_image',
+            image_url: 'https://fixture.invalid/image',
+            detail: 'original',
+            prompt_cache_breakpoint: expectedBreakpoint,
+          },
+          { type: 'input_file', file_id: 'file_fixture', prompt_cache_breakpoint: expectedBreakpoint },
         ],
       });
       expect(JSON.stringify(h.bodies[1]?.['input'])).not.toContain('retargeted');
@@ -8946,19 +8956,26 @@ describe('ResponsesToolRunner iteration', () => {
       [allowed, { ...allowed, call_id: 'unknown' }],
       [{ ...allowed, output: [{ type: 'input_text', text: 42 }] }],
       [{ ...allowed, output: [{ type: 'input_image', image_url: { private: true } }] }],
-      [
+      ...[null, 42, 'invalid', '1h'].map((ttl) => [
         {
           ...allowed,
           output: [
-            { type: 'input_text', text: 'value', prompt_cache_breakpoint: { mode: 'explicit', ttl: '1h' } },
+            { type: 'input_text', text: 'fixture', prompt_cache_breakpoint: { mode: 'explicit', ttl } },
           ],
         },
-      ],
+      ]),
       [
         {
           ...allowed,
           output: [
-            { type: 'input_text', text: 'value', prompt_cache_breakpoint: { mode: 'explicit', ttl: null } },
+            {
+              type: 'input_text',
+              text: 'fixture',
+              prompt_cache_breakpoint: Object.defineProperty({ mode: 'explicit' }, 'ttl', {
+                get: getter,
+                enumerable: true,
+              }),
+            },
           ],
         },
       ],
