@@ -6,7 +6,7 @@
 ### Features
 
 * **api:** add delegation controls and prompt cache lifetimes ([#3029](https://github.com/openai/openai-node/issues/3029)) ([d8931e7](https://github.com/openai/openai-node/commit/d8931e7facfd0b453cc1683c31c60be8cc1ae37e))
-* **api:** expand Live Decision item and question types ([#3034](https://github.com/openai/openai-node/issues/3034)) ([7562cd2](https://github.com/openai/openai-node/commit/7562cd29af87561ccce4e1ec4b873c2c04c97f87))
+* **api:** expand Live Decision item and question types. **Breaking change in a minor release.** Live Decision item events now include messages and function/custom-tool calls and outputs. `DecisionItemCreatedEvent.item` and `DecisionItemCreateEvent.item` are unions, so callers that directly access `item.content` or `item.role` may no longer compile. Narrow server-event items with `if (event.item.type === 'message')` before accessing message fields, and handle the tool-item variants separately. For create-event items, where a message may omit `type`, use `if ('content' in event.item)` to narrow to messages. ([#3034](https://github.com/openai/openai-node/issues/3034)) ([7562cd2](https://github.com/openai/openai-node/commit/7562cd29af87561ccce4e1ec4b873c2c04c97f87))
 
 
 ### Performance Improvements
