@@ -479,6 +479,15 @@ function outputRecord(value: unknown, keys: readonly string[]): Record<string, u
   return Object.fromEntries(Object.entries(fields).map(([key, field]) => [key, field.value]));
 }
 
+function suppliedBreakpoint(cache: unknown) {
+  const breakpoint = outputRecord(cache, ['mode', 'ttl']);
+  const { ttl } = breakpoint;
+  if (breakpoint['mode'] !== 'explicit' || (ttl !== undefined && ttl !== '30m' && ttl !== '12h')) {
+    throw new TypeError('Supplied output has an invalid cache breakpoint.');
+  }
+  return { mode: 'explicit', ...(ttl === undefined ? {} : { ttl }) };
+}
+
 function suppliedBlock(value: unknown): ResponseFunctionCallOutputItem {
   const block = outputRecord(value, [
     'type',
@@ -537,11 +546,7 @@ function suppliedBlock(value: unknown): ResponseFunctionCallOutputItem {
   }
   const cache = block['prompt_cache_breakpoint'];
   if (cache !== undefined && cache !== null) {
-    const breakpoint = outputRecord(cache, ['mode']);
-    if (breakpoint['mode'] !== 'explicit') {
-      throw new TypeError('Supplied output has an invalid cache breakpoint.');
-    }
-    block['prompt_cache_breakpoint'] = { mode: 'explicit' };
+    block['prompt_cache_breakpoint'] = suppliedBreakpoint(cache);
   }
   if (type === 'input_text') {
     const { text } = block;

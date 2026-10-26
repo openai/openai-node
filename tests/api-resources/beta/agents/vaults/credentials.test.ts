@@ -70,7 +70,6 @@ describe('resource credentials', () => {
   test('update: only required params', async () => {
     const responsePromise = client.beta.agents.vaults.credentials.update('credential_id', {
       vault_id: 'vault_id',
-      metadata: {},
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);

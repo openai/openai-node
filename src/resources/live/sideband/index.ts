@@ -3,7 +3,9 @@
 export {
   Sideband,
   type ConnectClientEvent,
+  type SidebandClientEvent,
   type ConnectServerEvent,
+  type SidebandServerEvent,
   type SidebandConnectParams,
 } from './sideband';
 export { type SidebandWSClientOptions } from './ws';

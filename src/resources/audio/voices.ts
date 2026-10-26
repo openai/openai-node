@@ -161,10 +161,6 @@ export declare namespace VoiceCreateParams {
     type?: 'audio_sample';
   }
 
-  /**
-   * Creates a synthetic voice from a text description. Supports application/json or
-   * multipart/form-data.
-   */
   export interface Prompt {
     /**
      * The name of the new voice.
@@ -184,7 +180,7 @@ export declare namespace VoiceCreateParams {
     /**
      * The voice creation model to use. Defaults to `auto`.
      */
-    model?: string | 'auto' | '2026-10-08';
+    model?: (string & {}) | 'auto' | '2026-10-08';
 
     /**
      * Optional text for the voice to speak during creation. If omitted, a script is

@@ -5,6 +5,10 @@ import * as LiveAPI from '../live';
 
 export class Sideband extends APIResource {}
 
+export type SidebandClientEvent = ConnectClientEvent;
+
+export type SidebandServerEvent = ConnectServerEvent;
+
 /**
  * Client events accepted by an attached Live sideband WebSocket. The session has
  * already started. Send input audio over the primary connection.
@@ -182,7 +186,9 @@ export interface SidebandConnectParams {
 export declare namespace Sideband {
   export {
     type ConnectClientEvent as ConnectClientEvent,
+    type SidebandClientEvent as SidebandClientEvent,
     type ConnectServerEvent as ConnectServerEvent,
+    type SidebandServerEvent as SidebandServerEvent,
     type SidebandConnectParams as SidebandConnectParams,
   };
 }

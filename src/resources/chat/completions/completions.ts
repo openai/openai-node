@@ -1514,6 +1514,11 @@ export namespace ChatCompletionContentPart {
        * The breakpoint mode. Always `explicit`.
        */
       mode: 'explicit';
+
+      /**
+       * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+       */
+      ttl?: '30m' | '12h';
     }
   }
 }
@@ -1562,6 +1567,11 @@ export namespace ChatCompletionContentPartImage {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -1607,6 +1617,11 @@ export namespace ChatCompletionContentPartInputAudio {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -1655,6 +1670,11 @@ export namespace ChatCompletionContentPartText {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
