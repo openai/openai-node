@@ -13,17 +13,13 @@ import {
 } from '../internal/runner-lifecycle';
 import type { RunnerDiagnosticObserver } from '../internal/runner-diagnostics';
 
-import type {
-  Decision,
-  DecisionCreateParams,
-  DecisionInputMessage,
-  DecisionInputPart,
-} from '../resources/decisions';
+import type { Decision, DecisionCreateParams, DecisionInputPart } from '../resources/decisions';
 
 export type { RunnerDiagnostic, RunnerDiagnosticObserver } from '../internal/runner-diagnostics';
 
 /** Current text or inline image evidence. It is sent as a fresh user message each turn. */
-export type DecisionObservation = DecisionInputMessage['content'];
+export type DecisionObservation = string | OwnedDecisionObservationPart[];
+type OwnedDecisionObservationPart = Extract<DecisionInputPart, { type: 'input_text' | 'input_image' }>;
 
 /** The caller supplies every argument in the executor; Decisions selects only its ID. */
 export type DecisionCandidate =
@@ -174,7 +170,10 @@ export class DecisionsToolRunner {
     };
   }
 
-  private static ownObservation(supplied: DecisionObservation, stop: StopRun): DecisionObservation {
+  private static ownObservation(
+    supplied: DecisionObservation,
+    stop: StopRun,
+  ): string | OwnedDecisionObservationPart[] {
     if (typeof supplied === 'string') {
       return supplied;
     }
@@ -190,6 +189,14 @@ export class DecisionsToolRunner {
       return ('value' in entry ? entry.value : supplied[index]) as DecisionInputPart;
     });
     const captured = structuredClone(entries);
+    DecisionsToolRunner.validateObservationParts(captured, stop);
+    return captured;
+  }
+
+  private static validateObservationParts(
+    captured: DecisionInputPart[],
+    stop: StopRun,
+  ): asserts captured is OwnedDecisionObservationPart[] {
     for (const part of captured) {
       if (!isObj(part) || !hasOwn(part, 'type')) {
         stop('failed');
@@ -212,7 +219,6 @@ export class DecisionsToolRunner {
         }
       }
     }
-    return captured;
   }
 
   // oxlint-disable-next-line complexity -- Keep field ownership and candidate admission in the same validation pass.

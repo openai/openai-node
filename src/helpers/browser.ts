@@ -573,9 +573,7 @@ function readText(value: unknown, limit: number, allowEmpty: boolean): string {
   return value;
 }
 
-function snapshotImageBreakpoint(
-  value: unknown,
-): { mode: 'explicit'; ttl?: '30m' | '12h' } | null | undefined {
+function snapshotImageBreakpoint(value: unknown): ResponseInputImageContent['prompt_cache_breakpoint'] {
   if (value === undefined || value === null) {
     return value;
   }

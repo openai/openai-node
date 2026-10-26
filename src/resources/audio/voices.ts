@@ -5,6 +5,7 @@ import { APIPromise } from '../../core/api-promise';
 import { type Uploadable } from '../../core/uploads';
 import { RequestOptions } from '../../internal/request-options';
 import { multipartFormRequestOptions } from '../../internal/uploads';
+import { path } from '../../internal/utils/path';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
@@ -47,6 +48,30 @@ export class Voices extends APIResource {
       ),
     );
   }
+
+  /**
+   * Deletes a voice created from a text prompt or an audio sample.
+   *
+   * Requires voice write permission and access to the voice's project. Access to
+   * voices created from recordings is limited to eligible customers. See the
+   * [custom voices guide](https://developers.openai.com/api/docs/guides/custom-voices).
+   *
+   * Deleting a voice does not delete its consent recording. Deleting an already
+   * deleted voice returns a 404 error.
+   *
+   * @example
+   * ```ts
+   * const voiceDeleted = await client.audio.voices.delete(
+   *   'voice_id',
+   * );
+   * ```
+   */
+  delete(voiceID: string, options?: RequestOptions): APIPromise<VoiceDeleted> {
+    return this._client.delete(
+      path`/audio/voices/${voiceID}`,
+      resolveResourceRequestOptions(options, (options) => ({ ...options, __security: { bearerAuth: true } })),
+    );
+  }
 }
 
 /**
@@ -87,6 +112,23 @@ export interface Voice {
   prompt?: string;
 }
 
+export interface VoiceDeleted {
+  /**
+   * The voice identifier.
+   */
+  id: string;
+
+  /**
+   * Whether the voice was deleted.
+   */
+  deleted: boolean;
+
+  /**
+   * The object type, which is always `audio.voice.deleted`.
+   */
+  object: 'audio.voice.deleted';
+}
+
 export type VoiceCreateParams = VoiceCreateParams.Consent | VoiceCreateParams.Prompt;
 
 export declare namespace VoiceCreateParams {
@@ -119,10 +161,6 @@ export declare namespace VoiceCreateParams {
     type?: 'audio_sample';
   }
 
-  /**
-   * Creates a synthetic voice from a text description. Supports application/json or
-   * multipart/form-data.
-   */
   export interface Prompt {
     /**
      * The name of the new voice.
@@ -142,7 +180,7 @@ export declare namespace VoiceCreateParams {
     /**
      * The voice creation model to use. Defaults to `auto`.
      */
-    model?: string | 'auto' | '2026-10-08';
+    model?: (string & {}) | 'auto' | '2026-10-08';
 
     /**
      * Optional text for the voice to speak during creation. If omitted, a script is
@@ -154,5 +192,9 @@ export declare namespace VoiceCreateParams {
 }
 
 export declare namespace Voices {
-  export { type Voice as Voice, type VoiceCreateParams as VoiceCreateParams };
+  export {
+    type Voice as Voice,
+    type VoiceDeleted as VoiceDeleted,
+    type VoiceCreateParams as VoiceCreateParams,
+  };
 }

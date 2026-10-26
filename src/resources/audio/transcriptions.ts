@@ -61,7 +61,7 @@ export class Transcriptions extends APIResource {
     options?: RequestOptions,
   ): APIPromise<Stream<TranscriptionStreamEvent>>;
   create(
-    body: TranscriptionCreateParamsStreaming,
+    body: TranscriptionCreateParams,
     options?: RequestOptions,
   ): APIPromise<TranscriptionCreateResponse | string | Stream<TranscriptionStreamEvent>>;
   create(
@@ -73,19 +73,18 @@ export class Transcriptions extends APIResource {
       resolveResourceRequestOptions(options, (options) =>
         multipartFormRequestOptions(
           withBodyFinalization(
-            {
+            ((request) => ({ ...request, __metadata: { model: body.model } }))({
               body,
               ...options,
               stream: body.stream ?? false,
-              __metadata: { model: body.model },
               __security: { bearerAuth: true },
-            },
+            }),
             { streamFromBody: true },
           ),
           this._client,
         ),
       ),
-    );
+    ) as APIPromise<TranscriptionCreateResponse> | APIPromise<Stream<TranscriptionStreamEvent>>;
   }
 }
 

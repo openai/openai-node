@@ -7,6 +7,10 @@ Types:
 - <code><a href="./src/resources/shared.ts">ComparisonFilter</a></code>
 - <code><a href="./src/resources/shared.ts">CompoundFilter</a></code>
 - <code><a href="./src/resources/shared.ts">CustomToolInputFormat</a></code>
+- <code><a href="./src/resources/shared.ts">DecisionInputJSON</a></code>
+- <code><a href="./src/resources/shared.ts">DecisionQuestionInputImage</a></code>
+- <code><a href="./src/resources/shared.ts">DecisionQuestionInputPart</a></code>
+- <code><a href="./src/resources/shared.ts">DecisionQuestionInputText</a></code>
 - <code><a href="./src/resources/shared.ts">ErrorObject</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionDefinition</a></code>
 - <code><a href="./src/resources/shared.ts">FunctionParameters</a></code>
@@ -31,6 +35,10 @@ Types:
 - <code><a href="./src/resources/decisions.ts">DecisionInputPart</a></code>
 - <code><a href="./src/resources/decisions.ts">DecisionInputText</a></code>
 - <code><a href="./src/resources/decisions.ts">DecisionPromptCacheBreakpoint</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionInputJson</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionQuestionInputImage</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionQuestionInputPart</a></code>
+- <code><a href="./src/resources/decisions.ts">DecisionQuestionInputText</a></code>
 
 Methods:
 
@@ -138,7 +146,7 @@ Methods:
 - <code title="get /files">client.files.<a href="./src/resources/files.ts">list</a>({ ...params }) -> FileObjectsPage</code>
 - <code title="delete /files/{file_id}">client.files.<a href="./src/resources/files.ts">delete</a>(fileID) -> FileDeleted</code>
 - <code title="get /files/{file_id}/content">client.files.<a href="./src/resources/files.ts">content</a>(fileID) -> Response</code>
-- <code>client.files.<a href="./src/resources/files.ts">waitForProcessing</a>(id, { pollInterval = 5000, maxWait = 30 _ 60 _ 1000 }) -> Promise&lt;FileObject&gt;</code>
+- <code>client.files.<a href="./src/resources/files.ts">waitForProcessing</a>(id, { pollInterval = 5000, maxWait = 30 * 60 * 1000 }) -> Promise&lt;FileObject&gt;</code>
 
 # Images
 
@@ -226,10 +234,12 @@ Methods:
 Types:
 
 - <code><a href="./src/resources/audio/voices.ts">Voice</a></code>
+- <code><a href="./src/resources/audio/voices.ts">VoiceDeleted</a></code>
 
 Methods:
 
 - <code title="post /audio/voices">client.audio.voices.<a href="./src/resources/audio/voices.ts">create</a>({ ...params }) -> Voice</code>
+- <code title="delete /audio/voices/{voice_id}">client.audio.voices.<a href="./src/resources/audio/voices.ts">delete</a>(voiceID) -> VoiceDeleted</code>
 
 ## VoiceConsents
 
@@ -404,7 +414,7 @@ Methods:
 - <code title="delete /vector_stores/{vector_store_id}/files/{file_id}">client.vectorStores.files.<a href="./src/resources/vector-stores/files.ts">delete</a>(fileID, { ...params }) -> VectorStoreFileDeleted</code>
 - <code title="get /vector_stores/{vector_store_id}/files/{file_id}/content">client.vectorStores.files.<a href="./src/resources/vector-stores/files.ts">content</a>(fileID, { ...params }) -> FileContentResponsesPage</code>
 - <code>client.vectorStores.files.<a href="./src/resources/vector-stores/files.ts">createAndPoll</a>(vectorStoreId, body, options?) -> Promise&lt;VectorStoreFile&gt;</code>
-- <code>client.vectorStores.files.<a href="./src/resources/vector-stores/files.ts">poll</a>(vectorStoreId, fileId, options?) -> Promise&lt;VectorStoreFile&gt;</code>
+- <code>client.vectorStores.files.<a href="./src/resources/vector-stores/files.ts">poll</a>(vectorStoreID, fileID, options?) -> Promise&lt;VectorStoreFile&gt;</code>
 - <code>client.vectorStores.files.<a href="./src/resources/vector-stores/files.ts">upload</a>(vectorStoreId, file, options?) -> Promise&lt;VectorStoreFile&gt;</code>
 - <code>client.vectorStores.files.<a href="./src/resources/vector-stores/files.ts">uploadAndPoll</a>(vectorStoreId, file, options?) -> Promise&lt;VectorStoreFile&gt;</code>
 
@@ -419,9 +429,9 @@ Methods:
 - <code title="post /vector_stores/{vector_store_id}/file_batches">client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">create</a>(vectorStoreID, { ...params }) -> VectorStoreFileBatch</code>
 - <code title="get /vector_stores/{vector_store_id}/file_batches/{batch_id}">client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">retrieve</a>(batchID, { ...params }) -> VectorStoreFileBatch</code>
 - <code title="post /vector_stores/{vector_store_id}/file_batches/{batch_id}/cancel">client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">cancel</a>(batchID, { ...params }) -> VectorStoreFileBatch</code>
-- <code title="get /vector_stores/{vector_store_id}/file_batches/{batch_id}/files">client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">listFiles</a>(batchID, { ...params }) -> VectorStoreFilesPage</code>
 - <code>client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">createAndPoll</a>(vectorStoreId, body, options?) -> Promise&lt;VectorStoreFileBatch&gt;</code>
-- <code>client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">poll</a>(vectorStoreId, batchId, options?) -> Promise&lt;VectorStoreFileBatch&gt;</code>
+- <code title="get /vector_stores/{vector_store_id}/file_batches/{batch_id}/files">client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">listFiles</a>(batchID, { ...params }) -> VectorStoreFilesPage</code>
+- <code>client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">poll</a>(vectorStoreID, batchID, options?) -> Promise&lt;VectorStoreFileBatch&gt;</code>
 - <code>client.vectorStores.fileBatches.<a href="./src/resources/vector-stores/file-batches.ts">uploadAndPoll</a>(vectorStoreId, { files, fileIds? }, options?) -> Promise&lt;VectorStoreFileBatch&gt;</code>
 
 <a id="safety-1"></a>
@@ -568,6 +578,43 @@ Methods:
 - <code title="post /agents/{agent_id}">client.beta.agents.<a href="./src/resources/beta/agents/agents.ts">update</a>(agentID, { ...params }) -> Agent</code>
 - <code title="get /agents">client.beta.agents.<a href="./src/resources/beta/agents/agents.ts">list</a>({ ...params }) -> AgentsPage</code>
 - <code title="delete /agents/{agent_id}">client.beta.agents.<a href="./src/resources/beta/agents/agents.ts">delete</a>(agentID) -> AgentDeleted</code>
+
+### Automations
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">Automation</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">AutomationAgentConfig</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">AutomationCreatedBy</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">AutomationDeleted</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">AutomationEnvironment</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">AutomationTarget</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">AutomationTargetParam</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">OneTimeAutomation</a></code>
+- <code><a href="./src/resources/beta/agents/automations/automations.ts">PeriodicAutomation</a></code>
+
+Methods:
+
+- <code title="post /agents/automations">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">create</a>({ ...params }) -> Automation</code>
+- <code title="get /agents/automations/{automation_id}">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">retrieve</a>(automationID) -> Automation</code>
+- <code title="post /agents/automations/{automation_id}">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">update</a>(automationID, { ...params }) -> Automation</code>
+- <code title="get /agents/automations">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">list</a>({ ...params }) -> AutomationsPage</code>
+- <code title="delete /agents/automations/{automation_id}">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">delete</a>(automationID) -> AutomationDeleted</code>
+- <code title="post /agents/automations/{automation_id}/pause">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">pause</a>(automationID) -> Automation</code>
+- <code title="post /agents/automations/{automation_id}/resume">client.beta.agents.automations.<a href="./src/resources/beta/agents/automations/automations.ts">resume</a>(automationID) -> Automation</code>
+
+#### Invocations
+
+Types:
+
+- <code><a href="./src/resources/beta/agents/automations/invocations.ts">AutomationInvocation</a></code>
+- <code><a href="./src/resources/beta/agents/automations/invocations.ts">AutomationInvocationSource</a></code>
+
+Methods:
+
+- <code title="post /agents/automations/{automation_id}/invocations">client.beta.agents.automations.invocations.<a href="./src/resources/beta/agents/automations/invocations.ts">create</a>(automationID) -> AutomationInvocation</code>
+- <code title="get /agents/automations/{automation_id}/invocations/{invocation_id}">client.beta.agents.automations.invocations.<a href="./src/resources/beta/agents/automations/invocations.ts">retrieve</a>(invocationID, { ...params }) -> AutomationInvocation</code>
+- <code title="get /agents/automations/{automation_id}/invocations">client.beta.agents.automations.invocations.<a href="./src/resources/beta/agents/automations/invocations.ts">list</a>(automationID, { ...params }) -> AutomationInvocationsPage</code>
 
 ### Environments
 
@@ -1027,7 +1074,7 @@ Methods:
 - <code title="post /threads/{thread_id}">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">update</a>(threadID, { ...params }) -> Thread</code>
 - <code title="delete /threads/{thread_id}">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">delete</a>(threadID) -> ThreadDeleted</code>
 - <code title="post /threads/runs">client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">createAndRun</a>({ ...params }) -> Run</code>
-- <code>client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">createAndRunPoll</a>(body, options?) -> Promise&lt;Threads.Run&gt;</code>
+- <code>client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">createAndRunPoll</a>(body, options?) -> Promise&lt;Run&gt;</code>
 - <code>client.beta.threads.<a href="./src/resources/beta/threads/threads.ts">createAndRunStream</a>(body, options?) -> AssistantStream</code>
 
 ### Runs
@@ -1045,11 +1092,11 @@ Methods:
 - <code title="post /threads/{thread_id}/runs/{run_id}">client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">update</a>(runID, { ...params }) -> Run</code>
 - <code title="get /threads/{thread_id}/runs">client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">list</a>(threadID, { ...params }) -> RunsPage</code>
 - <code title="post /threads/{thread_id}/runs/{run_id}/cancel">client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">cancel</a>(runID, { ...params }) -> Run</code>
-- <code title="post /threads/{thread_id}/runs/{run_id}/submit_tool_outputs">client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">submitToolOutputs</a>(runID, { ...params }) -> Run</code>
 - <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">createAndPoll</a>(threadId, body, options?) -> Promise&lt;Run&gt;</code>
 - <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">createAndStream</a>(threadId, body, options?) -> AssistantStream</code>
 - <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">poll</a>(runId, params, options?) -> Promise&lt;Run&gt;</code>
 - <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">stream</a>(threadId, body, options?) -> AssistantStream</code>
+- <code title="post /threads/{thread_id}/runs/{run_id}/submit_tool_outputs">client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">submitToolOutputs</a>(runID, { ...params }) -> Run</code>
 - <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">submitToolOutputsAndPoll</a>(runId, params, options?) -> Promise&lt;Run&gt;</code>
 - <code>client.beta.threads.runs.<a href="./src/resources/beta/threads/runs/runs.ts">submitToolOutputsStream</a>(runId, params, options?) -> AssistantStream</code>
 

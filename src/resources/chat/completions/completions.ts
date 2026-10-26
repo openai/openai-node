@@ -9,10 +9,6 @@ import { MessageListParams, Messages } from './messages';
 import { APIPromise } from '../../../core/api-promise';
 import { CursorPage, type CursorPageParams, PagePromise } from '../../../core/pagination';
 import { Stream } from '../../../core/streaming';
-import {
-  normalizeChatCompletionStream,
-  type ChatCompletionWireChunk,
-} from '../../../lib/chat-completions/streaming';
 import { RequestOptions } from '../../../internal/request-options';
 import { path } from '../../../internal/utils/path';
 
@@ -30,6 +26,11 @@ import {
 import { type RunnableToolFunctionWithContext } from '../../../lib/RunnableFunction';
 import { ChatCompletionStream, type ChatCompletionStreamParams } from '../../../lib/ChatCompletionStream';
 import { ExtractParsedContentFromParams, parseChatCompletion, validateInputTools } from '../../../lib/parser';
+
+import {
+  normalizeChatCompletionStream,
+  type ChatCompletionWireChunk,
+} from '../../../lib/chat-completions/streaming';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
@@ -208,12 +209,7 @@ export class Completions extends APIResource {
         '/chat/completions',
         resolveResourceRequestOptions(options, (options) =>
           withBodyFinalization(
-            {
-              body,
-              ...options,
-              stream: body.stream ?? false,
-              __security: { bearerAuth: true },
-            },
+            { body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } },
             { streamFromBody: true },
           ),
         ),
@@ -509,39 +505,6 @@ export class Completions extends APIResource {
     return ChatCompletionStream.createChatCompletion(this._client, body, options);
   }
 }
-
-export interface ParsedFunction extends ChatCompletionMessageFunctionToolCall.Function {
-  parsed_arguments?: unknown;
-}
-
-export interface ParsedFunctionToolCall extends ChatCompletionMessageFunctionToolCall {
-  function: ParsedFunction;
-}
-
-/**
- * A tool call on a parsed chat completion message.
- *
- * Function tool calls are augmented with `function.parsed_arguments`, custom tool
- * calls are returned as-is because they have no arguments schema to parse against.
- */
-export type ParsedChatCompletionMessageToolCall =
-  | ParsedFunctionToolCall
-  | ChatCompletionMessageCustomToolCall;
-
-export interface ParsedChatCompletionMessage<ParsedT> extends ChatCompletionMessage {
-  parsed: ParsedT | null;
-  tool_calls?: Array<ParsedChatCompletionMessageToolCall>;
-}
-
-export interface ParsedChoice<ParsedT> extends ChatCompletion.Choice {
-  message: ParsedChatCompletionMessage<ParsedT>;
-}
-
-export interface ParsedChatCompletion<ParsedT> extends ChatCompletion {
-  choices: Array<ParsedChoice<ParsedT>>;
-}
-
-export type ChatCompletionParseParams = ChatCompletionCreateParamsNonStreaming;
 
 export { ChatCompletionStreamingRunner } from '../../../lib/ChatCompletionStreamingRunner';
 export {
@@ -1551,6 +1514,11 @@ export namespace ChatCompletionContentPart {
        * The breakpoint mode. Always `explicit`.
        */
       mode: 'explicit';
+
+      /**
+       * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+       */
+      ttl?: '30m' | '12h';
     }
   }
 }
@@ -1599,6 +1567,11 @@ export namespace ChatCompletionContentPartImage {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -1644,6 +1617,11 @@ export namespace ChatCompletionContentPartInputAudio {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -1692,6 +1670,11 @@ export namespace ChatCompletionContentPartText {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 
@@ -2961,6 +2944,39 @@ export interface ChatCompletionListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
+export interface ParsedFunction extends ChatCompletionMessageFunctionToolCall.Function {
+  parsed_arguments?: unknown;
+}
+
+export interface ParsedFunctionToolCall extends ChatCompletionMessageFunctionToolCall {
+  function: ParsedFunction;
+}
+
+/**
+ * A tool call on a parsed chat completion message.
+ *
+ * Function tool calls are augmented with `function.parsed_arguments`, custom tool
+ * calls are returned as-is because they have no arguments schema to parse against.
+ */
+export type ParsedChatCompletionMessageToolCall =
+  | ParsedFunctionToolCall
+  | ChatCompletionMessageCustomToolCall;
+
+export interface ParsedChatCompletionMessage<ParsedT> extends ChatCompletionMessage {
+  parsed: ParsedT | null;
+  tool_calls?: Array<ParsedChatCompletionMessageToolCall>;
+}
+
+export interface ParsedChoice<ParsedT> extends ChatCompletion.Choice {
+  message: ParsedChatCompletionMessage<ParsedT>;
+}
+
+export interface ParsedChatCompletion<ParsedT> extends ChatCompletion {
+  choices: Array<ParsedChoice<ParsedT>>;
+}
+
+export type ChatCompletionParseParams = ChatCompletionCreateParamsNonStreaming;
+
 Completions.Messages = Messages;
 
 export declare namespace Completions {
@@ -3002,12 +3018,19 @@ export declare namespace Completions {
     type ChatCompletionUserMessageParam as ChatCompletionUserMessageParam,
     type ChatCompletionAllowedTools as ChatCompletionAllowedTools,
     type ChatCompletionReasoningEffort as ChatCompletionReasoningEffort,
+    type ParsedFunction as ParsedFunction,
+    type ParsedFunctionToolCall as ParsedFunctionToolCall,
+    type ParsedChatCompletionMessageToolCall as ParsedChatCompletionMessageToolCall,
+    type ParsedChatCompletionMessage as ParsedChatCompletionMessage,
+    type ParsedChoice as ParsedChoice,
+    type ParsedChatCompletion as ParsedChatCompletion,
     type ChatCompletionsPage as ChatCompletionsPage,
     type ChatCompletionCreateParams as ChatCompletionCreateParams,
     type ChatCompletionCreateParamsNonStreaming as ChatCompletionCreateParamsNonStreaming,
     type ChatCompletionCreateParamsStreaming as ChatCompletionCreateParamsStreaming,
     type ChatCompletionUpdateParams as ChatCompletionUpdateParams,
     type ChatCompletionListParams as ChatCompletionListParams,
+    type ChatCompletionParseParams as ChatCompletionParseParams,
   };
 
   export { Messages as Messages, type MessageListParams as MessageListParams };

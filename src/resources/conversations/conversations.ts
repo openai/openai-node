@@ -132,6 +132,11 @@ export namespace ComputerScreenshotContent {
      * The breakpoint mode. Always `explicit`.
      */
     mode: 'explicit';
+
+    /**
+     * The minimum lifetime of this cache breakpoint. Defaults to the request TTL.
+     */
+    ttl?: '30m' | '12h';
   }
 }
 

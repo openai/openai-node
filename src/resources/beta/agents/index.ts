@@ -113,6 +113,24 @@ export {
   type AgentsPage,
 } from './agents';
 export {
+  Automations,
+  type Automation,
+  type AutomationAgentConfig,
+  type AutomationCreatedBy,
+  type AutomationDeleted,
+  type AutomationEnvironment,
+  type AutomationTarget,
+  type AutomationTargetParam,
+  type OneTimeAutomation,
+  type PeriodicAutomation,
+  type AutomationCreateParams,
+  type CreateAutomationParamsPeriodic,
+  type CreateAutomationParamsOnce,
+  type AutomationUpdateParams,
+  type AutomationListParams,
+  type AutomationsPage,
+} from './automations/index';
+export {
   Environments,
   type EnvironmentInfo,
   type EnvironmentCreateParams,

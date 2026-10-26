@@ -3,6 +3,25 @@
 import { APIResource } from '../../../core/resource';
 import * as AgentsAPI from './agents';
 import * as TurnsAPI from './sessions/turns/turns';
+import * as AutomationsAPI from './automations/automations';
+import {
+  Automation,
+  AutomationAgentConfig,
+  AutomationCreateParams,
+  AutomationCreatedBy,
+  AutomationDeleted,
+  AutomationEnvironment,
+  AutomationListParams,
+  AutomationTarget,
+  AutomationTargetParam,
+  AutomationUpdateParams,
+  Automations,
+  AutomationsPage,
+  CreateAutomationParamsOnce,
+  CreateAutomationParamsPeriodic,
+  OneTimeAutomation,
+  PeriodicAutomation,
+} from './automations/automations';
 import * as EnvironmentsAPI from './environments/environments';
 import {
   EnvironmentCreateParams,
@@ -153,6 +172,7 @@ function normalizeRequestOptionsForQuery(
 }
 
 export class Agents extends APIResource {
+  automations: AutomationsAPI.Automations = new AutomationsAPI.Automations(this._client);
   environments: EnvironmentsAPI.Environments = new EnvironmentsAPI.Environments(this._client);
   vaults: VaultsAPI.Vaults = new VaultsAPI.Vaults(this._client);
   sessions: SessionsAPI.Sessions = new SessionsAPI.Sessions(this._client);
@@ -3268,7 +3288,8 @@ export type AgentTool =
   | AgentTool.AgentToolResourceProgrammaticToolCalling
   | AgentTool.AgentToolResourceMcp
   | AgentTool.AgentToolResourceWebSearch
-  | AgentTool.AgentToolResourceComputerUse;
+  | AgentTool.AgentToolResourceComputerUse
+  | AgentTool.AgentToolResourceAutomations;
 
 export namespace AgentTool {
   /**
@@ -3433,6 +3454,16 @@ export namespace AgentTool {
      */
     type: 'computer_use';
   }
+
+  /**
+   * Lets the agent manage its own scheduled wakeups.
+   */
+  export interface AgentToolResourceAutomations {
+    /**
+     * The type of the object. Always `automations`.
+     */
+    type: 'automations';
+  }
 }
 
 /**
@@ -3444,7 +3475,8 @@ export type AgentToolParam =
   | AgentToolParam.AgentToolConfigParamProgrammaticToolCalling
   | AgentToolParam.AgentToolConfigParamMcp
   | AgentToolParam.AgentToolConfigParamWebSearch
-  | AgentToolParam.AgentToolConfigParamComputerUse;
+  | AgentToolParam.AgentToolConfigParamComputerUse
+  | AgentToolParam.AgentToolConfigParamAutomations;
 
 export namespace AgentToolParam {
   /**
@@ -3629,6 +3661,16 @@ export namespace AgentToolParam {
      * Whether computer tool outputs include screenshots. Defaults to `false`.
      */
     include_screenshots?: boolean;
+  }
+
+  /**
+   * Lets the agent manage its own scheduled wakeups.
+   */
+  export interface AgentToolConfigParamAutomations {
+    /**
+     * The type of the object. Always `automations`.
+     */
+    type: 'automations';
   }
 }
 
@@ -3862,8 +3904,8 @@ export namespace Environment {
 export type EnvironmentParam =
   | EnvironmentParam.EnvironmentParamNone
   | EnvironmentParam.EnvironmentParamOpenAIHosted
-  | EnvironmentParam.EnvironmentParamPrewarmed
-  | EnvironmentParam.EnvironmentParamSelfHosted;
+  | EnvironmentParam.EnvironmentParamSelfHosted
+  | EnvironmentParam.EnvironmentParamPrewarmed;
 
 export namespace EnvironmentParam {
   /**
@@ -3877,8 +3919,8 @@ export namespace EnvironmentParam {
   }
 
   /**
-   * New inline/template-based hosted configuration. Use EnvironmentParamPrewarmed
-   * to attach an existing environment.
+   * An existing OpenAI-hosted environment or new inline/template-based hosted
+   * configuration.
    */
   export interface EnvironmentParamOpenAIHosted {
     /**
@@ -3908,7 +3950,9 @@ export namespace EnvironmentParam {
      */
     env?: { [key: string]: string } | null;
 
-    /** Use EnvironmentParamPrewarmed to attach an existing environment instead. */
+    /**
+     * Use EnvironmentParamPrewarmed to attach an existing environment instead.
+     */
     environment_id?: never;
 
     /**
@@ -3949,11 +3993,6 @@ export namespace EnvironmentParam {
      */
     skills?: Array<AgentsAPI.HostedSkillParam> | null;
   }
-
-  /** An existing hosted environment, with no inline or template configuration. */
-  export type EnvironmentParamPrewarmed = { type: 'openai_hosted'; environment_id: string } & {
-    [Field in Exclude<keyof EnvironmentParamOpenAIHosted, 'type' | 'environment_id'>]?: never;
-  };
 
   export namespace EnvironmentParamOpenAIHosted {
     /**
@@ -4581,7 +4620,8 @@ export type PersistedAgentTool =
   | PersistedAgentTool.PersistedAgentToolResourceProgrammaticToolCalling
   | PersistedAgentTool.PersistedAgentToolResourceMcp
   | PersistedAgentTool.PersistedAgentToolResourceWebSearch
-  | PersistedAgentTool.PersistedAgentToolResourceComputerUse;
+  | PersistedAgentTool.PersistedAgentToolResourceComputerUse
+  | PersistedAgentTool.PersistedAgentToolResourceAutomations;
 
 export namespace PersistedAgentTool {
   /**
@@ -4755,6 +4795,16 @@ export namespace PersistedAgentTool {
      */
     type: 'computer_use';
   }
+
+  /**
+   * Lets the agent manage its own scheduled wakeups.
+   */
+  export interface PersistedAgentToolResourceAutomations {
+    /**
+     * The type of the object. Always `automations`.
+     */
+    type: 'automations';
+  }
 }
 
 /**
@@ -4766,7 +4816,8 @@ export type PersistedAgentToolParam =
   | PersistedAgentToolParam.PersistedAgentToolConfigParamProgrammaticToolCalling
   | PersistedAgentToolParam.PersistedAgentToolConfigParamMcp
   | PersistedAgentToolParam.PersistedAgentToolConfigParamWebSearch
-  | PersistedAgentToolParam.PersistedAgentToolConfigParamComputerUse;
+  | PersistedAgentToolParam.PersistedAgentToolConfigParamComputerUse
+  | PersistedAgentToolParam.PersistedAgentToolConfigParamAutomations;
 
 export namespace PersistedAgentToolParam {
   /**
@@ -4949,6 +5000,16 @@ export namespace PersistedAgentToolParam {
      * Whether computer tool outputs include screenshots. Defaults to `false`.
      */
     include_screenshots?: boolean;
+  }
+
+  /**
+   * Lets the agent manage its own scheduled wakeups.
+   */
+  export interface PersistedAgentToolConfigParamAutomations {
+    /**
+     * The type of the object. Always `automations`.
+     */
+    type: 'automations';
   }
 }
 
@@ -5572,6 +5633,14 @@ export interface AgentListParams extends CursorPageParams {
   order?: 'asc' | 'desc';
 }
 
+export namespace EnvironmentParam {
+  /** An existing hosted environment, with no inline or template configuration. */
+  export type EnvironmentParamPrewarmed = { type: 'openai_hosted'; environment_id: string } & {
+    [Field in Exclude<keyof EnvironmentParamOpenAIHosted, 'type' | 'environment_id'>]?: never;
+  };
+}
+
+Agents.Automations = Automations;
 Agents.Environments = Environments;
 Agents.Vaults = Vaults;
 Agents.Sessions = Sessions;
@@ -5684,6 +5753,25 @@ export declare namespace Agents {
     type AgentCreateParams as AgentCreateParams,
     type AgentUpdateParams as AgentUpdateParams,
     type AgentListParams as AgentListParams,
+  };
+
+  export {
+    Automations as Automations,
+    type Automation as Automation,
+    type AutomationAgentConfig as AutomationAgentConfig,
+    type AutomationCreatedBy as AutomationCreatedBy,
+    type AutomationDeleted as AutomationDeleted,
+    type AutomationEnvironment as AutomationEnvironment,
+    type AutomationTarget as AutomationTarget,
+    type AutomationTargetParam as AutomationTargetParam,
+    type OneTimeAutomation as OneTimeAutomation,
+    type PeriodicAutomation as PeriodicAutomation,
+    type CreateAutomationParamsPeriodic as CreateAutomationParamsPeriodic,
+    type CreateAutomationParamsOnce as CreateAutomationParamsOnce,
+    type AutomationsPage as AutomationsPage,
+    type AutomationCreateParams as AutomationCreateParams,
+    type AutomationUpdateParams as AutomationUpdateParams,
+    type AutomationListParams as AutomationListParams,
   };
 
   export {

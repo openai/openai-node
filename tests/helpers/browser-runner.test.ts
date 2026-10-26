@@ -8956,7 +8956,7 @@ describe('ResponsesToolRunner iteration', () => {
       [allowed, { ...allowed, call_id: 'unknown' }],
       [{ ...allowed, output: [{ type: 'input_text', text: 42 }] }],
       [{ ...allowed, output: [{ type: 'input_image', image_url: { private: true } }] }],
-      ...[null, 42, 'invalid'].map((ttl) => [
+      ...[null, 42, 'invalid', '1h'].map((ttl) => [
         {
           ...allowed,
           output: [

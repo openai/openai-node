@@ -47,6 +47,10 @@ export {
   type DecisionInputPart,
   type DecisionInputText,
   type DecisionPromptCacheBreakpoint,
+  type DecisionInputJson,
+  type DecisionQuestionInputImage,
+  type DecisionQuestionInputPart,
+  type DecisionQuestionInputText,
   type DecisionCreateParams,
 } from './decisions';
 export {

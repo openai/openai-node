@@ -11,7 +11,7 @@ on:
       - '!gh-readonly-queue/**'
       - '!integrated/**'
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   merge_group:
     types:
       - checks_requested

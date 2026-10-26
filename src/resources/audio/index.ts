@@ -37,4 +37,4 @@ export {
   type VoiceConsentListParams,
   type VoiceConsentsPage,
 } from './voice-consents';
-export { Voices, type Voice, type VoiceCreateParams } from './voices';
+export { Voices, type Voice, type VoiceDeleted, type VoiceCreateParams } from './voices';

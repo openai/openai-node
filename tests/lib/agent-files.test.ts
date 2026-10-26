@@ -219,6 +219,33 @@ describe('beta agent file preparation', () => {
       paths.map((path, i) => ({ type: 'file_id', file_id: `file_${i + 1}`, path })),
     );
   });
+  test.each(['prepare', 'upload'] as const)(
+    'avoids repeatedly hashing ancestor prefixes in %s',
+    async (method) => {
+      const { client, requests } = fileTransport();
+      const path = `/workspace/${'nested/'.repeat(512)}file.txt`;
+      const file = new File(['contents'], 'input.txt');
+      // Count lookup input rather than elapsed time so this regression is independent of host speed.
+      const lookups = vi.spyOn(Set.prototype, 'has');
+      let pending;
+      let lookupCharacters = 0;
+      try {
+        pending =
+          method === 'prepare'
+            ? client.beta.agents.environments.files.prepare({ [path]: file })
+            : client.beta.agents.environments.files.upload('env_test', { path, file });
+        lookupCharacters = lookups.mock.calls.reduce(
+          (total, [key]) => total + (typeof key === 'string' ? key.length : 0),
+          0,
+        );
+      } finally {
+        lookups.mockRestore();
+      }
+      await pending;
+      expect(requests).toHaveLength(method === 'prepare' ? 1 : 2);
+      expect(lookupCharacters).toBeLessThan(path.length * 8);
+    },
+  );
   test.each([() => 1, 51 * 1024 * 1024])(
     'accepts upload streams with unrelated size members: %s',
     async (size) => {

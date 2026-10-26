@@ -1,5 +1,64 @@
 # Changelog
 
+## [7.44.0](https://github.com/openai/openai-node/compare/v7.43.0...v7.44.0) (2026-10-25)
+
+
+### Features
+
+* **api:** add delegation controls and prompt cache lifetimes and scheduled automations via `client.beta.agents.automations`, including invocation endpoints and the `automations` agent-tool variant ([#3029](https://github.com/openai/openai-node/issues/3029)) ([d8931e7](https://github.com/openai/openai-node/commit/d8931e7facfd0b453cc1683c31c60be8cc1ae37e))
+* **api:** expand Live Decision item and question types. **Breaking change in a minor release.** Live Decision item events now include messages and function/custom-tool calls and outputs. `DecisionItemCreatedEvent.item` and `DecisionItemCreateEvent.item` are unions, so callers that directly access `item.content` or `item.role` may no longer compile. For both event types, use `if ('content' in event.item)` before accessing message fields, and handle tool-item variants separately. Message items may omit `type`, so checking only `item.type === 'message'` can skip valid messages. This release also updates image-model documentation: `gpt-image-1` was shut down on October 23, 2026; replace explicit selections with `gpt-image-2.5-sunburst` or `gpt-image-2.5-flare`. The documented default for Responses image-generation tools is now `gpt-image-2`; specify a supported model explicitly when you need a particular model. ([#3034](https://github.com/openai/openai-node/issues/3034)) ([7562cd2](https://github.com/openai/openai-node/commit/7562cd29af87561ccce4e1ec4b873c2c04c97f87))
+
+
+### Performance Improvements
+
+* **agents:** reuse action checks between stream events ([#3028](https://github.com/openai/openai-node/issues/3028)) ([8e32d2d](https://github.com/openai/openai-node/commit/8e32d2df55d99fdcd5be8862d4815007f7ad076f))
+
+
+### Chores
+
+* **api:** clarify contribution review requirements ([#3027](https://github.com/openai/openai-node/issues/3027)) ([4c11b87](https://github.com/openai/openai-node/commit/4c11b87c3e5e4fcddeeffc85b55502b2296f49fd))
+* **api:** fix links in API reference documentation ([#3026](https://github.com/openai/openai-node/issues/3026)) ([d342603](https://github.com/openai/openai-node/commit/d3426032943f3acdd315f6627d2e459f82fc4e05))
+* refresh customization checks ([#3024](https://github.com/openai/openai-node/issues/3024)) ([3538a74](https://github.com/openai/openai-node/commit/3538a74be53604d4d80a9f6a7a106a7e8b7c69ac))
+
+## [7.43.0](https://github.com/openai/openai-node/compare/v7.42.0...v7.43.0) (2026-10-22)
+
+
+### Features
+
+* **api:** **Breaking change in a minor release.** A Live response's Decisions question `instructions` can now be a string or an array of text, image, or JSON parts. Code such as `question.instructions.trim()` can fail when it receives an array; check `typeof question.instructions === 'string'` and handle the array case. Decisions request inputs also accept new message roles and tool-history items, so update code that assumes it knows every input type. `DecisionInputMessage` is now a union: code that extends or implements the old interface must use `DecisionInputMessage.DecisionInputUserMessage` instead. Existing string instructions and user-message inputs still work. ([21a056d](https://github.com/openai/openai-node/commit/21a056dc61ceca96aceda58a845353b3c1b13efc))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump follow-redirects from 1.16.0 to 1.16.1 in /ecosystem-tests/vercel-edge ([#2998](https://github.com/openai/openai-node/issues/2998)) ([1c69ab8](https://github.com/openai/openai-node/commit/1c69ab88e6f44fa983cae7936726b611cb851260))
+* **deps-dev:** bump launch-editor from 2.14.1 to 2.14.2 in /ecosystem-tests/ts-browser-webpack ([#2997](https://github.com/openai/openai-node/issues/2997)) ([0e1bedc](https://github.com/openai/openai-node/commit/0e1bedc564439017f96fa20b691042f359462723))
+* **deps:** bump next from 15.5.27 to 15.5.28 in /ecosystem-tests/vercel-edge ([#3021](https://github.com/openai/openai-node/issues/3021)) ([482f73e](https://github.com/openai/openai-node/commit/482f73ecfb4c727e1678bf0a9cb439546c43347f))
+
+
+### Chores
+
+* **api:** preserve client and helper compatibility ([#3016](https://github.com/openai/openai-node/issues/3016)) ([17e0f08](https://github.com/openai/openai-node/commit/17e0f08e83e2381efa075b1bbe9ed5eb7b63a6e1))
+* refresh trusted next policy tooling ([#3017](https://github.com/openai/openai-node/issues/3017)) ([7a970a7](https://github.com/openai/openai-node/commit/7a970a75e18b2dce834b25743863cfcf52396a1c))
+
+## [7.42.0](https://github.com/openai/openai-node/compare/v7.41.0...v7.42.0) (2026-10-22)
+
+
+### Features
+
+* **api:** add voice deletion ([#3014](https://github.com/openai/openai-node/issues/3014)) ([2a88010](https://github.com/openai/openai-node/commit/2a880100d82ab92f6c82caeb5830494595bb5d00))
+
+
+### Bug Fixes
+
+* **agents:** avoid repeated ancestor-path hashing ([#3010](https://github.com/openai/openai-node/issues/3010)) ([e352050](https://github.com/openai/openai-node/commit/e35205033764ec2a2adc7fc71f3d2df9b0ea8679))
+* **api:** avoid excessive work when redacting long log values ([#3012](https://github.com/openai/openai-node/issues/3012)) ([e310fe0](https://github.com/openai/openai-node/commit/e310fe08633e496b495b318eed3dd7a71929b3d9))
+
+
+### Chores
+
+* **api:** clarify service-account API key deletion ([#3015](https://github.com/openai/openai-node/issues/3015)) ([ab6d626](https://github.com/openai/openai-node/commit/ab6d6262d03852c839cd5d03e272cbfc1d4eea59))
+* **api:** preserve file helpers and resource exports ([#3007](https://github.com/openai/openai-node/issues/3007)) ([94c0c1b](https://github.com/openai/openai-node/commit/94c0c1ba4ac01c919bafcd325b8a2f4470e2f2d8))
+
 ## [7.41.0](https://github.com/openai/openai-node/compare/v7.40.0...v7.41.0) (2026-10-21)
 
 

@@ -9,7 +9,7 @@ import type {
   RunnerDiagnostic,
 } from 'openai/helpers/decisions-tool-runner';
 import type { Decision } from 'openai/resources/decisions';
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, expectTypeOf, test, vi } from 'vitest';
 
 const params = { model: '', input: 'Set the fixture to complete.', safety_identifier: 'fixture' };
 const done: DecisionCandidate = { id: 'finish', description: 'The fixture is complete', done: true };
@@ -59,6 +59,10 @@ function harness(turns: unknown[], metadata?: (decision: Record<string, unknown>
 }
 
 describe('DecisionsToolRunner', () => {
+  test('observations exclude JSON input', () => {
+    expectTypeOf<{ type: 'input_json'; data: Record<string, never> }[]>().not.toExtend<DecisionObservation>();
+  });
+
   test.each(['name', 'type'] as const)('rejects a refusal whose cloned %s changes', async (field) => {
     const env = harness([[{ type: 'refusal', name: 'next_action', refusal: 'Stop' }]]);
     const create = env.client.decisions.create.bind(env.client.decisions);

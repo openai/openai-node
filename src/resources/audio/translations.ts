@@ -48,7 +48,11 @@ export class Translations extends APIResource {
       '/audio/translations',
       resolveResourceRequestOptions(options, (options) =>
         multipartFormRequestOptions(
-          { body, ...options, __metadata: { model: body.model }, __security: { bearerAuth: true } },
+          ((request) => ({ ...request, __metadata: { model: body.model } }))({
+            body,
+            ...options,
+            __security: { bearerAuth: true },
+          }),
           this._client,
         ),
       ),

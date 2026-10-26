@@ -1,17 +1,18 @@
 // File generated from our OpenAPI spec by Castiron. See CONTRIBUTING.md for details.
 
-import {
-  prepareAgentFiles,
-  uploadAgentFile,
-  type PreparedAgentFiles,
-} from '../../../../lib/beta/agents/files';
-import type { Uploadable } from '../../../../internal/uploads';
 import { APIResource } from '../../../../core/resource';
 import { APIPromise } from '../../../../core/api-promise';
 import { PagePromise, TokenPage, type TokenPageParams } from '../../../../core/pagination';
 import { buildHeaders } from '../../../../internal/headers';
 import { RequestOptions } from '../../../../internal/request-options';
 import { path } from '../../../../internal/utils/path';
+
+import {
+  prepareAgentFiles,
+  uploadAgentFile,
+  type PreparedAgentFiles,
+} from '../../../../lib/beta/agents/files';
+import type { Uploadable } from '../../../../internal/uploads';
 
 function resolveResourceRequestOptions(
   options: RequestOptions | undefined,
@@ -21,16 +22,6 @@ function resolveResourceRequestOptions(
 }
 
 export class Files extends APIResource {
-  /** Beta: prepare initial hosted file references; uploaded Files API objects remain caller-owned. */
-  prepare(files: Record<string, Uploadable>, options?: RequestOptions): Promise<PreparedAgentFiles> {
-    return prepareAgentFiles(this._client, files, options);
-  }
-
-  /** Beta: upload one local file and stage its reference in a live environment. */
-  upload(environmentID: string, params: { file: Uploadable; path: string }, options?: RequestOptions) {
-    return uploadAgentFile(this._client, this, environmentID, params, options);
-  }
-
   /**
    * Copies inline bytes or a Files API file into a connected execution environment,
    * replacing an existing regular file at the same path. Upload between turns and
@@ -42,11 +33,7 @@ export class Files extends APIResource {
    * const environmentFile =
    *   await client.beta.agents.environments.files.create(
    *     'environment_id',
-   *     {
-   *       type: 'inline',
-   *       path: '/workspace/example.txt',
-   *       data: 'SGVsbG8K',
-   *     },
+   *     { file_id: 'x', path: 'x', type: 'file_id' },
    *   );
    * ```
    */
@@ -96,6 +83,16 @@ export class Files extends APIResource {
         __security: { bearerAuth: true },
       })),
     );
+  }
+
+  /** Beta: prepare initial hosted file references; uploaded Files API objects remain caller-owned. */
+  prepare(files: Record<string, Uploadable>, options?: RequestOptions): Promise<PreparedAgentFiles> {
+    return prepareAgentFiles(this._client, files, options);
+  }
+
+  /** Beta: upload one local file and stage its reference in a live environment. */
+  upload(environmentID: string, params: { file: Uploadable; path: string }, options?: RequestOptions) {
+    return uploadAgentFile(this._client, this, environmentID, params, options);
   }
 }
 
