@@ -218,14 +218,23 @@ export async function runTranscriptDemo(
         'the first answer to settle',
       );
     }
+    // The answer can arrive while audio is still being sent. Do not mistake the
+    // first answer's delayed closure for a reply to the second utterance.
+    const previousSegments = new Set(latest.keys());
     await sendPCM(secondAudio);
-    const beforeAnswer = assistantCharacters;
-    const beforeClose = closedAssistant;
     await waitWithAudio(
       () =>
-        assistantCharacters > beforeAnswer &&
-        closedAssistant > beforeClose &&
-        performance.now() - lastTextAt >= 2500,
+        performance.now() - lastTextAt >= 2500 &&
+        result.segments.some(({ segment }, index, segments) => {
+          const previous = segments[index - 1]?.segment;
+          return (
+            segment.speaker === 'assistant' &&
+            previous?.speaker === 'user' &&
+            !previousSegments.has(previous.id) &&
+            segment.previousId === previous.id &&
+            segment.endMs >= previous.startMs
+          );
+        }),
       'the final answer to settle',
     );
     finishing = true;
