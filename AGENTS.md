@@ -73,6 +73,8 @@ explicitly requires it.
   when the public contract changes. Preserve existing documentation URLs and import
   paths, and make examples runnable with the documented environment and dependencies.
 
+<a id="custom-code-budget"></a>
+
 ## Generated-file ownership
 
 Never hand-edit generated SDK files, including generated tests, documentation,

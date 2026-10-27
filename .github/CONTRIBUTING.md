@@ -80,6 +80,8 @@ Most of the SDK is generated code. Never edit generated files by hand; change
 the authoritative generation inputs or compiler and regenerate instead. The generator will never
 modify the contents of the `src/lib/` and `examples/` directories.
 
+<a id="custom-code-budget"></a>
+
 ## Generated-file ownership
 
 Do not edit generated SDK files by hand. Fix the API schema, generation
