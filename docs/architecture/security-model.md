@@ -2,8 +2,20 @@
 
 Generated files are updated through authoritative inputs or the compiler and
 regeneration; handwritten edits to them are forbidden. Code review enforces this
-ownership rule. The customization-budget reporter and publishers are retired
-and are not part of the active CI or security controls.
+ownership rule. The customization-budget system is being retired, but this
+`next` revision still contains its workflow and publisher implementations.
+Their removal is a separate canonical regeneration; this documentation change
+does not remove or disable executable workflows.
+
+Until those files are removed, include them in security review. The legacy
+`.github/workflows/castiron-custom-code.yml` accepts PR/merge-group input, and
+`.github/workflows/castiron-custom-code-comment.yml` can publish statuses and
+comments. Preserve its trusted-code, event/repository/revision identity,
+artifact-validation, freshness, and least-privilege boundaries. Do not infer
+that repository settings eliminate these code paths from a scan of this tree.
+See `scripts/castiron/CUSTOM_CODE.md` for the remaining implementation's historical
+protocol; it does not authorize new handwritten edits to generated files or a
+replacement budget system.
 
 The repository's canonical security policy is `.github/SECURITY.md`; this is
 the canonical detailed threat model that policy references for the `openai`

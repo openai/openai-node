@@ -96,6 +96,16 @@ dedicated generated-file edit check or required gate. Fix violations in the
 generation inputs/compiler and regenerate; do not edit inventory hashes to
 accept a handwritten patch.
 
+### Transition on `next`
+
+This guidance is a prerequisite for regeneration, not the tooling-removal change.
+This `next` revision still contains the legacy budget/reporting workflows and
+`scripts/castiron/CUSTOM_CODE.md`, which documents their existing protocol.
+Canonical regeneration will remove them. Until then, preserve their security
+checks and inspect the repository's actual workflow settings and results; do not
+assume this documentation disables them or bypass a required check. Do not start
+new budget changes or add handwritten edits to generated output.
+
 ## Security requirements
 
 ### Credentials, examples, and diagnostics
@@ -317,6 +327,10 @@ requires GitHub Actions OIDC trusted publishing; local token-based publishing is
 
 The table describes workflow execution and npm publication dependencies for changes targeting `main`
 in `openai/openai-node`.
+It describes main after the tooling retirement. On this `next` revision, the
+legacy Castiron PR/merge-group and privileged publication workflow definitions
+also remain until canonical regeneration removes them; their hosted activation
+is controlled separately in repository settings.
 Required merge checks are configured in repository rules. The `test matrix` check requires the Node.js
 tests, benchmarks, credential-free ecosystem job, and Windows build to succeed.
 
