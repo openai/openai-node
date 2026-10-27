@@ -13,9 +13,10 @@ in external scan configuration. It records reusable architecture and
 trust-boundary context; the scenarios below are hypotheses and calibration
 examples, not findings.
 
-SDK lint verifies generated-file contents and Git file modes against the
-checked-in compiler inventory. The checker runs with the existing lint job
-permissions; inventory and checker changes receive ordinary SDK code review.
+Generated-file ownership currently relies on `AGENTS.md`, contributor guidance,
+and ordinary SDK code review. There is no dedicated generated-file edit check or
+required gate. Review generated output and inventory changes together; fix
+violations in the inputs/compiler and regenerate.
 
 ## 1. Overview
 

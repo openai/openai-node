@@ -1,5 +1,4 @@
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import {
   copyFileSync,
   mkdirSync,
@@ -486,7 +485,6 @@ test('checks and fixes generated imports through the public package commands', (
     mkdirSync(path.join(fixtureRoot, 'scripts'));
     for (const file of [
       'scripts/lint',
-      'scripts/check_generated_files.py',
       'scripts/format',
       'scripts/lint-generated.cjs',
       'scripts/generated-files.cjs',
@@ -537,27 +535,6 @@ test('checks and fixes generated imports through the public package commands', (
         '',
       ].join('\n'),
     );
-    const inventoryPath = path.join(fixtureRoot, 'scripts/castiron/generated-files.json');
-    const recordGeneratedSnapshot = () => {
-      mkdirSync(path.dirname(inventoryPath), { recursive: true });
-      writeFileSync(
-        inventoryPath,
-        `${JSON.stringify(
-          {
-            schema_version: 1,
-            files: {
-              'generated.ts': {
-                mode: '100644',
-                sha256: createHash('sha256').update(readFileSync(generatedPath)).digest('hex'),
-              },
-            },
-          },
-          null,
-          2,
-        )}\n`,
-      );
-    };
-    recordGeneratedSnapshot();
 
     const rejected = spawnPnpm(['lint'], fixtureRoot);
 
@@ -568,26 +545,13 @@ test('checks and fixes generated imports through the public package commands', (
 
     const fixed = spawnPnpm(['format'], fixtureRoot);
 
-    expect({
-      status: fixed.status,
-      output: fixed.status === 0 ? '' : fixed.stdout + fixed.stderr,
-    }).toEqual({ status: 0, output: '' });
+    expect(fixed.status).toBe(0);
     expect(readFileSync(generatedPath, 'utf-8')).not.toContain('Unused');
     expect(readFileSync(handwrittenPath, 'utf-8')).toBe("export const formatted = 'value';\n");
 
-    const staleInventory = spawnPnpm(['lint'], fixtureRoot);
-
-    expect(staleInventory.status).toBe(1);
-    expect(`${staleInventory.stdout}${staleInventory.stderr}`).toContain('Generated files differ');
-
-    // Generation records its synthetic snapshot after formatting has finished.
-    recordGeneratedSnapshot();
     const accepted = spawnPnpm(['lint'], fixtureRoot);
 
-    expect({
-      status: accepted.status,
-      output: accepted.status === 0 ? '' : accepted.stdout + accepted.stderr,
-    }).toEqual({ status: 0, output: '' });
+    expect(accepted.status).toBe(0);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
