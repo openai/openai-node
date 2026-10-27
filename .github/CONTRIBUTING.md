@@ -316,16 +316,16 @@ in `openai/openai-node`.
 Required merge checks are configured in repository rules. The `test matrix` check requires the Node.js
 tests, benchmarks, credential-free ecosystem job, and Windows build to succeed.
 
-| Checks                                                              | PR             | Merge queue   | Push to `main`    | Release PR     | npm publication                             |
-| ------------------------------------------------------------------- | -------------- | ------------- | ----------------- | -------------- | ------------------------------------------- |
-| CI lint, build, Node.js tests, packed-package tests, benchmarks     | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
-| Windows contributor bootstrap and SDK build                         | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
-| Credential-free ecosystem startup/import and compatibility checks   | Runs           | Runs          | Runs              | Runs           | CI gate                                     |
-| Live examples and live ecosystem tests                              | Skipped        | Skipped       | Runs²             | Skipped        | CI gate²                                    |
-| CodeQL merge protection, breaking-change detection | Runs           | Runs          | Not triggered     | Runs           | Merge protection; no separate release gate  |
-| Standalone Node.js support policy workflow                          | Not triggered  | Not triggered | Runs              | Not triggered  | No separate gate; assertions also run in CI |
-| Release PR title/version validation                                 | Not applicable | Not triggered | Not applicable    | Runs           | Checked before release creation             |
-| Release state, native-browser compatibility, release-package build  | Not applicable | Not triggered | Release workflow³ | Not applicable | Required                                    |
+| Checks                                                             | PR             | Merge queue   | Push to `main`    | Release PR     | npm publication                             |
+| ------------------------------------------------------------------ | -------------- | ------------- | ----------------- | -------------- | ------------------------------------------- |
+| CI lint, build, Node.js tests, packed-package tests, benchmarks    | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
+| Windows contributor bootstrap and SDK build                        | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
+| Credential-free ecosystem startup/import and compatibility checks  | Runs           | Runs          | Runs              | Runs           | CI gate                                     |
+| Live examples and live ecosystem tests                             | Skipped        | Skipped       | Runs²             | Skipped        | CI gate²                                    |
+| CodeQL merge protection, breaking-change detection                 | Runs           | Runs          | Not triggered     | Runs           | Merge protection; no separate release gate  |
+| Standalone Node.js support policy workflow                         | Not triggered  | Not triggered | Runs              | Not triggered  | No separate gate; assertions also run in CI |
+| Release PR title/version validation                                | Not applicable | Not triggered | Not applicable    | Runs           | Checked before release creation             |
+| Release state, native-browser compatibility, release-package build | Not applicable | Not triggered | Release workflow³ | Not applicable | Required                                    |
 
 ¹ Same-repository PRs run these checks through branch pushes; duplicate PR-event jobs may be skipped.
 Fork PRs and `ready_for_review` events run them directly. Release PRs receive the same CI coverage.
