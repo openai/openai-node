@@ -13,7 +13,13 @@ Basic text based example with `ws`:
 import { OpenAIRealtimeWS } from 'openai/realtime/ws';
 
 const rt = new OpenAIRealtimeWS({ model: 'gpt-realtime' });
-let responseDone = false;
+let settled = false;
+const timeout = setTimeout(() => {
+  settled = true;
+  console.error('Timed out waiting for the response.');
+  process.exitCode = 1;
+  rt.close();
+}, 60_000);
 
 // access the underlying `ws.WebSocket` instance
 rt.socket.on('open', () => {
@@ -39,7 +45,12 @@ rt.socket.on('open', () => {
 });
 
 rt.on('error', (err) => {
+  if (settled) return;
+  settled = true;
+  clearTimeout(timeout);
   console.error('Realtime error:', err);
+  process.exitCode = 1;
+  rt.close();
 });
 
 rt.on('session.created', (event) => {
@@ -52,7 +63,9 @@ rt.on('response.output_text.done', () => console.log());
 
 // response.done also covers failed, cancelled, and incomplete responses.
 rt.on('response.done', (event) => {
-  responseDone = true;
+  if (settled) return;
+  settled = true;
+  clearTimeout(timeout);
   if (event.response.status !== 'completed') {
     console.error('Response did not complete successfully.');
     process.exitCode = 1;
@@ -61,7 +74,9 @@ rt.on('response.done', (event) => {
 });
 
 rt.socket.on('close', () => {
-  if (!responseDone) {
+  clearTimeout(timeout);
+  if (!settled) {
+    settled = true;
     console.error('WebSocket closed before the response completed.');
     process.exitCode = 1;
   }
@@ -69,7 +84,7 @@ rt.socket.on('close', () => {
 });
 ```
 
-`response.done` indicates a terminal response, not necessarily a successful one. Check `event.response.status` for `completed`; a socket close before `response.done` also leaves the response unfinished.
+`response.done` indicates a terminal response, not necessarily a successful one. Check `event.response.status` for `completed`; a socket close before `response.done` also leaves the response unfinished. This single-response example treats an API error or 60 seconds without a terminal response as a failure. Adjust that deadline for your application. The connection might remain usable after an API error, but this example closes it because it does not implement recovery.
 
 To use the web API `WebSocket` implementation, replace `OpenAIRealtimeWS` with `OpenAIRealtimeWebSocket` and adjust any `rt.socket` access:
 

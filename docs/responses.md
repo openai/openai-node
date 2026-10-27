@@ -118,9 +118,21 @@ import { ResponsesWS } from 'openai/resources/responses/ws';
 
 const client = new OpenAI();
 const socket = new ResponsesWS(client);
+let settled = false;
+const timeout = setTimeout(() => {
+  settled = true;
+  console.error('Timed out waiting for the response.');
+  process.exitCode = 1;
+  socket.close();
+}, 60_000);
 
 socket.on('error', (error) => {
+  if (settled) return;
+  settled = true;
+  clearTimeout(timeout);
   console.error('Responses WebSocket error:', error);
+  process.exitCode = 1;
+  socket.close();
 });
 
 socket.on('response.output_text.delta', (event) => {
@@ -129,21 +141,34 @@ socket.on('response.output_text.delta', (event) => {
 
 socket.on('event', (event) => {
   if (
-    event.type !== 'response.completed' &&
-    event.type !== 'response.failed' &&
-    event.type !== 'response.incomplete'
+    settled ||
+    (event.type !== 'response.completed' &&
+      event.type !== 'response.failed' &&
+      event.type !== 'response.incomplete')
   ) {
     return;
   }
+  settled = true;
+  clearTimeout(timeout);
 
   if (event.type === 'response.completed') {
     console.log('\nResponse ID:', event.response.id);
   } else {
     const details = event.response.error ?? event.response.incomplete_details;
     console.error(`\n${event.type}:`, details ?? 'No additional details.');
+    process.exitCode = 1;
   }
 
   socket.close();
+});
+
+socket.on('close', () => {
+  clearTimeout(timeout);
+  if (!settled) {
+    settled = true;
+    console.error('WebSocket closed before a terminal response.');
+    process.exitCode = 1;
+  }
 });
 
 socket.send({
@@ -153,6 +178,10 @@ socket.send({
   stream: true,
 });
 ```
+
+This single-response example treats an API error, an early close or 60 seconds without a terminal response as a failure.
+Adjust the deadline to your application's needs. A terminal `response.failed` or `response.incomplete` also exits with
+a failure status; it must not be used as a completed result.
 
 The connection inherits endpoint configuration from the `OpenAI` client. The synchronous Node constructor uses a
 static `apiKey`, a function-backed key already resolved by a previous request, or a caller-supplied credential.
