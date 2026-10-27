@@ -93,22 +93,23 @@ Handwritten edits to generated output are overwritten, not carried forward.
 Separately owned handwritten files are preserved. Resolve ownership conflicts
 explicitly before regeneration. Follow the ownership rules in `AGENTS.md`
 and review generated output and inventory changes together. Generated-file
-ownership will rely on contributor guidance and code review after canonical
-regeneration removes the legacy reporting tooling. Until then, the retained
-strict ownership checker can reject generated-file mismatches; preserve its
-checks and satisfy any required statuses. Fix violations in the
+ownership relies on contributor guidance and code review. Fix violations in the
 generation inputs/compiler and regenerate; do not edit inventory hashes to
 accept a handwritten patch.
 
 ### Transition on `next`
 
-This guidance is a prerequisite for regeneration, not the tooling-removal change.
-This `next` revision still contains the legacy budget/reporting workflows and
-`scripts/castiron/CUSTOM_CODE.md`, which documents their existing protocol.
-Canonical regeneration will remove them. Until then, preserve their security
-checks and inspect the repository's actual workflow settings and results; do not
-assume this documentation disables them or bypass a required check. Do not start
-new budget changes or add handwritten edits to generated output.
+Canonical regeneration retires the legacy budget/reporting workflows,
+privileged status publisher, checker, and `scripts/castiron/CUSTOM_CODE.md`.
+The files present depend on the revision: while a checkout still contains the
+legacy tooling, preserve its security checks and satisfy required statuses.
+After regeneration removes it, do not recreate it or introduce a replacement
+budget system.
+
+Repository rules and hosted workflow settings are configured separately from
+these files. Inspect the actual settings and check results before merging;
+this guidance neither disables workflows nor bypasses a required check.
+Never add handwritten edits to generated output.
 
 ## Security requirements
 
@@ -331,10 +332,10 @@ requires GitHub Actions OIDC trusted publishing; local token-based publishing is
 
 The table describes workflow execution and npm publication dependencies for changes targeting `main`
 in `openai/openai-node`.
-It describes main after the tooling retirement. On this `next` revision, the
-legacy Castiron PR/merge-group and privileged publication workflow definitions
-also remain until canonical regeneration removes them; their hosted activation
-is controlled separately in repository settings.
+It describes main after the tooling retirement. A `next` revision may still
+contain legacy Castiron PR/merge-group and privileged publication workflow
+definitions until canonical regeneration removes them. Inspect the checkout and
+hosted workflow settings to determine which checks apply.
 Required merge checks are configured in repository rules. The `test matrix` check requires the Node.js
 tests, benchmarks, credential-free ecosystem job, and Windows build to succeed.
 
