@@ -5338,18 +5338,18 @@ export interface BetaResponseInputFile {
   filename?: string;
 
   /**
-   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-   * token block.
+   * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+   * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+   * not rounded to a token block.
    */
   prompt_cache_breakpoint?: BetaResponseInputFile.PromptCacheBreakpoint;
 }
 
 export namespace BetaResponseInputFile {
   /**
-   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-   * token block.
+   * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+   * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+   * not rounded to a token block.
    */
   export interface PromptCacheBreakpoint {
     /**
@@ -5403,18 +5403,18 @@ export interface BetaResponseInputFileContent {
   filename?: string | null;
 
   /**
-   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-   * token block.
+   * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+   * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+   * not rounded to a token block.
    */
   prompt_cache_breakpoint?: BetaResponseInputFileContent.PromptCacheBreakpoint | null;
 }
 
 export namespace BetaResponseInputFileContent {
   /**
-   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-   * token block.
+   * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+   * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+   * not rounded to a token block.
    */
   export interface PromptCacheBreakpoint {
     /**
@@ -5457,18 +5457,18 @@ export interface BetaResponseInputImage {
   image_url?: string | null;
 
   /**
-   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-   * token block.
+   * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+   * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+   * not rounded to a token block.
    */
   prompt_cache_breakpoint?: BetaResponseInputImage.PromptCacheBreakpoint;
 }
 
 export namespace BetaResponseInputImage {
   /**
-   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-   * token block.
+   * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+   * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+   * not rounded to a token block.
    */
   export interface PromptCacheBreakpoint {
     /**
@@ -5511,18 +5511,18 @@ export interface BetaResponseInputImageContent {
   image_url?: string | null;
 
   /**
-   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-   * token block.
+   * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+   * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+   * not rounded to a token block.
    */
   prompt_cache_breakpoint?: BetaResponseInputImageContent.PromptCacheBreakpoint | null;
 }
 
 export namespace BetaResponseInputImageContent {
   /**
-   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-   * token block.
+   * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+   * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+   * not rounded to a token block.
    */
   export interface PromptCacheBreakpoint {
     /**
@@ -7226,18 +7226,18 @@ export interface BetaResponseInputText {
   type: 'input_text';
 
   /**
-   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-   * token block.
+   * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+   * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+   * not rounded to a token block.
    */
   prompt_cache_breakpoint?: BetaResponseInputText.PromptCacheBreakpoint;
 }
 
 export namespace BetaResponseInputText {
   /**
-   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-   * token block.
+   * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+   * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+   * not rounded to a token block.
    */
   export interface PromptCacheBreakpoint {
     /**
@@ -7267,18 +7267,18 @@ export interface BetaResponseInputTextContent {
   type: 'input_text';
 
   /**
-   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-   * token block.
+   * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+   * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+   * not rounded to a token block.
    */
   prompt_cache_breakpoint?: BetaResponseInputTextContent.PromptCacheBreakpoint | null;
 }
 
 export namespace BetaResponseInputTextContent {
   /**
-   * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-   * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-   * token block.
+   * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+   * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+   * not rounded to a token block.
    */
   export interface PromptCacheBreakpoint {
     /**
@@ -7442,18 +7442,18 @@ export namespace BetaResponseItem {
       type: 'computer_screenshot';
 
       /**
-       * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-       * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-       * token block.
+       * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+       * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+       * not rounded to a token block.
        */
       prompt_cache_breakpoint?: ComputerScreenshot.PromptCacheBreakpoint;
     }
 
     export namespace ComputerScreenshot {
       /**
-       * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-       * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-       * token block.
+       * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+       * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+       * not rounded to a token block.
        */
       export interface PromptCacheBreakpoint {
         /**
@@ -8734,18 +8734,18 @@ export namespace BetaResponseOutputItem {
       type: 'computer_screenshot';
 
       /**
-       * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-       * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-       * token block.
+       * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+       * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+       * not rounded to a token block.
        */
       prompt_cache_breakpoint?: ComputerScreenshot.PromptCacheBreakpoint;
     }
 
     export namespace ComputerScreenshot {
       /**
-       * Marks the exact end of a reusable prompt prefix. The breakpoint inherits its TTL
-       * from the request's `prompt_cache_options.ttl`; the boundary is not rounded to a
-       * token block.
+       * Marks the exact end of a reusable prompt prefix. When `ttl` is omitted, the
+       * breakpoint inherits the request's `prompt_cache_options.ttl`; the boundary is
+       * not rounded to a token block.
        */
       export interface PromptCacheBreakpoint {
         /**
