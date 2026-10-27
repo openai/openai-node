@@ -1,5 +1,11 @@
 # Eliminate mixed generated and handwritten files in the Node SDK
 
+> Historical migration plan: the budgets, reporter commands, and three-way
+> replay described below have been retired. These measurements and rollout steps
+> record the migration baseline, not current operating instructions. Follow
+> [AGENTS.md](../AGENTS.md#generated-file-ownership) for the current policy:
+> change the schema/compiler or handwritten extensions, then regenerate.
+
 ## Objective and non-negotiable contract
 
 Every Castiron-owned file should match its verified generated snapshot. SDK-specific

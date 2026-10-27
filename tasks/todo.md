@@ -1,5 +1,11 @@
 # Node generated ownership transition tasks
 
+> Historical migration checklist: the budgets, trusted checker/checkpoint, and
+> strict-ownership activation steps below have been retired. This queue records
+> the migration baseline, not current operating instructions. Follow
+> [AGENTS.md](../AGENTS.md#generated-file-ownership) for the current policy:
+> change the schema/compiler or handwritten extensions, then regenerate.
+
 Canonical analysis, inventory, contracts and execution policy: [plan.md](plan.md).
 Every task below is split into small PRs where indicated. Work is preauthorized;
 CI, required review and compiler-before-promotion rules remain required.
