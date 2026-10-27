@@ -76,26 +76,37 @@ This will install all the required dependencies and build output files to `dist/
 
 ## Modifying/Adding code
 
-Most of the SDK is generated code. Modifications to code will be persisted between generations, but may
-result in merge conflicts between manual patches and changes from the generator. The generator will never
+Most of the SDK is generated code. Never edit generated files by hand; change
+the authoritative generation inputs or compiler and regenerate instead. The generator will never
 modify the contents of the `src/lib/` and `examples/` directories.
 
-## Custom-code budget
+<a id="custom-code-budget"></a>
 
-The custom-code budget counts additions plus deletions in the remaining patch
-against verified generated output. `.castiron-ratchet.json` defines this repository's
-ceiling. CI uses the checker and budget on main, not the PR's proposed versions.
+## Generated-file ownership
 
-Budget changes must be in a separate PR modifying **only `.castiron-ratchet.json`**.
-Justify the current usage, proposed ceiling, and why fixing generation is not
-appropriate in the PR description. Increases require a **human approving review**
-and must merge before an SDK change relies on them. Agents may draft proposals,
-but must not approve increases or bypass the gate. Keep default CODEOWNERS.
-Lower the ceiling after cleanup while retaining headroom; decreases must still
-fit the measured usage.
+Do not edit generated SDK files by hand. Fix the API schema, generation
+configuration, or compiler and regenerate instead. Put SDK-specific behavior in
+separately owned handwritten helpers and extension points.
 
-See [custom-code technical details](../scripts/castiron/CUSTOM_CODE.md) for accounting,
-local checks, trusted CI, and activation instructions.
+Regeneration replaces generated files and removes retired generated paths.
+Handwritten edits to generated output are overwritten, not carried forward.
+Separately owned handwritten files are preserved. Resolve ownership conflicts
+explicitly before regeneration. Follow the ownership rules in `AGENTS.md`
+and review generated output and inventory changes together. Generated-file
+ownership currently relies on contributor guidance and code review, without a
+dedicated generated-file edit check or required gate. Fix violations in the
+generation inputs/compiler and regenerate; do not edit inventory hashes to
+accept a handwritten patch.
+
+### Transition on `next`
+
+This guidance is a prerequisite for regeneration, not the tooling-removal change.
+This `next` revision still contains the legacy budget/reporting workflows and
+`scripts/castiron/CUSTOM_CODE.md`, which documents their existing protocol.
+Canonical regeneration will remove them. Until then, preserve their security
+checks and inspect the repository's actual workflow settings and results; do not
+assume this documentation disables them or bypass a required check. Do not start
+new budget changes or add handwritten edits to generated output.
 
 ## Security requirements
 
@@ -318,19 +329,23 @@ requires GitHub Actions OIDC trusted publishing; local token-based publishing is
 
 The table describes workflow execution and npm publication dependencies for changes targeting `main`
 in `openai/openai-node`.
+It describes main after the tooling retirement. On this `next` revision, the
+legacy Castiron PR/merge-group and privileged publication workflow definitions
+also remain until canonical regeneration removes them; their hosted activation
+is controlled separately in repository settings.
 Required merge checks are configured in repository rules. The `test matrix` check requires the Node.js
 tests, benchmarks, credential-free ecosystem job, and Windows build to succeed.
 
-| Checks                                                              | PR             | Merge queue   | Push to `main`    | Release PR     | npm publication                             |
-| ------------------------------------------------------------------- | -------------- | ------------- | ----------------- | -------------- | ------------------------------------------- |
-| CI lint, build, Node.js tests, packed-package tests, benchmarks     | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
-| Windows contributor bootstrap and SDK build                         | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
-| Credential-free ecosystem startup/import and compatibility checks   | Runs           | Runs          | Runs              | Runs           | CI gate                                     |
-| Live examples and live ecosystem tests                              | Skipped        | Skipped       | Runs²             | Skipped        | CI gate²                                    |
-| CodeQL merge protection, breaking-change detection, Castiron checks | Runs           | Runs          | Not triggered     | Runs           | Merge protection; no separate release gate  |
-| Standalone Node.js support policy workflow                          | Not triggered  | Not triggered | Runs              | Not triggered  | No separate gate; assertions also run in CI |
-| Release PR title/version validation                                 | Not applicable | Not triggered | Not applicable    | Runs           | Checked before release creation             |
-| Release state, native-browser compatibility, release-package build  | Not applicable | Not triggered | Release workflow³ | Not applicable | Required                                    |
+| Checks                                                             | PR             | Merge queue   | Push to `main`    | Release PR     | npm publication                             |
+| ------------------------------------------------------------------ | -------------- | ------------- | ----------------- | -------------- | ------------------------------------------- |
+| CI lint, build, Node.js tests, packed-package tests, benchmarks    | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
+| Windows contributor bootstrap and SDK build                        | Runs¹          | Runs          | Runs              | Runs¹          | CI gate                                     |
+| Credential-free ecosystem startup/import and compatibility checks  | Runs           | Runs          | Runs              | Runs           | CI gate                                     |
+| Live examples and live ecosystem tests                             | Skipped        | Skipped       | Runs²             | Skipped        | CI gate²                                    |
+| CodeQL merge protection, breaking-change detection                 | Runs           | Runs          | Not triggered     | Runs           | Merge protection; no separate release gate  |
+| Standalone Node.js support policy workflow                         | Not triggered  | Not triggered | Runs              | Not triggered  | No separate gate; assertions also run in CI |
+| Release PR title/version validation                                | Not applicable | Not triggered | Not applicable    | Runs           | Checked before release creation             |
+| Release state, native-browser compatibility, release-package build | Not applicable | Not triggered | Release workflow³ | Not applicable | Required                                    |
 
 ¹ Same-repository PRs run these checks through branch pushes; duplicate PR-event jobs may be skipped.
 Fork PRs and `ready_for_review` events run them directly. Release PRs receive the same CI coverage.
