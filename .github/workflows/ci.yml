@@ -29,6 +29,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Check generated files
+        run: python3 -I scripts/check_generated_files.py
+
       - name: Set up pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
 

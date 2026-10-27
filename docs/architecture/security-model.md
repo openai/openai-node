@@ -13,6 +13,10 @@ in external scan configuration. It records reusable architecture and
 trust-boundary context; the scenarios below are hypotheses and calibration
 examples, not findings.
 
+SDK lint verifies generated-file contents and Git file modes against the
+checked-in compiler inventory. The checker runs with the existing lint job
+permissions; inventory and checker changes receive ordinary SDK code review.
+
 ## 1. Overview
 
 The published `openai` package is an outbound API client library, not an
