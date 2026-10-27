@@ -4,6 +4,8 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+python3 -I scripts/check_generated_files.py
+
 node ./scripts/lint-generated.cjs --check
 
 PATH="$PWD/node_modules/.bin:$PATH" exec ./node_modules/.bin/ultracite check
