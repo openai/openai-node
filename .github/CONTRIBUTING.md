@@ -93,8 +93,10 @@ Handwritten edits to generated output are overwritten, not carried forward.
 Separately owned handwritten files are preserved. Resolve ownership conflicts
 explicitly before regeneration. Follow the ownership rules in `AGENTS.md`
 and review generated output and inventory changes together. Generated-file
-ownership currently relies on contributor guidance and code review, without a
-dedicated generated-file edit check or required gate. Fix violations in the
+ownership will rely on contributor guidance and code review after canonical
+regeneration removes the legacy reporting tooling. Until then, the retained
+strict ownership checker can reject generated-file mismatches; preserve its
+checks and satisfy any required statuses. Fix violations in the
 generation inputs/compiler and regenerate; do not edit inventory hashes to
 accept a handwritten patch.
 
