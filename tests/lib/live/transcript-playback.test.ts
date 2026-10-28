@@ -45,8 +45,8 @@ it.each(['before-eof', 'after-eof', 'complete', 'missing', 'nonzero'])(
       player.write(Buffer.alloc(480, 3));
       const pid = Number(await vi.waitFor(() => readFile(ready, 'utf-8')));
       if (stage === 'before-eof') {
-        await player.close();
         expect(await readFile(eof).catch(() => {})).toBeUndefined();
+        await player.close();
       } else {
         const result = player.finish().then(
           () => 'completed',
