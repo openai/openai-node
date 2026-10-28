@@ -22,10 +22,23 @@ it.concurrent.each([
   { timing: 'straddling-stale-only', interrupt: true },
   { timing: 'reused-user', interrupt: true },
   { timing: 'audio-tail', interrupt: false },
+  { timing: 'delayed-finalization', interrupt: false },
+  { timing: 'eof-finalization', interrupt: false },
+  { timing: 'premature-finalization', interrupt: false },
+  { timing: 'premature-finalization-open', interrupt: false },
   { timing: 'error', interrupt: false },
   { timing: 'eof', interrupt: true },
 ])('handles a $timing answer (interrupt=$interrupt)', async ({ timing, interrupt }) => {
-  const expectsAnswer = !['no-answer', 'straddling-stale-only', 'error', 'eof'].includes(timing);
+  const expectsAnswer = ![
+    'no-answer',
+    'straddling-stale-only',
+    'error',
+    'eof',
+    'eof-finalization',
+    'premature-finalization',
+    'premature-finalization-open',
+  ].includes(timing);
+  const receivesAnswer = expectsAnswer || timing === 'eof-finalization';
   const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
   await once(server, 'listening');
   const address = server.address();
@@ -38,6 +51,8 @@ it.concurrent.each([
   let secondChunks = 0;
   let answerAtChunk = 0;
   let sentSessionClose = false;
+  let sentSessionClosed = false;
+  let forcedPrematureClose = false;
   let audioFrames = 0;
 
   server.on('connection', (socket) => {
@@ -63,14 +78,31 @@ it.concurrent.each([
         }),
       );
     };
+    const startSession = () => {
+      if (timing === 'premature-finalization' || timing === 'premature-finalization-open') {
+        socket.send(
+          JSON.stringify({ type: 'session.closed', reason: 'close_requested', session: { id: 'fixture' } }),
+        );
+        if (timing === 'premature-finalization-open') {
+          timers.push(
+            setTimeout(() => {
+              forcedPrematureClose = true;
+              socket.close();
+            }, 3000),
+          );
+        } else {
+          socket.close();
+        }
+        return;
+      }
+      socket.send(JSON.stringify({ type: 'session.started', session: { id: 'fixture', status: 'active' } }));
+    };
     let heardFirst = false;
     let firstEnd = 0;
     socket.on('message', (raw) => {
       const event: { type: string; audio: string } = JSON.parse(raw.toString());
       if (event.type === 'session.start') {
-        socket.send(
-          JSON.stringify({ type: 'session.started', session: { id: 'fixture', status: 'active' } }),
-        );
+        startSession();
       }
       if (event.type === 'session.input_audio.append') {
         const [marker] = Buffer.from(event.audio, 'base64');
@@ -113,7 +145,7 @@ it.concurrent.each([
               );
             }
             const answerDelay = timing === 'delayed' || timing === 'overlap' ? 2050 : 720;
-            if (expectsAnswer) {
+            if (receivesAnswer) {
               timers.push(
                 setTimeout(() => {
                   answerAtChunk = secondChunks;
@@ -159,10 +191,24 @@ it.concurrent.each([
       }
       if (event.type === 'session.close') {
         sentSessionClose = true;
-        socket.send(
-          JSON.stringify({ type: 'session.closed', reason: 'close_requested', session: { id: 'fixture' } }),
-        );
-        socket.close();
+        const finalize = () => {
+          if (timing !== 'eof-finalization') {
+            sentSessionClosed = true;
+            socket.send(
+              JSON.stringify({
+                type: 'session.closed',
+                reason: 'close_requested',
+                session: { id: 'fixture' },
+              }),
+            );
+          }
+          socket.close();
+        };
+        if (timing === 'delayed-finalization') {
+          timers.push(setTimeout(finalize, 650));
+        } else {
+          finalize();
+        }
       }
     });
   });
@@ -174,6 +220,7 @@ it.concurrent.each([
     if (expectsAnswer) {
       const demo = await result;
       expect(sentSessionClose).toBe(true);
+      expect(sentSessionClosed).toBe(true);
       expect(secondChunks).toBe(40);
       if (timing === 'delayed' || timing === 'overlap') {
         expect(answerAtChunk).toBe(secondChunks);
@@ -196,7 +243,8 @@ it.concurrent.each([
       }
     } else {
       await expect(result).rejects.toBeInstanceOf(Error);
-      expect(sentSessionClose).toBe(false);
+      expect(sentSessionClose).toBe(timing === 'eof-finalization');
+      expect(forcedPrematureClose).toBe(false);
     }
   } finally {
     for (const timer of timers) {

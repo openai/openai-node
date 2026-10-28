@@ -94,6 +94,7 @@ export async function runTranscriptDemo(
   };
   let ready = false;
   let finishing = false;
+  let sessionClosed = false;
   let lastAudioAt = Number.NEGATIVE_INFINITY;
   let lastTextAt = Number.NEGATIVE_INFINITY;
   let assistantCharacters = 0;
@@ -125,7 +126,7 @@ export async function runTranscriptDemo(
 
   live.on('error', (error) => abort.abort(error));
   live.on('close', () => {
-    if (!finishing) {
+    if (!finishing || !sessionClosed) {
       abort.abort(new Error('Live transport closed before the demo completed'));
     }
   });
@@ -157,6 +158,10 @@ export async function runTranscriptDemo(
       }
       transcript.push(event);
       if (event.type === 'session.closed') {
+        if (!finishing) {
+          abort.abort(new Error('Live session ended before the demo completed'));
+        }
+        sessionClosed = true;
         live.off('event', onEvent);
       }
     } catch (error) {
@@ -257,8 +262,11 @@ export async function runTranscriptDemo(
     );
     finishing = true;
     live.send({ type: 'session.close' });
-    // Give the public session.closed event a chance to finalize remaining text.
-    await sleep(300, undefined, { signal: abort.signal });
+    // Confirm finalization before closing the transport or returning the transcript.
+    // oxlint-disable-next-line no-unmodified-loop-condition -- The session.closed event listener sets sessionClosed.
+    while (!sessionClosed) {
+      await sleep(20, undefined, { signal: abort.signal });
+    }
   } finally {
     finishing = true;
     clearTimeout(timeout);
