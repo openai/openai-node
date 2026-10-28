@@ -49,10 +49,11 @@ export async function prepareTranscriptDemo(client: OpenAI): Promise<Buffer[]> {
  * Send pre-generated PCM through the public Live WebSocket and group only its
  * public transcript events. This makes paid API requests; requires Live access.
  * No microphone, local TTS latency, internal API, or server turn events are used.
- * Completion is a best-effort observation of speech after the second input,
- * followed by transcript and audio inactivity. Live's public transcript does not
- * identify managed backend turns. A pause after an acknowledgment can still look
- * like completion, so this demo cannot guarantee that a final answer has arrived.
+ * Completion is a best-effort guess from received events and a period of transcript
+ * and audio inactivity. Live's public transcript does not identify managed turns
+ * or map each fragment to an audio append. Delayed earlier speech can be mistaken
+ * for the new clip, and an acknowledgment can be mistaken for a final answer.
+ * The demo can stop before the second transcript or final answer arrives.
  * In an interactive application, leave the session open until the user closes it.
  */
 export async function runTranscriptDemo(
