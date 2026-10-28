@@ -56,7 +56,12 @@ pnpm tsn -T examples/live/transcript-grouper.ts
 ```
 
 Audio playback requires `ffplay` on your `PATH`. To run without playback, add
-`--no-audio`.
+`--no-audio`. The example uses a 45-second demo budget after preparing the TTS
+clips, including session startup. In a terminal, press Enter to finish sooner,
+or Ctrl-C to cancel and stop playback. Both normal finish paths request closure
+and wait for the server's confirmation.
+The budget is an observation window, not a claim that the model finished its
+answer. No path infers answer completion from a pause or transcript fragment.
 
 ## WebRTC with a backend sideband
 
