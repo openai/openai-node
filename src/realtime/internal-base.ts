@@ -299,6 +299,9 @@ export function buildRealtimeURL(
     url.search = '';
   } else {
     url.pathname += url.pathname.endsWith('/') ? 'realtime' : '/realtime';
+    url.searchParams.delete('model');
+    url.searchParams.delete('intent');
+    url.searchParams.delete('call_id');
   }
 
   url.hash = '';

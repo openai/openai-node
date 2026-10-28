@@ -197,6 +197,11 @@ export function buildRealtimeURL(
   }
 
   url.protocol = 'wss';
+  if (!azure) {
+    url.searchParams.delete('model');
+    url.searchParams.delete('intent');
+    url.searchParams.delete('call_id');
+  }
   // Sideband control connections attach to an existing call via `call_id`.
   if (azure) {
     if (hasCallID) {
