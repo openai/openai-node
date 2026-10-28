@@ -499,7 +499,7 @@ it.concurrent.each(['startup', 'input', 'finalization'])(
       expect(new Set(events)).toEqual(new Set(expected));
       expect(events[0]).toBe('session.start');
       if (stage === 'finalization') {
-        expect(events.at(-1)).toBe('session.close');
+        expect(events.slice(-1)).toEqual(['session.close']);
       }
     } finally {
       const closed = once(server, 'close');
