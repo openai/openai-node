@@ -512,7 +512,7 @@ export interface BetaCompactedResponse {
    * The compacted list of output items. This is a list of all user messages,
    * followed by a single compaction item.
    */
-  output: Array<BetaResponseOutputItem>;
+  output: Array<BetaResponseItem>;
 
   /**
    * Token accounting for the compaction pass, including cached, reasoning, and total
