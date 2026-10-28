@@ -52,6 +52,15 @@ export class Audio extends APIResource {
   voiceConsents: VoiceConsentsAPI.VoiceConsents = new VoiceConsentsAPI.VoiceConsents(this._client);
 }
 
+/**
+ * Deprecated values:
+ *
+ * - "whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe",
+ *   "gpt-4o-mini-transcribe-2025-12-15", "gpt-4o-transcribe-diarize": Announced
+ *   shutdown date: 2027-02-26. See
+ *   https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ */
 export type AudioModel =
   | 'whisper-1'
   | 'gpt-transcribe'

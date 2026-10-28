@@ -59,6 +59,13 @@ export interface AudioTranscription {
    * `gpt-4o-mini-transcribe-2025-12-15`, `gpt-4o-transcribe`,
    * `gpt-4o-transcribe-diarize`, and `gpt-realtime-whisper`. Use
    * `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
+   *
+   * Deprecated values:
+   *
+   * - "whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-mini-transcribe-2025-12-15",
+   *   "gpt-4o-transcribe", "gpt-4o-transcribe-diarize": Announced shutdown date:
+   *   2027-02-26. See https://developers.openai.com/api/docs/deprecations for
+   *   details and recommended replacements.
    */
   model?:
     | (string & {})
@@ -2886,6 +2893,14 @@ export interface RealtimeSession {
 
   /**
    * The Realtime model used for this session.
+   *
+   * Deprecated values:
+   *
+   * - "gpt-realtime", "gpt-realtime-2025-08-28", "gpt-realtime-mini",
+   *   "gpt-realtime-mini-2025-12-15", "gpt-audio-mini", "gpt-audio-mini-2025-12-15":
+   *   Announced shutdown date: 2027-01-20. See
+   *   https://developers.openai.com/api/docs/deprecations for details and
+   *   recommended replacements.
    */
   model?:
     | (string & {})
@@ -3182,6 +3197,14 @@ export interface RealtimeSessionCreateRequest {
 
   /**
    * The Realtime model used for this session.
+   *
+   * Deprecated values:
+   *
+   * - "gpt-realtime", "gpt-realtime-2025-08-28", "gpt-realtime-mini",
+   *   "gpt-realtime-mini-2025-12-15", "gpt-audio-mini", "gpt-audio-mini-2025-12-15":
+   *   Announced shutdown date: 2027-01-20. See
+   *   https://developers.openai.com/api/docs/deprecations for details and
+   *   recommended replacements.
    */
   model?:
     | (string & {})

@@ -223,7 +223,7 @@
     },
     "src/resources/audio/audio.ts": {
       "mode": "100644",
-      "sha256": "9498f6e960c66d723d01355c8a27b49bf63f1a39a363411c1459bf266f60d501"
+      "sha256": "8453261bfa31ff0461a15e3ca5c04199900dc02af4b8918886a6ac2e505a8d7c"
     },
     "src/resources/audio/index.ts": {
       "mode": "100644",
@@ -231,7 +231,7 @@
     },
     "src/resources/audio/speech.ts": {
       "mode": "100644",
-      "sha256": "8d058285fdb07c8be55bc5c7fc07fe2a7c863ad0646deca292c7c814dae7576e"
+      "sha256": "d0989bdab475785c6000f969d94469673121d82e09fc02778bd81e742712aaad"
     },
     "src/resources/audio/transcriptions.ts": {
       "mode": "100644",
@@ -239,7 +239,7 @@
     },
     "src/resources/audio/translations.ts": {
       "mode": "100644",
-      "sha256": "7bf24e88987cbe340cc36eab6dd3bea51e0a9c3f7e81dfc807b184ecf520ad18"
+      "sha256": "1868adba37b8cc402975ad3a51f23ae506520abf4bdfb5314b9ed7656bbc404d"
     },
     "src/resources/audio/voice-consents.ts": {
       "mode": "100644",
@@ -451,7 +451,7 @@
     },
     "src/resources/beta/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "f760d2f29d48d247b4c5c7d4afb801cb030ec82420b64fc4be28d7b4b104ea7d"
+      "sha256": "19e24eef832131a1a2802215fbfb9e0f7502034ebb6905a2296358edd9c0d221"
     },
     "src/resources/beta/responses/ws-base.ts": {
       "mode": "100644",
@@ -807,7 +807,7 @@
     },
     "src/resources/realtime/client-secrets.ts": {
       "mode": "100644",
-      "sha256": "f12c8c835fddbc9a251829477537c740efb23d5612ac986d479e78f9eb9e7276"
+      "sha256": "03c530f31e0766e1daddb814d4f88ccc162b177320759dbfa4bf0e0ee08ecda5"
     },
     "src/resources/realtime/index.ts": {
       "mode": "100644",
@@ -815,7 +815,7 @@
     },
     "src/resources/realtime/realtime.ts": {
       "mode": "100644",
-      "sha256": "9f296305e3a9f1fb07c015e055f159133537468c47ce7170cc3f7f90f9ca9978"
+      "sha256": "d85ac0e9bbbb22943d10fd442a70859765a86ced94a6470c12be3daf9b89d37f"
     },
     "src/resources/realtime/translations.ts": {
       "mode": "100644",
@@ -863,7 +863,7 @@
     },
     "src/resources/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "9539693b7552bbb0bc2e9a12705ca14728c962f3d2ecb5c01a320d29219ed551"
+      "sha256": "be587df72325b151f6107d3ac3231da47ed50965d59ff6679189c3d5f1a8b280"
     },
     "src/resources/responses/ws-base.ts": {
       "mode": "100644",
@@ -895,7 +895,7 @@
     },
     "src/resources/shared.ts": {
       "mode": "100644",
-      "sha256": "69cef390c30bc7df0dc8b120e37d8ae1e4559e9f68a6d78b36a6a3a0c56063f4"
+      "sha256": "15cf6803634242502525c52098acddea16b9c2bb2439f85aa388dd43fa837455"
     },
     "src/resources/skills.ts": {
       "mode": "100644",
