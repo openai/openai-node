@@ -52,6 +52,7 @@ export async function prepareTranscriptDemo(client: OpenAI): Promise<Buffer[]> {
  * The caller ends capture with finishSignal; transcript activity never ends it.
  * This controls capture duration, not whether the model finished an answer.
  * The result is returned only after the server confirms session.closed.
+ * Finishing before session startup rejects without returning an unconfirmed capture.
  */
 export async function runTranscriptDemo(
   client: OpenAI,
@@ -76,6 +77,9 @@ export async function runTranscriptDemo(
   const [firstAudio, secondAudio] = audio;
   if (!firstAudio?.length || !secondAudio?.length) {
     throw new Error('Generate both TTS clips before opening Live.');
+  }
+  if (options.finishSignal.aborted) {
+    throw new Error('Live transcript capture stopped before session startup');
   }
   const live = new LiveWS(client, options.websocketOptions);
 
@@ -215,8 +219,12 @@ export async function runTranscriptDemo(
     // The generated transport queues this until the socket opens.
     live.send({ type: 'session.start', session });
     // oxlint-disable-next-line no-unmodified-loop-condition -- The session.started event listener sets ready.
-    while (!ready) {
+    while (!ready && !options.finishSignal.aborted) {
       await sleep(20, undefined, { signal: abort.signal });
+    }
+    abort.signal.throwIfAborted();
+    if (!ready) {
+      throw new Error('Live transcript capture stopped before session startup');
     }
     await sendPCM(firstAudio);
     if (options.interrupt) {

@@ -379,3 +379,62 @@ it.concurrent.each(['close_requested', 'expired', 'content', 'remote_hangup', 'c
     }
   },
 );
+
+it.concurrent.each(['before-opening', 'during-startup'])(
+  'stops capture %s without sending an unstarted session.close',
+  async (stage) => {
+    const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+    await once(server, 'listening');
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Expected an ephemeral TCP address');
+    }
+    const client = new OpenAI({ apiKey: 'local-test-key', baseURL: `http://127.0.0.1:${address.port}/v1` });
+    const finish = new AbortController();
+    const events: string[] = [];
+    let connections = 0;
+    let startupTimedOut = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    if (stage === 'before-opening') {
+      finish.abort('This caller reason must not enter the error');
+    }
+    server.on('connection', (socket) => {
+      connections += 1;
+      socket.on('message', (raw) => {
+        const event: { type: string } = JSON.parse(raw.toString());
+        events.push(event.type);
+        if (event.type === 'session.start') {
+          finish.abort('This caller reason must not enter the error');
+          // Do not confirm startup. An early stop must not wait for this error
+          // or send a command which requires a started session.
+          timers.push(
+            setTimeout(() => {
+              startupTimedOut = true;
+              socket.send(JSON.stringify({ type: 'error', message: 'Synthetic startup timeout' }));
+            }, 1200),
+          );
+        }
+      });
+    });
+    try {
+      await expect(
+        runTranscriptDemo(client, [Buffer.alloc(1920, 1), Buffer.alloc(1920, 2)], {
+          finishSignal: finish.signal,
+        }),
+      ).rejects.toThrow('Live transcript capture stopped before session startup');
+      expect(startupTimedOut).toBe(false);
+      expect(events).toEqual(stage === 'before-opening' ? [] : ['session.start']);
+      expect(connections).toBe(stage === 'before-opening' ? 0 : 1);
+    } finally {
+      for (const timer of timers) {
+        clearTimeout(timer);
+      }
+      const closed = once(server, 'close');
+      for (const socket of server.clients) {
+        socket.terminate();
+      }
+      server.close();
+      await closed;
+    }
+  },
+);
