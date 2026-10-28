@@ -98,6 +98,30 @@ describe.each([StableWS, StableNative])('GA Realtime target selection (%s)', (Re
   );
 });
 
+describe.each([BetaWS, BetaNative])('beta Realtime target selection (%s)', (Realtime) => {
+  test.each([
+    { target: { model: 'chosen-model' }, selected: ['model', 'chosen-model'] },
+    { target: { callID: 'call_test_+/&' }, selected: ['call_id', 'call_test_+/&'] },
+  ])('replaces stale base URL targets with $selected', async ({ target, selected }) => {
+    const incoming = once(peers, 'connection');
+    const client = new OpenAI({
+      baseURL: `${baseURL}?model=old&model=other&intent=old&call_id=old&call_id=other&tenant=one`,
+      apiKey: 'ek_synthetic_wire',
+    });
+    const realtime = new Realtime({ ...target, options: settings.options }, client);
+    const opened = rawEvent(realtime.socket, 'open');
+    try {
+      const [, request] = await incoming;
+      await opened;
+      expect([...new URL(request.url, baseURL).searchParams]).toEqual([['tenant', 'one'], selected]);
+    } finally {
+      const closed = rawEvent(realtime.socket, 'close');
+      realtime.close();
+      await closed;
+    }
+  });
+});
+
 describe.each([
   { label: 'GA ws', Realtime: StableWS, native: false, beta: false },
   { label: 'beta ws', Realtime: BetaWS, native: false, beta: true },
