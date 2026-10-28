@@ -438,3 +438,77 @@ it.concurrent.each(['before-opening', 'during-startup'])(
     }
   },
 );
+
+it.concurrent.each(['startup', 'input', 'finalization'])(
+  'cancels %s promptly without publishing an unconfirmed transcript',
+  async (stage) => {
+    const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+    await once(server, 'listening');
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Expected an ephemeral TCP address');
+    }
+
+    const finish = new AbortController();
+    const cancel = new AbortController();
+    const events: string[] = [];
+    const connected = once(server, 'connection');
+    server.once('connection', (socket) => {
+      socket.on('message', (message) => {
+        const event = JSON.parse(message.toString());
+        events.push(event.type);
+        if (event.type === 'session.start') {
+          if (stage === 'startup') {
+            cancel.abort();
+          } else {
+            socket.send(
+              JSON.stringify({ type: 'session.started', session: { id: 'fixture', status: 'active' } }),
+            );
+          }
+        } else if (event.type === 'session.input_audio.append') {
+          if (stage === 'input') {
+            cancel.abort();
+          } else {
+            finish.abort();
+          }
+        } else if (event.type === 'session.close') {
+          // A silent peer must not hold cancellation until the 120 s demo deadline.
+          cancel.abort();
+        }
+      });
+    });
+    const client = new OpenAI({ apiKey: 'local-test-key', baseURL: `http://127.0.0.1:${address.port}/v1` });
+    try {
+      const demo = runTranscriptDemo(client, [Buffer.alloc(48_000), Buffer.alloc(48_000)], {
+        finishSignal: finish.signal,
+        signal: cancel.signal,
+        interrupt: true,
+      });
+      const [socket] = await connected;
+      const closed = once(socket, 'close');
+      await expect(demo).rejects.toThrow();
+      await closed;
+      const expected = ['session.start'];
+      if (stage !== 'startup') {
+        expected.push('session.input_audio.append');
+      }
+      if (stage === 'finalization') {
+        expected.push('session.close');
+      }
+      // Extra input frames can already be in flight before the server's abort reaches the client.
+      expect(new Set(events)).toEqual(new Set(expected));
+      expect(events[0]).toBe('session.start');
+      if (stage === 'finalization') {
+        expect(events.at(-1)).toBe('session.close');
+      }
+    } finally {
+      const closed = once(server, 'close');
+      for (const socket of server.clients) {
+        socket.terminate();
+      }
+      server.close();
+      await closed;
+    }
+  },
+  2000,
+);
