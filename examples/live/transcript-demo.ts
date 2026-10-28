@@ -151,6 +151,8 @@ export async function runTranscriptDemo(
       if (event.type === 'session.closed') {
         if (!finishing) {
           abort.abort(new Error('Live session ended before the demo completed'));
+        } else if (event.reason !== 'close_requested') {
+          abort.abort(new Error('Live session ended without confirming the requested close'));
         }
         sessionClosed = true;
         live.off('event', onEvent);

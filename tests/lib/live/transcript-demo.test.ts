@@ -308,63 +308,74 @@ it.concurrent.each([
   }
 });
 
-it('finishes during the first input without sending the second clip, and waits for session.closed', async () => {
-  const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
-  await once(server, 'listening');
-  const address = server.address();
-  if (!address || typeof address === 'string') {
-    throw new Error('Expected an ephemeral TCP address');
-  }
-  const client = new OpenAI({ apiKey: 'local-test-key', baseURL: `http://127.0.0.1:${address.port}/v1` });
-  const finish = new AbortController();
-  const markers: number[] = [];
-  let sawSessionClose = false;
-  let sawSessionClosed = false;
-  const timers: ReturnType<typeof setTimeout>[] = [];
-  server.on('connection', (socket) => {
-    socket.on('message', (raw) => {
-      const event: { type: string; audio: string } = JSON.parse(raw.toString());
-      if (event.type === 'session.start') {
-        socket.send(JSON.stringify({ type: 'session.started', session: { id: 'early', status: 'active' } }));
-      } else if (event.type === 'session.input_audio.append') {
-        const [marker] = Buffer.from(event.audio, 'base64');
-        expect(marker).toBeDefined();
-        if (marker !== undefined) {
-          markers.push(marker);
+it.concurrent.each(['close_requested', 'expired', 'content', 'remote_hangup', 'connection_lost'])(
+  'finishes during the first input and checks the session.closed reason: %s',
+  async (reason) => {
+    const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+    await once(server, 'listening');
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Expected an ephemeral TCP address');
+    }
+    const client = new OpenAI({ apiKey: 'local-test-key', baseURL: `http://127.0.0.1:${address.port}/v1` });
+    const finish = new AbortController();
+    const markers: number[] = [];
+    let sawSessionClose = false;
+    let sawSessionClosed = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    server.on('connection', (socket) => {
+      socket.on('message', (raw) => {
+        const event: { type: string; audio: string } = JSON.parse(raw.toString());
+        if (event.type === 'session.start') {
+          socket.send(
+            JSON.stringify({ type: 'session.started', session: { id: 'early', status: 'active' } }),
+          );
+        } else if (event.type === 'session.input_audio.append') {
+          const [marker] = Buffer.from(event.audio, 'base64');
+          expect(marker).toBeDefined();
+          if (marker !== undefined) {
+            markers.push(marker);
+          }
+          finish.abort();
+        } else if (event.type === 'session.close') {
+          sawSessionClose = true;
+          timers.push(
+            setTimeout(() => {
+              sawSessionClosed = true;
+              socket.send(
+                JSON.stringify({
+                  type: 'session.closed',
+                  reason,
+                  session: { id: 'early', status: 'active' },
+                }),
+              );
+              socket.close();
+            }, 200),
+          );
         }
-        finish.abort();
-      } else if (event.type === 'session.close') {
-        sawSessionClose = true;
-        timers.push(
-          setTimeout(() => {
-            sawSessionClosed = true;
-            socket.send(
-              JSON.stringify({ type: 'session.closed', session: { id: 'early', status: 'active' } }),
-            );
-            socket.close();
-          }, 200),
-        );
+      });
+    });
+    try {
+      const result = runTranscriptDemo(client, [Buffer.alloc(1920 * 40, 1), Buffer.alloc(1920 * 40, 2)], {
+        interrupt: true,
+        finishSignal: finish.signal,
+      });
+      await (reason === 'close_requested'
+        ? expect(result).resolves.toMatchObject({ interruptionSentDuringOutput: false })
+        : expect(result).rejects.toThrow());
+      expect(markers).toEqual([1]);
+      expect(sawSessionClose).toBe(true);
+      expect(sawSessionClosed).toBe(true);
+    } finally {
+      for (const timer of timers) {
+        clearTimeout(timer);
       }
-    });
-  });
-  try {
-    const result = await runTranscriptDemo(client, [Buffer.alloc(1920 * 40, 1), Buffer.alloc(1920 * 40, 2)], {
-      interrupt: true,
-      finishSignal: finish.signal,
-    });
-    expect(markers).toEqual([1]);
-    expect(sawSessionClose).toBe(true);
-    expect(sawSessionClosed).toBe(true);
-    expect(result.interruptionSentDuringOutput).toBe(false);
-  } finally {
-    for (const timer of timers) {
-      clearTimeout(timer);
+      const closed = once(server, 'close');
+      for (const socket of server.clients) {
+        socket.terminate();
+      }
+      server.close();
+      await closed;
     }
-    const closed = once(server, 'close');
-    for (const socket of server.clients) {
-      socket.terminate();
-    }
-    server.close();
-    await closed;
-  }
-});
+  },
+);
