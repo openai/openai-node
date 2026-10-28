@@ -81935,7 +81935,7 @@ components:
           type: array
           description: The compacted list of output items. This is a list of all user messages, followed by a single compaction item.
           items:
-            $ref: '#/components/schemas/OutputItem'
+            $ref: '#/components/schemas/ItemResource'
         created_at:
           type: integer
           format: unixtime
@@ -104480,7 +104480,7 @@ components:
           type: array
           description: The compacted list of output items. This is a list of all user messages, followed by a single compaction item.
           items:
-            $ref: '#/components/schemas/BetaOutputItem'
+            $ref: '#/components/schemas/BetaItemResource'
         created_at:
           type: integer
           format: unixtime

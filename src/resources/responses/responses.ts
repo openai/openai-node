@@ -510,7 +510,7 @@ export interface CompactedResponse {
    * The compacted list of output items. This is a list of all user messages,
    * followed by a single compaction item.
    */
-  output: Array<ResponseOutputItem>;
+  output: Array<ResponseItem>;
 
   /**
    * Token accounting for the compaction pass, including cached, reasoning, and total

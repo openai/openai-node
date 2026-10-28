@@ -14,6 +14,29 @@ The minimum supported runtime and tooling versions are now:
 
 ## Breaking changes
 
+### Compaction output includes retained input messages
+
+`responses.compact()` now types its `output` as `ResponseItem[]`, including retained
+user, system, and developer messages alongside assistant output and compaction items.
+The beta API makes the equivalent change to `BetaResponseItem[]`.
+
+Replace explicit `ResponseOutputItem[]` annotations on compaction results with
+`ResponseItem[]` (or infer the type from `result.output`). For beta results, use
+`BetaResponseItem[]`. Update exhaustive item visitors to handle input messages:
+check both `item.type` and `item.role` before reading assistant-only content fields.
+Do not discard retained messages merely to satisfy the old output-only type.
+
+```ts
+import type { ResponseItem } from 'openai/resources/responses/responses';
+
+const compacted = await client.responses.compact({ model, input });
+const items: ResponseItem[] = compacted.output;
+```
+
+This change widens compaction response types; it does not change all request-input
+unions. Passing the entire union back as request input can still require handling
+item variants that its input type does not accept.
+
 ### Web types for `withResponse`, `asResponse`, and `APIError.headers`
 
 Because we now use the builtin Web fetch API on all platforms, if you wrote code that used `withResponse` or `asResponse` and then accessed `node-fetch`-specific properties on the result, you will need to switch to standardized alternatives.

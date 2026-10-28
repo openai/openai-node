@@ -85,11 +85,9 @@ separately owned handwritten helpers and extension points.
 Regeneration replaces generator-owned files and deletes retired generated paths.
 Handwritten edits to generated files are overwritten; they are never replayed or
 merged into new output. Preserve separately owned handwritten files and resolve
-ownership collisions explicitly. Follow this AGENTS.md rule and review generated output and inventory changes
-together. After canonical regeneration removes the legacy reporting tooling,
-generated-file ownership relies on contributor guidance and code review. Until
-then, the retained strict ownership checker can reject generated-file mismatches;
-preserve its checks and satisfy any required statuses.
+ownership collisions explicitly. Generated-file ownership relies on contributor
+guidance and code review. Review generated output and inventory changes together.
+The legacy reporting workflows and strict ownership checker have been removed.
 Fix violations in the inputs/compiler and regenerate; never update inventory
 hashes to accept a handwritten patch.
 
