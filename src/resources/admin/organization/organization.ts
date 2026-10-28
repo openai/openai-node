@@ -33,6 +33,15 @@ import {
 } from './certificates';
 import * as DataRetentionAPI from './data-retention';
 import { DataRetention, DataRetentionUpdateParams, OrganizationDataRetention } from './data-retention';
+import * as ExternalKeysAPI from './external-keys';
+import {
+  ExternalKey,
+  ExternalKeyCreateParams,
+  ExternalKeyListParams,
+  ExternalKeyValidateResponse,
+  ExternalKeys,
+  ExternalKeysPage,
+} from './external-keys';
 import * as ExternalStorageAPI from './external-storage';
 import {
   AwsExternalStorageProvider,
@@ -156,6 +165,7 @@ export class Organization extends APIResource {
   spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
   projects: ProjectsAPI.Projects = new ProjectsAPI.Projects(this._client);
+  externalKeys: ExternalKeysAPI.ExternalKeys = new ExternalKeysAPI.ExternalKeys(this._client);
 }
 
 Organization.AuditLogs = AuditLogs;
@@ -171,6 +181,7 @@ Organization.SpendLimit = SpendLimit;
 Organization.SpendAlerts = SpendAlerts;
 Organization.Certificates = Certificates;
 Organization.Projects = Projects;
+Organization.ExternalKeys = ExternalKeys;
 
 export declare namespace Organization {
   export {
@@ -320,5 +331,14 @@ export declare namespace Organization {
     type ProjectCreateParams as ProjectCreateParams,
     type ProjectUpdateParams as ProjectUpdateParams,
     type ProjectListParams as ProjectListParams,
+  };
+
+  export {
+    ExternalKeys as ExternalKeys,
+    type ExternalKey as ExternalKey,
+    type ExternalKeyValidateResponse as ExternalKeyValidateResponse,
+    type ExternalKeysPage as ExternalKeysPage,
+    type ExternalKeyCreateParams as ExternalKeyCreateParams,
+    type ExternalKeyListParams as ExternalKeyListParams,
   };
 }

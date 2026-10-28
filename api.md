@@ -1672,6 +1672,21 @@ Methods:
 - <code title="post /organization/projects/{project_id}/certificates/activate">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">activate</a>(projectID, { ...params }) -> CertificateActivateResponsesPage</code>
 - <code title="post /organization/projects/{project_id}/certificates/deactivate">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">deactivate</a>(projectID, { ...params }) -> CertificateDeactivateResponsesPage</code>
 
+### ExternalKeys
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/external-keys.ts">ExternalKey</a></code>
+- <code><a href="./src/resources/admin/organization/external-keys.ts">ExternalKeyValidateResponse</a></code>
+
+Methods:
+
+- <code title="post /organization/external_keys">client.admin.organization.externalKeys.<a href="./src/resources/admin/organization/external-keys.ts">create</a>({ ...params }) -> ExternalKey</code>
+- <code title="get /organization/external_keys/{external_key_id}">client.admin.organization.externalKeys.<a href="./src/resources/admin/organization/external-keys.ts">retrieve</a>(externalKeyID) -> ExternalKey</code>
+- <code title="get /organization/external_keys">client.admin.organization.externalKeys.<a href="./src/resources/admin/organization/external-keys.ts">list</a>({ ...params }) -> ExternalKeysPage</code>
+- <code title="delete /organization/external_keys/{external_key_id}">client.admin.organization.externalKeys.<a href="./src/resources/admin/organization/external-keys.ts">delete</a>(externalKeyID) -> ExternalKey</code>
+- <code title="post /organization/external_keys/{external_key_id}/validate">client.admin.organization.externalKeys.<a href="./src/resources/admin/organization/external-keys.ts">validate</a>(externalKeyID) -> ExternalKeyValidateResponse</code>
+
 # [Responses](src/resources/responses/api.md)
 
 # [Live](src/resources/live/api.md)

@@ -3,7 +3,7 @@
   "files": {
     "api.md": {
       "mode": "100644",
-      "sha256": "fc38e1d873ac4544fa16fe74478a228d86058ad681f2c7b939dff463015c928b"
+      "sha256": "ad391dde9aa269ac337a10b5f041a40680bc193b3ad119a32a9927514c53b82c"
     },
     "src/client.ts": {
       "mode": "100644",
@@ -53,6 +53,10 @@
       "mode": "100644",
       "sha256": "19697c314dda14ab8fce3ad020b2b129ebbe8ccb2daf70bdfd7b9361cdba2c19"
     },
+    "src/resources/admin/organization/external-keys.ts": {
+      "mode": "100644",
+      "sha256": "56b7bc0ce61ebc624afb500d0a2c0d079c96916ac3c0652c71c6b01080d3c91a"
+    },
     "src/resources/admin/organization/external-storage.ts": {
       "mode": "100644",
       "sha256": "6f11c00489dff60c60a04618938a44d7a373f542e126e2d4a88456313b90cdb8"
@@ -79,7 +83,7 @@
     },
     "src/resources/admin/organization/index.ts": {
       "mode": "100644",
-      "sha256": "2c410f0edacf4d4a5dadfb1633949161e334a71e09dcd4c19d8605b1a740a0d7"
+      "sha256": "a9109e55e1892a24cdb343fd22eb702a89a4fc63e81beedb227a24f531879bd3"
     },
     "src/resources/admin/organization/invites.ts": {
       "mode": "100644",
@@ -87,7 +91,7 @@
     },
     "src/resources/admin/organization/organization.ts": {
       "mode": "100644",
-      "sha256": "777e9127a15e28dfb943d7877d6b016f5ac5499996092789df1c2af50a441b4a"
+      "sha256": "e0405a7fd7437fe81d553feeba2efcfa98225d5b6813cd62f9fbf988794297c0"
     },
     "src/resources/admin/organization/projects.ts": {
       "mode": "100644",
@@ -1004,6 +1008,10 @@
     "tests/api-resources/admin/organization/data-retention.test.ts": {
       "mode": "100644",
       "sha256": "adc7c901899e76ef8662fc974e8650d5fd8e1b4f45970e2d9610fe5a9dd7edc4"
+    },
+    "tests/api-resources/admin/organization/external-keys.test.ts": {
+      "mode": "100644",
+      "sha256": "3b2098a6742fd04cc01c2cc167fa5fad4926e329383cd74491a98f9a81e1c562"
     },
     "tests/api-resources/admin/organization/external-storage.test.ts": {
       "mode": "100644",
