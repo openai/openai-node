@@ -9263,6 +9263,11 @@ export namespace ResponseToolSearchOutputItemParam {
      *
      * `gpt-image-1` was shut down on October 23, 2026. Use `gpt-image-2.5-sunburst` or
      * `gpt-image-2.5-flare` instead.
+     *
+     * Deprecated values:
+     *
+     * - "gpt-image-1": GPT Image 1 was shut down on October 23, 2026. Use
+     *   gpt-image-2.5-sunburst or gpt-image-2.5-flare instead.
      */
     model?:
       | (string & {})
@@ -11180,6 +11185,11 @@ export namespace Tool {
      *
      * `gpt-image-1` was shut down on October 23, 2026. Use `gpt-image-2.5-sunburst` or
      * `gpt-image-2.5-flare` instead.
+     *
+     * Deprecated values:
+     *
+     * - "gpt-image-1": GPT Image 1 was shut down on October 23, 2026. Use
+     *   gpt-image-2.5-sunburst or gpt-image-2.5-flare instead.
      */
     model?:
       | (string & {})
