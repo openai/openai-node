@@ -9,6 +9,7 @@ const firstUser = 'Plan our picnic.';
 const secondUser = 'Make it breakfast.';
 const firstAnswer = 'There are sandwiches, fruit and a vegetarian salad.';
 const finalAnswer = 'Bring breakfast rolls and coffee.';
+const acknowledgment = 'I understand the change and will think about a breakfast picnic.';
 
 it.concurrent.each([
   { timing: 'early', interrupt: false },
@@ -21,6 +22,8 @@ it.concurrent.each([
   { timing: 'no-answer', interrupt: true },
   { timing: 'straddling-stale-only', interrupt: true },
   { timing: 'reused-user', interrupt: true },
+  { timing: 'delayed-first-input', interrupt: true },
+  { timing: 'long-acknowledgment', interrupt: true },
   { timing: 'audio-tail', interrupt: false },
   { timing: 'delayed-finalization', interrupt: false },
   { timing: 'eof-finalization', interrupt: false },
@@ -54,6 +57,13 @@ it.concurrent.each([
   let sentSessionClosed = false;
   let forcedPrematureClose = false;
   let audioFrames = 0;
+  let answerSent = false;
+  const finish = new AbortController();
+  const finishAfterExpectedInputAndAnswer = (): void => {
+    if (secondChunks === 40 && answerSent && timing !== 'audio-tail') {
+      finish.abort();
+    }
+  };
 
   server.on('connection', (socket) => {
     const startedAt = performance.now();
@@ -99,6 +109,15 @@ it.concurrent.each([
     };
     let heardFirst = false;
     let firstEnd = 0;
+    let firstMark = 0;
+    const answerDelay =
+      new Map([
+        ['delayed', 2050],
+        ['overlap', 2050],
+        ['delayed-first-input', 4300],
+        ['long-acknowledgment', 4300],
+      ]).get(timing) ?? 720;
+    const firstInputFragmented = ['reused-user', 'delayed-first-input'].includes(timing);
     socket.on('message', (raw) => {
       const event: { type: string; audio: string } = JSON.parse(raw.toString());
       if (event.type === 'session.start') {
@@ -109,7 +128,8 @@ it.concurrent.each([
         if (marker === 1 && !heardFirst) {
           heardFirst = true;
           const mark = now();
-          sendText('input', timing === 'reused-user' ? 'Plan our ' : firstUser, Math.max(0, mark - 20), mark);
+          firstMark = mark;
+          sendText('input', firstInputFragmented ? 'Plan our ' : firstUser, Math.max(0, mark - 20), mark);
           timers.push(
             setTimeout(() => {
               firstEnd = now();
@@ -127,7 +147,11 @@ it.concurrent.each([
           secondChunks += 1;
           if (secondChunks === 1) {
             const mark = now();
-            if (timing !== 'overlap') {
+            if (timing === 'delayed-first-input') {
+              sendText('input', 'picnic.', firstMark, firstMark + 10);
+              sendText('output', ' Plus lemonade.', firstEnd + 1, firstEnd + 40);
+              sendAudio();
+            } else if (timing !== 'overlap') {
               sendText('input', secondUser, Math.max(0, mark - 20), mark);
             }
             if (timing === 'stale' || timing === 'no-answer' || timing === 'straddling-stale-only') {
@@ -144,7 +168,15 @@ it.concurrent.each([
                 }, 140),
               );
             }
-            const answerDelay = timing === 'delayed' || timing === 'overlap' ? 2050 : 720;
+            if (timing === 'long-acknowledgment') {
+              timers.push(
+                setTimeout(() => {
+                  const ackEnd = now();
+                  sendText('output', acknowledgment, ackEnd - 200, ackEnd);
+                  sendAudio();
+                }, 400),
+              );
+            }
             if (receivesAnswer) {
               timers.push(
                 setTimeout(() => {
@@ -156,9 +188,14 @@ it.concurrent.each([
                     sendText('input', secondUser, Math.max(0, mark - 20), answerEnd);
                     sendText('output', finalAnswer, mark + 650, mark + 1000);
                   } else {
+                    if (timing === 'delayed-first-input') {
+                      sendText('input', secondUser, mark, mark + 1600);
+                    }
                     sendText('output', finalAnswer, answerEnd - 50, answerEnd);
                   }
                   sendAudio();
+                  answerSent = true;
+                  finishAfterExpectedInputAndAnswer();
                 }, answerDelay),
               );
             }
@@ -166,6 +203,7 @@ it.concurrent.each([
               for (const delay of [1800, 2400, 3200, 4000, 4800]) {
                 timers.push(setTimeout(sendAudio, delay));
               }
+              timers.push(setTimeout(() => finish.abort(), 5200));
             }
             // Allow a real settled answer, then close the peer to bound a failed
             // demo without waiting for its 45-second production timeout.
@@ -187,6 +225,7 @@ it.concurrent.each([
               ),
             );
           }
+          finishAfterExpectedInputAndAnswer();
         }
       }
       if (event.type === 'session.close') {
@@ -215,6 +254,7 @@ it.concurrent.each([
 
   try {
     const result = runTranscriptDemo(client, [Buffer.alloc(1920, 1), Buffer.alloc(1920 * 40, 2)], {
+      finishSignal: finish.signal,
       interrupt,
     });
     if (expectsAnswer) {
@@ -222,13 +262,22 @@ it.concurrent.each([
       expect(sentSessionClose).toBe(true);
       expect(sentSessionClosed).toBe(true);
       expect(secondChunks).toBe(40);
-      if (timing === 'delayed' || timing === 'overlap') {
+      if (['delayed', 'overlap', 'delayed-first-input', 'long-acknowledgment'].includes(timing)) {
         expect(answerAtChunk).toBe(secondChunks);
       } else {
         expect(answerAtChunk).toBeLessThan(secondChunks);
       }
       expect(demo.rawUserText).toBe(firstUser + secondUser);
       expect(demo.interruptionSentDuringOutput).toBe(interrupt);
+      if (timing === 'delayed-first-input' || timing === 'long-acknowledgment') {
+        expect(answerSent).toBe(true);
+        const assistant = demo.segments
+          .filter(({ segment }) => segment.speaker === 'assistant')
+          .map(({ segment }) => segment.text)
+          .join('');
+        expect(assistant).toContain(finalAnswer);
+        return;
+      }
       if (timing === 'audio-tail') {
         expect(audioFrames).toBe(7);
       }
@@ -253,6 +302,67 @@ it.concurrent.each([
     const closed = once(server, 'close');
     for (const peer of server.clients) {
       peer.terminate();
+    }
+    server.close();
+    await closed;
+  }
+});
+
+it('finishes during the first input without sending the second clip, and waits for session.closed', async () => {
+  const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+  await once(server, 'listening');
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Expected an ephemeral TCP address');
+  }
+  const client = new OpenAI({ apiKey: 'local-test-key', baseURL: `http://127.0.0.1:${address.port}/v1` });
+  const finish = new AbortController();
+  const markers: number[] = [];
+  let sawSessionClose = false;
+  let sawSessionClosed = false;
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  server.on('connection', (socket) => {
+    socket.on('message', (raw) => {
+      const event: { type: string; audio: string } = JSON.parse(raw.toString());
+      if (event.type === 'session.start') {
+        socket.send(JSON.stringify({ type: 'session.started', session: { id: 'early', status: 'active' } }));
+      } else if (event.type === 'session.input_audio.append') {
+        const [marker] = Buffer.from(event.audio, 'base64');
+        expect(marker).toBeDefined();
+        if (marker !== undefined) {
+          markers.push(marker);
+        }
+        finish.abort();
+      } else if (event.type === 'session.close') {
+        sawSessionClose = true;
+        timers.push(
+          setTimeout(() => {
+            sawSessionClosed = true;
+            socket.send(
+              JSON.stringify({ type: 'session.closed', session: { id: 'early', status: 'active' } }),
+            );
+            socket.close();
+          }, 200),
+        );
+      }
+    });
+  });
+  try {
+    const result = await runTranscriptDemo(client, [Buffer.alloc(1920 * 40, 1), Buffer.alloc(1920 * 40, 2)], {
+      interrupt: true,
+      finishSignal: finish.signal,
+    });
+    expect(markers).toEqual([1]);
+    expect(sawSessionClose).toBe(true);
+    expect(sawSessionClosed).toBe(true);
+    expect(result.interruptionSentDuringOutput).toBe(false);
+  } finally {
+    for (const timer of timers) {
+      clearTimeout(timer);
+    }
+    const closed = once(server, 'close');
+    for (const socket of server.clients) {
+      socket.terminate();
     }
     server.close();
     await closed;

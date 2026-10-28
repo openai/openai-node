@@ -21,6 +21,9 @@ describeLive('Transcript grouper with TTS input over the public Live API', () =>
     'groups a real conversation (interrupt: %s)',
     async (interrupt) => {
       const result = await runTranscriptDemo(client, audio, {
+        // This test controls its observation window; it does not infer a final
+        // answer from live speech. Assert what was actually captured below.
+        finishSignal: AbortSignal.timeout(45_000),
         interrupt,
         websocketOptions: process.env['OPENAI_LIVE_COMPATIBILITY_HEADER']
           ? { headers: { 'OpenAI-Alpha': process.env['OPENAI_LIVE_COMPATIBILITY_HEADER'] } }

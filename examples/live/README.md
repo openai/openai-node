@@ -56,7 +56,9 @@ pnpm tsn -T examples/live/transcript-grouper.ts
 ```
 
 Audio playback requires `ffplay` on your `PATH`. To run without playback, add
-`--no-audio`.
+`--no-audio`. Press Enter to finish capturing the transcript. The example
+requests closure and waits for the server's confirmation. It does not infer that
+the model finished an answer from a pause or transcript fragment.
 
 ## WebRTC with a backend sideband
 
