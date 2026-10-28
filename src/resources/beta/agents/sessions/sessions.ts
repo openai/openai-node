@@ -381,7 +381,7 @@ export class Sessions extends APIResource {
   ): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession> {
     const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ['after', 'agent_id', 'limit', 'order'],
+      ['after', 'agent_id', 'limit', 'metadata', 'order'],
       options,
     );
     if (normalizeRequestOptionsForQueryOptions !== undefined) {
@@ -646,6 +646,14 @@ export interface SessionListParams extends CursorPageParams {
    * all agents.
    */
   agent_id?: string;
+
+  /**
+   * Exact string matches supplied as `metadata[key]=value`. All supplied pairs must
+   * match. Up to 16 pairs, with keys from 1 to 64 characters and values up to 512
+   * characters. New sessions and metadata updates may take time to appear in
+   * filtered results.
+   */
+  metadata?: { [key: string]: string };
 
   /**
    * The order in which resources are returned. Defaults to `desc`.
