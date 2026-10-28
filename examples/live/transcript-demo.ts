@@ -49,6 +49,11 @@ export async function prepareTranscriptDemo(client: OpenAI): Promise<Buffer[]> {
  * Send pre-generated PCM through the public Live WebSocket and group only its
  * public transcript events. This makes paid API requests; requires Live access.
  * No microphone, local TTS latency, internal API, or server turn events are used.
+ * Completion is a best-effort observation of speech after the second input,
+ * followed by transcript and audio inactivity. Live's public transcript does not
+ * identify managed backend turns. A pause after an acknowledgment can still look
+ * like completion, so this demo cannot guarantee that a final answer has arrived.
+ * In an interactive application, leave the session open until the user closes it.
  */
 export async function runTranscriptDemo(
   client: OpenAI,
@@ -93,6 +98,9 @@ export async function runTranscriptDemo(
   let lastTextAt = Number.NEGATIVE_INFINITY;
   let assistantCharacters = 0;
   let closedAssistant = 0;
+  let secondAudioStarted = false;
+  let secondInputStartMs: number | undefined;
+  let secondOutputStartMs = Number.NEGATIVE_INFINITY;
   const latest = new Map<string, string>();
   const closedIds = new Set<string>();
   transcript.on('segment.updated', (segment) => {
@@ -128,11 +136,17 @@ export async function runTranscriptDemo(
     if (event.type === 'session.input_transcript.delta') {
       result.rawTranscriptEvents += 1;
       result.rawUserText += event.delta;
+      if (secondAudioStarted && event.delta) {
+        secondInputStartMs ??= event.start_ms;
+      }
     }
     if (event.type === 'session.output_transcript.delta') {
       result.rawTranscriptEvents += 1;
       assistantCharacters += event.delta.length;
       lastTextAt = performance.now();
+      if (secondAudioStarted && event.delta) {
+        secondOutputStartMs = Math.max(secondOutputStartMs, event.start_ms);
+      }
     }
     if (event.type === 'session.output_audio.delta') {
       lastAudioAt = performance.now();
@@ -214,28 +228,32 @@ export async function runTranscriptDemo(
       result.interruptionSentDuringOutput = true;
     } else {
       await waitWithAudio(
-        () => closedAssistant > 0 && performance.now() - lastTextAt >= 2500,
+        () => closedAssistant > 0 && performance.now() - Math.max(lastTextAt, lastAudioAt) >= 2500,
         'the first answer to settle',
       );
     }
-    // The answer can arrive while audio is still being sent. Do not mistake the
-    // first answer's delayed closure for a reply to the second utterance.
-    const previousSegments = new Set(latest.keys());
+    // Snapshot text, not just IDs: the second utterance can extend an active
+    // user bubble. A delayed old output interval must not count merely because
+    // its end overlaps the new input.
+    const previousSegments = new Map(latest);
+    secondAudioStarted = true;
     await sendPCM(secondAudio);
     await waitWithAudio(
       () =>
-        performance.now() - lastTextAt >= 2500 &&
+        performance.now() - Math.max(lastTextAt, lastAudioAt) >= 2500 &&
+        secondInputStartMs !== undefined &&
+        secondOutputStartMs >= secondInputStartMs &&
         result.segments.some(({ segment }, index, segments) => {
           const previous = segments[index - 1]?.segment;
           return (
             segment.speaker === 'assistant' &&
             previous?.speaker === 'user' &&
-            !previousSegments.has(previous.id) &&
+            previousSegments.get(previous.id) !== previous.text &&
             segment.previousId === previous.id &&
-            segment.endMs >= previous.startMs
+            segment.endMs >= secondOutputStartMs
           );
         }),
-      'the final answer to settle',
+      'speech after the second input to settle',
     );
     finishing = true;
     live.send({ type: 'session.close' });
