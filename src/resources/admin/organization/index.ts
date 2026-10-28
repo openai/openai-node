@@ -38,6 +38,14 @@ export {
   type DataRetentionUpdateParams,
 } from './data-retention';
 export {
+  ExternalKeys,
+  type ExternalKey,
+  type ExternalKeyValidateResponse,
+  type ExternalKeyCreateParams,
+  type ExternalKeyListParams,
+  type ExternalKeysPage,
+} from './external-keys';
+export {
   ExternalStorage,
   type AwsExternalStorageProvider,
   type AzureExternalStorageProvider,
