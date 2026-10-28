@@ -1,5 +1,13 @@
 # Changelog
 
+## [7.45.1](https://github.com/openai/openai-node/compare/v7.45.0...v7.45.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **api:** clarify prompt cache breakpoint TTL behavior ([#3057](https://github.com/openai/openai-node/issues/3057)) ([60224b3](https://github.com/openai/openai-node/commit/60224b376e25912bb1143007c81d2ecdc7a7434c))
+* **vertex:** support google-auth-library v11 ([#3046](https://github.com/openai/openai-node/issues/3046)) ([381709f](https://github.com/openai/openai-node/commit/381709f60ae0a460d53d795f23c7eba7f576798e))
+
 ## [7.45.0](https://github.com/openai/openai-node/compare/v7.44.0...v7.45.0) (2026-10-26)
 
 

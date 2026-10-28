@@ -1,9 +1,17 @@
 import { once } from 'node:events';
 import { WebSocketServer } from 'ws';
 import OpenAI from 'openai';
+import type { ResponsesDelegationConfig, SessionResource } from 'openai/resources/live/live';
 import { LiveWS } from 'openai/resources/live/ws';
 import { ForksWS } from 'openai/resources/live/forks/ws';
 import { SidebandWS } from 'openai/resources/live/sideband/ws';
+
+function expectResponses(session: SessionResource, expected: ResponsesDelegationConfig) {
+  if (session.delegation?.type !== 'responses') {
+    throw new Error('Missing resolved Responses delegation');
+  }
+  expect(session.delegation.responses).toEqual(expected);
+}
 
 describe.each(['primary', 'fork', 'sideband'] as const)('Live %s wire contract', (role) => {
   test.each(['', '?tenant=sample&scope=read&scope=write&trace=old&trace=older'])(
@@ -18,7 +26,30 @@ describe.each(['primary', 'fork', 'sideband'] as const)('Live %s wire contract',
       const failures: unknown[] = [];
       let connections = 0;
       let requests = 0;
-      const session = { id: 'live_fixture', model: 'gpt-live-1', status: 'active', expires_at: 123 };
+      const responses = {
+        model: 'gpt-4.1',
+        tool_choice: {
+          type: 'allowed_tools',
+          mode: 'required',
+          tools: [
+            { type: 'mcp', server_label: 'fixture', name: 'lookup_fixture' },
+            { type: 'mcp', server_label: 'fixture', name: null },
+            { type: 'mcp', server_label: 'fixture' },
+          ],
+        },
+        tools: [
+          { type: 'shell', environment: { type: 'container_reference', container_id: 'cntr_fixture' } },
+          { type: 'shell', environment: null },
+          { type: 'shell' },
+        ],
+      } satisfies ResponsesDelegationConfig;
+      const session = {
+        id: 'live_fixture',
+        model: 'gpt-live-1',
+        status: 'active',
+        expires_at: 123,
+        delegation: { type: 'responses', responses },
+      };
       server.on('connection', (socket, request) => {
         connections += 1;
         try {
@@ -123,9 +154,16 @@ describe.each(['primary', 'fork', 'sideband'] as const)('Live %s wire contract',
             expect(item.message.type).toBe(
               role === 'sideband' ? 'session.output_transcript.delta' : 'session.started',
             );
+            if (item.message.type === 'session.started') {
+              expectResponses(item.message.session, responses);
+            }
             firstMessage = false;
             connection.send({ type: 'session.update', event_id: 'caller-update', session: {} });
           } else {
+            if (item.message.type !== 'session.updated') {
+              throw new Error('Missing updated Responses delegation');
+            }
+            expectResponses(item.message.session, responses);
             expect(item.message).toEqual({
               type: 'session.updated',
               event_id: 'updated',

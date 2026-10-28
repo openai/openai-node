@@ -21,6 +21,14 @@ export class Speech extends APIResource {
    *
    * Returns the audio file content, or a stream of audio events.
    *
+   * The `tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`, `gpt-4o-mini-tts-2025-03-20`, and
+   * `gpt-4o-mini-tts-2025-12-15` models are deprecated and scheduled to shut down on
+   * January 6, 2027. These examples use the existing Speech API; for new
+   * integrations, migrate to `gpt-realtime-2.1-mini` through the
+   * [Realtime API](https://developers.openai.com/api/docs/guides/realtime). See the
+   * [deprecation schedule](https://developers.openai.com/api/docs/deprecations) for
+   * migration details.
+   *
    * @example
    * ```ts
    * const speech = await client.audio.speech.create({
@@ -47,6 +55,14 @@ export class Speech extends APIResource {
   }
 }
 
+/**
+ * Deprecated values:
+ *
+ * - "tts-1", "tts-1-hd", "gpt-4o-mini-tts", "gpt-4o-mini-tts-2025-12-15":
+ *   Announced shutdown date: 2027-01-06. See
+ *   https://developers.openai.com/api/docs/deprecations for details and
+ *   recommended replacements.
+ */
 export type SpeechModel = 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts' | 'gpt-4o-mini-tts-2025-12-15';
 
 export interface SpeechCreateParams {
