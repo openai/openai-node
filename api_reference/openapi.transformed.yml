@@ -582,6 +582,13 @@ paths:
         Generates audio from the input text.
 
         Returns the audio file content, or a stream of audio events.
+
+        The `tts-1`, `tts-1-hd`, `gpt-4o-mini-tts`, `gpt-4o-mini-tts-2025-03-20`, and
+        `gpt-4o-mini-tts-2025-12-15` models are deprecated and scheduled to shut down
+        on January 6, 2027. These examples use the existing Speech API; for new
+        integrations, migrate to `gpt-realtime-2.1-mini` through the
+        [Realtime API](https://developers.openai.com/api/docs/guides/realtime). See the
+        [deprecation schedule](https://developers.openai.com/api/docs/deprecations) for migration details.
       requestBody:
         required: true
         content:
@@ -1344,7 +1351,14 @@ paths:
       tags:
       - Audio
       summary: Create translation
-      description: Translates audio into English.
+      description: |
+        Translates audio into English.
+
+        This endpoint supports only `whisper-1`. The endpoint and model are deprecated
+        and scheduled to shut down on February 26, 2027. Migrate to
+        `/v1/realtime/translations`, which requires a separate integration. See the
+        [deprecation schedule](https://developers.openai.com/api/docs/deprecations)
+        for details.
       requestBody:
         required: true
         content:
@@ -1463,6 +1477,7 @@ paths:
             {
               "text": "Hello, my name is Wolfgang and I come from Germany. Where are you heading today?"
             }
+      deprecated: true
   /audio/voice_consents:
     post:
       operationId: createVoiceConsent
@@ -38366,6 +38381,18 @@ components:
           message: 'Announced shutdown date: 2027-01-14. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
         gpt-4o-mini:
           message: 'Announced shutdown date: 2027-01-14. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+        gpt-5:
+          message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+        gpt-5-mini:
+          message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+        gpt-5-nano:
+          message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+        gpt-5-2025-08-07:
+          message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+        gpt-5-mini-2025-08-07:
+          message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+        gpt-5-nano-2025-08-07:
+          message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
     AssistantToolsCode:
       type: object
       title: Code interpreter tool
@@ -38519,6 +38546,17 @@ components:
             - gpt-4o-transcribe
             - gpt-4o-transcribe-diarize
             - gpt-realtime-whisper
+            x-openai-enum-deprecations:
+              gpt-4o-mini-transcribe-2025-12-15:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              whisper-1:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-4o-transcribe:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-4o-mini-transcribe:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-4o-transcribe-diarize:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
         language:
           type: string
           description: |
@@ -38576,6 +38614,17 @@ components:
             - gpt-4o-transcribe
             - gpt-4o-transcribe-diarize
             - gpt-realtime-whisper
+            x-openai-enum-deprecations:
+              gpt-4o-mini-transcribe-2025-12-15:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              whisper-1:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-4o-transcribe:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-4o-mini-transcribe:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-4o-transcribe-diarize:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
         language:
           type: string
           description: |
@@ -45214,6 +45263,15 @@ components:
             - tts-1-hd
             - gpt-4o-mini-tts
             - gpt-4o-mini-tts-2025-12-15
+            x-openai-enum-deprecations:
+              gpt-4o-mini-tts:
+                message: 'Announced shutdown date: 2027-01-06. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              tts-1:
+                message: 'Announced shutdown date: 2027-01-06. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              tts-1-hd:
+                message: 'Announced shutdown date: 2027-01-06. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-4o-mini-tts-2025-12-15:
+                message: 'Announced shutdown date: 2027-01-06. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
             x-stainless-nominal: false
           x-oaiTypeLabel: string
         input:
@@ -45359,6 +45417,19 @@ components:
             - gpt-3.5-turbo-1106
             - gpt-3.5-turbo-0125
             - gpt-3.5-turbo-16k-0613
+            x-openai-enum-deprecations:
+              gpt-5:
+                message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-5-mini:
+                message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-5-nano:
+                message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-5-2025-08-07:
+                message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-5-mini-2025-08-07:
+                message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-5-nano-2025-08-07:
+                message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
           x-oaiTypeLabel: string
           nullable: true
         instructions:
@@ -45604,6 +45675,17 @@ components:
             - gpt-4o-mini-transcribe-2025-12-15
             - gpt-4o-transcribe-diarize
             x-stainless-const: true
+            x-openai-enum-deprecations:
+              gpt-4o-mini-transcribe-2025-12-15:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              whisper-1:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-4o-transcribe:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-4o-mini-transcribe:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-4o-transcribe-diarize:
+                message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
             x-stainless-nominal: false
           x-oaiTypeLabel: string
         language:
@@ -51876,10 +51958,13 @@ components:
           type: string
           description: The ID of the existing Live session to attach to.
     LiveSidebandServerEvent:
-      description: Server events received by an attached Live sideband WebSocket, including reflected input and output audio and transport notifications.
+      description: Server events received by an attached Live sideband WebSocket. Audio deltas are delivered over the primary connection.
       discriminator:
         propertyName: type
       anyOf:
+      - $ref: '#/components/schemas/LiveTransportRinging'
+      - $ref: '#/components/schemas/LiveTransportAnswered'
+      - $ref: '#/components/schemas/LiveTransportFailed'
       - $ref: '#/components/schemas/LiveSessionStarted'
       - $ref: '#/components/schemas/LiveSessionUpdated'
       - $ref: '#/components/schemas/LiveInputAudioMuted'
@@ -51904,9 +51989,6 @@ components:
       - $ref: '#/components/schemas/LiveOutputAudioDelta'
       - $ref: '#/components/schemas/LiveTransportDTMFReceived'
       - $ref: '#/components/schemas/LiveTransportDTMFSend'
-      - $ref: '#/components/schemas/LiveTransportRinging'
-      - $ref: '#/components/schemas/LiveTransportAnswered'
-      - $ref: '#/components/schemas/LiveTransportFailed'
     LiveWebRTCTransport:
       type: object
       description: WebRTC transport carrying the offer SDP in a creation request or answer SDP in its response.
@@ -61566,6 +61648,19 @@ components:
             - gpt-audio-mini
             - gpt-audio-mini-2025-10-06
             - gpt-audio-mini-2025-12-15
+            x-openai-enum-deprecations:
+              gpt-realtime-2025-08-28:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-realtime-mini-2025-12-15:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-audio-mini-2025-12-15:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-realtime:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-realtime-mini:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-audio-mini:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
         instructions:
           type: string
           description: |
@@ -62000,6 +62095,19 @@ components:
             - gpt-audio-mini
             - gpt-audio-mini-2025-10-06
             - gpt-audio-mini-2025-12-15
+            x-openai-enum-deprecations:
+              gpt-realtime-2025-08-28:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-realtime-mini-2025-12-15:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-audio-mini-2025-12-15:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-realtime:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-realtime-mini:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-audio-mini:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
             x-stainless-nominal: false
             x-openai-go-public-type: string_alias
           description: |
@@ -62445,6 +62553,19 @@ components:
             - gpt-audio-mini
             - gpt-audio-mini-2025-10-06
             - gpt-audio-mini-2025-12-15
+            x-openai-enum-deprecations:
+              gpt-realtime-2025-08-28:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-realtime-mini-2025-12-15:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-audio-mini-2025-12-15:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-realtime:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-realtime-mini:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-audio-mini:
+                message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
           description: |
             The Realtime model used for this session.
         instructions:
@@ -78843,55 +78964,44 @@ components:
       - auto
       - none
       - required
-    LegacyComputerAction:
-      discriminator:
-        propertyName: type
-      anyOf:
-      - $ref: '#/components/schemas/ClickParam'
-      - $ref: '#/components/schemas/DoubleClickAction'
-      - $ref: '#/components/schemas/DragParam'
-      - $ref: '#/components/schemas/KeyPressAction'
-      - $ref: '#/components/schemas/MoveParam'
-      - $ref: '#/components/schemas/ScreenshotParam'
-      - $ref: '#/components/schemas/ScrollParam'
-      - $ref: '#/components/schemas/TypeParam'
-      - $ref: '#/components/schemas/WaitParam'
-    CodeInterpreterContainerAuto:
+    LiveFunctionToolChoiceParam:
+      type: object
       properties:
         type:
+          description: The tool to call. Always `function`.
+          default: function
+          x-stainless-const: true
           type: string
           enum:
-          - auto
-          description: Always `auto`.
-          default: auto
-          x-stainless-const: true
-        file_ids:
-          items:
-            type: string
-            example: file-123
-          type: array
-          maxItems: 50
-          description: An optional list of uploaded files to make available to your code.
-        memory_limit:
-          anyOf:
-          - $ref: '#/components/schemas/ContainerMemoryLimit'
-            description: The memory limit for the code interpreter container.
-          - type: 'null'
-        network_policy:
-          discriminator:
-            propertyName: type
-          description: Network access policy for the container.
-          anyOf:
-          - $ref: '#/components/schemas/ContainerNetworkPolicyDisabledParam'
-          - $ref: '#/components/schemas/ContainerNetworkPolicyAllowlistParam'
-      type: object
+          - function
+        name:
+          description: The name of the function tool to call.
+          type: string
       required:
       - type
-      title: CodeInterpreterToolAuto
-      description: Configuration for a code interpreter container. Optionally specify the IDs of the files to run the code on.
-      x-stainless-naming:
-        go:
-          type_name: ToolCodeInterpreterContainerCodeInterpreterContainerAuto
+      - name
+    LiveMCPToolChoiceParam:
+      type: object
+      properties:
+        type:
+          description: The tool to call. Always `mcp`.
+          default: mcp
+          x-stainless-const: true
+          type: string
+          enum:
+          - mcp
+        server_label:
+          description: The label of the MCP server to call.
+          type: string
+        name:
+          anyOf:
+          - description: The name of the MCP tool to call. If omitted, the server may choose a default.
+            type: string
+          - type: 'null'
+      required:
+      - type
+      - server_label
+      x-stainless-variantName: McpToolChoice
     LiveSpecificFileSearchParam:
       type: object
       properties:
@@ -78990,6 +79100,7 @@ components:
           - shell
       required:
       - type
+      x-stainless-variantName: ShellToolChoice
     LiveSpecificCustomToolParam:
       type: object
       properties:
@@ -79006,6 +79117,7 @@ components:
       required:
       - type
       - name
+      x-stainless-variantName: CustomToolChoice
     LiveSpecificApplyPatchParam:
       title: Specific apply patch tool choice
       description: Forces the model to call the apply_patch tool when executing a tool call.
@@ -79107,12 +79219,37 @@ components:
             anyOf:
             - $ref: '#/components/schemas/LiveFunctionToolInputParam'
             - $ref: '#/components/schemas/LiveWebSearchToolInputParam'
+            - $ref: '#/components/schemas/LiveFileSearchToolInputParam'
+            - $ref: '#/components/schemas/LiveCodeInterpreterToolInputParam'
+            - $ref: '#/components/schemas/LiveHostedShellToolInputParam'
+            - $ref: '#/components/schemas/LiveImageGenerationToolInputParam'
+            - $ref: '#/components/schemas/LiveMCPToolInputParam'
+            - $ref: '#/components/schemas/LiveCustomToolInputParam'
+            - $ref: '#/components/schemas/LiveNamespaceToolInputParam'
+            - $ref: '#/components/schemas/LiveToolSearchToolInputParam'
+            - $ref: '#/components/schemas/LiveProgrammaticToolInputParam'
+            - $ref: '#/components/schemas/LiveComputerToolInputParam'
+            - $ref: '#/components/schemas/LiveApplyPatchToolInputParam'
         tool_choice:
           description: Controls which tool the Responses backend uses when handling a task delegated by the Live model.
           anyOf:
           - $ref: '#/components/schemas/LiveToolChoiceEnum'
-          - $ref: '#/components/schemas/LiveFunctionToolChoiceParam'
-          - $ref: '#/components/schemas/LiveMCPToolChoiceParam'
+          - discriminator:
+              propertyName: type
+            anyOf:
+            - $ref: '#/components/schemas/LiveFunctionToolChoiceParam'
+            - $ref: '#/components/schemas/LiveMCPToolChoiceParam'
+            - $ref: '#/components/schemas/LiveSpecificFileSearchParam'
+            - $ref: '#/components/schemas/LiveSpecificWebSearchParam'
+            - $ref: '#/components/schemas/LiveSpecificWebSearchPreviewParam'
+            - $ref: '#/components/schemas/LiveSpecificImageGenParam'
+            - $ref: '#/components/schemas/LiveSpecificComputerParam'
+            - $ref: '#/components/schemas/LiveSpecificCodeInterpreterParam'
+            - $ref: '#/components/schemas/LiveSpecificProgrammaticToolCallingParam'
+            - $ref: '#/components/schemas/LiveSpecificFunctionShellParam'
+            - $ref: '#/components/schemas/LiveSpecificCustomToolParam'
+            - $ref: '#/components/schemas/LiveSpecificApplyPatchParam'
+          - $ref: '#/components/schemas/LiveAllowedToolsChoiceParam'
         parallel_tool_calls:
           anyOf:
           - description: Whether the delegated Responses model may request multiple tool calls in a single response.
@@ -79740,12 +79877,37 @@ components:
             anyOf:
             - $ref: '#/components/schemas/LiveFunctionToolInputParam'
             - $ref: '#/components/schemas/LiveWebSearchToolInputParam'
+            - $ref: '#/components/schemas/LiveFileSearchToolInputParam'
+            - $ref: '#/components/schemas/LiveCodeInterpreterToolInputParam'
+            - $ref: '#/components/schemas/LiveHostedShellToolInputParam'
+            - $ref: '#/components/schemas/LiveImageGenerationToolInputParam'
+            - $ref: '#/components/schemas/LiveMCPToolInputParam'
+            - $ref: '#/components/schemas/LiveCustomToolInputParam'
+            - $ref: '#/components/schemas/LiveNamespaceToolInputParam'
+            - $ref: '#/components/schemas/LiveToolSearchToolInputParam'
+            - $ref: '#/components/schemas/LiveProgrammaticToolInputParam'
+            - $ref: '#/components/schemas/LiveComputerToolInputParam'
+            - $ref: '#/components/schemas/LiveApplyPatchToolInputParam'
         tool_choice:
           description: Controls which tool the Responses backend uses when handling a task delegated by the Live model.
           anyOf:
           - $ref: '#/components/schemas/LiveToolChoiceEnum'
-          - $ref: '#/components/schemas/LiveFunctionToolChoiceParam'
-          - $ref: '#/components/schemas/LiveMCPToolChoiceParam'
+          - discriminator:
+              propertyName: type
+            anyOf:
+            - $ref: '#/components/schemas/LiveFunctionToolChoiceParam'
+            - $ref: '#/components/schemas/LiveMCPToolChoiceParam'
+            - $ref: '#/components/schemas/LiveSpecificFileSearchParam'
+            - $ref: '#/components/schemas/LiveSpecificWebSearchParam'
+            - $ref: '#/components/schemas/LiveSpecificWebSearchPreviewParam'
+            - $ref: '#/components/schemas/LiveSpecificImageGenParam'
+            - $ref: '#/components/schemas/LiveSpecificComputerParam'
+            - $ref: '#/components/schemas/LiveSpecificCodeInterpreterParam'
+            - $ref: '#/components/schemas/LiveSpecificProgrammaticToolCallingParam'
+            - $ref: '#/components/schemas/LiveSpecificFunctionShellParam'
+            - $ref: '#/components/schemas/LiveSpecificCustomToolParam'
+            - $ref: '#/components/schemas/LiveSpecificApplyPatchParam'
+          - $ref: '#/components/schemas/LiveAllowedToolsChoiceParam'
         parallel_tool_calls:
           anyOf:
           - description: Whether the delegated Responses model may request multiple tool calls in a single response.
@@ -94895,7 +95057,11 @@ components:
             - $ref: '#/components/schemas/LiveDecisionsDelegationUpdateParam'
           - type: 'null'
         triggers:
-          $ref: '#/components/schemas/LiveSessionCreateParams/properties/triggers'
+          description: At most one Decisions trigger per transcript event type. Triggers run independently of delegation. On update, omit triggers to keep the current configuration, send a list to replace it, or send an empty list to disable triggers.
+          type: array
+          items:
+            $ref: '#/components/schemas/LiveDecisionTriggerInputParam'
+          maxItems: 2
       required: []
     LiveSessionUpdateParam:
       description: Update the delegation settings or transcript triggers of an active Live session. The server acknowledges accepted changes with `session.updated`.
@@ -95878,7 +96044,11 @@ components:
             - $ref: '#/components/schemas/LiveDecisionsDelegationParam'
           - type: 'null'
         triggers:
-          $ref: '#/components/schemas/LiveSessionCreateParams/properties/triggers'
+          description: At most one Decisions trigger per transcript event type. Triggers run independently of delegation. On update, omit triggers to keep the current configuration, send a list to replace it, or send an empty list to disable triggers.
+          type: array
+          items:
+            $ref: '#/components/schemas/LiveDecisionTriggerInputParam'
+          maxItems: 2
         store:
           description: Whether to store the session for later forking and recording download. Defaults to false for new sessions.
           type: boolean
@@ -97151,7 +97321,7 @@ components:
         reason: close_requested
         session:
           id: live_abc123
-          model: '{{models.live.default}}'
+          model: gpt-live-1
           status: active
           expires_at: 1788555600
           instructions: Help the caller plan a restaurant reservation. Confirm details before booking.
@@ -97228,7 +97398,7 @@ components:
           reason: close_requested
           session:
             id: live_abc123
-            model: '{{models.live.default}}'
+            model: gpt-live-1
             status: active
             expires_at: 1788555600
             instructions: Help the caller plan a restaurant reservation. Confirm details before booking.
@@ -110811,6 +110981,10 @@ components:
           message: 'Announced shutdown date: 2027-01-20. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
         gpt-5.1-mini:
           message: Not a supported model ID. Retained for SDK compatibility.
+        gpt-5.1-2025-11-13:
+          message: 'Announced shutdown date: 2027-04-01. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+        gpt-5.4-nano-2026-03-17:
+          message: 'Announced shutdown date: 2027-04-01. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
       x-stainless-nominal: false
     LiveBuiltInVoice:
       type: string
@@ -110911,6 +111085,19 @@ components:
             - gpt-3.5-turbo-1106
             - gpt-3.5-turbo-0125
             - gpt-3.5-turbo-16k-0613
+            x-openai-enum-deprecations:
+              gpt-5:
+                message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-5-mini:
+                message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-5-nano:
+                message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-5-2025-08-07:
+                message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-5-mini-2025-08-07:
+                message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+              gpt-5-nano-2025-08-07:
+                message: 'Announced shutdown date: 2026-12-11. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
           x-oaiTypeLabel: string
           nullable: true
         instructions:
@@ -111133,46 +111320,55 @@ components:
       - completed
       - incomplete
       - expired
-    LiveFunctionToolChoiceParam:
-      type: object
+    CodeInterpreterContainerAuto:
       properties:
         type:
-          default: function
-          x-stainless-const: true
           type: string
           enum:
-          - function
-        name:
-          type: string
-          minLength: 1
-          maxLength: 64
-          pattern: ^[a-zA-Z0-9_-]+$
-      required:
-      - type
-      - name
-    LiveMCPToolChoiceParam:
+          - auto
+          description: Always `auto`.
+          default: auto
+          x-stainless-const: true
+        file_ids:
+          items:
+            type: string
+            example: file-123
+          type: array
+          maxItems: 50
+          description: An optional list of uploaded files to make available to your code.
+        memory_limit:
+          anyOf:
+          - $ref: '#/components/schemas/ContainerMemoryLimit'
+            description: The memory limit for the code interpreter container.
+          - type: 'null'
+        network_policy:
+          discriminator:
+            propertyName: type
+          description: Network access policy for the container.
+          anyOf:
+          - $ref: '#/components/schemas/ContainerNetworkPolicyDisabledParam'
+          - $ref: '#/components/schemas/ContainerNetworkPolicyAllowlistParam'
       type: object
-      properties:
-        type:
-          default: mcp
-          x-stainless-const: true
-          type: string
-          enum:
-          - mcp
-        server_label:
-          type: string
-          minLength: 1
-          maxLength: 64
-          pattern: ^[a-zA-Z0-9_-]+$
-        name:
-          type: string
-          minLength: 1
-          maxLength: 64
-          pattern: ^[a-zA-Z0-9_-]+$
       required:
       - type
-      - server_label
-      - name
+      title: CodeInterpreterToolAuto
+      description: Configuration for a code interpreter container. Optionally specify the IDs of the files to run the code on.
+      x-stainless-naming:
+        go:
+          type_name: ToolCodeInterpreterContainerCodeInterpreterContainerAuto
+    LegacyComputerAction:
+      discriminator:
+        propertyName: type
+      anyOf:
+      - $ref: '#/components/schemas/ClickParam'
+      - $ref: '#/components/schemas/DoubleClickAction'
+      - $ref: '#/components/schemas/DragParam'
+      - $ref: '#/components/schemas/KeyPressAction'
+      - $ref: '#/components/schemas/MoveParam'
+      - $ref: '#/components/schemas/ScreenshotParam'
+      - $ref: '#/components/schemas/ScrollParam'
+      - $ref: '#/components/schemas/TypeParam'
+      - $ref: '#/components/schemas/WaitParam'
   responses:
     TooManyRequests:
       description: The request was rejected because a rate limit was exceeded.

@@ -22,13 +22,13 @@ export class Translations extends APIResource {
   /**
    * Translates audio into English.
    *
-   * @example
-   * ```ts
-   * const translation = await client.audio.translations.create({
-   *   file: fs.createReadStream('speech.mp3'),
-   *   model: 'whisper-1',
-   * });
-   * ```
+   * This endpoint supports only `whisper-1`. The endpoint and model are deprecated
+   * and scheduled to shut down on February 26, 2027. Migrate to
+   * `/v1/realtime/translations`, which requires a separate integration. See the
+   * [deprecation schedule](https://developers.openai.com/api/docs/deprecations) for
+   * details.
+   *
+   * @deprecated
    */
   create(
     body: TranslationCreateParams<'json' | undefined>,

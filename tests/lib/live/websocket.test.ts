@@ -2,6 +2,7 @@ import { expectTypeOf, vi } from 'vitest';
 import type { ClientOptions } from 'ws';
 
 import OpenAI from 'openai';
+import type { SessionUpdateEvent } from 'openai/resources/live/live';
 import { LiveWS } from 'openai/resources/live/ws';
 import type { LiveWSClientOptions } from 'openai/resources/live/ws';
 import { SidebandWS } from 'openai/resources/live/sideband/ws';
@@ -73,6 +74,38 @@ test('requires the correct identifier and only allows disabled redirects for Liv
 });
 
 describe.each(variants)('Live $name WebSocket inputs', ({ connect, path, query }) => {
+  test('sends expanded delegation tool choices without changing their wire shape', () => {
+    const client = new OpenAI({ apiKey: 'fake-live-key', baseURL: 'https://example.test/v1/' });
+    const live = connect(client);
+    const event = {
+      type: 'session.update',
+      session: {
+        delegation: {
+          type: 'responses',
+          responses: {
+            tools: [
+              { type: 'file_search' },
+              { type: 'code_interpreter' },
+              { type: 'mcp' },
+              { type: 'custom' },
+            ],
+            tool_choice: {
+              type: 'allowed_tools',
+              mode: 'required',
+              tools: [{ type: 'file_search' }],
+            },
+          },
+        },
+      },
+    } satisfies SessionUpdateEvent;
+    try {
+      live.send(event);
+      expect(live.socket.platformSocket.send).toHaveBeenCalledWith(JSON.stringify(event));
+    } finally {
+      live.close();
+    }
+  });
+
   test.each(['https:', 'http:'])(
     'maps the endpoint and preserves custom headers/options (%s)',
     (protocol) => {

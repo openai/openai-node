@@ -16,9 +16,10 @@ in external scan configuration. It records reusable architecture and
 trust-boundary context; the scenarios below are hypotheses and calibration
 examples, not findings.
 
-Generated-file ownership relies on `AGENTS.md`, contributor guidance, and SDK code
-review. Review output and inventory changes together; fix violations in the
-inputs/compiler and regenerate.
+Generated-file ownership currently relies on `AGENTS.md`, contributor guidance,
+and ordinary SDK code review. There is no dedicated generated-file edit check or
+required gate. Review generated output and inventory changes together; fix
+violations in the inputs/compiler and regenerate.
 
 ## 1. Overview
 

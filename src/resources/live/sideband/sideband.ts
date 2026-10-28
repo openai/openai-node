@@ -29,10 +29,13 @@ export type ConnectClientEvent =
   | LiveAPI.SessionCloseEvent;
 
 /**
- * Server events received by an attached Live sideband WebSocket, including
- * reflected input and output audio and transport notifications.
+ * Server events received by an attached Live sideband WebSocket. Audio deltas are
+ * delivered over the primary connection.
  */
 export type ConnectServerEvent =
+  | ConnectServerEvent.TransportRinging
+  | ConnectServerEvent.TransportAnswered
+  | ConnectServerEvent.TransportFailed
   | LiveAPI.SessionStartedEvent
   | LiveAPI.SessionUpdatedEvent
   | LiveAPI.InputAudioMutedEvent
@@ -56,59 +59,9 @@ export type ConnectServerEvent =
   | ConnectServerEvent.SessionInputAudioAppend
   | LiveAPI.OutputAudioDeltaEvent
   | ConnectServerEvent.TransportDtmfReceived
-  | ConnectServerEvent.TransportDtmfSend
-  | ConnectServerEvent.TransportRinging
-  | ConnectServerEvent.TransportAnswered
-  | ConnectServerEvent.TransportFailed;
+  | ConnectServerEvent.TransportDtmfSend;
 
 export namespace ConnectServerEvent {
-  /**
-   * Input audio received from the primary transport and reflected to a Live sideband
-   * connection before model-input muting.
-   */
-  export interface SessionInputAudioAppend {
-    /**
-     * Base64-encoded raw mono PCM16LE at 24 kHz received from the primary transport,
-     * reflected to the sideband before model-input muting. This server event uses the
-     * same audio key as the client command, but is not an acknowledgment of it.
-     */
-    audio: string;
-
-    /**
-     * The event type, always `session.input_audio.append`.
-     */
-    type: 'session.input_audio.append';
-  }
-
-  /**
-   * A SIP DTMF keypress received from the caller. Delivered only to sideband
-   * observers.
-   */
-  export interface TransportDtmfReceived {
-    event: string;
-
-    event_id: string;
-
-    type: 'transport.dtmf.received';
-  }
-
-  /**
-   * A SIP DTMF keypress successfully sent to the SIP trunk. Delivered only to
-   * sideband observers; this is not a client command.
-   */
-  export interface TransportDtmfSend {
-    event: string;
-
-    event_id: string;
-
-    type: 'transport.dtmf.send';
-
-    /**
-     * The event_id of the client command, when supplied.
-     */
-    client_event_id?: string;
-  }
-
   /**
    * The outbound SIP provider leg is ringing or providing early media. Delivered
    * only to sideband observers.
@@ -172,6 +125,53 @@ export namespace ConnectServerEvent {
        */
       param?: string;
     }
+  }
+
+  /**
+   * Input audio received from the primary transport and reflected to a Live sideband
+   * connection before model-input muting.
+   */
+  export interface SessionInputAudioAppend {
+    /**
+     * Base64-encoded raw mono PCM16LE at 24 kHz received from the primary transport,
+     * reflected to the sideband before model-input muting. This server event uses the
+     * same audio key as the client command, but is not an acknowledgment of it.
+     */
+    audio: string;
+
+    /**
+     * The event type, always `session.input_audio.append`.
+     */
+    type: 'session.input_audio.append';
+  }
+
+  /**
+   * A SIP DTMF keypress received from the caller. Delivered only to sideband
+   * observers.
+   */
+  export interface TransportDtmfReceived {
+    event: string;
+
+    event_id: string;
+
+    type: 'transport.dtmf.received';
+  }
+
+  /**
+   * A SIP DTMF keypress successfully sent to the SIP trunk. Delivered only to
+   * sideband observers; this is not a client command.
+   */
+  export interface TransportDtmfSend {
+    event: string;
+
+    event_id: string;
+
+    type: 'transport.dtmf.send';
+
+    /**
+     * The event_id of the client command, when supplied.
+     */
+    client_event_id?: string;
   }
 }
 

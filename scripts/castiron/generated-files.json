@@ -223,7 +223,7 @@
     },
     "src/resources/audio/audio.ts": {
       "mode": "100644",
-      "sha256": "9498f6e960c66d723d01355c8a27b49bf63f1a39a363411c1459bf266f60d501"
+      "sha256": "8453261bfa31ff0461a15e3ca5c04199900dc02af4b8918886a6ac2e505a8d7c"
     },
     "src/resources/audio/index.ts": {
       "mode": "100644",
@@ -231,7 +231,7 @@
     },
     "src/resources/audio/speech.ts": {
       "mode": "100644",
-      "sha256": "8d058285fdb07c8be55bc5c7fc07fe2a7c863ad0646deca292c7c814dae7576e"
+      "sha256": "d0989bdab475785c6000f969d94469673121d82e09fc02778bd81e742712aaad"
     },
     "src/resources/audio/transcriptions.ts": {
       "mode": "100644",
@@ -239,7 +239,7 @@
     },
     "src/resources/audio/translations.ts": {
       "mode": "100644",
-      "sha256": "7bf24e88987cbe340cc36eab6dd3bea51e0a9c3f7e81dfc807b184ecf520ad18"
+      "sha256": "1868adba37b8cc402975ad3a51f23ae506520abf4bdfb5314b9ed7656bbc404d"
     },
     "src/resources/audio/voice-consents.ts": {
       "mode": "100644",
@@ -451,7 +451,7 @@
     },
     "src/resources/beta/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "0579e507bdcc9e2618a77b931bf5f7e7c03e5d391546fcefeb3c3bc997721af5"
+      "sha256": "ac148ff0dc1511cab136331ecae2ad65b0ea4fef8eacb45f31e035c4b7b30e65"
     },
     "src/resources/beta/responses/ws-base.ts": {
       "mode": "100644",
@@ -747,7 +747,7 @@
     },
     "src/resources/live/live.ts": {
       "mode": "100644",
-      "sha256": "e7760424f2702bfa87bac151f9301cf97f6fb0d9f44a1c226e0e7afb1140a357"
+      "sha256": "9bd74141b1562740b5ff86ff5de5d9336a23be07eeabcb92ba9f7e2b326e7a82"
     },
     "src/resources/live/sessions.ts": {
       "mode": "100644",
@@ -767,7 +767,7 @@
     },
     "src/resources/live/sideband/sideband.ts": {
       "mode": "100644",
-      "sha256": "6f9f8ab532ab205a1f0191ce60b63ab9944aafaf766e5e9d13a246c1bfbe21f7"
+      "sha256": "35e7a91d29037a0fe7c22f48ee770ee01ed96c137a796610e59ae743f47fc671"
     },
     "src/resources/live/sideband/ws-base.ts": {
       "mode": "100644",
@@ -807,7 +807,7 @@
     },
     "src/resources/realtime/client-secrets.ts": {
       "mode": "100644",
-      "sha256": "f12c8c835fddbc9a251829477537c740efb23d5612ac986d479e78f9eb9e7276"
+      "sha256": "03c530f31e0766e1daddb814d4f88ccc162b177320759dbfa4bf0e0ee08ecda5"
     },
     "src/resources/realtime/index.ts": {
       "mode": "100644",
@@ -815,7 +815,7 @@
     },
     "src/resources/realtime/realtime.ts": {
       "mode": "100644",
-      "sha256": "9f296305e3a9f1fb07c015e055f159133537468c47ce7170cc3f7f90f9ca9978"
+      "sha256": "d85ac0e9bbbb22943d10fd442a70859765a86ced94a6470c12be3daf9b89d37f"
     },
     "src/resources/realtime/translations.ts": {
       "mode": "100644",
@@ -863,7 +863,7 @@
     },
     "src/resources/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "59ac0d67dc3938e8768156d183d5750720576eadaf4571f5a2c0e73281250dc8"
+      "sha256": "ca37ee6291a30c25bbf23a1612b7d042391c03158fe29155fa3a8f228982f3c5"
     },
     "src/resources/responses/ws-base.ts": {
       "mode": "100644",
@@ -895,7 +895,7 @@
     },
     "src/resources/shared.ts": {
       "mode": "100644",
-      "sha256": "69cef390c30bc7df0dc8b120e37d8ae1e4559e9f68a6d78b36a6a3a0c56063f4"
+      "sha256": "15cf6803634242502525c52098acddea16b9c2bb2439f85aa388dd43fa837455"
     },
     "src/resources/skills.ts": {
       "mode": "100644",
