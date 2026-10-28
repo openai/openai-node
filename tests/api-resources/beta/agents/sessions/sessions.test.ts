@@ -112,6 +112,7 @@ describe('resource sessions', () => {
           after: 'after',
           agent_id: 'agent_id',
           limit: 1,
+          metadata: { foo: 'string' },
           order: 'asc',
         },
         { path: '/_stainless_unknown_path' },
