@@ -2478,6 +2478,7 @@ export type ServerEvent =
   | InfoEvent
   | ServerEvent.TransportDtmfReceived
   | ServerEvent.TransportDtmfSend
+  | ServerEvent.TransportDtmfSent
   | ServerEvent.TransportRinging
   | ServerEvent.TransportAnswered
   | ServerEvent.TransportFailed;
@@ -2514,8 +2515,9 @@ export namespace ServerEvent {
   }
 
   /**
-   * A SIP DTMF keypress successfully sent to the SIP trunk. Delivered only to
-   * sideband observers; this is not a client command.
+   * Legacy SIP DTMF delivery notification retained for SDK compatibility and saved
+   * events. Current servers confirm delivery with transport.dtmf.sent;
+   * transport.dtmf.send is now the client command.
    */
   export interface TransportDtmfSend {
     event: string;
@@ -2523,6 +2525,23 @@ export namespace ServerEvent {
     event_id: string;
 
     type: 'transport.dtmf.send';
+
+    /**
+     * The event_id of the client command, when supplied.
+     */
+    client_event_id?: string;
+  }
+
+  /**
+   * A SIP DTMF keypress successfully sent to the SIP trunk. Delivered only to
+   * sideband observers; this is not a client command.
+   */
+  export interface TransportDtmfSent {
+    event: string;
+
+    event_id: string;
+
+    type: 'transport.dtmf.sent';
 
     /**
      * The event_id of the client command, when supplied.
