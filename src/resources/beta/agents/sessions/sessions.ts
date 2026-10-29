@@ -500,6 +500,12 @@ export namespace SessionCreateParams {
     compaction?: Agent.Compaction | null;
 
     /**
+     * Experimental settings to merge by key. Omitted settings keep their current
+     * values.
+     */
+    experimental?: Agent.Experimental;
+
+    /**
      * Additional instructions appended to the agent's default base instructions. Omit
      * to leave unchanged.
      */
@@ -559,6 +565,18 @@ export namespace SessionCreateParams {
        * token usage.
        */
       async?: boolean | null;
+    }
+
+    /**
+     * Experimental settings to merge by key. Omitted settings keep their current
+     * values.
+     */
+    export interface Experimental {
+      /**
+       * Whether to give the model periodic current-time reminders. Omit to keep the
+       * current setting.
+       */
+      time_awareness?: boolean;
     }
   }
 

@@ -25,6 +25,7 @@ describe('resource sessions', () => {
       environment: { type: 'none' },
       agent: {
         compaction: { async: true },
+        experimental: { time_awareness: true },
         instructions: 'instructions',
         model: 'model',
         multi_agent: { enabled: true, max_concurrent_subagents: 1 },
