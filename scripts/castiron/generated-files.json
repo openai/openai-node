@@ -703,7 +703,7 @@
     },
     "src/resources/images.ts": {
       "mode": "100644",
-      "sha256": "6780bc97fe28f7c3cab0c54464d11f94b8cfe2028ea2388de3fcb30df4a2ffea"
+      "sha256": "1d179793d833912eb104aaa6b39b9aec016ddd442ea2efde5cf5eba61b343fb2"
     },
     "src/resources/index.ts": {
       "mode": "100644",
@@ -1339,7 +1339,7 @@
     },
     "tests/api-resources/images.test.ts": {
       "mode": "100644",
-      "sha256": "4d510888b7d0bc31b8e307ff397e846cbf40d1b5477a3afe5065a3653c992fb6"
+      "sha256": "f60b4a2a2b74c06c7e99632d5a67574f226039025eebcccc081bf8cad39f2f1c"
     },
     "tests/api-resources/live/live.test.ts": {
       "mode": "100644",
