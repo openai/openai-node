@@ -465,6 +465,23 @@ export interface Agent {
    * The Unix timestamp, in seconds, when the agent was last updated.
    */
   updated_at: number;
+
+  /**
+   * The effective context compaction settings.
+   */
+  compaction?: Agent.Compaction;
+}
+
+export namespace Agent {
+  /**
+   * The effective context compaction settings.
+   */
+  export interface Compaction {
+    /**
+     * Whether context is compacted in the background. Defaults to true.
+     */
+    async: boolean;
+  }
 }
 
 export interface AgentBrowserAuthenticationCancelParam {
@@ -1344,6 +1361,23 @@ export namespace AgentSession {
      * Tools available to the agent.
      */
     tools: Array<AgentsAPI.AgentTool>;
+
+    /**
+     * The effective context compaction settings.
+     */
+    compaction?: Agent.Compaction;
+  }
+
+  export namespace Agent {
+    /**
+     * The effective context compaction settings.
+     */
+    export interface Compaction {
+      /**
+       * Whether context is compacted in the background. Defaults to true.
+       */
+      async: boolean;
+    }
   }
 
   /**
@@ -5512,6 +5546,11 @@ export interface AgentCreateParams {
   model: string;
 
   /**
+   * Context compaction settings. Omission or null enables background compaction.
+   */
+  compaction?: AgentCreateParams.Compaction | null;
+
+  /**
    * Additional instructions appended to the agent's default base instructions. Omit
    * or set to null to add no custom instructions.
    */
@@ -5564,7 +5603,28 @@ export interface AgentCreateParams {
   tools?: Array<PersistedAgentToolParam> | null;
 }
 
+export namespace AgentCreateParams {
+  /**
+   * Context compaction settings. Omission or null enables background compaction.
+   */
+  export interface Compaction {
+    /**
+     * Whether to compact context in the background. Omission or null defaults to true.
+     * Set to false to use blocking compaction. Background compaction may increase
+     * token usage.
+     */
+    async?: boolean | null;
+  }
+}
+
 export interface AgentUpdateParams {
+  /**
+   * Context compaction settings. Omit to keep the current settings. A supplied
+   * object replaces the settings; null or an empty object enables background
+   * compaction.
+   */
+  compaction?: AgentUpdateParams.Compaction | null;
+
   /**
    * Additional instructions appended to the agent's default base instructions. Omit
    * to leave unchanged.
@@ -5621,6 +5681,22 @@ export interface AgentUpdateParams {
    * The replacement must fit within 3 MiB (3,145,728 bytes) of compact UTF-8 JSON.
    */
   tools?: Array<PersistedAgentToolParam> | null;
+}
+
+export namespace AgentUpdateParams {
+  /**
+   * Context compaction settings. Omit to keep the current settings. A supplied
+   * object replaces the settings; null or an empty object enables background
+   * compaction.
+   */
+  export interface Compaction {
+    /**
+     * Whether to compact context in the background. Omission or null defaults to true.
+     * Set to false to use blocking compaction. Background compaction may increase
+     * token usage.
+     */
+    async?: boolean | null;
+  }
 }
 
 export interface AgentListParams extends CursorPageParams {
