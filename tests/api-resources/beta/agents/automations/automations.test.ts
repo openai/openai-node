@@ -52,6 +52,7 @@ describe('resource automations', () => {
         type: 'new_session',
         agent: {
           compaction: { async: true },
+          experimental: { time_awareness: true },
           instructions: 'instructions',
           model: 'model',
           multi_agent: { enabled: true, max_concurrent_subagents: 1 },

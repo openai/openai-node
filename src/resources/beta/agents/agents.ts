@@ -470,6 +470,11 @@ export interface Agent {
    * The effective context compaction settings.
    */
   compaction?: Agent.Compaction;
+
+  /**
+   * The effective experimental settings for the agent.
+   */
+  experimental?: Agent.Experimental;
 }
 
 export namespace Agent {
@@ -481,6 +486,16 @@ export namespace Agent {
      * Whether context is compacted in the background. Defaults to true.
      */
     async: boolean;
+  }
+
+  /**
+   * The effective experimental settings for the agent.
+   */
+  export interface Experimental {
+    /**
+     * Whether the model receives periodic current-time reminders.
+     */
+    time_awareness: boolean;
   }
 }
 
@@ -1366,6 +1381,11 @@ export namespace AgentSession {
      * The effective context compaction settings.
      */
     compaction?: Agent.Compaction;
+
+    /**
+     * The effective experimental settings for the agent.
+     */
+    experimental?: Agent.Experimental;
   }
 
   export namespace Agent {
@@ -1377,6 +1397,16 @@ export namespace AgentSession {
        * Whether context is compacted in the background. Defaults to true.
        */
       async: boolean;
+    }
+
+    /**
+     * The effective experimental settings for the agent.
+     */
+    export interface Experimental {
+      /**
+       * Whether the model receives periodic current-time reminders.
+       */
+      time_awareness: boolean;
     }
   }
 
@@ -5551,6 +5581,11 @@ export interface AgentCreateParams {
   compaction?: AgentCreateParams.Compaction | null;
 
   /**
+   * Experimental agent settings. All experimental features default to disabled.
+   */
+  experimental?: AgentCreateParams.Experimental;
+
+  /**
    * Additional instructions appended to the agent's default base instructions. Omit
    * or set to null to add no custom instructions.
    */
@@ -5615,6 +5650,16 @@ export namespace AgentCreateParams {
      */
     async?: boolean | null;
   }
+
+  /**
+   * Experimental agent settings. All experimental features default to disabled.
+   */
+  export interface Experimental {
+    /**
+     * Whether to give the model periodic current-time reminders. Defaults to false.
+     */
+    time_awareness?: boolean;
+  }
 }
 
 export interface AgentUpdateParams {
@@ -5624,6 +5669,12 @@ export interface AgentUpdateParams {
    * compaction.
    */
   compaction?: AgentUpdateParams.Compaction | null;
+
+  /**
+   * Experimental settings to merge by key. Omitted settings keep their current
+   * values.
+   */
+  experimental?: AgentUpdateParams.Experimental;
 
   /**
    * Additional instructions appended to the agent's default base instructions. Omit
@@ -5696,6 +5747,18 @@ export namespace AgentUpdateParams {
      * token usage.
      */
     async?: boolean | null;
+  }
+
+  /**
+   * Experimental settings to merge by key. Omitted settings keep their current
+   * values.
+   */
+  export interface Experimental {
+    /**
+     * Whether to give the model periodic current-time reminders. Omit to keep the
+     * current setting.
+     */
+    time_awareness?: boolean;
   }
 }
 

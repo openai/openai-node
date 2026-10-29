@@ -24,6 +24,7 @@ describe('resource agents', () => {
     await client.beta.agents.create({
       model: 'model',
       compaction: { async: true },
+      experimental: { time_awareness: true },
       instructions: 'instructions',
       metadata: { foo: 'string' },
       multi_agent: { enabled: true, max_concurrent_subagents: 1 },
@@ -75,6 +76,7 @@ describe('resource agents', () => {
         'agent_id',
         {
           compaction: { async: true },
+          experimental: { time_awareness: true },
           instructions: 'instructions',
           metadata: { foo: 'string' },
           model: 'model',
