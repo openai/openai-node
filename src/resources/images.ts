@@ -665,6 +665,13 @@ export interface ImageEditParamsBase {
   input_fidelity?: 'high' | 'low' | null;
 
   /**
+   * A transparent PNG overlaid on the first image to guide the edit. Must match that
+   * image's dimensions after orientation and contain transparent pixels. Supports
+   * GPT Image 2.5 and 2.6. Cannot be combined with mask.
+   */
+  markup?: Uploadable;
+
+  /**
    * An additional image whose fully transparent areas (e.g. where alpha is zero)
    * indicate where `image` should be edited. If there are multiple images provided,
    * the mask will be applied on the first image. Must be a valid PNG file, less than

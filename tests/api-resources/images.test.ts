@@ -53,6 +53,7 @@ describe('resource images', () => {
       prompt: 'A cute baby sea otter wearing a beret',
       background: 'transparent',
       input_fidelity: 'high',
+      markup: await toFile(Buffer.from('Example data'), 'README.md'),
       mask: await toFile(Buffer.from('Example data'), 'README.md'),
       model: 'gpt-image-1.5',
       n: 1,
