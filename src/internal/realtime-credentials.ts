@@ -1,7 +1,37 @@
 import type { OpenAI } from '../client';
 import { assertValidBedrockBearerCredential, brand_privateBedrockClient } from './bedrock';
+import { buildWebSocketOptions } from './ws';
 
 type CaptureAPIKey = (apiKey: string | null) => void;
+
+/** Native Realtime accepts routing metadata through these two server-supported subprotocols. */
+export function realtimeRoutingProtocols(
+  client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
+  apiKey: string | null,
+): string[] {
+  const protocols = [];
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Structural partial clients may omit the callable header hook; check it before using the client's header contract.
+  if ('_buildWebSocketHeaders' in client && typeof client._buildWebSocketHeaders === 'function') {
+    // SAFETY: The checked client hook owns header precedence; no other OpenAI members are used.
+    const { headers } = buildWebSocketOptions(client as OpenAI, { Authorization: `Bearer ${apiKey}` }, null);
+    for (const field of ['organization', 'project']) {
+      const value = headers[`openai-${field}`];
+      if (value !== undefined) {
+        protocols.push(`openai-${field}.${value}`);
+      }
+    }
+    return protocols;
+  }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Realtime accepts structural partial clients; optional routing fields enter from that untyped client boundary.
+  if ('organization' in client && typeof client.organization === 'string') {
+    protocols.push(`openai-organization.${client.organization}`);
+  }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Only the supported string field can be emitted to the native protocol boundary.
+  if ('project' in client && typeof client.project === 'string') {
+    protocols.push(`openai-project.${client.project}`);
+  }
+  return protocols;
+}
 export interface DeferredAPIKeyCache {
   client: Pick<OpenAI, 'apiKey'>;
   providerKey?: string;

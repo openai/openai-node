@@ -536,7 +536,7 @@ describe.each([
       'wss://example.com/v1/realtime?route=tenant&model=gpt-realtime',
     );
     expect(realtime.url.toString()).toBe(lastNodeSocket().url.toString());
-    expect(lastNodeSocket().options.headers).toMatchObject({ Authorization: 'Bearer test-key' });
+    expect(lastNodeSocket().options.headers).toMatchObject({ authorization: 'Bearer test-key' });
   });
 
   test('preserves base URL routing queries when resolving sideband credentials', async () => {
@@ -550,7 +550,7 @@ describe.each([
     expect(lastNodeSocket().url.toString()).toBe(
       'wss://example.com/v1/realtime?route=tenant&call_id=rtc_123',
     );
-    expect(lastNodeSocket().options.headers).toMatchObject({ Authorization: 'Bearer rotating-key' });
+    expect(lastNodeSocket().options.headers).toMatchObject({ authorization: 'Bearer rotating-key' });
   });
 
   test('opens authenticated model and sideband sessions and preserves custom headers', () => {
@@ -562,10 +562,10 @@ describe.each([
 
     expect(model.url.toString()).toBe('wss://example.com/v1/realtime?model=gpt-realtime');
     expect(lastNodeSocket().options.headers).toMatchObject({
-      Authorization: 'Bearer test-key',
-      'User-Agent': `OpenAI/JS ${VERSION}`,
-      'X-Custom': 'value',
-      ...(beta ? { 'OpenAI-Beta': 'realtime=v1' } : {}),
+      authorization: 'Bearer test-key',
+      'user-agent': `OpenAI/JS ${VERSION}`,
+      'x-custom': 'value',
+      ...(beta ? { 'openai-beta': 'realtime=v1' } : {}),
     });
 
     const sideband = new Realtime({ callID: 'call-123' }, client);
@@ -580,7 +580,7 @@ describe.each([
 
     expect(realtime.socket).toBe(lastNodeSocket());
     expect(lastNodeSocket().options.headers).toMatchObject({
-      'User-Agent': 'custom-client/1.0.0',
+      'user-agent': 'custom-client/1.0.0',
     });
   });
 
@@ -592,7 +592,7 @@ describe.each([
     );
 
     await Realtime.create(client, { model: 'gpt-realtime' });
-    expect(lastNodeSocket().options.headers).toMatchObject({ Authorization: 'Bearer rotating-key' });
+    expect(lastNodeSocket().options.headers).toMatchObject({ authorization: 'Bearer rotating-key' });
   });
 
   test('dispatches valid events and reports malformed messages and socket failures', () => {
@@ -674,7 +674,7 @@ describe.each([
     const socket = lastNodeSocket();
 
     expect(socket.options.headers).toMatchObject({ 'api-key': 'azure-key' });
-    expect(socket.options.headers).not.toHaveProperty('Authorization');
+    expect(socket.options.headers).not.toHaveProperty('authorization');
     expect(socket.url.pathname).toBe(beta ? '/openai/realtime' : '/openai/v1/realtime');
     expect(socket.url.searchParams.get(beta ? 'deployment' : 'model')).toBe('chat');
     expect(socket.url.searchParams.has('api-version')).toBe(beta);
@@ -684,7 +684,7 @@ describe.each([
     await Realtime.azure(createAzureClient({ deployment: 'chat', tokenProvider: true }));
     const socket = lastNodeSocket();
 
-    expect(socket.options.headers).toMatchObject({ Authorization: 'Bearer azure-token' });
+    expect(socket.options.headers).toMatchObject({ authorization: 'Bearer azure-token' });
     expect(socket.options.headers).not.toHaveProperty('api-key');
     expect(socket.url.pathname).toBe(beta ? '/openai/realtime' : '/openai/v1/realtime');
     expect(socket.url.searchParams.get(beta ? 'deployment' : 'model')).toBe('chat');
@@ -715,8 +715,8 @@ describe('stable Node realtime transcription', () => {
     expect(socket.url.searchParams.get('model')).toBe('override');
     expect(socket.url.searchParams.has('api-version')).toBe(false);
     expect(socket.url.searchParams.has('deployment')).toBe(false);
-    expect(socket.options.headers).toMatchObject({ 'api-key': 'azure-key', 'X-Custom': 'value' });
-    expect(socket.options.headers).not.toHaveProperty('OpenAI-Beta');
+    expect(socket.options.headers).toMatchObject({ 'api-key': 'azure-key', 'x-custom': 'value' });
+    expect(socket.options.headers).not.toHaveProperty('openai-beta');
   });
 
   test('opens authenticated transcription-only sessions without a beta header', () => {
@@ -727,10 +727,10 @@ describe('stable Node realtime transcription', () => {
 
     expect(realtime.url.toString()).toBe('wss://example.com/v1/realtime?intent=transcription');
     expect(lastNodeSocket().options.headers).toMatchObject({
-      Authorization: 'Bearer test-key',
-      'X-Custom': 'value',
+      authorization: 'Bearer test-key',
+      'x-custom': 'value',
     });
-    expect(lastNodeSocket().options.headers).not.toHaveProperty('OpenAI-Beta');
+    expect(lastNodeSocket().options.headers).not.toHaveProperty('openai-beta');
   });
 
   test.each([undefined, 'configured-deployment'])(
@@ -749,10 +749,10 @@ describe('stable Node realtime transcription', () => {
       expect(socket.url.searchParams.has('deployment')).toBe(false);
       expect(socket.options.headers).toMatchObject({
         'api-key': 'azure-key',
-        'X-Custom': 'value',
+        'x-custom': 'value',
       });
-      expect(socket.options.headers).not.toHaveProperty('Authorization');
-      expect(socket.options.headers).not.toHaveProperty('OpenAI-Beta');
+      expect(socket.options.headers).not.toHaveProperty('authorization');
+      expect(socket.options.headers).not.toHaveProperty('openai-beta');
     },
   );
 
@@ -766,9 +766,9 @@ describe('stable Node realtime transcription', () => {
     expect(socket.url.searchParams.get('intent')).toBe('transcription');
     expect(socket.url.searchParams.has('api-version')).toBe(false);
     expect(socket.url.searchParams.has('deployment')).toBe(false);
-    expect(socket.options.headers).toMatchObject({ Authorization: 'Bearer azure-token' });
+    expect(socket.options.headers).toMatchObject({ authorization: 'Bearer azure-token' });
     expect(socket.options.headers).not.toHaveProperty('api-key');
-    expect(socket.options.headers).not.toHaveProperty('OpenAI-Beta');
+    expect(socket.options.headers).not.toHaveProperty('openai-beta');
   });
 
   test.each([
@@ -947,7 +947,7 @@ describe('stable Node realtime custom URL builder', () => {
     expect(lastNodeSocket().url.toString()).toBe(customURL.toString());
     expect(lastNodeSocket().options).toMatchObject({
       handshakeTimeout: 4321,
-      headers: { Authorization: 'Bearer test-key', 'X-Custom': 'value' },
+      headers: { authorization: 'Bearer test-key', 'x-custom': 'value' },
     });
     expect(realtime.url).not.toBe(customURL);
     expect(realtime.url.searchParams.has('model')).toBe(false);
@@ -980,8 +980,8 @@ describe('stable Node realtime custom URL builder', () => {
 
     expect(lastNodeSocket().url.toString()).toBe(customURL.toString());
     expect(lastNodeSocket().options.headers).toMatchObject({
-      Authorization: 'Bearer rotating-key',
-      'X-Custom': 'value',
+      authorization: 'Bearer rotating-key',
+      'x-custom': 'value',
     });
     expect(realtime.url.searchParams.has('model')).toBe(false);
   });
@@ -1007,9 +1007,9 @@ describe('stable Node realtime custom URL builder', () => {
     expect(socket.url.searchParams.has('deployment')).toBe(false);
     expect(socket.options).toMatchObject({
       handshakeTimeout: 4321,
-      headers: { 'api-key': 'azure-key', 'X-Custom': 'value' },
+      headers: { 'api-key': 'azure-key', 'x-custom': 'value' },
     });
-    expect(socket.options.headers).not.toHaveProperty('Authorization');
+    expect(socket.options.headers).not.toHaveProperty('authorization');
   });
 
   test('preserves custom Azure URLs and authenticates token providers with a bearer header', async () => {
@@ -1022,7 +1022,7 @@ describe('stable Node realtime custom URL builder', () => {
 
     expect(socket.url.toString()).toBe(customURL.toString());
     expect(socket.url.searchParams.has('model')).toBe(false);
-    expect(socket.options.headers).toMatchObject({ Authorization: 'Bearer azure-token' });
+    expect(socket.options.headers).toMatchObject({ authorization: 'Bearer azure-token' });
     expect(socket.options.headers).not.toHaveProperty('api-key');
   });
 

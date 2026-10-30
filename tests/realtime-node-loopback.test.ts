@@ -145,7 +145,7 @@ test('GA Realtime WSS preserves handshake options and accepts another command af
     expect(request.url).toBe('/gateway/v1/realtime?model=gpt-realtime');
     expect(request.headers).toMatchObject({
       'x-trace': 'synthetic-session',
-      authorization: 'Bearer synthetic-client-key',
+      authorization: 'Bearer synthetic-override',
     });
     expect(request.headers).not.toHaveProperty('openai-beta');
 

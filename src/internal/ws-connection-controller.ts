@@ -152,12 +152,22 @@ export class WebSocketConnection<
 
   private _cancelRefresh: (() => void) | undefined;
 
+  private _hasAutomaticBacklog(): boolean {
+    return (
+      !this._hooks.manualQueue &&
+      !this._isReconnecting &&
+      this._sendQueue.hasPending &&
+      !this._sendQueue.isFlushing &&
+      this._owner.socket.readyState === ReadyState.OPEN
+    );
+  }
+
   send(event: TClientEvent) {
+    if (this._permanentClosed || (this._hooks.manualQueue && this._intentionallyClosed)) {
+      this._hooks.onError('cannot send on a closed WebSocket');
+      return;
+    }
     if (this._hooks.manualQueue) {
-      if (this._intentionallyClosed || this._permanentClosed) {
-        this._hooks.onError('cannot send on a closed WebSocket');
-        return;
-      }
       if (this._isReconnecting) {
         let accepted: boolean;
         try {
@@ -176,23 +186,43 @@ export class WebSocketConnection<
         return;
       }
     }
+    const flushBacklog = this._hasAutomaticBacklog();
     sendWebSocketEvent(
       this._owner,
       event,
       this._sendQueue,
-      () => this._isReconnecting,
+      () => this._isReconnecting || flushBacklog,
       (message, cause) => this._hooks.onError(message, cause),
     );
+    if (flushBacklog && this._hasAutomaticBacklog()) {
+      this._flushSendQueue();
+    }
   }
 
   sendRaw(data: RawWebSocketData) {
+    if (this._permanentClosed || (this._hooks.manualQueue && this._intentionallyClosed)) {
+      this._hooks.onError('cannot send on a closed WebSocket');
+      return;
+    }
+    if (
+      this._hooks.manualQueue &&
+      !this._isReconnecting &&
+      this._owner.socket.readyState === ReadyState.CONNECTING
+    ) {
+      this._hooks.onError('cannot send before the WebSocket is open');
+      return;
+    }
+    const flushBacklog = this._hasAutomaticBacklog();
     sendRawWebSocketData(
       this._owner,
       data,
       this._sendQueue,
-      () => this._isReconnecting,
+      () => this._isReconnecting || flushBacklog,
       (message, cause) => this._hooks.onError(message, cause),
     );
+    if (flushBacklog && this._hasAutomaticBacklog()) {
+      this._flushSendQueue();
+    }
   }
 
   close(props?: { code: number; reason: string }) {
@@ -487,7 +517,10 @@ export class WebSocketConnection<
       if (socket !== this._owner.socket) {
         return;
       }
-      this._flushSendQueue();
+      // Recovery owns the flush until the replacement has passed its retry attempt.
+      if (!this._isReconnecting) {
+        this._flushSendQueue();
+      }
     });
 
     socket.on('close', (code: number, reason: string) => {
@@ -617,6 +650,7 @@ export class WebSocketConnection<
     return this._hooks.lifetimeRetries ? this._retryCount : attempt;
   }
 
+  // oxlint-disable-next-line eslint/complexity -- One retry loop must own opening, flushing, and actual close codes without catching public observer errors as transport failures.
   private async _reconnect(initialCloseCode: number): Promise<void> {
     let closeCode = initialCloseCode;
     if (!this._owner.socket) {
@@ -724,9 +758,47 @@ export class WebSocketConnection<
         }
         continue;
       }
-      this._isReconnecting = false;
       this._internalEvents._emit('socketSwap', oldSocket, this._owner.socket);
-      this._flushSendQueue();
+      let flushed: boolean;
+      try {
+        flushed = this._flushSendQueue();
+      } catch (observerError) {
+        // Flush reports send failures itself. A throwing observer aborts this recovery;
+        // keep the original observer error while closing and exposing unattempted frames.
+        try {
+          this._owner.socket.close();
+        } catch {
+          // The permanent-close guard still blocks sends if physical disposal failed.
+        }
+        this._isReconnecting = false;
+        try {
+          this._emitPermanentClose(
+            this._intentionallyClosed ? this._closeCode : closeCode,
+            this._intentionallyClosed ? this._closeReason : 'reconnect interrupted by error observer',
+          );
+        } catch {
+          // A later close observer must not replace the original error observer failure.
+        }
+        throw observerError;
+      }
+      if (this._owner.socket.readyState !== ReadyState.OPEN) {
+        // Capture a real peer/explicit close, including a send that closed without throwing.
+        // Do not let our later disposal of an open, failed-write socket replace this code.
+        closeCode = await closeCodePromise;
+        if (this._abortReconnect(closeCode, lastError)) {
+          return;
+        }
+        continue;
+      }
+      if (!flushed) {
+        try {
+          this._owner.socket.close();
+        } catch {
+          // A failed replacement must not obscure the original write failure or retain its retry slot.
+        }
+        continue;
+      }
+      this._isReconnecting = false;
       try {
         this._hooks.emitReconnected();
       } finally {
@@ -749,11 +821,11 @@ export class WebSocketConnection<
     }
   }
 
-  private _flushSendQueue(explicit = false): void {
+  private _flushSendQueue(explicit = false): boolean {
     if (this._hooks.manualQueue && !explicit) {
-      return;
+      return true;
     }
-    flushWebSocketSendQueue(
+    return flushWebSocketSendQueue(
       this._owner,
       this._sendQueue,
       (message, cause) => this._hooks.onError(message, cause),

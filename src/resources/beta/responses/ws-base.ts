@@ -125,6 +125,7 @@ export abstract class ResponsesWSBase<TSocket extends WebSocketLike> extends Res
         emitReconnected: () => this._emit('reconnected'),
         emitClose: (code, reason, unsent) => this._emit('close', code, reason, unsent),
         onSocketError: recordWebSocketError,
+        requeueFailed: false,
         prepareReconnectSocket: () => this._prepareReconnectSocket(),
       },
       options,

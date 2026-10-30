@@ -1,11 +1,40 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type * as WS from 'ws';
 import type { WebSocketLike } from './ws-adapter';
-import { protectWebSocketOptionsFromCredentialRedirects } from './ws';
+import { buildWebSocketOptions, protectWebSocketOptionsFromCredentialRedirects } from './ws';
 import { setRealtimeAPIKeyCacheContext } from './realtime-credentials';
 import type { DeferredAPIKeyCache } from './realtime-credentials';
+import type { OpenAI } from '../client';
+import { VERSION } from '../version';
 
 setRealtimeAPIKeyCacheContext(new AsyncLocalStorage<DeferredAPIKeyCache | undefined>());
+
+/** Use the real client's header hook while retaining Realtime's structural partial-client contract. */
+export function buildRealtimeWebSocketHeaders(
+  client: Pick<OpenAI, 'apiKey' | 'baseURL'>,
+  authHeaders: Record<string, string>,
+  options: WS.ClientOptions | ReturnType<typeof snapshotNodeWebSocketOptions> | undefined,
+): NonNullable<WS.ClientOptions['headers']> {
+  if ('_buildWebSocketHeaders' in client && typeof client._buildWebSocketHeaders === 'function') {
+    // SAFETY: buildWebSocketOptions only calls this checked hook and uses the client as a WeakMap key.
+    return buildWebSocketOptions(client as OpenAI, authHeaders, { headers: options?.headers }).headers;
+  }
+  const headers = new Map<string, string | string[]>(
+    Object.entries({ 'User-Agent': `${client.constructor.name}/JS ${VERSION}`, ...authHeaders }).map(
+      ([name, value]) => [name.toLowerCase(), value],
+    ),
+  );
+  for (const [name, value] of Object.entries(options?.headers ?? {})) {
+    const normalizedName = name.toLowerCase();
+    if (value === null) {
+      headers.delete(normalizedName);
+    } else if (value !== undefined) {
+      headers.set(normalizedName, value);
+    }
+  }
+  // SAFETY: ws forwards repeated-header arrays to Node's HTTP client, but its header type only declares strings.
+  return Object.fromEntries(headers) as NonNullable<WS.ClientOptions['headers']>;
+}
 
 /** A generic event listener callback. */
 type Listener = (...args: any[]) => void;

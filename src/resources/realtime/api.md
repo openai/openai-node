@@ -62,6 +62,7 @@ Types:
 - <code><a href="../../../src/resources/realtime/realtime.ts">RealtimeResponseCreateAudioOutput</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">RealtimeResponseCreateMcpTool</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">RealtimeResponseCreateParams</a></code>
+- <code><a href="../../../src/resources/realtime/realtime.ts">RealtimeResponseCreateParamsWithReferencesParam</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">RealtimeResponseStatus</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">RealtimeResponseUsage</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">RealtimeResponseUsageInputTokenDetails</a></code>
@@ -103,10 +104,12 @@ Types:
 - <code><a href="../../../src/resources/realtime/realtime.ts">ResponseContentPartAddedEvent</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">ResponseContentPartDoneEvent</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">ResponseCreateEvent</a></code>
+- <code><a href="../../../src/resources/realtime/realtime.ts">ResponseCreateEventWithReferencesParam</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">ResponseCreatedEvent</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">ResponseDoneEvent</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">ResponseFunctionCallArgumentsDeltaEvent</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">ResponseFunctionCallArgumentsDoneEvent</a></code>
+- <code><a href="../../../src/resources/realtime/realtime.ts">ResponseItemReference</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">ResponseMcpCallArgumentsDelta</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">ResponseMcpCallArgumentsDone</a></code>
 - <code><a href="../../../src/resources/realtime/realtime.ts">ResponseMcpCallCompleted</a></code>

@@ -1,5 +1,9 @@
 import { createRealtimeRecovery, validateRealtimeRecovery } from '../internal/realtime-recovery';
-import { NodeWebSocket, snapshotNodeWebSocketOptions } from '../internal/ws-adapter-node';
+import {
+  buildRealtimeWebSocketHeaders,
+  NodeWebSocket,
+  snapshotNodeWebSocketOptions,
+} from '../internal/ws-adapter-node';
 import type { WebSocketConnection } from '../internal/ws-connection-controller';
 import type { UnsentMessage } from '../internal/ws';
 import { resolveRealtimeAPIKey } from '../internal/realtime-credentials';
@@ -8,8 +12,10 @@ import { assertBedrockWebSocketOrigin } from '../internal/bedrock';
 import { protectWebSocketOptionsFromCredentialRedirects } from '../internal/ws';
 import type { AzureOpenAI } from '../index';
 import { OpenAI } from '../index';
-import { VERSION } from '../version';
-import type { RealtimeClientEvent } from '../resources/realtime/realtime';
+import type {
+  RealtimeClientEvent,
+  ResponseCreateEventWithReferencesParam,
+} from '../resources/realtime/realtime';
 import {
   OpenAIRealtimeEmitter,
   buildRealtimeURL,
@@ -93,13 +99,14 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
         throw new Error('Azure OpenAI Realtime requires an API key');
       }
       const azureKey = isAzure(connectionClient) && !resolvedApiKey;
-      const headers = {
-        'User-Agent': `${connectionClient.constructor.name}/JS ${VERSION}`,
-        ...options?.headers,
-        // Credentials remain own data properties without invoking inherited setters.
-        ...(azureKey && props.__apiKey !== undefined ? { 'api-key': attemptKey ?? '' } : {}),
-        ...(azureKey ? {} : { Authorization: `Bearer ${attemptKey}` }),
-      };
+      const headers = buildRealtimeWebSocketHeaders(
+        connectionClient,
+        {
+          ...(azureKey && props.__apiKey !== undefined ? { 'api-key': attemptKey ?? '' } : {}),
+          ...(azureKey ? {} : { Authorization: `Bearer ${attemptKey}` }),
+        },
+        options,
+      );
 
       const { maxPayload, ...nativeOptions } = options ?? {};
       const socketOptions: WS.ClientOptions = {
@@ -277,14 +284,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     return new OpenAIRealtimeWS(
       {
         ...connection,
-        options: {
-          ...props.options,
-          headers: {
-            ...props.options?.headers,
-            // A credential must be an own data property without invoking an inherited setter.
-            ...(isApiKeyProvider ? {} : { 'api-key': apiKey }),
-          },
-        },
+        options: props.options,
         __resolvedApiKey: isApiKeyProvider,
         __apiKey: apiKey,
       },
@@ -302,6 +302,32 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     }
     try {
       this.socket.send(JSON.stringify(event));
+    } catch (err) {
+      this._onError(null, 'could not send data', err);
+    }
+  }
+
+  /**
+   * Sends a response.create event whose input may include existing item references.
+   * Other event and response parameters are preserved. Serialization or transport
+   * errors are emitted through the usual error event.
+   *
+   * With recovery enabled, unsent events submitted by this method are returned as
+   * raw JSON frames by takePending() and close, including events without references.
+   */
+  sendResponseCreate(event: ResponseCreateEventWithReferencesParam): void {
+    let data: string;
+    try {
+      data = JSON.stringify(event);
+    } catch (err) {
+      this._onError(null, 'could not send data', err);
+      return;
+    }
+    if (this._recovery) {
+      return this._recovery.sendRaw(data);
+    }
+    try {
+      this.socket.send(data);
     } catch (err) {
       this._onError(null, 'could not send data', err);
     }

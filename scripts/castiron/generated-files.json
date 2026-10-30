@@ -3,7 +3,7 @@
   "files": {
     "api.md": {
       "mode": "100644",
-      "sha256": "ad391dde9aa269ac337a10b5f041a40680bc193b3ad119a32a9927514c53b82c"
+      "sha256": "a57b3d76a11c704e7daaae3607e1f2aec69d68a03a316928ec653bd67943038a"
     },
     "src/client.ts": {
       "mode": "100644",
@@ -91,7 +91,7 @@
     },
     "src/resources/admin/organization/organization.ts": {
       "mode": "100644",
-      "sha256": "e0405a7fd7437fe81d553feeba2efcfa98225d5b6813cd62f9fbf988794297c0"
+      "sha256": "55fe9573a51a5094781dab6742e112873f36d881cb26daa2325d206638b64caf"
     },
     "src/resources/admin/organization/projects.ts": {
       "mode": "100644",
@@ -459,7 +459,7 @@
     },
     "src/resources/beta/responses/ws-base.ts": {
       "mode": "100644",
-      "sha256": "aa3ce6134773924112e7ffa9591dd373c57cfa05e22a0e1f3b8f189e5eedbbc8"
+      "sha256": "2169c7e44c99aae1d5ed84e006149ae1c885a0d039783f09c9304bc4ba0afff2"
     },
     "src/resources/beta/responses/ws.ts": {
       "mode": "100644",
@@ -803,7 +803,7 @@
     },
     "src/resources/realtime/api.md": {
       "mode": "100644",
-      "sha256": "d7bbba158a56711ba8da321df48fad2ff2d1326942231ad1f206a501f018b157"
+      "sha256": "23dba745e79153aed3c663ee88c70dccfc4ada9c16e4c706221eaf3bbecb8c10"
     },
     "src/resources/realtime/calls.ts": {
       "mode": "100644",
@@ -819,7 +819,7 @@
     },
     "src/resources/realtime/realtime.ts": {
       "mode": "100644",
-      "sha256": "d85ac0e9bbbb22943d10fd442a70859765a86ced94a6470c12be3daf9b89d37f"
+      "sha256": "487b535d66091309e6b071c40ea4479becba83b93043fb03035d97d78591b9f3"
     },
     "src/resources/realtime/translations.ts": {
       "mode": "100644",
@@ -871,7 +871,7 @@
     },
     "src/resources/responses/ws-base.ts": {
       "mode": "100644",
-      "sha256": "63d87ead2d5d55d065920a21d6d8e4c70ce5130e5051d7fbe290b25ce938f165"
+      "sha256": "276db652f3752669697cdb95ff1b5579c89b8750d11611e439bd2c661b033cb4"
     },
     "src/resources/responses/ws.ts": {
       "mode": "100644",
