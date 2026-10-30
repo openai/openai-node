@@ -254,7 +254,7 @@ export class Sessions extends APIResource {
   }
 
   /**
-   * Updates session metadata, model, reasoning effort, or service tier. Model
+   * Updates session tools, metadata, model, reasoning effort, or service tier. Model
    * settings apply to subsequent turns. Omitted fields are unchanged. See
    * [managing sessions](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage).
    *
@@ -470,6 +470,15 @@ export interface SessionCreateParamsBase {
   metadata?: { [key: string]: string } | null;
 
   /**
+   * Action review mode. Omit to use none.
+   *
+   * - `none` - Keep the existing execution behavior without automatic action review.
+   * - `auto_review` - Review eligible actions automatically. Deny manual approval
+   *   fallbacks.
+   */
+  review?: 'none' | 'auto_review';
+
+  /**
    * Optional spending limit in USD cents. Omission or null creates an unlimited
    * session.
    */
@@ -611,7 +620,7 @@ export interface SessionCreateParamsStreaming extends SessionCreateParamsBase {
 
 export interface SessionUpdateParams {
   /**
-   * Model settings for subsequent turns. Omitted fields stay unchanged.
+   * Agent settings to update on this session. Omitted fields stay unchanged.
    */
   agent?: SessionUpdateParams.Agent;
 
@@ -623,6 +632,16 @@ export interface SessionUpdateParams {
   metadata?: { [key: string]: string } | null;
 
   /**
+   * Default action review for new root turns. Existing turns and their subagents
+   * keep their review mode.
+   *
+   * - `none` - Keep the existing execution behavior without automatic action review.
+   * - `auto_review` - Review eligible actions automatically. Deny manual approval
+   *   fallbacks.
+   */
+  review?: 'none' | 'auto_review';
+
+  /**
    * Omit to retain the limit; null or a null limit removes it without resetting
    * spend.
    */
@@ -631,7 +650,7 @@ export interface SessionUpdateParams {
 
 export namespace SessionUpdateParams {
   /**
-   * Model settings for subsequent turns. Omitted fields stay unchanged.
+   * Agent settings to update on this session. Omitted fields stay unchanged.
    */
   export interface Agent {
     /**
@@ -655,6 +674,13 @@ export namespace SessionUpdateParams {
      * - `ultrafast` - Uses the ultrafast service tier.
      */
     service_tier?: 'auto' | 'default' | 'flex' | 'priority' | 'fast' | 'ultrafast' | null;
+
+    /**
+     * Replaces the session tools. Functions and MCP servers change on the next model
+     * call. Built-in tools change by the next turn. Omit to keep the current tools, or
+     * pass null or an empty array to clear them.
+     */
+    tools?: Array<AgentsAPI.AgentToolParam> | null;
   }
 
   export namespace Agent {
