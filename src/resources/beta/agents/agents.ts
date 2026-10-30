@@ -1320,6 +1320,12 @@ export interface AgentSession {
   vault_ids: Array<string>;
 
   /**
+   * Review applied to eligible actions in this session. Omitted when review is none
+   * and automatic review is not enabled. Omission means none.
+   */
+  review?: 'none' | 'auto_review';
+
+  /**
    * Configured spending limit and best-effort consumption, in USD cents. Unlimited
    * sessions omit this object.
    */
