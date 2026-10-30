@@ -3289,8 +3289,8 @@ export interface BetaResponseComputerToolCallOutputScreenshot {
 }
 
 /**
- * A configuration update that applies to subsequent responses until it is replaced
- * by another configuration update.
+ * A configuration update for subsequent responses. Each setting stays in effect
+ * until a later update replaces that setting.
  */
 export interface BetaResponseConfigurationUpdateItem {
   /**
@@ -3312,6 +3312,11 @@ export interface BetaResponseConfigurationUpdateItem {
    * The reasoning configuration applied by this update.
    */
   reasoning?: BetaResponseConfigurationUpdateItem.Reasoning;
+
+  /**
+   * The text output configuration for subsequent responses.
+   */
+  text?: BetaResponseConfigurationUpdateItem.Text;
 }
 
 export namespace BetaResponseConfigurationUpdateItem {
@@ -3335,12 +3340,33 @@ export namespace BetaResponseConfigurationUpdateItem {
      */
     effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
   }
+
+  /**
+   * The text output configuration for subsequent responses.
+   */
+  export interface Text {
+    /**
+     * Use a JSON schema for structured output or text to return to plain text.
+     */
+    format: Text.Text | ResponsesAPI.BetaResponseFormatTextJSONSchemaConfig;
+  }
+
+  export namespace Text {
+    /**
+     * Default response format. Used to generate text responses.
+     */
+    export interface Text {
+      /**
+       * The type of response format being defined. Always `text`.
+       */
+      type: 'text';
+    }
+  }
 }
 
 /**
- * An update to the conversation's response configuration. The configuration
- * remains in effect for subsequent responses until it is replaced by another
- * configuration update.
+ * An update to the conversation's response configuration. Supply reasoning, text,
+ * or both. Each setting stays in effect until a later update replaces it.
  */
 export interface BetaResponseConfigurationUpdateItemParam {
   /**
@@ -3362,6 +3388,11 @@ export interface BetaResponseConfigurationUpdateItemParam {
    * Updates to reasoning configuration. Only effort is supported.
    */
   reasoning?: BetaResponseConfigurationUpdateItemParam.Reasoning;
+
+  /**
+   * The text output configuration for subsequent responses.
+   */
+  text?: BetaResponseConfigurationUpdateItemParam.Text;
 }
 
 export namespace BetaResponseConfigurationUpdateItemParam {
@@ -3384,6 +3415,28 @@ export namespace BetaResponseConfigurationUpdateItemParam {
      * update replaces it.
      */
     effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
+  }
+
+  /**
+   * The text output configuration for subsequent responses.
+   */
+  export interface Text {
+    /**
+     * Use a JSON schema for structured output or text to return to plain text.
+     */
+    format: Text.Text | ResponsesAPI.BetaResponseFormatTextJSONSchemaConfig;
+  }
+
+  export namespace Text {
+    /**
+     * Default response format. Used to generate text responses.
+     */
+    export interface Text {
+      /**
+       * The type of response format being defined. Always `text`.
+       */
+      type: 'text';
+    }
   }
 }
 

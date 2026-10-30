@@ -7,7 +7,7 @@
     },
     "src/client.ts": {
       "mode": "100644",
-      "sha256": "2c261bd7faffbd847f45acaa5f0dbd433764b638431ad05d4e841cae6061b0f5"
+      "sha256": "ad27a23b9f869472bbd20b922b55fdc0d095f9be8a25b44def7ef5a8f0fd53ad"
     },
     "src/internal/data-residency.ts": {
       "mode": "100644",
@@ -455,7 +455,7 @@
     },
     "src/resources/beta/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "fd3c7c3e2977effdbd9e32bd6f4909e6df73f8e932be7864217a451fe8740151"
+      "sha256": "616b35abba36c3483b5c436e6ace3367e4edc67d65c20e00e1e6899000c43c82"
     },
     "src/resources/beta/responses/ws-base.ts": {
       "mode": "100644",
@@ -867,7 +867,7 @@
     },
     "src/resources/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "c5ee978ba351dbbd8d41d0e1dc39f1f05ec8ec70a49c2cb30be2edd509671282"
+      "sha256": "3b7e7d73b48411a15cb9c9f30e32d6daa720a60ba005ab239ec8fdb7862e57fc"
     },
     "src/resources/responses/ws-base.ts": {
       "mode": "100644",
