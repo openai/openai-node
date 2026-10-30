@@ -2,12 +2,13 @@ import type {
   ParsedResponse,
   Response,
   ResponseCreateParamsBase,
-  ResponseCreateParamsStreaming,
   ResponseStreamEvent,
   ResponseTextConfig,
 } from '../../resources/responses/responses';
 import type { RequestOptions } from '../../internal/request-options';
 import type { ReadableStream } from '../../internal/shim-types';
+import { CancelReadableStream } from '../../internal/shims';
+import { APIPromise } from '../../core/api-promise';
 import { APIError, OpenAIError } from '../../error';
 import type OpenAI from '../../index';
 import { EventStream } from '../EventStream';
@@ -23,8 +24,13 @@ import {
 } from '../../internal/responses/response-accumulator';
 import { ensureCanonicalOutputText } from '../../internal/responses/canonical-output-text';
 import { hasOwn, isObj } from '../../internal/utils/values';
-import type { ParseableToolsParams } from '../ResponsesParser';
-import { addOutputText, maybeParseResponse } from '../ResponsesParser';
+import type {
+  ParseableToolsParams,
+  ResponseParseOptions,
+  ResponseParserTextFormat,
+  ResponseParsingInput,
+} from '../ResponsesParser';
+import { addOutputText, maybeParseResponse, resolveResponseParseOptions } from '../ResponsesParser';
 import { Stream } from '../../streaming';
 
 type EventField<Event> = Event extends unknown ? keyof Event : never;
@@ -68,10 +74,11 @@ const nativeEventFields: Record<EventField<ResponseStreamEvent>, true> = {
 export type ResponseStreamParams = ResponseCreateAndStreamParams | ResponseStreamByIdParams;
 
 /** Response-creation parameters accepted by the streaming convenience helper. */
-export type ResponseCreateAndStreamParams = Omit<ResponseCreateParamsBase, 'stream'> & {
-  /** Streaming is always enabled by the helper and may be specified explicitly. */
-  stream?: true;
-};
+export type ResponseCreateAndStreamParams = Omit<ResponseCreateParamsBase, 'stream'> &
+  ResponseParsingInput & {
+    /** Streaming is always enabled by the helper and may be specified explicitly. */
+    stream?: true;
+  };
 
 /** Parameters for replaying an existing response and optionally filtering emitted events. */
 export type ResponseStreamByIdParams = {
@@ -162,15 +169,20 @@ export class ResponseStream<ParsedT = null>
   static createResponse<ParsedT>(
     client: OpenAI,
     params: ResponseStreamParams,
-    options?: RequestOptions,
+    options?: ResponseParseOptions,
   ): ResponseStream<ParsedT> {
-    // SAFETY: The runner's request path forces stream: true; the constructor retains the same caller parameters for parsing metadata.
-    const runner = new ResponseStream<ParsedT>(params as ResponseCreateParamsStreaming);
+    const { getTextFormat, requestOptions } = resolveResponseParseOptions(params, options);
+    const runner = new ResponseStream<ParsedT>(Array.isArray(params.tools) ? { tools: params.tools } : {});
     runner._run(() =>
-      runner._createOrRetrieveResponse(client, params, {
-        ...options,
-        __metadata: { ...options?.__metadata, helperMethod: 'stream' },
-      }),
+      runner._createOrRetrieveResponse(
+        client,
+        params,
+        {
+          ...requestOptions,
+          __metadata: { ...requestOptions?.__metadata, helperMethod: 'stream' },
+        },
+        getTextFormat,
+      ),
     );
     return runner;
   }
@@ -571,7 +583,7 @@ export class ResponseStream<ParsedT = null>
     }
   }
 
-  #endRequest(): ParsedResponse<ParsedT> {
+  #endRequest(format?: ResponseParserTextFormat): ParsedResponse<ParsedT> {
     if (this.ended) {
       throw new OpenAIError(`stream has ended, this shouldn't happen`);
     }
@@ -587,7 +599,7 @@ export class ResponseStream<ParsedT = null>
     this.#interimOrderDirty = false;
     this.#completedOutput.clear();
     this.#unfinishedOutput.clear();
-    const parsedResponse = finalizeResponse<ParsedT>(snapshot, this.#params);
+    const parsedResponse = finalizeResponse<ParsedT>(snapshot, this.#params, format);
     this.#finalResponse = parsedResponse;
 
     return parsedResponse;
@@ -597,13 +609,16 @@ export class ResponseStream<ParsedT = null>
     client: OpenAI,
     params: ResponseStreamParams,
     options?: RequestOptions,
+    getTextFormat = resolveResponseParseOptions(params).getTextFormat,
   ): Promise<ParsedResponse<ParsedT>> {
     this._listenForAbort(options?.signal);
     this.#beginRequest();
 
     let stream: Stream<ResponseStreamEvent> | undefined;
+    let format: ResponseParserTextFormat;
     let starting_after: number | null = null;
     if ('response_id' in params) {
+      format = getTextFormat({ body: params });
       // Keep the full replay so that `accumulateResponse()` sees `response.created` and can build
       // complete snapshots before locally filtering events at `starting_after`.
       stream = await client.responses.retrieve(
@@ -613,10 +628,28 @@ export class ResponseStream<ParsedT = null>
       );
       starting_after = params.starting_after ?? null;
     } else {
-      stream = await client.responses.create(
-        { ...params, stream: true },
-        { ...options, signal: this.controller.signal },
-      );
+      const body = { ...params, stream: true as const };
+      let prepared: RequestOptions = { body };
+      let responseBody: ReadableStream<Uint8Array> | null = null;
+      let request = client.responses.create(body, { ...options, signal: this.controller.signal });
+      // Custom transports can return a plain promise without the prepared request metadata.
+      if (request instanceof APIPromise) {
+        request = request._thenUnwrap((events, props) => {
+          prepared = props.options;
+          responseBody = props.response.body;
+          return events;
+        });
+      }
+      stream = await request;
+      try {
+        format = getTextFormat(prepared);
+      } catch (error) {
+        // Validation precedes iteration, so close the open response here.
+        this.abort();
+        stream.controller.abort();
+        void cancelUnconsumedBody(responseBody);
+        throw error;
+      }
     }
 
     this._connected();
@@ -626,7 +659,7 @@ export class ResponseStream<ParsedT = null>
     if (stream.controller.signal?.aborted) {
       throw this._userAbortError();
     }
-    return this.#endRequest();
+    return this.#endRequest(format);
   }
 
   protected async _fromReadableStream(
@@ -674,6 +707,14 @@ export class ResponseStream<ParsedT = null>
   }
 }
 
+async function cancelUnconsumedBody(body: ReadableStream<Uint8Array> | null): Promise<void> {
+  try {
+    await CancelReadableStream(body);
+  } catch {
+    // The fetch abort may already have closed the response body.
+  }
+}
+
 function outputIdentity(item: Response['output'][number]): string {
   return JSON.stringify([
     item.type,
@@ -685,6 +726,7 @@ function outputIdentity(item: Response['output'][number]): string {
 function finalizeResponse<ParsedT>(
   snapshot: Response,
   params: ResponseStreamingParams | null,
+  format?: ResponseParserTextFormat,
 ): ParsedResponse<ParsedT> {
-  return maybeParseResponse(snapshot, params);
+  return maybeParseResponse(snapshot, params, format);
 }

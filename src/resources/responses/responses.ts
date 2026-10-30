@@ -16,7 +16,10 @@ import { path } from '../../internal/utils/path';
 
 import {
   type ExtractParsedContentFromParams,
+  type ParsedWithOptions,
   parseResponse,
+  resolveResponseParseOptions,
+  type ResponseParseOptions,
   type ResponseCreateParamsWithTools,
   addOutputText,
 } from '../../lib/ResponsesParser';
@@ -453,23 +456,31 @@ export class Responses extends APIResource {
     );
   }
 
-  parse<Params extends ResponseCreateParamsWithTools, ParsedT = ExtractParsedContentFromParams<Params>>(
-    body: Params,
-    options?: RequestOptions,
-  ): APIPromise<ParsedResponse<ParsedT>> {
+  /** Parses completed text using the last format update or the local `parseAs` option. */
+  parse<
+    Params extends ResponseCreateParamsWithTools,
+    ParsedT = ExtractParsedContentFromParams<Params>,
+    Options extends ResponseParseOptions = RequestOptions,
+  >(body: Params, options?: Options): APIPromise<ParsedResponse<ParsedWithOptions<Options, ParsedT>>> {
+    const { getTextFormat, requestOptions } = resolveResponseParseOptions(body, options);
     return this._client.responses
-      .create(body, options)
-      ._thenUnwrap((response) => parseResponse(response as Response, body));
+      .create(body, requestOptions)
+      ._thenUnwrap((response, { options: prepared }) =>
+        parseResponse<Params, ParsedWithOptions<Options, ParsedT>>(
+          response as Response,
+          body,
+          getTextFormat(prepared),
+        ),
+      );
   }
 
-  /**
-   * Creates a model response stream
-   */
-  stream<Params extends ResponseStreamParams, ParsedT = ExtractParsedContentFromParams<Params>>(
-    body: Params,
-    options?: RequestOptions,
-  ): ResponseStream<ParsedT> {
-    return ResponseStream.createResponse<ParsedT>(this._client, body, options);
+  /** Creates a response stream with the same local parsing options as `parse()`. */
+  stream<
+    Params extends ResponseStreamParams,
+    ParsedT = ExtractParsedContentFromParams<Params>,
+    Options extends ResponseParseOptions = RequestOptions,
+  >(body: Params, options?: Options): ResponseStream<ParsedWithOptions<Options, ParsedT>> {
+    return ResponseStream.createResponse<ParsedWithOptions<Options, ParsedT>>(this._client, body, options);
   }
 }
 
@@ -2868,8 +2879,8 @@ export interface ResponseComputerToolCallOutputScreenshot {
 }
 
 /**
- * A configuration update that applies to subsequent responses until it is replaced
- * by another configuration update.
+ * A configuration update for subsequent responses. Each setting stays in effect
+ * until a later update replaces that setting.
  */
 export interface ResponseConfigurationUpdateItem {
   /**
@@ -2886,6 +2897,11 @@ export interface ResponseConfigurationUpdateItem {
    * The reasoning configuration applied by this update.
    */
   reasoning?: ResponseConfigurationUpdateItem.Reasoning;
+
+  /**
+   * The text output configuration for subsequent responses.
+   */
+  text?: ResponseConfigurationUpdateItem.Text;
 }
 
 export namespace ResponseConfigurationUpdateItem {
@@ -2899,12 +2915,21 @@ export namespace ResponseConfigurationUpdateItem {
      */
     effort?: Shared.ReasoningEffort | null;
   }
+
+  /**
+   * The text output configuration for subsequent responses.
+   */
+  export interface Text {
+    /**
+     * Use a JSON schema for structured output or text to return to plain text.
+     */
+    format: Shared.ResponseFormatText | ResponsesAPI.ResponseFormatTextJSONSchemaConfig;
+  }
 }
 
 /**
- * An update to the conversation's response configuration. The configuration
- * remains in effect for subsequent responses until it is replaced by another
- * configuration update.
+ * An update to the conversation's response configuration. Supply reasoning, text,
+ * or both. Each setting stays in effect until a later update replaces it.
  */
 export interface ResponseConfigurationUpdateItemParam {
   /**
@@ -2921,6 +2946,11 @@ export interface ResponseConfigurationUpdateItemParam {
    * Updates to reasoning configuration. Only effort is supported.
    */
   reasoning?: ResponseConfigurationUpdateItemParam.Reasoning;
+
+  /**
+   * The text output configuration for subsequent responses.
+   */
+  text?: ResponseConfigurationUpdateItemParam.Text;
 }
 
 export namespace ResponseConfigurationUpdateItemParam {
@@ -2933,6 +2963,16 @@ export namespace ResponseConfigurationUpdateItemParam {
      * update replaces it.
      */
     effort?: Shared.ReasoningEffort | null;
+  }
+
+  /**
+   * The text output configuration for subsequent responses.
+   */
+  export interface Text {
+    /**
+     * Use a JSON schema for structured output or text to return to plain text.
+     */
+    format: Shared.ResponseFormatText | ResponsesAPI.ResponseFormatTextJSONSchemaConfig;
   }
 }
 
