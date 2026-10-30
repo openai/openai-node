@@ -2,12 +2,19 @@ import { BrowserWebSocket } from '../internal/ws-adapter-browser';
 import { createRealtimeRecovery, validateRealtimeRecovery } from '../internal/realtime-recovery';
 import type { WebSocketConnection } from '../internal/ws-connection-controller';
 import type { UnsentMessage } from '../internal/ws';
-import { getRealtimeAPIKey, resolveRealtimeAPIKey } from '../internal/realtime-credentials';
+import {
+  getRealtimeAPIKey,
+  realtimeRoutingProtocols,
+  resolveRealtimeAPIKey,
+} from '../internal/realtime-credentials';
 import type { AzureOpenAI } from '../index';
 import { assertBedrockWebSocketOrigin } from '../internal/bedrock';
 import { OpenAI } from '../index';
 import { OpenAIError } from '../error';
-import type { RealtimeClientEvent } from '../resources/realtime/realtime';
+import type {
+  RealtimeClientEvent,
+  ResponseCreateEventWithReferencesParam,
+} from '../resources/realtime/realtime';
 import {
   OpenAIRealtimeEmitter,
   buildRealtimeURL,
@@ -239,7 +246,15 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
       assertBedrockWebSocketOrigin(connectionClient, url);
 
       const azure = isAzure(connectionClient);
-      const protocols = ['realtime', ...(azure ? [] : [`openai-insecure-api-key.${attemptKey}`])];
+      const protocols = [
+        'realtime',
+        ...(azure
+          ? []
+          : [
+              `openai-insecure-api-key.${attemptKey}`,
+              ...realtimeRoutingProtocols(connectionClient, attemptKey),
+            ]),
+      ];
 
       const socket = azure
         ? createAzureWebSocket(url, attemptKey, resolvedApiKey === true, protocols)
@@ -397,6 +412,32 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     }
     try {
       this.socket.send(JSON.stringify(event));
+    } catch (err) {
+      this._onError(null, 'could not send data', err);
+    }
+  }
+
+  /**
+   * Sends a response.create event whose input may include existing item references.
+   * Other event and response parameters are preserved. Serialization or transport
+   * errors are emitted through the usual error event.
+   *
+   * With recovery enabled, unsent events submitted by this method are returned as
+   * raw JSON frames by takePending() and close, including events without references.
+   */
+  sendResponseCreate(event: ResponseCreateEventWithReferencesParam): void {
+    let data: string;
+    try {
+      data = JSON.stringify(event);
+    } catch (err) {
+      this._onError(null, 'could not send data', err);
+      return;
+    }
+    if (this._recovery) {
+      return this._recovery.sendRaw(data);
+    }
+    try {
+      this.socket.send(data);
     } catch (err) {
       this._onError(null, 'could not send data', err);
     }

@@ -123,7 +123,7 @@ describe.each([
     expect(lastNodeSocket().options).toMatchObject({
       followRedirects: false,
       handshakeTimeout: 4321,
-      headers: { 'api-key': 'azure-key', 'X-Custom': 'value' },
+      headers: { 'api-key': 'azure-key', 'x-custom': 'value' },
     });
   });
 
@@ -147,9 +147,9 @@ describe.each([
         followRedirects: false,
         handshakeTimeout: 4321,
         headers: {
-          [header]: 'custom-secret',
-          Authorization: 'Bearer test-key',
-          'X-Custom': 'value',
+          [header.toLowerCase()]: 'custom-secret',
+          authorization: 'Bearer test-key',
+          'x-custom': 'value',
         },
       });
     },
@@ -174,12 +174,12 @@ describe.each([
       expect(lastNodeSocket().options).toMatchObject({
         followRedirects: false,
         handshakeTimeout: 4321,
-        headers: { [header]: 'custom-secret', 'X-Custom': 'value' },
+        headers: { [header.toLowerCase()]: 'custom-secret', 'x-custom': 'value' },
       });
     },
   );
 
-  test('preserves generated bearer precedence while disabling redirects', () => {
+  test('preserves explicit bearer precedence while disabling redirects', () => {
     const realtime = new Realtime(
       {
         model: 'gpt-realtime',
@@ -196,7 +196,7 @@ describe.each([
     expect(lastNodeSocket().options).toMatchObject({
       followRedirects: false,
       handshakeTimeout: 4321,
-      headers: { Authorization: 'Bearer test-key', 'X-Custom': 'value' },
+      headers: { authorization: 'custom-secret', 'x-custom': 'value' },
     });
   });
 
@@ -217,7 +217,7 @@ describe.each([
     expect(lastNodeSocket().options).toMatchObject({
       followRedirects: false,
       handshakeTimeout: 4321,
-      headers: { Authorization: 'Bearer test-key', 'X-Custom': 'value' },
+      headers: { authorization: 'Bearer test-key', 'x-custom': 'value' },
     });
   });
 
@@ -234,7 +234,7 @@ describe.each([
     expect(lastNodeSocket().options).toMatchObject({
       followRedirects: false,
       handshakeTimeout: 4321,
-      headers: { Authorization: 'Bearer test-key', 'X-Custom': 'value' },
+      headers: { authorization: 'Bearer test-key', 'x-custom': 'value' },
     });
   });
 
@@ -245,7 +245,7 @@ describe.each([
 
     expect(lastNodeSocket().options).toMatchObject({
       followRedirects: false,
-      headers: { Authorization: 'Bearer azure-token', 'X-Custom': 'value' },
+      headers: { authorization: 'Bearer azure-token', 'x-custom': 'value' },
     });
   });
 

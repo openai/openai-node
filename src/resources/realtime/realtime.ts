@@ -2508,6 +2508,336 @@ export interface RealtimeResponseCreateParams {
 }
 
 /**
+ * Create a new Realtime response with these parameters
+ */
+export interface RealtimeResponseCreateParamsWithReferencesParam {
+  /**
+   * Configuration for audio input and output.
+   */
+  audio?: RealtimeResponseCreateParamsWithReferencesParam.Audio;
+
+  /**
+   * Controls which conversation the response is added to. Currently supports `auto`
+   * and `none`, with `auto` as the default value. The `auto` value means that the
+   * contents of the response will be added to the default conversation. Set this to
+   * `none` to create an out-of-band response which will not add items to default
+   * conversation.
+   */
+  conversation?: (string & {}) | 'auto' | 'none';
+
+  /**
+   * Input items to include in the prompt for the model. Using this field creates a
+   * new context for this Response instead of using the default conversation. An
+   * empty array `[]` will clear the context for this Response. Note that this can
+   * include references to items that previously appeared in the session using their
+   * id.
+   */
+  input?: Array<
+    | RealtimeConversationItemSystemMessage
+    | RealtimeConversationItemUserMessage
+    | RealtimeConversationItemAssistantMessage
+    | RealtimeConversationItemFunctionCall
+    | RealtimeConversationItemFunctionCallOutput
+    | RealtimeMcpApprovalResponse
+    | RealtimeMcpListTools
+    | RealtimeMcpToolCall
+    | RealtimeMcpApprovalRequest
+    | ResponseItemReference
+  >;
+
+  /**
+   * The default system instructions (i.e. system message) prepended to model calls.
+   * This field allows the client to guide the model on desired responses. The model
+   * can be instructed on response content and format, (e.g. "be extremely succinct",
+   * "act friendly", "here are examples of good responses") and on audio behavior
+   * (e.g. "talk quickly", "inject emotion into your voice", "laugh frequently"). The
+   * instructions are not guaranteed to be followed by the model, but they provide
+   * guidance to the model on the desired behavior. Note that the server sets default
+   * instructions which will be used if this field is not set and are visible in the
+   * `session.created` event at the start of the session.
+   */
+  instructions?: string;
+
+  /**
+   * Maximum number of output tokens for a single assistant response, inclusive of
+   * tool calls. Provide an integer between 1 and 4096 to limit output tokens, or
+   * `inf` for the maximum available tokens for a given model. Defaults to `inf`.
+   */
+  max_output_tokens?: number | 'inf';
+
+  /**
+   * Set of 16 key-value pairs that can be attached to an object. This can be useful
+   * for storing additional information about the object in a structured format, and
+   * querying for objects via API or the dashboard.
+   *
+   * Keys are strings with a maximum length of 64 characters. Values are strings with
+   * a maximum length of 512 characters.
+   */
+  metadata?: Shared.Metadata | null;
+
+  /**
+   * The set of modalities the model used to respond, currently the only possible
+   * values are `[\"audio\"]`, `[\"text\"]`. Audio output always include a text
+   * transcript. Setting the output to mode `text` will disable audio output from the
+   * model.
+   */
+  output_modalities?: Array<'text' | 'audio'>;
+
+  /**
+   * Whether the model may call multiple tools in parallel. Only supported by
+   * reasoning Realtime models such as `gpt-realtime-2`.
+   */
+  parallel_tool_calls?: boolean;
+
+  /**
+   * Reference to a prompt template and its variables.
+   * [Learn more](https://developers.openai.com/api/docs/guides/text?api-mode=responses#version-prompts-in-code).
+   */
+  prompt?: ResponsesAPI.ResponsePrompt | null;
+
+  /**
+   * Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
+   */
+  reasoning?: RealtimeReasoning;
+
+  /**
+   * How the model chooses tools. Provide one of the string modes or force a specific
+   * function/MCP tool.
+   */
+  tool_choice?: ResponsesAPI.ToolChoiceOptions | ResponsesAPI.ToolChoiceFunction | ResponsesAPI.ToolChoiceMcp;
+
+  /**
+   * Tools available to the model.
+   */
+  tools?: Array<RealtimeFunctionTool | RealtimeResponseCreateParamsWithReferencesParam.McpTool>;
+}
+
+export namespace RealtimeResponseCreateParamsWithReferencesParam {
+  /**
+   * Configuration for audio input and output.
+   */
+  export interface Audio {
+    output?: Audio.Output;
+  }
+
+  export namespace Audio {
+    export interface Output {
+      /**
+       * The format of the output audio.
+       */
+      format?: RealtimeAPI.RealtimeAudioFormats;
+
+      /**
+       * The voice the model uses to respond. Supported built-in voices are `alloy`,
+       * `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`, and
+       * `cedar`. You may also provide a custom voice object with an `id`, for example
+       * `{ "id": "voice_1234" }`. Voice cannot be changed during the session once the
+       * model has responded with audio at least once. Custom voices must be created from
+       * audio samples. Voices created from text prompts are supported only in Live. We
+       * recommend `marin` and `cedar` for best quality.
+       */
+      voice?:
+        | string
+        | 'alloy'
+        | 'ash'
+        | 'ballad'
+        | 'coral'
+        | 'echo'
+        | 'sage'
+        | 'shimmer'
+        | 'verse'
+        | 'marin'
+        | 'cedar'
+        | Output.ID;
+    }
+
+    export namespace Output {
+      /**
+       * Custom voice reference.
+       */
+      export interface ID {
+        /**
+         * The custom voice ID, e.g. `voice_1234`.
+         */
+        id: string;
+      }
+    }
+  }
+
+  /**
+   * Give the model access to additional tools via remote Model Context Protocol
+   * (MCP) servers.
+   * [Learn more about MCP](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
+   */
+  export interface McpTool {
+    /**
+     * A label for this MCP server, used to identify it in tool calls.
+     */
+    server_label: string;
+
+    /**
+     * The type of the MCP tool. Always `mcp`.
+     */
+    type: 'mcp';
+
+    /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+    /**
+     * List of allowed tool names or a filter object.
+     */
+    allowed_tools?: Array<string> | McpTool.McpToolFilter | null;
+
+    /**
+     * An OAuth access token that can be used with a remote MCP server, either with a
+     * custom MCP server URL or a service connector. Your application must handle the
+     * OAuth authorization flow and provide the token here.
+     */
+    authorization?: string;
+
+    /**
+     * @deprecated Identifier for service connectors, like those available in ChatGPT.
+     * One of `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more
+     * about service connectors
+     * [here](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#connectors).
+     *
+     * This field is deprecated for models released after September 1, 2026. Use
+     * `server_url` to connect to a remote MCP server, or `tunnel_id` to connect
+     * through a Secure MCP Tunnel.
+     *
+     * Currently supported `connector_id` values are:
+     *
+     * - Dropbox: `connector_dropbox`
+     * - Gmail: `connector_gmail`
+     * - Google Calendar: `connector_googlecalendar`
+     * - Google Drive: `connector_googledrive`
+     * - Microsoft Teams: `connector_microsoftteams`
+     * - Outlook Calendar: `connector_outlookcalendar`
+     * - Outlook Email: `connector_outlookemail`
+     * - SharePoint: `connector_sharepoint`
+     */
+    connector_id?:
+      | 'connector_dropbox'
+      | 'connector_gmail'
+      | 'connector_googlecalendar'
+      | 'connector_googledrive'
+      | 'connector_microsoftteams'
+      | 'connector_outlookcalendar'
+      | 'connector_outlookemail'
+      | 'connector_sharepoint';
+
+    /**
+     * Whether this MCP tool is deferred and discovered via tool search.
+     */
+    defer_loading?: boolean;
+
+    /**
+     * Optional HTTP headers to send to the MCP server. Use for authentication or other
+     * purposes.
+     */
+    headers?: { [key: string]: string } | null;
+
+    /**
+     * Specify which of the MCP server's tools require approval.
+     */
+    require_approval?: McpTool.McpToolApprovalFilter | 'always' | 'never' | null;
+
+    /**
+     * Optional description of the MCP server, used to provide more context.
+     */
+    server_description?: string;
+
+    /**
+     * The URL for the MCP server. One of `server_url`, `connector_id`, or `tunnel_id`
+     * must be provided.
+     */
+    server_url?: string;
+
+    /**
+     * The Secure MCP Tunnel ID to use instead of a direct server URL. One of
+     * `server_url`, `connector_id`, or `tunnel_id` must be provided.
+     */
+    tunnel_id?: string;
+  }
+
+  export namespace McpTool {
+    /**
+     * A filter object to specify which tools are allowed.
+     */
+    export interface McpToolFilter {
+      /**
+       * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+       * is
+       * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+       * it will match this filter.
+       */
+      read_only?: boolean;
+
+      /**
+       * List of allowed tool names.
+       */
+      tool_names?: Array<string>;
+    }
+
+    /**
+     * Specify which of the MCP server's tools require approval. Can be `always`,
+     * `never`, or a filter object associated with tools that require approval.
+     */
+    export interface McpToolApprovalFilter {
+      /**
+       * A filter object to specify which tools are allowed.
+       */
+      always?: McpToolApprovalFilter.Always;
+
+      /**
+       * A filter object to specify which tools are allowed.
+       */
+      never?: McpToolApprovalFilter.Never;
+    }
+
+    export namespace McpToolApprovalFilter {
+      /**
+       * A filter object to specify which tools are allowed.
+       */
+      export interface Always {
+        /**
+         * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+         * is
+         * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+         * it will match this filter.
+         */
+        read_only?: boolean;
+
+        /**
+         * List of allowed tool names.
+         */
+        tool_names?: Array<string>;
+      }
+
+      /**
+       * A filter object to specify which tools are allowed.
+       */
+      export interface Never {
+        /**
+         * Indicates whether or not a tool modifies data or is read-only. If an MCP server
+         * is
+         * [annotated with `readOnlyHint`](https://modelcontextprotocol.io/specification/2025-06-18/schema#toolannotations-readonlyhint),
+         * it will match this filter.
+         */
+        read_only?: boolean;
+
+        /**
+         * List of allowed tool names.
+         */
+        tool_names?: Array<string>;
+      }
+    }
+  }
+}
+
+/**
  * Additional details about the status.
  */
 export interface RealtimeResponseStatus {
@@ -4743,6 +5073,51 @@ export interface ResponseCreateEvent {
 }
 
 /**
+ * This event instructs the server to create a Response, which means triggering
+ * model inference. When in Server VAD mode, the server will create Responses
+ * automatically.
+ *
+ * A Response will include at least one Item, and may have two, in which case the
+ * second will be a function call. These Items will be appended to the conversation
+ * history by default.
+ *
+ * The server will respond with a `response.created` event, events for Items and
+ * content created, and finally a `response.done` event to indicate the Response is
+ * complete.
+ *
+ * The `response.create` event includes inference configuration like `instructions`
+ * and `tools`. If these are set, they will override the Session's configuration
+ * for this Response only.
+ *
+ * Responses can be created out-of-band of the default Conversation, meaning that
+ * they can have arbitrary input, and it's possible to disable writing the output
+ * to the Conversation. Only one Response can write to the default Conversation at
+ * a time, but otherwise multiple Responses can be created in parallel. The
+ * `metadata` field is a good way to disambiguate multiple simultaneous Responses.
+ *
+ * Clients can set `conversation` to `none` to create a Response that does not
+ * write to the default Conversation. Arbitrary input can be provided with the
+ * `input` field, which is an array accepting raw Items and references to existing
+ * Items.
+ */
+export interface ResponseCreateEventWithReferencesParam {
+  /**
+   * The event type, must be `response.create`.
+   */
+  type: 'response.create';
+
+  /**
+   * Optional client-generated ID used to identify this event.
+   */
+  event_id?: string;
+
+  /**
+   * Create a new Realtime response with these parameters
+   */
+  response?: RealtimeResponseCreateParamsWithReferencesParam;
+}
+
+/**
  * Returned when a new Response is created. The first event of response creation,
  * where the response is in an initial state of `in_progress`.
  */
@@ -4876,6 +5251,23 @@ export interface ResponseFunctionCallArgumentsDoneEvent {
    * The event type, must be `response.function_call_arguments.done`.
    */
   type: 'response.function_call_arguments.done';
+}
+
+/**
+ * Reference an existing item in this Realtime session as response.create input.
+ * Item references are only accepted in the response input array, not as new
+ * conversation items.
+ */
+export interface ResponseItemReference {
+  /**
+   * The ID of an existing item in the same Realtime session.
+   */
+  id: string;
+
+  /**
+   * The type of this item. Always `item_reference`.
+   */
+  type: 'item_reference';
 }
 
 /**
@@ -5550,6 +5942,7 @@ export declare namespace Realtime {
     type RealtimeResponseCreateAudioOutput as RealtimeResponseCreateAudioOutput,
     type RealtimeResponseCreateMcpTool as RealtimeResponseCreateMcpTool,
     type RealtimeResponseCreateParams as RealtimeResponseCreateParams,
+    type RealtimeResponseCreateParamsWithReferencesParam as RealtimeResponseCreateParamsWithReferencesParam,
     type RealtimeResponseStatus as RealtimeResponseStatus,
     type RealtimeResponseUsage as RealtimeResponseUsage,
     type RealtimeResponseUsageInputTokenDetails as RealtimeResponseUsageInputTokenDetails,
@@ -5591,10 +5984,12 @@ export declare namespace Realtime {
     type ResponseContentPartAddedEvent as ResponseContentPartAddedEvent,
     type ResponseContentPartDoneEvent as ResponseContentPartDoneEvent,
     type ResponseCreateEvent as ResponseCreateEvent,
+    type ResponseCreateEventWithReferencesParam as ResponseCreateEventWithReferencesParam,
     type ResponseCreatedEvent as ResponseCreatedEvent,
     type ResponseDoneEvent as ResponseDoneEvent,
     type ResponseFunctionCallArgumentsDeltaEvent as ResponseFunctionCallArgumentsDeltaEvent,
     type ResponseFunctionCallArgumentsDoneEvent as ResponseFunctionCallArgumentsDoneEvent,
+    type ResponseItemReference as ResponseItemReference,
     type ResponseMcpCallArgumentsDelta as ResponseMcpCallArgumentsDelta,
     type ResponseMcpCallArgumentsDone as ResponseMcpCallArgumentsDone,
     type ResponseMcpCallCompleted as ResponseMcpCallCompleted,

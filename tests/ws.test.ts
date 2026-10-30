@@ -77,6 +77,48 @@ describe('SendQueue', () => {
     ]);
   });
 
+  test.each([
+    { requeueFailed: true, remaining: ['attempted', 'old-second', 'new-third'] },
+    { requeueFailed: false, remaining: ['old-second', 'new-third'] },
+  ])(
+    'retains reentrant successors and follows the failed-write policy $requeueFailed',
+    ({ requeueFailed, remaining }) => {
+      const queue = new SendQueue(1024);
+      queue.enqueueRaw('attempted');
+      queue.enqueueRaw('old-second');
+      expect(() =>
+        queue.flush(
+          (data) => {
+            if (data === 'attempted') {
+              queue.enqueueRaw('new-third');
+              throw new Error('synthetic uncertain submission');
+            }
+          },
+          { requeueFailed },
+        ),
+      ).toThrow('synthetic uncertain submission');
+      expect(queue.drain()).toEqual(remaining.map((data) => ({ type: 'raw', data })));
+      expect(queue.enqueueRaw('x'.repeat(2048))).toBe(true);
+    },
+  );
+
+  test('a reentrant drain followed by failure does not resurrect completed or detached work', () => {
+    const queue = new SendQueue(1024);
+    queue.enqueueRaw('attempted');
+    queue.enqueueRaw('old-second');
+    expect(() =>
+      queue.flush(() => {
+        queue.enqueueRaw('new-third');
+        expect(queue.drain()).toEqual([
+          { type: 'raw', data: 'old-second' },
+          { type: 'raw', data: 'new-third' },
+        ]);
+        throw new Error('synthetic close then write failure');
+      }),
+    ).toThrow('synthetic close then write failure');
+    expect(queue.drain()).toEqual([]);
+  });
+
   test('drain returns unsent messages and resets the queue', () => {
     const queue = new SendQueue(1024);
     queue.enqueue({ msg: 'hello' });

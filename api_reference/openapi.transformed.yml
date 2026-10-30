@@ -27110,10 +27110,24 @@ paths:
                   "geography": "US",
                   "status": "validated",
                   "created_at": 1711471400
+                },
+                {
+                  "object": "organization.external_storage",
+                  "id": "extstorage_oci123",
+                  "project_id": "proj_oci123",
+                  "provider": {
+                    "type": "oci",
+                    "tenancy_ocid": "ocid1.tenancy.oc1..example",
+                    "region": "us-ashburn-1",
+                    "bucket": "customer-oci-retention"
+                  },
+                  "geography": "US",
+                  "status": "validated",
+                  "created_at": 1711471300
                 }
               ],
               "first_id": "extstorage_abc123",
-              "last_id": "extstorage_gcp123",
+              "last_id": "extstorage_oci123",
               "has_more": false
             }
       security:
@@ -27262,6 +27276,36 @@ paths:
               "geography": "US",
               "status": "pending",
               "created_at": 1711471400
+            }
+        - title: OCI Object Storage
+          request:
+            curl: |
+              curl -X POST https://api.openai.com/v1/organization/external_storage \
+                -H "Authorization: Bearer $OPENAI_ADMIN_KEY" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "project_id": "proj_oci123",
+                  "provider": {
+                    "type": "oci",
+                    "tenancy_ocid": "ocid1.tenancy.oc1..example",
+                    "region": "us-ashburn-1",
+                    "bucket": "customer-oci-retention"
+                  }
+                }'
+          response: |
+            {
+              "object": "organization.external_storage",
+              "id": "extstorage_oci123",
+              "project_id": "proj_oci123",
+              "provider": {
+                "type": "oci",
+                "tenancy_ocid": "ocid1.tenancy.oc1..example",
+                "region": "us-ashburn-1",
+                "bucket": "customer-oci-retention"
+              },
+              "geography": "US",
+              "status": "pending",
+              "created_at": 1711471300
             }
       security:
       - AdminApiKeyAuth: []
@@ -33194,6 +33238,7 @@ paths:
             maxLength: 64
           minProperties: 0
           maxProperties: 16
+          x-openai-go-public-type: pointer_collection
         description: Exact string matches supplied as `metadata[key]=value`. All supplied pairs must match. Up to 16 pairs, with keys from 1 to 64 characters and values up to 512 characters. New sessions and metadata updates may take time to appear in filtered results.
         style: deepObject
         explode: true
@@ -45813,7 +45858,6 @@ components:
             - gpt-4o-mini-transcribe
             - gpt-4o-mini-transcribe-2025-12-15
             - gpt-4o-transcribe-diarize
-            x-stainless-const: true
             x-openai-enum-deprecations:
               gpt-4o-mini-transcribe-2025-12-15:
                 message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
@@ -45825,6 +45869,7 @@ components:
                 message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
               gpt-4o-transcribe-diarize:
                 message: 'Announced shutdown date: 2027-02-26. See https://developers.openai.com/api/docs/deprecations for details and recommended replacements.'
+            x-stainless-const: true
             x-stainless-nominal: false
           x-oaiTypeLabel: string
         language:
@@ -53137,11 +53182,10 @@ components:
                     x-openai-go-public-shape:
                       variant_names:
                         '#/components/schemas/AssistantToolsFileSearchTypeOnly': FileSearchTool
+                        '#/components/schemas/MessageObject/properties/attachments/anyOf/0/items/properties/tools/items/anyOf/1': FileSearchTool
                     anyOf:
                     - $ref: '#/components/schemas/AssistantToolsCode'
                     - $ref: '#/components/schemas/AssistantToolsFileSearchTypeOnly'
-                      x-openai-go-public-shape:
-                        type_name: MessageAttachmentToolFileSearchTool
             description: A list of files attached to the message, and the tools they were added to.
           - type: 'null'
         metadata:
@@ -58353,7 +58397,7 @@ components:
         example: |
           // Trigger a response with the default Conversation and no special parameters
           {
-            "type": "response.create",
+            "type": "response.create"
           }
 
           // Trigger an out-of-band response that does not write to the default Conversation
@@ -60038,10 +60082,9 @@ components:
               "role": "assistant",
               "content": [
                 {
-                  "type": "audio",
+                  "type": "output_audio",
                   "transcript": "Yes, I can hear you loud and clear. How can I help you today?",
-                  "audio": "8//2//v/9//q/+//+P/s...",
-                  "format": "pcm16"
+                  "audio": "AAABAP//AAA="
                 }
               ]
             }
@@ -60236,9 +60279,9 @@ components:
         group: realtime
         example: |
           {
-              "type":" input_audio_buffer.dtmf_event_received",
-              "event": "9",
-              "received_at": 1763605109,
+            "type": "input_audio_buffer.dtmf_event_received",
+            "event": "9",
+            "received_at": 1763605109
           }
     RealtimeServerEventInputAudioBufferSpeechStarted:
       type: object
@@ -60962,7 +61005,7 @@ components:
               },
               "usage": null,
               "metadata": null
-            },
+            }
           }
     RealtimeServerEventResponseDone:
       type: object
@@ -61406,23 +61449,23 @@ components:
         group: realtime
         example: |
           {
-              "event_id": "event_3536",
-              "type": "response.output_item.done",
-              "response_id": "resp_001",
-              "output_index": 0,
-              "item": {
-                  "id": "msg_007",
-                  "object": "realtime.item",
-                  "type": "message",
-                  "status": "completed",
-                  "role": "assistant",
-                  "content": [
-                      {
-                          "type": "text",
-                          "text": "Sure, I can help with that."
-                      }
-                  ]
-              }
+            "event_id": "event_3536",
+            "type": "response.output_item.done",
+            "response_id": "resp_001",
+            "output_index": 0,
+            "item": {
+              "id": "msg_007",
+              "object": "realtime.item",
+              "type": "message",
+              "status": "completed",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Sure, I can help with that."
+                }
+              ]
+            }
           }
     RealtimeServerEventResponseTextDelta:
       type: object
@@ -61593,7 +61636,7 @@ components:
                 }
               },
               "include": null
-            },
+            }
           }
     RealtimeServerEventSessionUpdated:
       type: object
@@ -61695,7 +61738,7 @@ components:
                 }
               },
               "include": null
-            },
+            }
           }
     RealtimeServerEventTranscriptionSessionUpdated:
       type: object
@@ -64293,6 +64336,21 @@ components:
             x-stainless-skip: true
           usage:
             $ref: '#/components/schemas/ResponseUsage'
+          tool_usage:
+            $ref: '#/components/schemas/ResponseToolUsage'
+            description: |
+              Usage reported by hosted tools, separate from base model `usage`. The field
+              can be omitted when tool usage is unavailable. When present, tool families
+              with no recorded usage have zero counts.
+
+              `image_gen` sums available token counts across image generation calls.
+              Calls with missing or incomplete usage records may be skipped. Output
+              token details and cached input counts can be omitted. An omitted cache
+              count means cache usage is unknown.
+
+              `web_search.num_requests` counts billable searches. Discounted searches
+              and actions such as opening a page are excluded. Use billing records to
+              reconcile final charges.
           prompt_cache_options:
             $ref: '#/components/schemas/PromptCacheOptions'
           prompt_cache_diagnostics:
@@ -64318,21 +64376,6 @@ components:
                 An upper bound for the number of tokens that can be generated for a response, including visible output tokens and [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
               type: integer
             - type: 'null'
-          tool_usage:
-            $ref: '#/components/schemas/ResponseToolUsage'
-            description: |
-              Usage reported by hosted tools, separate from base model `usage`. The field
-              can be omitted when tool usage is unavailable. When present, tool families
-              with no recorded usage have zero counts.
-
-              `image_gen` sums available token counts across image generation calls.
-              Calls with missing or incomplete usage records may be skipped. Output
-              token details and cached input counts can be omitted. An omitted cache
-              count means cache usage is unknown.
-
-              `web_search.num_requests` counts billable searches. Discounted searches
-              and actions such as opening a page are excluded. Use billing records to
-              reconcile final charges.
         required:
         - access_programs
         - id
@@ -97476,7 +97519,7 @@ components:
         reason: close_requested
         session:
           id: live_abc123
-          model: '{{models.live.default}}'
+          model: gpt-live-1
           status: active
           expires_at: 1788555600
           instructions: Help the caller plan a restaurant reservation. Confirm details before booking.
@@ -97553,7 +97596,7 @@ components:
           reason: close_requested
           session:
             id: live_abc123
-            model: '{{models.live.default}}'
+            model: gpt-live-1
             status: active
             expires_at: 1788555600
             instructions: Help the caller plan a restaurant reservation. Confirm details before booking.
@@ -105216,6 +105259,21 @@ components:
             x-stainless-skip: true
           usage:
             $ref: '#/components/schemas/BetaResponseUsage'
+          tool_usage:
+            $ref: '#/components/schemas/BetaResponseToolUsage'
+            description: |
+              Usage reported by hosted tools, separate from base model `usage`. The field
+              can be omitted when tool usage is unavailable. When present, tool families
+              with no recorded usage have zero counts.
+
+              `image_gen` sums available token counts across image generation calls.
+              Calls with missing or incomplete usage records may be skipped. Output
+              token details and cached input counts can be omitted. An omitted cache
+              count means cache usage is unknown.
+
+              `web_search.num_requests` counts billable searches. Discounted searches
+              and actions such as opening a page are excluded. Use billing records to
+              reconcile final charges.
           prompt_cache_options:
             $ref: '#/components/schemas/BetaPromptCacheOptions'
           prompt_cache_diagnostics:
@@ -105241,21 +105299,6 @@ components:
                 An upper bound for the number of tokens that can be generated for a response, including visible output tokens and [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
               type: integer
             - type: 'null'
-          tool_usage:
-            $ref: '#/components/schemas/BetaResponseToolUsage'
-            description: |
-              Usage reported by hosted tools, separate from base model `usage`. The field
-              can be omitted when tool usage is unavailable. When present, tool families
-              with no recorded usage have zero counts.
-
-              `image_gen` sums available token counts across image generation calls.
-              Calls with missing or incomplete usage records may be skipped. Output
-              token details and cached input counts can be omitted. An omitted cache
-              count means cache usage is unknown.
-
-              `web_search.num_requests` counts billable searches. Discounted searches
-              and actions such as opening a page are excluded. Use billing records to
-              reconcile final charges.
         required:
         - access_programs
         - id
@@ -112031,6 +112074,251 @@ components:
       - type
       - server_label
       - name
+    RealtimeConnectDocumentationParams:
+      type: object
+      properties:
+        model:
+          type: string
+        call_id:
+          type: string
+        intent:
+          type: string
+          enum:
+          - realtime
+          - transcription
+          description: |
+            Selects the session type. Set `transcription` and omit `model` for a transcription session. If omitted, the session type from a client secret applies when present; otherwise the intent is `realtime`.
+    RealtimeClientEventResponseCreateWithReferencesParam:
+      type: object
+      description: "This event instructs the server to create a Response, which means triggering \nmodel inference. When in Server VAD mode, the server will create Responses \nautomatically.\n\nA Response will include at least one Item, and may have two, in which case \nthe second will be a function call. These Items will be appended to the \nconversation history by default.\n\nThe server will respond with a `response.created` event, events for Items \nand content created, and finally a `response.done` event to indicate the \nResponse is complete.\n\nThe `response.create` event includes inference configuration like \n`instructions` and `tools`. If these are set, they will override the Session's \nconfiguration for this Response only.\n\nResponses can be created out-of-band of the default Conversation, meaning that they can\nhave arbitrary input, and it's possible to disable writing the output to the Conversation.\nOnly one Response can write to the default Conversation at a time, but otherwise multiple\nResponses can be created in parallel. The `metadata` field is a good way to disambiguate\nmultiple simultaneous Responses.\n\nClients can set `conversation` to `none` to create a Response that does not write to the default\nConversation. Arbitrary input can be provided with the `input` field, which is an array accepting\nraw Items and references to existing Items.\n"
+      properties:
+        event_id:
+          type: string
+          maxLength: 512
+          description: Optional client-generated ID used to identify this event.
+        type:
+          x-stainless-const: true
+          description: The event type, must be `response.create`.
+          const: response.create
+        response:
+          $ref: '#/components/schemas/RealtimeResponseCreateParamsWithReferencesParam'
+      required:
+      - type
+      x-oaiMeta:
+        name: response.create
+        group: realtime
+        example: |
+          // Trigger a response with the default Conversation and no special parameters
+          {
+            "type": "response.create"
+          }
+
+          // Trigger an out-of-band response that does not write to the default Conversation
+          {
+            "type": "response.create",
+            "response": {
+              "instructions": "Provide a concise answer.",
+              "tools": [], // clear any session tools
+              "conversation": "none",
+              "output_modalities": ["text"],
+              "metadata": {
+                "response_purpose": "summarization"
+              },
+              "input": [
+                {
+                  "type": "item_reference",
+                  "id": "item_12345"
+                },
+                {
+                  "type": "message",
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "input_text",
+                      "text": "Summarize the above message in one sentence."
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+    RealtimeResponseCreateParamsWithReferencesParam:
+      type: object
+      description: Create a new Realtime response with these parameters
+      properties:
+        output_modalities:
+          type: array
+          description: |
+            The set of modalities the model used to respond, currently the only possible values are
+            `[\"audio\"]`, `[\"text\"]`. Audio output always include a text transcript. Setting the
+            output to mode `text` will disable audio output from the model.
+          items:
+            type: string
+            enum:
+            - text
+            - audio
+        instructions:
+          type: string
+          description: |
+            The default system instructions (i.e. system message) prepended to model calls. This field allows the client to guide the model on desired responses. The model can be instructed on response content and format, (e.g. "be extremely succinct", "act friendly", "here are examples of good responses") and on audio behavior (e.g. "talk quickly", "inject emotion into your voice", "laugh frequently"). The instructions are not guaranteed to be followed by the model, but they provide guidance to the model on the desired behavior.
+            Note that the server sets default instructions which will be used if this field is not set and are visible in the `session.created` event at the start of the session.
+        audio:
+          type: object
+          description: Configuration for audio input and output.
+          properties:
+            output:
+              type: object
+              properties:
+                format:
+                  $ref: '#/components/schemas/RealtimeAudioFormats'
+                  description: The format of the output audio.
+                voice:
+                  $ref: '#/components/schemas/VoiceIdsOrCustomVoice'
+                  default: alloy
+                  description: |
+                    The voice the model uses to respond. Supported built-in voices are
+                    `alloy`, `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`,
+                    `marin`, and `cedar`. You may also provide a custom voice object with
+                    an `id`, for example `{ "id": "voice_1234" }`. Voice cannot be changed
+                    during the session once the model has responded with audio at least once.
+                    Custom voices must be created from audio samples. Voices created from text prompts are supported only in Live.
+                    We recommend `marin` and `cedar` for best quality.
+        tools:
+          type: array
+          description: Tools available to the model.
+          items:
+            anyOf:
+            - $ref: '#/components/schemas/RealtimeFunctionTool'
+            - $ref: '#/components/schemas/MCPTool'
+        tool_choice:
+          description: |
+            How the model chooses tools. Provide one of the string modes or force a specific
+            function/MCP tool.
+          default: auto
+          anyOf:
+          - $ref: '#/components/schemas/ToolChoiceOptions'
+          - $ref: '#/components/schemas/ToolChoiceFunction'
+          - $ref: '#/components/schemas/ToolChoiceMCP'
+        parallel_tool_calls:
+          type: boolean
+          description: |
+            Whether the model may call multiple tools in parallel. Only supported by
+            reasoning Realtime models such as `gpt-realtime-2`.
+        reasoning:
+          $ref: '#/components/schemas/RealtimeReasoning'
+        max_output_tokens:
+          description: |
+            Maximum number of output tokens for a single assistant response,
+            inclusive of tool calls. Provide an integer between 1 and 4096 to
+            limit output tokens, or `inf` for the maximum available tokens for a
+            given model. Defaults to `inf`.
+          anyOf:
+          - type: integer
+          - type: string
+            enum:
+            - inf
+            x-stainless-const: true
+        conversation:
+          description: |
+            Controls which conversation the response is added to. Currently supports
+            `auto` and `none`, with `auto` as the default value. The `auto` value
+            means that the contents of the response will be added to the default
+            conversation. Set this to `none` to create an out-of-band response which
+            will not add items to default conversation.
+          anyOf:
+          - type: string
+          - type: string
+            default: auto
+            enum:
+            - auto
+            - none
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        prompt:
+          $ref: '#/components/schemas/Prompt'
+        input:
+          type: array
+          description: |
+            Input items to include in the prompt for the model. Using this field
+            creates a new context for this Response instead of using the default
+            conversation. An empty array `[]` will clear the context for this Response.
+            Note that this can include references to items that previously appeared in the session
+            using their id.
+          items:
+            anyOf:
+            - $ref: '#/components/schemas/RealtimeConversationItem'
+            - $ref: '#/components/schemas/RealtimeResponseItemReference'
+    LiveDecisionStoredItemValidation:
+      discriminator:
+        propertyName: type
+      x-oai-default-discriminator-value: message
+      anyOf:
+      - discriminator:
+          propertyName: role
+        properties:
+          type:
+            type: string
+            enum:
+            - message
+        anyOf:
+        - $ref: '#/components/schemas/LiveDecisionStoredUserMessageParam'
+        - $ref: '#/components/schemas/LiveDecisionStoredDeveloperMessageParam'
+        - $ref: '#/components/schemas/LiveDecisionStoredSystemMessageParam'
+        - $ref: '#/components/schemas/LiveDecisionStoredAssistantMessageParam'
+      - $ref: '#/components/schemas/LiveDecisionStoredFunctionCallParam'
+      - $ref: '#/components/schemas/LiveDecisionStoredFunctionCallOutputParam'
+      - $ref: '#/components/schemas/LiveDecisionStoredCustomToolCallParam'
+      - $ref: '#/components/schemas/LiveDecisionStoredCustomToolCallOutputParam'
+    LiveDecisionInputItemValidation:
+      discriminator:
+        propertyName: type
+      x-oai-default-discriminator-value: message
+      anyOf:
+      - discriminator:
+          propertyName: role
+        properties:
+          type:
+            type: string
+            enum:
+            - message
+        anyOf:
+        - $ref: '#/components/schemas/LiveDecisionUserMessageParam'
+        - $ref: '#/components/schemas/LiveDecisionDeveloperMessageParam'
+        - $ref: '#/components/schemas/LiveDecisionSystemMessageParam'
+        - $ref: '#/components/schemas/LiveDecisionAssistantMessageParam'
+      - $ref: '#/components/schemas/LiveDecisionFunctionCallParam'
+      - $ref: '#/components/schemas/LiveDecisionFunctionCallOutputParam'
+      - $ref: '#/components/schemas/LiveDecisionCustomToolCallParam'
+      - $ref: '#/components/schemas/LiveDecisionCustomToolCallOutputParam'
+    RealtimeResponseItemReference:
+      type: object
+      description: |
+        Reference an existing item in this Realtime session as response.create input.
+        Item references are only accepted in the response input array, not as new
+        conversation items.
+      properties:
+        type:
+          type: string
+          enum:
+          - item_reference
+          x-stainless-const: true
+          description: The type of this item. Always `item_reference`.
+        id:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: ^[a-zA-Z0-9_-]+$
+          description: The ID of an existing item in the same Realtime session.
+      required:
+      - type
+      - id
+    RealtimeTranslationConnectParams:
+      type: object
+      properties:
+        model:
+          type: string
+      required:
+      - model
   responses:
     TooManyRequests:
       description: The request was rejected because a rate limit was exceeded.

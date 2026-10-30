@@ -160,12 +160,12 @@ export class Organization extends APIResource {
   groups: GroupsAPI.Groups = new GroupsAPI.Groups(this._client);
   roles: RolesAPI.Roles = new RolesAPI.Roles(this._client);
   dataRetention: DataRetentionAPI.DataRetention = new DataRetentionAPI.DataRetention(this._client);
+  externalKeys: ExternalKeysAPI.ExternalKeys = new ExternalKeysAPI.ExternalKeys(this._client);
   externalStorage: ExternalStorageAPI.ExternalStorage = new ExternalStorageAPI.ExternalStorage(this._client);
   spendLimit: SpendLimitAPI.SpendLimit = new SpendLimitAPI.SpendLimit(this._client);
   spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
   projects: ProjectsAPI.Projects = new ProjectsAPI.Projects(this._client);
-  externalKeys: ExternalKeysAPI.ExternalKeys = new ExternalKeysAPI.ExternalKeys(this._client);
 }
 
 Organization.AuditLogs = AuditLogs;
@@ -176,12 +176,12 @@ Organization.Users = Users;
 Organization.Groups = Groups;
 Organization.Roles = Roles;
 Organization.DataRetention = DataRetention;
+Organization.ExternalKeys = ExternalKeys;
 Organization.ExternalStorage = ExternalStorage;
 Organization.SpendLimit = SpendLimit;
 Organization.SpendAlerts = SpendAlerts;
 Organization.Certificates = Certificates;
 Organization.Projects = Projects;
-Organization.ExternalKeys = ExternalKeys;
 
 export declare namespace Organization {
   export {
@@ -276,6 +276,15 @@ export declare namespace Organization {
   };
 
   export {
+    ExternalKeys as ExternalKeys,
+    type ExternalKey as ExternalKey,
+    type ExternalKeyValidateResponse as ExternalKeyValidateResponse,
+    type ExternalKeysPage as ExternalKeysPage,
+    type ExternalKeyCreateParams as ExternalKeyCreateParams,
+    type ExternalKeyListParams as ExternalKeyListParams,
+  };
+
+  export {
     ExternalStorage as ExternalStorage,
     type AwsExternalStorageProvider as AwsExternalStorageProvider,
     type AzureExternalStorageProvider as AzureExternalStorageProvider,
@@ -331,14 +340,5 @@ export declare namespace Organization {
     type ProjectCreateParams as ProjectCreateParams,
     type ProjectUpdateParams as ProjectUpdateParams,
     type ProjectListParams as ProjectListParams,
-  };
-
-  export {
-    ExternalKeys as ExternalKeys,
-    type ExternalKey as ExternalKey,
-    type ExternalKeyValidateResponse as ExternalKeyValidateResponse,
-    type ExternalKeysPage as ExternalKeysPage,
-    type ExternalKeyCreateParams as ExternalKeyCreateParams,
-    type ExternalKeyListParams as ExternalKeyListParams,
   };
 }
