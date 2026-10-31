@@ -1,5 +1,38 @@
 # Changelog
 
+## [7.46.0](https://github.com/openai/openai-node/compare/v7.45.1...v7.46.0) (2026-10-31)
+
+
+### Features
+
+* **api:** add agent context compaction settings ([#3075](https://github.com/openai/openai-node/issues/3075)) ([3e3918d](https://github.com/openai/openai-node/commit/3e3918d12d726ca33ddf91a4e6ee676cf7efbf3a))
+* **api:** add agent session review and tool settings ([#3083](https://github.com/openai/openai-node/issues/3083)) ([fb9c100](https://github.com/openai/openai-node/commit/fb9c10058740c2fca39096bb5152e85c3fea23da))
+* **api:** add experimental agent time awareness ([#3078](https://github.com/openai/openai-node/issues/3078)) ([2ac178e](https://github.com/openai/openai-node/commit/2ac178e958fce3d4bc3ae7c5ebcb4cad7244bdf7))
+* **api:** add image edit markup overlays ([#3076](https://github.com/openai/openai-node/issues/3076)) ([4bfed1f](https://github.com/openai/openai-node/commit/4bfed1f69fc0e86e7da0657df8d54b6e99118c02))
+* **api:** add organization external key management ([#3073](https://github.com/openai/openai-node/issues/3073)) ([db2dcb2](https://github.com/openai/openai-node/commit/db2dcb267f692e99309249f292a1c4ed9d4be877))
+* **api:** add SIP DTMF commands and delivery events ([#3074](https://github.com/openai/openai-node/issues/3074)) ([ae25692](https://github.com/openai/openai-node/commit/ae256927c87b0c7c76cb3a3141734b5dd78f8b39))
+* **api:** add typed Realtime references and improve WebSocket delivery ([#3081](https://github.com/openai/openai-node/issues/3081)) ([a35bc8e](https://github.com/openai/openai-node/commit/a35bc8ee72b23ecb33789c2a43e7de96946c9e8f))
+* **api:** expose hosted tool usage in responses ([#3071](https://github.com/openai/openai-node/issues/3071)) ([4dc3ec4](https://github.com/openai/openai-node/commit/4dc3ec4adf392b396f44238050318c7bb211896b))
+* **api:** filter agent sessions by metadata ([#3070](https://github.com/openai/openai-node/issues/3070)) ([e397a1d](https://github.com/openai/openai-node/commit/e397a1d99d1908ca5eaa228b6637cb6688b2aa8b))
+* **api:** parse Responses using the latest text format update ([#3079](https://github.com/openai/openai-node/issues/3079)) ([5982f92](https://github.com/openai/openai-node/commit/5982f920dd6c12b74e9f5ccfdb8902b5915c4e3d))
+
+
+### Bug Fixes
+
+* **realtime:** honor the selected WebSocket session target ([#3059](https://github.com/openai/openai-node/issues/3059)) ([d6c8425](https://github.com/openai/openai-node/commit/d6c84252c9c55f1e047104d1dc3e0ac896bae38c))
+
+
+### Chores
+
+* **api:** document upcoming model shutdowns ([#3069](https://github.com/openai/openai-node/issues/3069)) ([6b53695](https://github.com/openai/openai-node/commit/6b536952dc4e1a06f6fae964ffc2f2c346fcdc09))
+* **api:** update image-model documentation ([#3066](https://github.com/openai/openai-node/issues/3066)) ([fc3ebfa](https://github.com/openai/openai-node/commit/fc3ebfafbeba0539810b2514d93c062e9c9f8cb3))
+* enforce generated-file ownership ([#3061](https://github.com/openai/openai-node/issues/3061)) ([e7afc14](https://github.com/openai/openai-node/commit/e7afc1412b120487d4f6361f3bb72cdab91da10a))
+
+
+### Documentation
+
+* simplify the Responses WebSocket request example ([#3082](https://github.com/openai/openai-node/issues/3082)) ([1c716c3](https://github.com/openai/openai-node/commit/1c716c325a9482e95483ea09665711981da49a6b))
+
 ## [7.45.1](https://github.com/openai/openai-node/compare/v7.45.0...v7.45.1) (2026-10-27)
 
 
