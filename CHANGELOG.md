@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.47.0](https://github.com/openai/openai-node/compare/v7.46.0...v7.47.0) (2026-10-31)
+
+
+### Features
+
+* **api:** support typed Responses WebSocket warmup ([#3084](https://github.com/openai/openai-node/issues/3084)) ([a365b5c](https://github.com/openai/openai-node/commit/a365b5cabfea52b90c0abe808ab3123d55fb34ab))
+
 ## [7.46.0](https://github.com/openai/openai-node/compare/v7.45.1...v7.46.0) (2026-10-31)
 
 
