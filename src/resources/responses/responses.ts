@@ -9704,6 +9704,13 @@ export namespace ResponsesClientEvent {
     conversation?: string | ResponsesAPI.ResponseConversationParam | null;
 
     /**
+     * Whether to generate output for this response. Defaults to true when omitted. Set
+     * to false to prepare request state without model output; the response ID can be
+     * used as previous_response_id on a later turn.
+     */
+    generate?: boolean;
+
+    /**
      * Specify additional output data to include in the model response. Currently
      * supported values are:
      *
