@@ -6,6 +6,14 @@ import { ResponsesWS } from 'openai/resources/responses/ws';
 import { ResponsesWS as BetaResponsesWS } from 'openai/resources/beta/responses/ws';
 import type { ResponsesServerEvent } from 'openai/resources/responses/responses';
 import { ResponsesWebSocketSession } from 'openai/lib/responses/responses-websocket-session';
+import type { ResponsesWebSocketEvent } from 'openai/lib/responses/responses-websocket-session';
+import type {
+  BetaResponse,
+  BetaResponseInputItem,
+  BetaResponseOutputItem,
+  BetaResponsesClientEvent,
+  BetaResponsesServerEvent,
+} from 'openai/resources/beta/responses/responses';
 
 const limits = { maxLanes: 8, maxBufferedEvents: 16, maxBufferedBytes: 4096 };
 
@@ -348,9 +356,7 @@ test.each([undefined, 'original'])(
   async (streamID) => {
     await withSocket(BetaResponsesWS, async (connection, peer) => {
       connection.on('event', (event) => Object.assign(event, { stream_id: 'redirected' }));
-      // SAFETY: JavaScript accepts beta sockets; generated beta request types differ from stable TypeScript types.
-      // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- This regression deliberately calls the JavaScript API with the beta socket whose generated request types differ.
-      const session = new ResponsesWebSocketSession(connection as unknown as ResponsesWS, limits);
+      const session = new ResponsesWebSocketSession(connection, limits);
       const original = session.lane(streamID);
       const redirected = session.lane('redirected');
       await sendEvent(connection, peer, {
@@ -370,9 +376,7 @@ test.each([undefined, 'original'])(
 test('counts beta wire bytes before an observer shrinks the event', async () => {
   await withSocket(BetaResponsesWS, async (connection, peer) => {
     connection.on('event', (event) => Object.assign(event, { padding: '' }));
-    // SAFETY: Exercise the beta socket accepted at the public JavaScript boundary.
-    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- The runtime accepts beta sockets even though their generated request types differ from stable.
-    const session = new ResponsesWebSocketSession(connection as unknown as ResponsesWS, {
+    const session = new ResponsesWebSocketSession(connection, {
       ...limits,
       maxBufferedBytes: 256,
     });
@@ -536,3 +540,103 @@ test.each(['session', 'lane'] as const)(
     });
   },
 );
+
+test('preserves beta-only finalized output and metadata through the public typed session', async () => {
+  await withSocket(BetaResponsesWS, async (connection, peer) => {
+    const session = new ResponsesWebSocketSession(connection, limits);
+    try {
+      const lane = session.lane('fixture');
+      const inputAgent = {
+        type: 'agent_message',
+        id: 'input_agent_fixture',
+        author: 'fixture_sender',
+        recipient: 'fixture_receiver',
+        content: [{ type: 'input_text', text: 'opaque instruction' }],
+      } satisfies Extract<BetaResponseInputItem, { type: 'agent_message' }>;
+      const agent = {
+        ...({
+          type: 'agent_message',
+          id: 'agent_fixture',
+          author: 'fixture_sender',
+          recipient: 'fixture_receiver',
+          content: [{ type: 'text', text: 'opaque agent text' }],
+        } satisfies Extract<BetaResponseOutputItem, { type: 'agent_message' }>),
+        future_optional: { nested: ['fixture'] },
+      };
+      const message = {
+        type: 'message',
+        id: 'msg_fixture',
+        role: 'assistant',
+        status: 'completed',
+        content: [{ type: 'output_text', text: 'visible fixture text', annotations: [], logprobs: [] }],
+      } satisfies Extract<BetaResponseOutputItem, { type: 'message' }>;
+      const model: BetaResponse & { future_response: { retained: boolean } } = {
+        ...({
+          id: 'resp_fixture',
+          object: 'response',
+          access_programs: null,
+          created_at: 1,
+          error: null,
+          incomplete_details: null,
+          instructions: [inputAgent],
+          metadata: { fixture: 'beta' },
+          model: 'fixture-model',
+          output: [],
+          parallel_tool_calls: false,
+          status: 'completed',
+          temperature: null,
+          tool_choice: 'auto',
+          tools: [],
+          top_p: null,
+        } satisfies BetaResponse),
+        future_response: { retained: true },
+      };
+      const sent = once(peer, 'message');
+      lane.create({ input: [inputAgent], tool_choice: { type: 'mcp', server_label: 'fixture' } });
+      await sent;
+      const { output: omitted, ...metadata } = model;
+      type Done = Extract<BetaResponsesServerEvent, { type: 'response.output_item.done' }>;
+      const agentDone = {
+        type: 'response.output_item.done',
+        sequence_number: 0,
+        stream_id: 'fixture',
+        output_index: 7,
+        item: agent,
+      } satisfies Done & { stream_id: string };
+      const messageDone = {
+        type: 'response.output_item.done',
+        sequence_number: 1,
+        stream_id: 'fixture',
+        output_index: 2,
+        item: message,
+      } satisfies Done & { stream_id: string };
+      const terminal = {
+        type: 'response.completed',
+        sequence_number: 2,
+        stream_id: 'fixture',
+        response: metadata,
+      } satisfies Extract<ResponsesWebSocketEvent<BetaResponsesClientEvent>, { type: 'response.completed' }>;
+      const frames = [agentDone, messageDone, terminal];
+      const raw = structuredClone(frames);
+      for (const frame of frames) {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- Preserve the ordered wire fixture.
+        await sendEvent(connection, peer, frame);
+      }
+      const result: BetaResponse & { output_text: string } = await lane.finalResponse({
+        signal: AbortSignal.timeout(1000),
+        maxResponseBytes: 4096,
+      });
+      expect(result).toStrictEqual({
+        ...metadata,
+        output: [message, agent],
+        output_text: 'visible fixture text',
+      });
+      expect(frames).toStrictEqual(raw);
+      expect(result.output[1]).not.toBe(agent);
+      expect(result.instructions).not.toBe(metadata.instructions);
+      expect(omitted).toEqual([]);
+    } finally {
+      session.close();
+    }
+  });
+});

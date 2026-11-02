@@ -7,23 +7,26 @@ import { WebSocketError } from '../../resources/responses/internal-base';
 import { OpenAIError } from '../../core/error';
 import { hasOwn, isObj } from '../../internal/utils/values';
 import {
-  cloneResponse,
   createCanonicalResponseContext,
   ensureCanonicalOutputText,
 } from '../../internal/responses/canonical-output-text';
 
-type WireResponse = Omit<Response, 'output' | 'output_text'> &
-  Partial<Pick<Response, 'output' | 'output_text'>>;
-
-type WireEvent<Event> = Event extends { response: Response }
-  ? Omit<Event, 'response'> & {
-      response: WireResponse;
-    }
-  : Event;
+import type {
+  BetaResponse,
+  BetaResponsesClientEvent,
+  BetaResponsesServerEvent,
+} from '../../resources/beta/responses/responses';
+import type {
+  WebSocketClientEvent,
+  WebSocketClient,
+  WebSocketFinalResponse,
+  WebSocketWireEvent,
+  WebSocketWireResponse,
+} from './responses-websocket-types';
 
 /** Raw lane events, including future types with unknown fields. Response output may be omitted. */
-export type ResponsesWebSocketEvent =
-  | WireEvent<ResponsesServerEvent>
+export type ResponsesWebSocketEvent<Client extends WebSocketClientEvent = ResponsesClientEvent> =
+  | WebSocketWireEvent<Client>
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- Future wire event fields have no SDK schema and must remain unknown to callers.
   | {
       /** The server's event tag, which may be newer than the SDK. */
@@ -31,10 +34,17 @@ export type ResponsesWebSocketEvent =
       [key: string]: unknown;
     };
 
-function isEventType<Type extends ResponsesServerEvent['type']>(
-  event: ResponsesWebSocketEvent,
+type InternalClient = ResponsesClientEvent | BetaResponsesClientEvent;
+type InternalEvent = ResponsesWebSocketEvent | ResponsesWebSocketEvent<BetaResponsesClientEvent>;
+type InternalResponse =
+  | WebSocketWireResponse<ResponsesClientEvent>
+  | WebSocketWireResponse<BetaResponsesClientEvent>;
+type InternalOutput = Response['output'][number] | BetaResponse['output'][number];
+
+function isEventType<Type extends (ResponsesServerEvent | BetaResponsesServerEvent)['type']>(
+  event: InternalEvent,
   ...types: Type[]
-): event is Extract<WireEvent<ResponsesServerEvent>, { type: Type }> {
+): event is Extract<InternalEvent, { type: Type }> {
   return types.some((type) => event.type === type);
 }
 
@@ -47,15 +57,16 @@ export function positiveInteger(value: number): number {
 }
 
 /** A single ordered local consumer. Canceling receive cancels only that wait. */
-export class ResponsesWebSocketLane {
+export class ResponsesWebSocketLane<Client extends WebSocketClientEvent = ResponsesClientEvent> {
   declare readonly streamID: string | undefined;
   readonly #streamID: string | undefined;
-  readonly #send: (event: ResponsesClientEvent) => void;
+  // Runtime storage is shared; public requests and reads retain the selected family.
+  readonly #send: (event: InternalClient) => void;
   readonly #release: (bytes: number) => void;
   readonly #maxEvents: number;
   readonly #maxBytes: number;
   #bytes = 0;
-  readonly #queue: ({ event: ResponsesWebSocketEvent; bytes: number } | undefined)[] = [];
+  readonly #queue: ({ event: InternalEvent; bytes: number } | undefined)[] = [];
   #queueHead = 0;
   #wake: (() => void) | undefined;
   #failure: Error | undefined;
@@ -66,7 +77,7 @@ export class ResponsesWebSocketLane {
    */
   constructor(
     streamID: string | undefined,
-    send: (event: ResponsesClientEvent) => void,
+    send: (event: WebSocketClient<Client>) => void,
     release: (bytes: number) => void,
     maxEvents: number,
     maxBytes: number,
@@ -78,7 +89,8 @@ export class ResponsesWebSocketLane {
       configurable: true,
       writable: true,
     });
-    this.#send = send;
+    // SAFETY: Only create invokes this callback, with this lane's selected client family.
+    this.#send = send as (event: InternalClient) => void;
     this.#release = release;
     this.#maxEvents = maxEvents;
     this.#maxBytes = maxBytes;
@@ -87,17 +99,18 @@ export class ResponsesWebSocketLane {
   /** Sends a request on this lane, omitting HTTP-only stream/background fields. previous_response_id remains caller-controlled. */
   create(
     request: Omit<
-      Extract<ResponsesClientEvent, { type: 'response.create' }>,
+      Extract<WebSocketClient<Client>, { type: 'response.create' }>,
       'type' | 'stream_id' | 'stream' | 'background'
     >,
   ): void {
     if (this.#failure) {
       throw this.#failure;
     }
-    const event: Extract<ResponsesClientEvent, { type: 'response.create' }> = {
-      ...request,
-      type: 'response.create',
-    };
+    // SAFETY: create accepts only this lane's generated create fields and owns the tag.
+    const event = { ...request, type: 'response.create' } as Extract<
+      WebSocketClient<Client>,
+      { type: 'response.create' }
+    >;
     // The SDK owns this envelope; a top-level hook must not replace its routing.
     Object.defineProperty(event, 'toJSON', { value: undefined });
     delete event.stream;
@@ -111,11 +124,12 @@ export class ResponsesWebSocketLane {
   }
 
   /** Returns the next raw event without filling omitted output or computing output_text. */
-  async receive(options: { signal?: AbortSignal } = {}): Promise<ResponsesWebSocketEvent> {
+  async receive(options: { signal?: AbortSignal } = {}): Promise<ResponsesWebSocketEvent<Client>> {
     this.#acquireReader();
     try {
       const item = await this.#receive(options);
-      return item.event;
+      // SAFETY: The router only enqueues this lane's selected event family.
+      return item.event as ResponsesWebSocketEvent<Client>;
     } finally {
       this.#reading = false;
     }
@@ -130,7 +144,7 @@ export class ResponsesWebSocketLane {
 
   async #receive(options: {
     signal?: AbortSignal | undefined;
-  }): Promise<{ event: ResponsesWebSocketEvent; bytes: number }> {
+  }): Promise<{ event: InternalEvent; bytes: number }> {
     const { signal } = options;
     for (;;) {
       if (signal?.aborted) {
@@ -177,17 +191,21 @@ export class ResponsesWebSocketLane {
    * also fails the lane; cancellation before consuming anything leaves it reusable.
    * An invalid completed output item or terminal response fails only this lane.
    */
-  async finalResponse(options: { signal?: AbortSignal; maxResponseBytes?: number } = {}): Promise<Response> {
+  async finalResponse(
+    options: { signal?: AbortSignal; maxResponseBytes?: number } = {},
+  ): Promise<WebSocketFinalResponse<Client>> {
     const { signal } = options;
     const maxBytes =
       options.maxResponseBytes === undefined ? Infinity : positiveInteger(options.maxResponseBytes);
-    const completedOutput = new Map<number, Response['output'][number]>();
+    const completedOutput = new Map<number, InternalOutput>();
     let consumedBytes = 0;
     this.#acquireReader();
     try {
       for (;;) {
         // oxlint-disable-next-line eslint/no-await-in-loop -- Protocol order is required to accumulate one response.
-        const { event, bytes } = await this.#receive({ signal });
+        const received = await this.#receive({ signal });
+        const { event } = received;
+        const { bytes } = received;
         consumedBytes += bytes;
         const terminal = isEventType(
           event,
@@ -228,9 +246,9 @@ export class ResponsesWebSocketLane {
   }
 
   #finalizeResponse(
-    response: WireResponse,
-    completedOutput: Map<number, Response['output'][number]>,
-  ): Response {
+    response: InternalResponse,
+    completedOutput: Map<number, InternalOutput>,
+  ): WebSocketFinalResponse<Client> {
     const context = createCanonicalResponseContext();
     try {
       // Socket deltas need not include the setup events required by SSE.
@@ -249,15 +267,25 @@ export class ResponsesWebSocketLane {
       ) {
         throw new OpenAIError('Invalid Responses WebSocket terminal response');
       }
-      const snapshot = cloneResponse(context, {
+      const snapshot = structuredClone({
         ...response,
         output: output ?? completedEntries.map(([, item]) => item),
         output_text: outputText ?? '',
       });
       if (outputText === undefined || outputText === null) {
-        ensureCanonicalOutputText(context, snapshot);
+        const textItems: Extract<Response['output'][number], { type: 'message' }>[] = [];
+        for (const item of snapshot.output) {
+          if (item.type === 'message') {
+            textItems.push(item);
+          }
+        }
+        const textView = { output: textItems, output_text: '' };
+        ensureCanonicalOutputText(context, textView);
+        snapshot.output_text = textView.output_text;
       }
-      return snapshot;
+      // SAFETY: The lane's client family fixes its response model. Normalization
+      // preserves that metadata and supplies only the validated output and derived text.
+      return snapshot as WebSocketFinalResponse<Client>;
     } catch {
       const error = new OpenAIError('Invalid Responses WebSocket terminal response');
       this.fail(error);
@@ -357,7 +385,7 @@ export class ResponsesWebSocketLane {
   }
 
   /** @internal */
-  push(event: ResponsesWebSocketEvent, bytes: number): void {
+  push(event: ResponsesWebSocketEvent<Client>, bytes: number): void {
     if (this.#failure) {
       this.#release(bytes);
       return;

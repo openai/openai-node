@@ -1,5 +1,7 @@
-import type { ResponsesServerEvent } from '../../resources/responses/responses';
+import type { ResponsesClientEvent, ResponsesServerEvent } from '../../resources/responses/responses';
 import type { ResponsesEmitter } from '../../resources/responses/internal-base';
+import type { ResponsesEmitter as BetaResponsesEmitter } from '../../resources/beta/responses/internal-base';
+import type { BetaResponsesServerEvent } from '../../resources/beta/responses/responses';
 import { WebSocketError } from '../../resources/responses/internal-base';
 import { OpenAIError } from '../../core/error';
 import { ReadyState } from '../../internal/ws-adapter';
@@ -13,11 +15,30 @@ import {
 } from '../../resources/beta/responses/ws-base';
 import { ResponsesWebSocketLane, positiveInteger } from './responses-websocket-lane';
 
+import type { ResponsesWebSocketEvent } from './responses-websocket-lane';
+import type { WebSocketClientEvent, WebSocketEmitter } from './responses-websocket-types';
+
+type IncomingEvent = ResponsesServerEvent | BetaResponsesServerEvent;
+type SocketConnection = (ResponsesEmitter | BetaResponsesEmitter) & { readonly socket: WebSocketLike };
+
+// The router does not use fluent emitter return values or its send/reconnect queue.
+interface ListenerConnection {
+  readonly socket: WebSocketLike;
+  on: {
+    (event: 'event', listener: (event: IncomingEvent) => void): void;
+    (event: 'error' | 'close' | 'reconnecting' | 'reconnected', listener: () => void): void;
+  };
+  off: {
+    (event: 'event', listener: (event: IncomingEvent) => void): void;
+    (event: 'error' | 'close' | 'reconnecting' | 'reconnected', listener: () => void): void;
+  };
+}
+
 export { ResponsesWebSocketLane } from './responses-websocket-lane';
 export type { ResponsesWebSocketEvent } from './responses-websocket-lane';
 
-interface LaneState {
-  lane: ResponsesWebSocketLane;
+interface LaneState<Client extends WebSocketClientEvent> {
+  lane: ResponsesWebSocketLane<Client>;
   events: number;
   bytes: number;
 }
@@ -36,9 +57,11 @@ export interface ResponsesWebSocketSessionOptions {
   maxBufferedBytes: number;
 }
 
-function parseEvent(serialized: string): ResponsesServerEvent {
+function parseEvent<Client extends WebSocketClientEvent>(
+  serialized: string,
+): ResponsesWebSocketEvent<Client> {
   // SAFETY: Validate the envelope below, as the native transport does for server-defined payloads.
-  const event = JSON.parse(serialized) as ResponsesServerEvent;
+  const event = JSON.parse(serialized) as ResponsesWebSocketEvent<Client>;
   if (
     !isObj(event) ||
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Match the native event envelope at this untyped boundary.
@@ -49,7 +72,7 @@ function parseEvent(serialized: string): ResponsesServerEvent {
   return event;
 }
 
-function serializeCustomEvent(incoming: ResponsesServerEvent): string {
+function serializeCustomEvent(incoming: IncomingEvent): string {
   const snapshot = structuredClone(incoming);
   // Mask inherited serialization hooks throughout our copy, not the caller's event.
   const pending: unknown[] = [snapshot];
@@ -80,9 +103,9 @@ function serializeCustomEvent(incoming: ResponsesServerEvent): string {
  * Reconnecting invalidates lanes: register new ones after restoring application state.
  * No request is replayed by this helper.
  */
-export class ResponsesWebSocketSession {
-  readonly #connection: ResponsesEmitter & { readonly socket: WebSocketLike };
-  readonly #lanes = new Map<string | undefined, LaneState>();
+export class ResponsesWebSocketSession<Client extends WebSocketClientEvent = ResponsesClientEvent> {
+  readonly #connection: ListenerConnection;
+  readonly #lanes = new Map<string | undefined, LaneState<Client>>();
   readonly #maxLanes: number;
   readonly #maxEvents: number;
   readonly #maxBytes: number;
@@ -92,10 +115,20 @@ export class ResponsesWebSocketSession {
   #socket: WebSocketLike | undefined;
   #failedTransport: { socket: WebSocketLike | undefined; error: WebSocketError } | undefined;
 
+  /* oxlint-disable typescript/unified-signatures -- The first overload infers the family from send; the last preserves constructor reflection and custom senders. */
   constructor(
-    connection: ResponsesEmitter & { readonly socket: WebSocketLike },
+    connection: WebSocketEmitter<Client> & {
+      readonly socket: WebSocketLike;
+      send: (event: Client) => void;
+    },
     options: ResponsesWebSocketSessionOptions,
-  ) {
+  );
+  constructor(
+    connection: WebSocketEmitter<Client> & { readonly socket: WebSocketLike },
+    options: ResponsesWebSocketSessionOptions,
+  );
+  /* oxlint-enable typescript/unified-signatures */
+  constructor(connection: SocketConnection, options: ResponsesWebSocketSessionOptions) {
     this.#connection = connection;
     this.#maxLanes = positiveInteger(options.maxLanes);
     this.#maxEvents = positiveInteger(options.maxBufferedEvents);
@@ -106,11 +139,11 @@ export class ResponsesWebSocketSession {
     ) {
       throw new OpenAIError('Cannot attach a Responses WebSocket session to a closing or closed socket');
     }
-    connection.on('event', this.#onEvent);
-    connection.on('error', this.#onError);
-    connection.on('close', this.#onClose);
-    connection.on('reconnecting', this.#onReconnect);
-    connection.on('reconnected', this.#onReconnected);
+    this.#connection.on('event', this.#onEvent);
+    this.#connection.on('error', this.#onError);
+    this.#connection.on('close', this.#onClose);
+    this.#connection.on('reconnecting', this.#onReconnect);
+    this.#connection.on('reconnected', this.#onReconnected);
     this.#onReconnected();
   }
 
@@ -121,7 +154,7 @@ export class ResponsesWebSocketSession {
   lane(
     streamID?: string,
     limits: { maxBufferedEvents?: number; maxBufferedBytes?: number } = {},
-  ): ResponsesWebSocketLane {
+  ): ResponsesWebSocketLane<Client> {
     if (this.#closed) {
       throw new OpenAIError('Responses WebSocket session is closed');
     }
@@ -145,10 +178,10 @@ export class ResponsesWebSocketSession {
     if (reservations.size >= this.#maxLanes) {
       throw new OpenAIError('Responses WebSocket lane limit exceeded');
     }
-    const entry: LaneState = {
+    const entry: LaneState<Client> = {
       events: 0,
       bytes: 0,
-      lane: new ResponsesWebSocketLane(
+      lane: new ResponsesWebSocketLane<Client>(
         streamID,
         (event) => {
           const { socket } = this.#connection;
@@ -192,11 +225,14 @@ export class ResponsesWebSocketSession {
     this.#socket = undefined;
   }
 
-  #onEvent = (incoming: ResponsesServerEvent): void => {
-    let event: ResponsesServerEvent;
+  #onEvent = (incoming: IncomingEvent): void => {
+    let event: ResponsesWebSocketEvent<Client>;
     let bytes: number;
     try {
-      const payload = getWebSocketEventPayload(incoming) ?? getBetaWebSocketEventPayload(incoming);
+      // SAFETY: Stable payload accounting uses the event object only as a WeakMap key.
+      // No beta response fields are read or converted through this lookup type.
+      const stableKey = incoming as ResponsesServerEvent;
+      const payload = getWebSocketEventPayload(stableKey) ?? getBetaWebSocketEventPayload(incoming);
       // Native events are copied from the wire, before any observer's mutations.
       // Clone custom inputs once to strip prototypes and evaluate accessors,
       // then retain only the JSON representation covered by byte accounting.
@@ -204,11 +240,11 @@ export class ResponsesWebSocketSession {
       if (serialized === undefined) {
         serialized = serializeCustomEvent(incoming);
       }
-      event = parseEvent(serialized);
+      event = parseEvent<Client>(serialized);
       bytes =
         payload === undefined
           ? rawByteLength(serialized)
-          : (getBetaWebSocketEventBytes(incoming) ?? getWebSocketEventBytes(incoming));
+          : (getBetaWebSocketEventBytes(incoming) ?? getWebSocketEventBytes(stableKey));
     } catch {
       this.#failLanes(new OpenAIError('Cannot snapshot custom WebSocket event'));
       return;

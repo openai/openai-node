@@ -15,6 +15,16 @@ connection headers again.
 routes an existing connection's events into independent local consumers. See
 the runnable [two-turn example](../examples/responses/websocket-session.ts).
 
+The session also accepts `ResponsesWS` from `openai/resources/beta/responses/ws`.
+Its lanes infer beta create fields and return `BetaResponse` with derived
+`output_text`. Stable connections keep their existing request and `Response`
+types. Beta-only output and response metadata remain intact. Custom beta emitters
+that widen their send type can specify
+`ResponsesWebSocketSession<BetaResponsesClientEvent>` explicitly.
+
+The optional provisional accumulator models stable output variants. For beta-only
+output kinds, retain raw events or use `finalResponse`.
+
 Choose `maxLanes`, `maxBufferedEvents`, and `maxBufferedBytes` for your application
 when creating the session. Individual lanes can use smaller queue budgets.
 `maxLanes` counts all IDs registered on the physical socket until reconnect, including
