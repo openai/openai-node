@@ -255,7 +255,8 @@ export class ResponsesWebSocketLane<Client extends WebSocketClientEvent = Respon
       // The terminal response is authoritative; finalized items fill an omitted output.
       const completedEntries = [...completedOutput];
       completedEntries.sort(([left], [right]) => left - right);
-      const output = hasOwn(response, 'output') ? response.output : undefined;
+      // One array view keeps .every callable in TypeScript 4.9.
+      const output: InternalOutput[] | undefined = hasOwn(response, 'output') ? response.output : undefined;
       const outputText = hasOwn(response, 'output_text') ? response.output_text : undefined;
       if (
         (output !== undefined &&
