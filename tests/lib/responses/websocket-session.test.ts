@@ -234,7 +234,7 @@ test('preview preserves supported logprobs while incomplete raw logprobs and ano
   });
 });
 
-test('idle and reset previews ignore non-output wire events but still reject unscaffolded output', async () => {
+test('idle and reset previews ignore non-output wire events and admit sparse output facts', async () => {
   await withSocket(async (connection, peer) => {
     const session = new ResponsesWebSocketSession(connection, limits);
     const lane = session.lane('preview');
@@ -274,7 +274,17 @@ test('idle and reset previews ignore non-output wire events but still reject uns
         }),
       );
       preview.add(await lane.receive({ signal }));
-      expect(preview.current?.phase).toBe('unavailable');
+      expect(preview.current).toEqual({
+        phase: 'provisional',
+        snapshot: { output: [], output_text: 'actual unscaffolded output' },
+        partialOutput: [
+          {
+            output_index: 0,
+            item_id: 'missing',
+            content: [{ content_index: 0, data: { text: 'actual unscaffolded output' } }],
+          },
+        ],
+      });
       const terminal = {
         type: 'response.completed',
         response: { id: 'r', output: [] },
