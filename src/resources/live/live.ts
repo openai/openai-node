@@ -2267,13 +2267,38 @@ export interface ResponsesDelegationConfig {
     | 'none'
     | 'required'
     | ResponsesDelegationConfig.LiveFunctionToolChoiceParam
-    | ResponsesDelegationConfig.LiveMCPToolChoiceParam;
+    | ResponsesDelegationConfig.LiveMCPToolChoiceParam
+    | ResponsesDelegationConfig.FileSearchToolChoice
+    | ResponsesDelegationConfig.WebSearchToolChoice
+    | ResponsesDelegationConfig.WebSearchPreview
+    | ResponsesDelegationConfig.ImageGenerationToolChoice
+    | ResponsesDelegationConfig.ComputerToolChoice
+    | ResponsesDelegationConfig.CodeInterpreterToolChoice
+    | ResponsesDelegationConfig.ProgrammaticToolCallingToolChoice
+    | ResponsesDelegationConfig.ShellToolChoice
+    | ResponsesDelegationConfig.CustomToolChoice
+    | ResponsesDelegationConfig.ApplyPatchToolChoice
+    | ResponsesDelegationConfig.LiveAllowedToolsChoiceParam;
 
   /**
    * Tools available to the Responses backend while it handles tasks delegated by the
    * Live model.
    */
-  tools?: Array<FunctionTool | ResponsesDelegationConfig.WebSearch>;
+  tools?: Array<
+    | FunctionTool
+    | ResponsesDelegationConfig.WebSearch
+    | ResponsesDelegationConfig.FileSearch
+    | ResponsesDelegationConfig.CodeInterpreter
+    | ResponsesDelegationConfig.Shell
+    | ResponsesDelegationConfig.ImageGeneration
+    | ResponsesDelegationConfig.Mcp
+    | ResponsesDelegationConfig.Custom
+    | ResponsesDelegationConfig.Namespace
+    | ResponsesDelegationConfig.ToolSearch
+    | ResponsesDelegationConfig.ProgrammaticToolCalling
+    | ResponsesDelegationConfig.Computer
+    | ResponsesDelegationConfig.ApplyPatch
+  >;
 }
 
 export namespace ResponsesDelegationConfig {
@@ -2319,6 +2344,214 @@ export namespace ResponsesDelegationConfig {
     type: 'mcp';
   }
 
+  export interface FileSearchToolChoice {
+    /**
+     * The tool to call. Always `file_search`.
+     */
+    type: 'file_search';
+  }
+
+  export interface WebSearchToolChoice {
+    /**
+     * The tool to call. Always `web_search`.
+     */
+    type: 'web_search';
+  }
+
+  export interface WebSearchPreview {
+    /**
+     * The tool to call. Always `web_search_preview`.
+     */
+    type: 'web_search_preview';
+  }
+
+  export interface ImageGenerationToolChoice {
+    /**
+     * The tool to call. Always `image_generation`.
+     */
+    type: 'image_generation';
+  }
+
+  export interface ComputerToolChoice {
+    /**
+     * The tool to call. Always `computer`.
+     */
+    type: 'computer';
+  }
+
+  export interface CodeInterpreterToolChoice {
+    /**
+     * The tool to call. Always `code_interpreter`.
+     */
+    type: 'code_interpreter';
+  }
+
+  export interface ProgrammaticToolCallingToolChoice {
+    /**
+     * The tool to call. Always `programmatic_tool_calling`.
+     */
+    type: 'programmatic_tool_calling';
+  }
+
+  /**
+   * Forces the model to call the shell tool when a tool call is required.
+   */
+  export interface ShellToolChoice {
+    /**
+     * The tool to call. Always `shell`.
+     */
+    type: 'shell';
+  }
+
+  export interface CustomToolChoice {
+    /**
+     * The name of the custom tool to call.
+     */
+    name: string;
+
+    /**
+     * The tool to call. Always `custom`.
+     */
+    type: 'custom';
+  }
+
+  /**
+   * Forces the model to call the apply_patch tool when executing a tool call.
+   */
+  export interface ApplyPatchToolChoice {
+    /**
+     * The tool to call. Always `apply_patch`.
+     */
+    type: 'apply_patch';
+  }
+
+  export interface LiveAllowedToolsChoiceParam {
+    /**
+     * The tools that the delegated Responses model may call.
+     */
+    tools: Array<
+      | LiveAllowedToolsChoiceParam.LiveFunctionToolChoiceParam
+      | LiveAllowedToolsChoiceParam.LiveMCPToolChoiceParam
+      | LiveAllowedToolsChoiceParam.FileSearchToolChoice
+      | LiveAllowedToolsChoiceParam.WebSearchToolChoice
+      | LiveAllowedToolsChoiceParam.WebSearchPreview
+      | LiveAllowedToolsChoiceParam.ImageGenerationToolChoice
+      | LiveAllowedToolsChoiceParam.ComputerToolChoice
+      | LiveAllowedToolsChoiceParam.CodeInterpreterToolChoice
+      | LiveAllowedToolsChoiceParam.ProgrammaticToolCallingToolChoice
+      | LiveAllowedToolsChoiceParam.ShellToolChoice
+      | LiveAllowedToolsChoiceParam.CustomToolChoice
+      | LiveAllowedToolsChoiceParam.ApplyPatchToolChoice
+    >;
+
+    /**
+     * The tool choice type. Always `allowed_tools`.
+     */
+    type: 'allowed_tools';
+
+    /**
+     * How to select a tool from the allowed set.
+     */
+    mode?: 'none' | 'auto' | 'required' | null;
+  }
+
+  export namespace LiveAllowedToolsChoiceParam {
+    export interface LiveFunctionToolChoiceParam {
+      name: string;
+
+      type: 'function';
+    }
+
+    export interface LiveMCPToolChoiceParam {
+      name: string;
+
+      server_label: string;
+
+      type: 'mcp';
+    }
+
+    export interface FileSearchToolChoice {
+      /**
+       * The tool to call. Always `file_search`.
+       */
+      type: 'file_search';
+    }
+
+    export interface WebSearchToolChoice {
+      /**
+       * The tool to call. Always `web_search`.
+       */
+      type: 'web_search';
+    }
+
+    export interface WebSearchPreview {
+      /**
+       * The tool to call. Always `web_search_preview`.
+       */
+      type: 'web_search_preview';
+    }
+
+    export interface ImageGenerationToolChoice {
+      /**
+       * The tool to call. Always `image_generation`.
+       */
+      type: 'image_generation';
+    }
+
+    export interface ComputerToolChoice {
+      /**
+       * The tool to call. Always `computer`.
+       */
+      type: 'computer';
+    }
+
+    export interface CodeInterpreterToolChoice {
+      /**
+       * The tool to call. Always `code_interpreter`.
+       */
+      type: 'code_interpreter';
+    }
+
+    export interface ProgrammaticToolCallingToolChoice {
+      /**
+       * The tool to call. Always `programmatic_tool_calling`.
+       */
+      type: 'programmatic_tool_calling';
+    }
+
+    /**
+     * Forces the model to call the shell tool when a tool call is required.
+     */
+    export interface ShellToolChoice {
+      /**
+       * The tool to call. Always `shell`.
+       */
+      type: 'shell';
+    }
+
+    export interface CustomToolChoice {
+      /**
+       * The name of the custom tool to call.
+       */
+      name: string;
+
+      /**
+       * The tool to call. Always `custom`.
+       */
+      type: 'custom';
+    }
+
+    /**
+     * Forces the model to call the apply_patch tool when executing a tool call.
+     */
+    export interface ApplyPatchToolChoice {
+      /**
+       * The tool to call. Always `apply_patch`.
+       */
+      type: 'apply_patch';
+    }
+  }
+
   /**
    * A web search tool available to the Live session’s Responses backend.
    */
@@ -2327,6 +2560,210 @@ export namespace ResponsesDelegationConfig {
      * The tool type. Always `web_search`.
      */
     type: 'web_search';
+  }
+
+  export interface FileSearch {
+    type: 'file_search';
+  }
+
+  export interface CodeInterpreter {
+    type: 'code_interpreter';
+  }
+
+  /**
+   * A Responses shell tool. Use a hosted container or return local shell results
+   * with response.item.create. Domain secrets are not supported.
+   */
+  export interface Shell {
+    type: 'shell';
+
+    environment?: Shell.ContainerAuto | Shell.ContainerReference | Shell.Local | null;
+  }
+
+  export namespace Shell {
+    export interface ContainerAuto {
+      /**
+       * Automatically creates a container for this request
+       */
+      type: 'container_auto';
+
+      /**
+       * An optional list of uploaded files to make available to your code.
+       */
+      file_ids?: Array<string> | null;
+
+      /**
+       * The memory limit for the container.
+       */
+      memory_limit?: '1g' | '4g' | '16g' | '64g' | null;
+
+      /**
+       * Network access policy for the container.
+       */
+      network_policy?: ContainerAuto.Disabled | ContainerAuto.Allowlist | null;
+
+      /**
+       * An optional list of skills referenced by id or inline data.
+       */
+      skills?: Array<ContainerAuto.SkillReference | ContainerAuto.Inline> | null;
+    }
+
+    export namespace ContainerAuto {
+      export interface Disabled {
+        /**
+         * Disable outbound network access. Always `disabled`.
+         */
+        type: 'disabled';
+      }
+
+      export interface Allowlist {
+        /**
+         * A list of allowed domains when type is `allowlist`.
+         */
+        allowed_domains: Array<string>;
+
+        /**
+         * Allow outbound network access only to specified domains. Always `allowlist`.
+         */
+        type: 'allowlist';
+      }
+
+      export interface SkillReference {
+        /**
+         * The ID of the referenced skill.
+         */
+        skill_id: string;
+
+        /**
+         * References a skill created with the /v1/skills endpoint.
+         */
+        type: 'skill_reference';
+
+        /**
+         * Optional skill version. Use a positive integer or 'latest'. Omit for default.
+         */
+        version?: string | null;
+      }
+
+      export interface Inline {
+        /**
+         * The description of the skill.
+         */
+        description: string;
+
+        /**
+         * The name of the skill.
+         */
+        name: string;
+
+        /**
+         * Inline skill payload
+         */
+        source: Inline.Source;
+
+        /**
+         * Defines an inline skill for this request.
+         */
+        type: 'inline';
+      }
+
+      export namespace Inline {
+        /**
+         * Inline skill payload
+         */
+        export interface Source {
+          /**
+           * Base64-encoded skill zip bundle.
+           */
+          data: string;
+
+          /**
+           * The media type of the inline skill payload. Must be `application/zip`.
+           */
+          media_type: 'application/zip';
+
+          /**
+           * The type of the inline skill source. Must be `base64`.
+           */
+          type: 'base64';
+        }
+      }
+    }
+
+    export interface ContainerReference {
+      /**
+       * The ID of the referenced container.
+       */
+      container_id: string;
+
+      /**
+       * References a container created with the /v1/containers endpoint
+       */
+      type: 'container_reference';
+    }
+
+    export interface Local {
+      /**
+       * Use a local computer environment.
+       */
+      type: 'local';
+
+      /**
+       * An optional list of skills.
+       */
+      skills?: Array<Local.Skill> | null;
+    }
+
+    export namespace Local {
+      export interface Skill {
+        /**
+         * The description of the skill.
+         */
+        description: string;
+
+        /**
+         * The name of the skill.
+         */
+        name: string;
+
+        /**
+         * The path to the directory containing the skill.
+         */
+        path: string;
+      }
+    }
+  }
+
+  export interface ImageGeneration {
+    type: 'image_generation';
+  }
+
+  export interface Mcp {
+    type: 'mcp';
+  }
+
+  export interface Custom {
+    type: 'custom';
+  }
+
+  export interface Namespace {
+    type: 'namespace';
+  }
+
+  export interface ToolSearch {
+    type: 'tool_search';
+  }
+
+  export interface ProgrammaticToolCalling {
+    type: 'programmatic_tool_calling';
+  }
+
+  export interface Computer {
+    type: 'computer';
+  }
+
+  export interface ApplyPatch {
+    type: 'apply_patch';
   }
 }
 
@@ -2383,13 +2820,38 @@ export interface ResponsesDelegationUpdateConfig {
     | 'none'
     | 'required'
     | ResponsesDelegationUpdateConfig.LiveFunctionToolChoiceParam
-    | ResponsesDelegationUpdateConfig.LiveMCPToolChoiceParam;
+    | ResponsesDelegationUpdateConfig.LiveMCPToolChoiceParam
+    | ResponsesDelegationUpdateConfig.FileSearchToolChoice
+    | ResponsesDelegationUpdateConfig.WebSearchToolChoice
+    | ResponsesDelegationUpdateConfig.WebSearchPreview
+    | ResponsesDelegationUpdateConfig.ImageGenerationToolChoice
+    | ResponsesDelegationUpdateConfig.ComputerToolChoice
+    | ResponsesDelegationUpdateConfig.CodeInterpreterToolChoice
+    | ResponsesDelegationUpdateConfig.ProgrammaticToolCallingToolChoice
+    | ResponsesDelegationUpdateConfig.ShellToolChoice
+    | ResponsesDelegationUpdateConfig.CustomToolChoice
+    | ResponsesDelegationUpdateConfig.ApplyPatchToolChoice
+    | ResponsesDelegationUpdateConfig.LiveAllowedToolsChoiceParam;
 
   /**
    * Tools available to the Responses backend while it handles tasks delegated by the
    * Live model.
    */
-  tools?: Array<FunctionTool | ResponsesDelegationUpdateConfig.WebSearch>;
+  tools?: Array<
+    | FunctionTool
+    | ResponsesDelegationUpdateConfig.WebSearch
+    | ResponsesDelegationUpdateConfig.FileSearch
+    | ResponsesDelegationUpdateConfig.CodeInterpreter
+    | ResponsesDelegationUpdateConfig.Shell
+    | ResponsesDelegationUpdateConfig.ImageGeneration
+    | ResponsesDelegationUpdateConfig.Mcp
+    | ResponsesDelegationUpdateConfig.Custom
+    | ResponsesDelegationUpdateConfig.Namespace
+    | ResponsesDelegationUpdateConfig.ToolSearch
+    | ResponsesDelegationUpdateConfig.ProgrammaticToolCalling
+    | ResponsesDelegationUpdateConfig.Computer
+    | ResponsesDelegationUpdateConfig.ApplyPatch
+  >;
 }
 
 export namespace ResponsesDelegationUpdateConfig {
@@ -2435,6 +2897,214 @@ export namespace ResponsesDelegationUpdateConfig {
     type: 'mcp';
   }
 
+  export interface FileSearchToolChoice {
+    /**
+     * The tool to call. Always `file_search`.
+     */
+    type: 'file_search';
+  }
+
+  export interface WebSearchToolChoice {
+    /**
+     * The tool to call. Always `web_search`.
+     */
+    type: 'web_search';
+  }
+
+  export interface WebSearchPreview {
+    /**
+     * The tool to call. Always `web_search_preview`.
+     */
+    type: 'web_search_preview';
+  }
+
+  export interface ImageGenerationToolChoice {
+    /**
+     * The tool to call. Always `image_generation`.
+     */
+    type: 'image_generation';
+  }
+
+  export interface ComputerToolChoice {
+    /**
+     * The tool to call. Always `computer`.
+     */
+    type: 'computer';
+  }
+
+  export interface CodeInterpreterToolChoice {
+    /**
+     * The tool to call. Always `code_interpreter`.
+     */
+    type: 'code_interpreter';
+  }
+
+  export interface ProgrammaticToolCallingToolChoice {
+    /**
+     * The tool to call. Always `programmatic_tool_calling`.
+     */
+    type: 'programmatic_tool_calling';
+  }
+
+  /**
+   * Forces the model to call the shell tool when a tool call is required.
+   */
+  export interface ShellToolChoice {
+    /**
+     * The tool to call. Always `shell`.
+     */
+    type: 'shell';
+  }
+
+  export interface CustomToolChoice {
+    /**
+     * The name of the custom tool to call.
+     */
+    name: string;
+
+    /**
+     * The tool to call. Always `custom`.
+     */
+    type: 'custom';
+  }
+
+  /**
+   * Forces the model to call the apply_patch tool when executing a tool call.
+   */
+  export interface ApplyPatchToolChoice {
+    /**
+     * The tool to call. Always `apply_patch`.
+     */
+    type: 'apply_patch';
+  }
+
+  export interface LiveAllowedToolsChoiceParam {
+    /**
+     * The tools that the delegated Responses model may call.
+     */
+    tools: Array<
+      | LiveAllowedToolsChoiceParam.LiveFunctionToolChoiceParam
+      | LiveAllowedToolsChoiceParam.LiveMCPToolChoiceParam
+      | LiveAllowedToolsChoiceParam.FileSearchToolChoice
+      | LiveAllowedToolsChoiceParam.WebSearchToolChoice
+      | LiveAllowedToolsChoiceParam.WebSearchPreview
+      | LiveAllowedToolsChoiceParam.ImageGenerationToolChoice
+      | LiveAllowedToolsChoiceParam.ComputerToolChoice
+      | LiveAllowedToolsChoiceParam.CodeInterpreterToolChoice
+      | LiveAllowedToolsChoiceParam.ProgrammaticToolCallingToolChoice
+      | LiveAllowedToolsChoiceParam.ShellToolChoice
+      | LiveAllowedToolsChoiceParam.CustomToolChoice
+      | LiveAllowedToolsChoiceParam.ApplyPatchToolChoice
+    >;
+
+    /**
+     * The tool choice type. Always `allowed_tools`.
+     */
+    type: 'allowed_tools';
+
+    /**
+     * How to select a tool from the allowed set.
+     */
+    mode?: 'none' | 'auto' | 'required' | null;
+  }
+
+  export namespace LiveAllowedToolsChoiceParam {
+    export interface LiveFunctionToolChoiceParam {
+      name: string;
+
+      type: 'function';
+    }
+
+    export interface LiveMCPToolChoiceParam {
+      name: string;
+
+      server_label: string;
+
+      type: 'mcp';
+    }
+
+    export interface FileSearchToolChoice {
+      /**
+       * The tool to call. Always `file_search`.
+       */
+      type: 'file_search';
+    }
+
+    export interface WebSearchToolChoice {
+      /**
+       * The tool to call. Always `web_search`.
+       */
+      type: 'web_search';
+    }
+
+    export interface WebSearchPreview {
+      /**
+       * The tool to call. Always `web_search_preview`.
+       */
+      type: 'web_search_preview';
+    }
+
+    export interface ImageGenerationToolChoice {
+      /**
+       * The tool to call. Always `image_generation`.
+       */
+      type: 'image_generation';
+    }
+
+    export interface ComputerToolChoice {
+      /**
+       * The tool to call. Always `computer`.
+       */
+      type: 'computer';
+    }
+
+    export interface CodeInterpreterToolChoice {
+      /**
+       * The tool to call. Always `code_interpreter`.
+       */
+      type: 'code_interpreter';
+    }
+
+    export interface ProgrammaticToolCallingToolChoice {
+      /**
+       * The tool to call. Always `programmatic_tool_calling`.
+       */
+      type: 'programmatic_tool_calling';
+    }
+
+    /**
+     * Forces the model to call the shell tool when a tool call is required.
+     */
+    export interface ShellToolChoice {
+      /**
+       * The tool to call. Always `shell`.
+       */
+      type: 'shell';
+    }
+
+    export interface CustomToolChoice {
+      /**
+       * The name of the custom tool to call.
+       */
+      name: string;
+
+      /**
+       * The tool to call. Always `custom`.
+       */
+      type: 'custom';
+    }
+
+    /**
+     * Forces the model to call the apply_patch tool when executing a tool call.
+     */
+    export interface ApplyPatchToolChoice {
+      /**
+       * The tool to call. Always `apply_patch`.
+       */
+      type: 'apply_patch';
+    }
+  }
+
   /**
    * A web search tool available to the Live session’s Responses backend.
    */
@@ -2443,6 +3113,210 @@ export namespace ResponsesDelegationUpdateConfig {
      * The tool type. Always `web_search`.
      */
     type: 'web_search';
+  }
+
+  export interface FileSearch {
+    type: 'file_search';
+  }
+
+  export interface CodeInterpreter {
+    type: 'code_interpreter';
+  }
+
+  /**
+   * A Responses shell tool. Use a hosted container or return local shell results
+   * with response.item.create. Domain secrets are not supported.
+   */
+  export interface Shell {
+    type: 'shell';
+
+    environment?: Shell.ContainerAuto | Shell.ContainerReference | Shell.Local | null;
+  }
+
+  export namespace Shell {
+    export interface ContainerAuto {
+      /**
+       * Automatically creates a container for this request
+       */
+      type: 'container_auto';
+
+      /**
+       * An optional list of uploaded files to make available to your code.
+       */
+      file_ids?: Array<string> | null;
+
+      /**
+       * The memory limit for the container.
+       */
+      memory_limit?: '1g' | '4g' | '16g' | '64g' | null;
+
+      /**
+       * Network access policy for the container.
+       */
+      network_policy?: ContainerAuto.Disabled | ContainerAuto.Allowlist | null;
+
+      /**
+       * An optional list of skills referenced by id or inline data.
+       */
+      skills?: Array<ContainerAuto.SkillReference | ContainerAuto.Inline> | null;
+    }
+
+    export namespace ContainerAuto {
+      export interface Disabled {
+        /**
+         * Disable outbound network access. Always `disabled`.
+         */
+        type: 'disabled';
+      }
+
+      export interface Allowlist {
+        /**
+         * A list of allowed domains when type is `allowlist`.
+         */
+        allowed_domains: Array<string>;
+
+        /**
+         * Allow outbound network access only to specified domains. Always `allowlist`.
+         */
+        type: 'allowlist';
+      }
+
+      export interface SkillReference {
+        /**
+         * The ID of the referenced skill.
+         */
+        skill_id: string;
+
+        /**
+         * References a skill created with the /v1/skills endpoint.
+         */
+        type: 'skill_reference';
+
+        /**
+         * Optional skill version. Use a positive integer or 'latest'. Omit for default.
+         */
+        version?: string | null;
+      }
+
+      export interface Inline {
+        /**
+         * The description of the skill.
+         */
+        description: string;
+
+        /**
+         * The name of the skill.
+         */
+        name: string;
+
+        /**
+         * Inline skill payload
+         */
+        source: Inline.Source;
+
+        /**
+         * Defines an inline skill for this request.
+         */
+        type: 'inline';
+      }
+
+      export namespace Inline {
+        /**
+         * Inline skill payload
+         */
+        export interface Source {
+          /**
+           * Base64-encoded skill zip bundle.
+           */
+          data: string;
+
+          /**
+           * The media type of the inline skill payload. Must be `application/zip`.
+           */
+          media_type: 'application/zip';
+
+          /**
+           * The type of the inline skill source. Must be `base64`.
+           */
+          type: 'base64';
+        }
+      }
+    }
+
+    export interface ContainerReference {
+      /**
+       * The ID of the referenced container.
+       */
+      container_id: string;
+
+      /**
+       * References a container created with the /v1/containers endpoint
+       */
+      type: 'container_reference';
+    }
+
+    export interface Local {
+      /**
+       * Use a local computer environment.
+       */
+      type: 'local';
+
+      /**
+       * An optional list of skills.
+       */
+      skills?: Array<Local.Skill> | null;
+    }
+
+    export namespace Local {
+      export interface Skill {
+        /**
+         * The description of the skill.
+         */
+        description: string;
+
+        /**
+         * The name of the skill.
+         */
+        name: string;
+
+        /**
+         * The path to the directory containing the skill.
+         */
+        path: string;
+      }
+    }
+  }
+
+  export interface ImageGeneration {
+    type: 'image_generation';
+  }
+
+  export interface Mcp {
+    type: 'mcp';
+  }
+
+  export interface Custom {
+    type: 'custom';
+  }
+
+  export interface Namespace {
+    type: 'namespace';
+  }
+
+  export interface ToolSearch {
+    type: 'tool_search';
+  }
+
+  export interface ProgrammaticToolCalling {
+    type: 'programmatic_tool_calling';
+  }
+
+  export interface Computer {
+    type: 'computer';
+  }
+
+  export interface ApplyPatch {
+    type: 'apply_patch';
   }
 }
 
