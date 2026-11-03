@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.49.0](https://github.com/openai/openai-node/compare/v7.48.0...v7.49.0) (2026-11-03)
+
+
+### Features
+
+* **api:** add workload identity providers and federation rules ([#3103](https://github.com/openai/openai-node/issues/3103)) ([47c4227](https://github.com/openai/openai-node/commit/47c4227222af55cc1e43cd8ae4f8ba17b80cae21))
+
 ## [7.48.0](https://github.com/openai/openai-node/compare/v7.47.0...v7.48.0) (2026-11-03)
 
 
