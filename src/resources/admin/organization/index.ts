@@ -145,3 +145,12 @@ export {
   type UserListParams,
   type OrganizationUsersPage,
 } from './users/index';
+export {
+  WorkloadIdentityProviders,
+  type WorkloadIdentityProvider,
+  type WorkloadIdentityProviderDeleted,
+  type WorkloadIdentityProviderCreateParams,
+  type WorkloadIdentityProviderUpdateParams,
+  type WorkloadIdentityProviderListParams,
+  type WorkloadIdentityProvidersPage,
+} from './workload-identity-providers/index';
