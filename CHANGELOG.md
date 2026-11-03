@@ -1,5 +1,22 @@
 # Changelog
 
+## [7.48.0](https://github.com/openai/openai-node/compare/v7.47.0...v7.48.0) (2026-11-03)
+
+
+### Features
+
+* **api:** expand Live Responses delegation tools and choices (exhaustive TypeScript switches may need to handle new variants) ([#3101](https://github.com/openai/openai-node/issues/3101)) ([e572875](https://github.com/openai/openai-node/commit/e572875c28a34c745b249daec4d954d8300f804b))
+* **responses:** retain sparse WebSocket output facts ([#3088](https://github.com/openai/openai-node/issues/3088)) ([aab2045](https://github.com/openai/openai-node/commit/aab204589e6a512883aa4d1e63dcfafbb4490f62))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump @cloudflare/workers-types from 5.20261018.1 to 5.20261025.1 in /ecosystem-tests/cloudflare-worker ([#3093](https://github.com/openai/openai-node/issues/3093)) ([8da4c55](https://github.com/openai/openai-node/commit/8da4c5572d540e18ff6c45569be933a7a7cd15a8))
+* **deps-dev:** bump follow-redirects from 1.16.1 to 1.16.2 in /ecosystem-tests/vercel-edge ([#3086](https://github.com/openai/openai-node/issues/3086)) ([be6b939](https://github.com/openai/openai-node/commit/be6b939a867e939f6ae6622d00599d65f60447e6))
+* **deps-dev:** bump puppeteer from 25.14.0 to 25.16.0 in /ecosystem-tests/browser-direct-import ([#3092](https://github.com/openai/openai-node/issues/3092)) ([784121e](https://github.com/openai/openai-node/commit/784121e6188916e14f300696158b62889e1f82dc))
+* **deps-dev:** bump webpack-dev-server from 5.2.6 to 5.2.7 in /ecosystem-tests/ts-browser-webpack ([#3097](https://github.com/openai/openai-node/issues/3097)) ([13be5dd](https://github.com/openai/openai-node/commit/13be5ddc26eff9e383c494d393813c131a435086))
+* **deps-dev:** bump wrangler from 4.151.1 to 4.152.0 in /ecosystem-tests/cloudflare-worker ([#3095](https://github.com/openai/openai-node/issues/3095)) ([b61074a](https://github.com/openai/openai-node/commit/b61074a74b584cdbc047d7735e918278b7ceb61e))
+
 ## [7.47.0](https://github.com/openai/openai-node/compare/v7.46.0...v7.47.0) (2026-10-31)
 
 
