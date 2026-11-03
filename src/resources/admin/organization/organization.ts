@@ -150,6 +150,16 @@ import {
   UserUpdateParams,
   Users,
 } from './users/users';
+import * as WorkloadIdentityProvidersAPI from './workload-identity-providers/workload-identity-providers';
+import {
+  WorkloadIdentityProvider,
+  WorkloadIdentityProviderCreateParams,
+  WorkloadIdentityProviderDeleted,
+  WorkloadIdentityProviderListParams,
+  WorkloadIdentityProviderUpdateParams,
+  WorkloadIdentityProviders,
+  WorkloadIdentityProvidersPage,
+} from './workload-identity-providers/workload-identity-providers';
 
 export class Organization extends APIResource {
   auditLogs: AuditLogsAPI.AuditLogs = new AuditLogsAPI.AuditLogs(this._client);
@@ -166,6 +176,8 @@ export class Organization extends APIResource {
   spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
   projects: ProjectsAPI.Projects = new ProjectsAPI.Projects(this._client);
+  workloadIdentityProviders: WorkloadIdentityProvidersAPI.WorkloadIdentityProviders =
+    new WorkloadIdentityProvidersAPI.WorkloadIdentityProviders(this._client);
 }
 
 Organization.AuditLogs = AuditLogs;
@@ -182,6 +194,7 @@ Organization.SpendLimit = SpendLimit;
 Organization.SpendAlerts = SpendAlerts;
 Organization.Certificates = Certificates;
 Organization.Projects = Projects;
+Organization.WorkloadIdentityProviders = WorkloadIdentityProviders;
 
 export declare namespace Organization {
   export {
@@ -340,5 +353,15 @@ export declare namespace Organization {
     type ProjectCreateParams as ProjectCreateParams,
     type ProjectUpdateParams as ProjectUpdateParams,
     type ProjectListParams as ProjectListParams,
+  };
+
+  export {
+    WorkloadIdentityProviders as WorkloadIdentityProviders,
+    type WorkloadIdentityProvider as WorkloadIdentityProvider,
+    type WorkloadIdentityProviderDeleted as WorkloadIdentityProviderDeleted,
+    type WorkloadIdentityProvidersPage as WorkloadIdentityProvidersPage,
+    type WorkloadIdentityProviderCreateParams as WorkloadIdentityProviderCreateParams,
+    type WorkloadIdentityProviderUpdateParams as WorkloadIdentityProviderUpdateParams,
+    type WorkloadIdentityProviderListParams as WorkloadIdentityProviderListParams,
   };
 }

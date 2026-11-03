@@ -3,7 +3,7 @@
   "files": {
     "api.md": {
       "mode": "100644",
-      "sha256": "a57b3d76a11c704e7daaae3607e1f2aec69d68a03a316928ec653bd67943038a"
+      "sha256": "9579a108cdef5d80de439b627101a1ee1f4923eeab502649b3ddbffa1dbcc0ae"
     },
     "src/client.ts": {
       "mode": "100644",
@@ -83,7 +83,7 @@
     },
     "src/resources/admin/organization/index.ts": {
       "mode": "100644",
-      "sha256": "a9109e55e1892a24cdb343fd22eb702a89a4fc63e81beedb227a24f531879bd3"
+      "sha256": "be323c91d7ffa1380aec0c426ef8d26128acb01e2c2a5fcff02bce73ca166766"
     },
     "src/resources/admin/organization/invites.ts": {
       "mode": "100644",
@@ -91,7 +91,7 @@
     },
     "src/resources/admin/organization/organization.ts": {
       "mode": "100644",
-      "sha256": "55fe9573a51a5094781dab6742e112873f36d881cb26daa2325d206638b64caf"
+      "sha256": "8835f598bfb83ba0e825725a7a4de1609614d07697544335dca9c3dc7e402ace"
     },
     "src/resources/admin/organization/projects.ts": {
       "mode": "100644",
@@ -220,6 +220,22 @@
     "src/resources/admin/organization/users/users.ts": {
       "mode": "100644",
       "sha256": "e44a42324c87d62990733c063e422b1e70bb6e053c3af38edf35bd4163966fbf"
+    },
+    "src/resources/admin/organization/workload-identity-providers.ts": {
+      "mode": "100644",
+      "sha256": "b3caf22eedc62d0d08ac5a2ca58517f39b1fbdc7cdc4fb704e3c3f970bb31bc5"
+    },
+    "src/resources/admin/organization/workload-identity-providers/federation-rules.ts": {
+      "mode": "100644",
+      "sha256": "08cfe5a51b13f32a50627f425b078071bba5b1e9ffa901876fb4f52f72343b4a"
+    },
+    "src/resources/admin/organization/workload-identity-providers/index.ts": {
+      "mode": "100644",
+      "sha256": "c5b1600342f2cf537dcca955629254b6ab68d6c2b364d01db99d034be21be3db"
+    },
+    "src/resources/admin/organization/workload-identity-providers/workload-identity-providers.ts": {
+      "mode": "100644",
+      "sha256": "a6adb16ded26bcb1e7f9e2a9bb1d174cee955b0965931af1373b1d66ac73a0a4"
     },
     "src/resources/audio.ts": {
       "mode": "100644",
@@ -1120,6 +1136,14 @@
     "tests/api-resources/admin/organization/users/users.test.ts": {
       "mode": "100644",
       "sha256": "bc327c04303832c377f8cd8df73c02455014f22ce37b64215e9e68bfe1e7cf6c"
+    },
+    "tests/api-resources/admin/organization/workload-identity-providers/federation-rules.test.ts": {
+      "mode": "100644",
+      "sha256": "a07fd0cdeab7db25a39e4f8c17161597d6678839da19ba8de075e180acfddf71"
+    },
+    "tests/api-resources/admin/organization/workload-identity-providers/workload-identity-providers.test.ts": {
+      "mode": "100644",
+      "sha256": "7f289e265dcc009791abe29e2dcc9c7807df601946475cb7f35b25fcfd23579f"
     },
     "tests/api-resources/audio/speech.test.ts": {
       "mode": "100644",
