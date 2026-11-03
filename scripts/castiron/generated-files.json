@@ -3,7 +3,7 @@
   "files": {
     "api.md": {
       "mode": "100644",
-      "sha256": "9579a108cdef5d80de439b627101a1ee1f4923eeab502649b3ddbffa1dbcc0ae"
+      "sha256": "a9667db2739a39e05e903dfc0a5d8701dfb7b9894e168409e18aa6721a6339f5"
     },
     "src/client.ts": {
       "mode": "100644",
@@ -131,7 +131,7 @@
     },
     "src/resources/admin/organization/projects/index.ts": {
       "mode": "100644",
-      "sha256": "1b0fbe79abd6ab648fe750064f0e1b6468b587b6d07299a5bee15cc927e98884"
+      "sha256": "ecde51c9c12738a91e6c958fdf7ddc5964c8ea3ad3093965c792aad79ef1abdc"
     },
     "src/resources/admin/organization/projects/model-permissions.ts": {
       "mode": "100644",
@@ -139,7 +139,7 @@
     },
     "src/resources/admin/organization/projects/projects.ts": {
       "mode": "100644",
-      "sha256": "3ac66de875c4097b61778095c21e02b00d39c3a2a706c0fbf68b6b17a38d3d9b"
+      "sha256": "57aa6f7f92a117e5a68cc55742f57e61703c6faafee6e24d3c137ca89c1afc6c"
     },
     "src/resources/admin/organization/projects/rate-limits.ts": {
       "mode": "100644",
@@ -164,6 +164,10 @@
     "src/resources/admin/organization/projects/service-accounts/service-accounts.ts": {
       "mode": "100644",
       "sha256": "f4d4810320e226258ae2142c316e5ad671b786aac0747ba35d4a9402bcebf2f4"
+    },
+    "src/resources/admin/organization/projects/service-tier-settings.ts": {
+      "mode": "100644",
+      "sha256": "79450a2cf9d1edb0aaf8ca9204bb05e1b9e6cde45f69874772b0ec8d305925fc"
     },
     "src/resources/admin/organization/projects/spend-alerts.ts": {
       "mode": "100644",
@@ -1096,6 +1100,10 @@
     "tests/api-resources/admin/organization/projects/service-accounts/service-accounts.test.ts": {
       "mode": "100644",
       "sha256": "641a2088a67a0e9671f0a3e3a88e2575291c2e62f3a7ebe1e76182924605c497"
+    },
+    "tests/api-resources/admin/organization/projects/service-tier-settings.test.ts": {
+      "mode": "100644",
+      "sha256": "3cfda503245fd7f4ff3248eff97c011de2f633be5f6a39227be7eb9215fe4676"
     },
     "tests/api-resources/admin/organization/projects/spend-alerts.test.ts": {
       "mode": "100644",
