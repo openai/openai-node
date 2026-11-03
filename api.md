@@ -1687,6 +1687,18 @@ Methods:
 - <code title="post /organization/projects/{project_id}/certificates/activate">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">activate</a>(projectID, { ...params }) -> CertificateActivateResponsesPage</code>
 - <code title="post /organization/projects/{project_id}/certificates/deactivate">client.admin.organization.projects.certificates.<a href="./src/resources/admin/organization/projects/certificates.ts">deactivate</a>(projectID, { ...params }) -> CertificateDeactivateResponsesPage</code>
 
+#### ServiceTierSettings
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/service-tier-settings.ts">ProjectOptionalServiceTier</a></code>
+- <code><a href="./src/resources/admin/organization/projects/service-tier-settings.ts">ProjectServiceTierSettings</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/service_tier_settings">client.admin.organization.projects.serviceTierSettings.<a href="./src/resources/admin/organization/projects/service-tier-settings.ts">retrieve</a>(projectID) -> ProjectServiceTierSettings</code>
+- <code title="post /organization/projects/{project_id}/service_tier_settings">client.admin.organization.projects.serviceTierSettings.<a href="./src/resources/admin/organization/projects/service-tier-settings.ts">update</a>(projectID, { ...params }) -> ProjectServiceTierSettings</code>
+
 ### WorkloadIdentityProviders
 
 Types:
