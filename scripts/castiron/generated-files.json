@@ -475,7 +475,7 @@
     },
     "src/resources/beta/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "9b497c011b35ac9380f7c8fc2694f5a49fc71d115b0a40739b9e92e584bd0a92"
+      "sha256": "4a07771c53084d287b840dc1e288e3917a9f6dec357e8e3f7a83f489c402baa7"
     },
     "src/resources/beta/responses/ws-base.ts": {
       "mode": "100644",
@@ -531,7 +531,7 @@
     },
     "src/resources/chat/completions/completions.ts": {
       "mode": "100644",
-      "sha256": "c42d4f538cef710809b2eea7bf1193f8093207aefc7a4d3ba3754324f3d85f91"
+      "sha256": "327c9ea669ff39a5460714a4c84d52d6e6d2d619ea91a1bf23608571ab037aa9"
     },
     "src/resources/chat/completions/index.ts": {
       "mode": "100644",
@@ -887,7 +887,7 @@
     },
     "src/resources/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "f84e394bf08d71403c054ccb4d41d278861f2d19db3ea426e7aec789f3eb5dbb"
+      "sha256": "936b71049f4658006a82dbb4e207fe78940bb50a40c37e52867c1436d9a3262f"
     },
     "src/resources/responses/ws-base.ts": {
       "mode": "100644",
