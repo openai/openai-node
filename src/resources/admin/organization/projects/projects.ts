@@ -58,6 +58,13 @@ import {
   RoleUpdateParams,
   Roles,
 } from './roles';
+import * as ServiceTierSettingsAPI from './service-tier-settings';
+import {
+  ProjectOptionalServiceTier,
+  ProjectServiceTierSettings,
+  ServiceTierSettingUpdateParams,
+  ServiceTierSettings,
+} from './service-tier-settings';
 import * as SpendAlertsAPI from './spend-alerts';
 import {
   ProjectSpendAlert,
@@ -252,6 +259,8 @@ export class Projects extends APIResource {
   spendLimit: SpendLimitAPI.SpendLimit = new SpendLimitAPI.SpendLimit(this._client);
   spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
+  serviceTierSettings: ServiceTierSettingsAPI.ServiceTierSettings =
+    new ServiceTierSettingsAPI.ServiceTierSettings(this._client);
 
   /**
    * Create a new project in the organization. Projects can be created and archived,
@@ -594,6 +603,7 @@ Projects.DataRetention = DataRetention;
 Projects.SpendLimit = SpendLimit;
 Projects.SpendAlerts = SpendAlerts;
 Projects.Certificates = Certificates;
+Projects.ServiceTierSettings = ServiceTierSettings;
 
 export declare namespace Projects {
   export {
@@ -719,5 +729,12 @@ export declare namespace Projects {
     type CertificateListParams as CertificateListParams,
     type CertificateActivateParams as CertificateActivateParams,
     type CertificateDeactivateParams as CertificateDeactivateParams,
+  };
+
+  export {
+    ServiceTierSettings as ServiceTierSettings,
+    type ProjectOptionalServiceTier as ProjectOptionalServiceTier,
+    type ProjectServiceTierSettings as ProjectServiceTierSettings,
+    type ServiceTierSettingUpdateParams as ServiceTierSettingUpdateParams,
   };
 }
