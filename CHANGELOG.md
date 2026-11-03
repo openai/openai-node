@@ -1,5 +1,23 @@
 # Changelog
 
+## [7.50.0](https://github.com/openai/openai-node/compare/v7.49.0...v7.50.0) (2026-11-03)
+
+
+### Features
+
+* **api:** add 12-hour Responses caching and cache-write usage ([#3106](https://github.com/openai/openai-node/issues/3106)) ([a286400](https://github.com/openai/openai-node/commit/a286400cf8d096d1315391701dc3312929feadfd))
+* **api:** add project service tier settings ([#3105](https://github.com/openai/openai-node/issues/3105)) ([13abd41](https://github.com/openai/openai-node/commit/13abd41307e8d2f54f5ed906128daa09c8f28b1f))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump puppeteer from 25.14.0 to 25.16.0 in /ecosystem-tests/ts-browser-webpack ([#3100](https://github.com/openai/openai-node/issues/3100)) ([65095d2](https://github.com/openai/openai-node/commit/65095d2f0ff54a1f16833e00fb13d001686b99ba))
+
+
+### Documentation
+
+* clarify generated-file ownership ([#3107](https://github.com/openai/openai-node/issues/3107)) ([3eb0f23](https://github.com/openai/openai-node/commit/3eb0f2350133a9f264e2b8d911b61805527eb738))
+
 ## [7.49.0](https://github.com/openai/openai-node/compare/v7.48.0...v7.49.0) (2026-11-03)
 
 
