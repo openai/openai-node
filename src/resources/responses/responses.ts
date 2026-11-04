@@ -528,6 +528,17 @@ export interface CompactedResponse {
    * tokens.
    */
   usage: ResponseUsage;
+
+  image?: CompactedResponse.Image;
+}
+
+export namespace CompactedResponse {
+  export interface Image {
+    /**
+     * Effective image context optimization policy.
+     */
+    context_compression: 'enabled' | 'disabled';
+  }
 }
 
 /**
@@ -1426,6 +1437,8 @@ export interface Response {
    */
   conversation?: Response.Conversation | null;
 
+  image?: Response.Image;
+
   /**
    * An upper bound for the number of tokens that can be generated for a response,
    * including visible output tokens and
@@ -1654,6 +1667,13 @@ export namespace Response {
     id: string;
   }
 
+  export interface Image {
+    /**
+     * Effective image context optimization policy.
+     */
+    context_compression: 'enabled' | 'disabled';
+  }
+
   /**
    * Moderation results for the response input and output, if moderated completions
    * were requested.
@@ -1840,7 +1860,7 @@ export namespace Response {
     /**
      * The minimum lifetime applied to each cache breakpoint.
      */
-    ttl: '30m';
+    ttl: '30m' | '12h';
 
     /**
      * The response ID supplied as the prompt cache diagnostics comparison.
@@ -9568,6 +9588,22 @@ export namespace ResponseUsage {
      * [More on prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching).
      */
     cached_tokens: number;
+
+    cache_write_tokens_details?: InputTokensDetails.CacheWriteTokensDetails;
+  }
+
+  export namespace InputTokensDetails {
+    export interface CacheWriteTokensDetails {
+      /**
+       * The number of input tokens written with 12-hour retention.
+       */
+      ttl_12h_tokens: number;
+
+      /**
+       * The number of input tokens written with 30-minute retention.
+       */
+      ttl_30m_tokens: number;
+    }
   }
 
   /**
@@ -9711,6 +9747,11 @@ export namespace ResponsesClientEvent {
     generate?: boolean;
 
     /**
+     * Request level image options.
+     */
+    image?: ResponseCreate.Image;
+
+    /**
      * Specify additional output data to include in the model response. Currently
      * supported values are:
      *
@@ -9826,7 +9867,7 @@ export namespace ResponsesClientEvent {
      * request can write up to four breakpoints. For cache matching, OpenAI considers
      * up to the latest 80 breakpoints in the conversation, without a content-block
      * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-     * `ttl` defaults to `30m`, which is currently the only supported value. See the
+     * `ttl` defaults to `30m`. Supported lifetimes depend on the API. See the
      * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
      * for current details.
      */
@@ -10059,6 +10100,18 @@ export namespace ResponsesClientEvent {
     }
 
     /**
+     * Request level image options.
+     */
+    export interface Image {
+      /**
+       * Controls image context optimization. Defaults to `auto`, which uses the model,
+       * transport, and input to select a policy. Use `enabled` to require compression
+       * support or `disabled` to turn it off.
+       */
+      context_compression?: 'auto' | 'enabled' | 'disabled';
+    }
+
+    /**
      * Configuration for running moderation on the input and output of this response.
      */
     export interface Moderation {
@@ -10114,7 +10167,7 @@ export namespace ResponsesClientEvent {
      * request can write up to four breakpoints. For cache matching, OpenAI considers
      * up to the latest 80 breakpoints in the conversation, without a content-block
      * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-     * `ttl` defaults to `30m`, which is currently the only supported value. See the
+     * `ttl` defaults to `30m`. Supported lifetimes depend on the API. See the
      * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
      * for current details.
      */
@@ -10143,10 +10196,10 @@ export namespace ResponsesClientEvent {
 
       /**
        * The minimum lifetime applied to every implicit and explicit cache breakpoint
-       * written by the request. Defaults to `30m`, which is currently the only supported
-       * value. The backend may retain cache entries for longer.
+       * written by the request. Supported values are `30m` (the default) and `12h`. The
+       * backend may retain cache entries for longer.
        */
-      ttl?: '30m';
+      ttl?: '30m' | '12h';
     }
 
     /**
@@ -11871,6 +11924,11 @@ export interface ResponseCreateParamsBase {
   conversation?: string | ResponseConversationParam | null;
 
   /**
+   * Request level image options.
+   */
+  image?: ResponseCreateParams.Image;
+
+  /**
    * Specify additional output data to include in the model response. Currently
    * supported values are:
    *
@@ -11986,7 +12044,7 @@ export interface ResponseCreateParamsBase {
    * request can write up to four breakpoints. For cache matching, OpenAI considers
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * `ttl` defaults to `30m`. Supported lifetimes depend on the API. See the
    * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
@@ -12210,6 +12268,18 @@ export namespace ResponseCreateParams {
   }
 
   /**
+   * Request level image options.
+   */
+  export interface Image {
+    /**
+     * Controls image context optimization. Defaults to `auto`, which uses the model,
+     * transport, and input to select a policy. Use `enabled` to require compression
+     * support or `disabled` to turn it off.
+     */
+    context_compression?: 'auto' | 'enabled' | 'disabled';
+  }
+
+  /**
    * Configuration for running moderation on the input and output of this response.
    */
   export interface Moderation {
@@ -12265,7 +12335,7 @@ export namespace ResponseCreateParams {
    * request can write up to four breakpoints. For cache matching, OpenAI considers
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * `ttl` defaults to `30m`. Supported lifetimes depend on the API. See the
    * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
@@ -12294,10 +12364,10 @@ export namespace ResponseCreateParams {
 
     /**
      * The minimum lifetime applied to every implicit and explicit cache breakpoint
-     * written by the request. Defaults to `30m`, which is currently the only supported
-     * value. The backend may retain cache entries for longer.
+     * written by the request. Supported values are `30m` (the default) and `12h`. The
+     * backend may retain cache entries for longer.
      */
-    ttl?: '30m';
+    ttl?: '30m' | '12h';
   }
 
   /**
@@ -12533,8 +12603,14 @@ export interface ResponseCompactParams {
     | 'gpt-daybreak-red-latest'
     | 'gpt-5.6-cyber'
     | 'gpt-rosalind-research'
+    | 'gpt-6-rosalind'
     | (string & {})
     | null;
+
+  /**
+   * Request level image options.
+   */
+  image?: ResponseCompactParams.Image;
 
   /**
    * Text, image, or file inputs to the model, used to generate a response
@@ -12569,7 +12645,7 @@ export interface ResponseCompactParams {
    * request can write up to four breakpoints. For cache matching, OpenAI considers
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * `ttl` defaults to `30m`. Supported lifetimes depend on the API. See the
    * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
@@ -12603,13 +12679,25 @@ export interface ResponseCompactParams {
 
 export namespace ResponseCompactParams {
   /**
+   * Request level image options.
+   */
+  export interface Image {
+    /**
+     * Controls image context optimization. Defaults to `auto`, which uses the model,
+     * transport, and input to select a policy. Use `enabled` to require compression
+     * support or `disabled` to turn it off.
+     */
+    context_compression?: 'auto' | 'enabled' | 'disabled';
+  }
+
+  /**
    * Options for prompt caching. Supported for `gpt-5.6` and later models. By
    * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
    * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
    * request can write up to four breakpoints. For cache matching, OpenAI considers
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * `ttl` defaults to `30m`. Supported lifetimes depend on the API. See the
    * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */

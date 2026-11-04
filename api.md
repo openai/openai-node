@@ -1402,6 +1402,36 @@ Methods:
 - <code title="delete /organization/external_keys/{external_key_id}">client.admin.organization.externalKeys.<a href="./src/resources/admin/organization/external-keys.ts">delete</a>(externalKeyID) -> ExternalKey</code>
 - <code title="post /organization/external_keys/{external_key_id}/validate">client.admin.organization.externalKeys.<a href="./src/resources/admin/organization/external-keys.ts">validate</a>(externalKeyID) -> ExternalKeyValidateResponse</code>
 
+### WorkloadIdentityProviders
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/workload-identity-providers/workload-identity-providers.ts">WorkloadIdentityProvider</a></code>
+- <code><a href="./src/resources/admin/organization/workload-identity-providers/workload-identity-providers.ts">WorkloadIdentityProviderDeleted</a></code>
+
+Methods:
+
+- <code title="post /organization/workload_identity_providers">client.admin.organization.workloadIdentityProviders.<a href="./src/resources/admin/organization/workload-identity-providers/workload-identity-providers.ts">create</a>({ ...params }) -> WorkloadIdentityProvider</code>
+- <code title="get /organization/workload_identity_providers/{workload_identity_provider_id}">client.admin.organization.workloadIdentityProviders.<a href="./src/resources/admin/organization/workload-identity-providers/workload-identity-providers.ts">retrieve</a>(workloadIdentityProviderID) -> WorkloadIdentityProvider</code>
+- <code title="post /organization/workload_identity_providers/{workload_identity_provider_id}">client.admin.organization.workloadIdentityProviders.<a href="./src/resources/admin/organization/workload-identity-providers/workload-identity-providers.ts">update</a>(workloadIdentityProviderID, { ...params }) -> WorkloadIdentityProvider</code>
+- <code title="get /organization/workload_identity_providers">client.admin.organization.workloadIdentityProviders.<a href="./src/resources/admin/organization/workload-identity-providers/workload-identity-providers.ts">list</a>({ ...params }) -> WorkloadIdentityProvidersPage</code>
+- <code title="delete /organization/workload_identity_providers/{workload_identity_provider_id}">client.admin.organization.workloadIdentityProviders.<a href="./src/resources/admin/organization/workload-identity-providers/workload-identity-providers.ts">delete</a>(workloadIdentityProviderID) -> WorkloadIdentityProviderDeleted</code>
+
+#### FederationRules
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/workload-identity-providers/federation-rules.ts">FederationRule</a></code>
+- <code><a href="./src/resources/admin/organization/workload-identity-providers/federation-rules.ts">FederationRuleDeleted</a></code>
+
+Methods:
+
+- <code title="post /organization/workload_identity_providers/{workload_identity_provider_id}/federation_rules">client.admin.organization.workloadIdentityProviders.federationRules.<a href="./src/resources/admin/organization/workload-identity-providers/federation-rules.ts">create</a>(workloadIdentityProviderID, { ...params }) -> FederationRule</code>
+- <code title="get /organization/workload_identity_providers/{workload_identity_provider_id}/federation_rules/{workload_identity_federation_rule_id}">client.admin.organization.workloadIdentityProviders.federationRules.<a href="./src/resources/admin/organization/workload-identity-providers/federation-rules.ts">retrieve</a>(workloadIdentityFederationRuleID, { ...params }) -> FederationRule</code>
+- <code title="post /organization/workload_identity_providers/{workload_identity_provider_id}/federation_rules/{workload_identity_federation_rule_id}">client.admin.organization.workloadIdentityProviders.federationRules.<a href="./src/resources/admin/organization/workload-identity-providers/federation-rules.ts">update</a>(workloadIdentityFederationRuleID, { ...params }) -> FederationRule</code>
+- <code title="get /organization/workload_identity_providers/{workload_identity_provider_id}/federation_rules">client.admin.organization.workloadIdentityProviders.federationRules.<a href="./src/resources/admin/organization/workload-identity-providers/federation-rules.ts">list</a>(workloadIdentityProviderID, { ...params }) -> FederationRulesPage</code>
+- <code title="delete /organization/workload_identity_providers/{workload_identity_provider_id}/federation_rules/{workload_identity_federation_rule_id}">client.admin.organization.workloadIdentityProviders.federationRules.<a href="./src/resources/admin/organization/workload-identity-providers/federation-rules.ts">delete</a>(workloadIdentityFederationRuleID, { ...params }) -> FederationRuleDeleted</code>
+
 ### ExternalStorage
 
 Types:
@@ -1578,6 +1608,18 @@ Methods:
 - <code title="get /organization/projects/{project_id}/model_permissions">client.admin.organization.projects.modelPermissions.<a href="./src/resources/admin/organization/projects/model-permissions.ts">retrieve</a>(projectID) -> ProjectModelPermissions</code>
 - <code title="post /organization/projects/{project_id}/model_permissions">client.admin.organization.projects.modelPermissions.<a href="./src/resources/admin/organization/projects/model-permissions.ts">update</a>(projectID, { ...params }) -> ProjectModelPermissions</code>
 - <code title="delete /organization/projects/{project_id}/model_permissions">client.admin.organization.projects.modelPermissions.<a href="./src/resources/admin/organization/projects/model-permissions.ts">delete</a>(projectID) -> ProjectModelPermissionsDeleted</code>
+
+#### ServiceTierSettings
+
+Types:
+
+- <code><a href="./src/resources/admin/organization/projects/service-tier-settings.ts">ProjectOptionalServiceTier</a></code>
+- <code><a href="./src/resources/admin/organization/projects/service-tier-settings.ts">ProjectServiceTierSettings</a></code>
+
+Methods:
+
+- <code title="get /organization/projects/{project_id}/service_tier_settings">client.admin.organization.projects.serviceTierSettings.<a href="./src/resources/admin/organization/projects/service-tier-settings.ts">retrieve</a>(projectID) -> ProjectServiceTierSettings</code>
+- <code title="post /organization/projects/{project_id}/service_tier_settings">client.admin.organization.projects.serviceTierSettings.<a href="./src/resources/admin/organization/projects/service-tier-settings.ts">update</a>(projectID, { ...params }) -> ProjectServiceTierSettings</code>
 
 #### HostedToolPermissions
 
