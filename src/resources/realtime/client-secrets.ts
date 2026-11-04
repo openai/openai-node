@@ -265,6 +265,13 @@ export namespace RealtimeSessionCreateResponse {
        */
       export interface NoiseReduction {
         /**
+         * Input noise suppression strength. Higher values apply more suppression. Defaults
+         * to 1 when noise reduction is first enabled. Omitting strength from a session
+         * update preserves the current strength.
+         */
+        strength?: number;
+
+        /**
          * Type of noise reduction. `near_field` is for close-talking microphones such as
          * headphones, `far_field` is for far-field microphones such as laptop or
          * conference room microphones.
@@ -681,6 +688,13 @@ export namespace RealtimeTranscriptionSessionCreateResponse {
        * Configuration for input audio noise reduction.
        */
       export interface NoiseReduction {
+        /**
+         * Input noise suppression strength. Higher values apply more suppression. Defaults
+         * to 1 when noise reduction is first enabled. Omitting strength from a session
+         * update preserves the current strength.
+         */
+        strength?: number;
+
         /**
          * Type of noise reduction. `near_field` is for close-talking microphones such as
          * headphones, `far_field` is for far-field microphones such as laptop or

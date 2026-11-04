@@ -528,6 +528,17 @@ export interface CompactedResponse {
    * tokens.
    */
   usage: ResponseUsage;
+
+  image?: CompactedResponse.Image;
+}
+
+export namespace CompactedResponse {
+  export interface Image {
+    /**
+     * Effective image context optimization policy.
+     */
+    context_compression: 'enabled' | 'disabled';
+  }
 }
 
 /**
@@ -1426,6 +1437,8 @@ export interface Response {
    */
   conversation?: Response.Conversation | null;
 
+  image?: Response.Image;
+
   /**
    * An upper bound for the number of tokens that can be generated for a response,
    * including visible output tokens and
@@ -1652,6 +1665,13 @@ export namespace Response {
      * The unique ID of the conversation that this response was associated with.
      */
     id: string;
+  }
+
+  export interface Image {
+    /**
+     * Effective image context optimization policy.
+     */
+    context_compression: 'enabled' | 'disabled';
   }
 
   /**
@@ -9727,6 +9747,11 @@ export namespace ResponsesClientEvent {
     generate?: boolean;
 
     /**
+     * Request level image options.
+     */
+    image?: ResponseCreate.Image;
+
+    /**
      * Specify additional output data to include in the model response. Currently
      * supported values are:
      *
@@ -10072,6 +10097,18 @@ export namespace ResponsesClientEvent {
        * Token threshold at which compaction should be triggered for this entry.
        */
       compact_threshold?: number | null;
+    }
+
+    /**
+     * Request level image options.
+     */
+    export interface Image {
+      /**
+       * Controls image context optimization. Defaults to `auto`, which uses the model,
+       * transport, and input to select a policy. Use `enabled` to require compression
+       * support or `disabled` to turn it off.
+       */
+      context_compression?: 'auto' | 'enabled' | 'disabled';
     }
 
     /**
@@ -11887,6 +11924,11 @@ export interface ResponseCreateParamsBase {
   conversation?: string | ResponseConversationParam | null;
 
   /**
+   * Request level image options.
+   */
+  image?: ResponseCreateParams.Image;
+
+  /**
    * Specify additional output data to include in the model response. Currently
    * supported values are:
    *
@@ -12226,6 +12268,18 @@ export namespace ResponseCreateParams {
   }
 
   /**
+   * Request level image options.
+   */
+  export interface Image {
+    /**
+     * Controls image context optimization. Defaults to `auto`, which uses the model,
+     * transport, and input to select a policy. Use `enabled` to require compression
+     * support or `disabled` to turn it off.
+     */
+    context_compression?: 'auto' | 'enabled' | 'disabled';
+  }
+
+  /**
    * Configuration for running moderation on the input and output of this response.
    */
   export interface Moderation {
@@ -12553,6 +12607,11 @@ export interface ResponseCompactParams {
     | null;
 
   /**
+   * Request level image options.
+   */
+  image?: ResponseCompactParams.Image;
+
+  /**
    * Text, image, or file inputs to the model, used to generate a response
    */
   input?: string | Array<ResponseInputItem> | null;
@@ -12618,6 +12677,18 @@ export interface ResponseCompactParams {
 }
 
 export namespace ResponseCompactParams {
+  /**
+   * Request level image options.
+   */
+  export interface Image {
+    /**
+     * Controls image context optimization. Defaults to `auto`, which uses the model,
+     * transport, and input to select a policy. Use `enabled` to require compression
+     * support or `disabled` to turn it off.
+     */
+    context_compression?: 'auto' | 'enabled' | 'disabled';
+  }
+
   /**
    * Options for prompt caching. Supported for `gpt-5.6` and later models. By
    * default, OpenAI automatically chooses one implicit cache breakpoint. You can add

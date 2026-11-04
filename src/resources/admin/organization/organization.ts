@@ -171,13 +171,13 @@ export class Organization extends APIResource {
   roles: RolesAPI.Roles = new RolesAPI.Roles(this._client);
   dataRetention: DataRetentionAPI.DataRetention = new DataRetentionAPI.DataRetention(this._client);
   externalKeys: ExternalKeysAPI.ExternalKeys = new ExternalKeysAPI.ExternalKeys(this._client);
+  workloadIdentityProviders: WorkloadIdentityProvidersAPI.WorkloadIdentityProviders =
+    new WorkloadIdentityProvidersAPI.WorkloadIdentityProviders(this._client);
   externalStorage: ExternalStorageAPI.ExternalStorage = new ExternalStorageAPI.ExternalStorage(this._client);
   spendLimit: SpendLimitAPI.SpendLimit = new SpendLimitAPI.SpendLimit(this._client);
   spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
   projects: ProjectsAPI.Projects = new ProjectsAPI.Projects(this._client);
-  workloadIdentityProviders: WorkloadIdentityProvidersAPI.WorkloadIdentityProviders =
-    new WorkloadIdentityProvidersAPI.WorkloadIdentityProviders(this._client);
 }
 
 Organization.AuditLogs = AuditLogs;
@@ -189,12 +189,12 @@ Organization.Groups = Groups;
 Organization.Roles = Roles;
 Organization.DataRetention = DataRetention;
 Organization.ExternalKeys = ExternalKeys;
+Organization.WorkloadIdentityProviders = WorkloadIdentityProviders;
 Organization.ExternalStorage = ExternalStorage;
 Organization.SpendLimit = SpendLimit;
 Organization.SpendAlerts = SpendAlerts;
 Organization.Certificates = Certificates;
 Organization.Projects = Projects;
-Organization.WorkloadIdentityProviders = WorkloadIdentityProviders;
 
 export declare namespace Organization {
   export {
@@ -298,6 +298,16 @@ export declare namespace Organization {
   };
 
   export {
+    WorkloadIdentityProviders as WorkloadIdentityProviders,
+    type WorkloadIdentityProvider as WorkloadIdentityProvider,
+    type WorkloadIdentityProviderDeleted as WorkloadIdentityProviderDeleted,
+    type WorkloadIdentityProvidersPage as WorkloadIdentityProvidersPage,
+    type WorkloadIdentityProviderCreateParams as WorkloadIdentityProviderCreateParams,
+    type WorkloadIdentityProviderUpdateParams as WorkloadIdentityProviderUpdateParams,
+    type WorkloadIdentityProviderListParams as WorkloadIdentityProviderListParams,
+  };
+
+  export {
     ExternalStorage as ExternalStorage,
     type AwsExternalStorageProvider as AwsExternalStorageProvider,
     type AzureExternalStorageProvider as AzureExternalStorageProvider,
@@ -353,15 +363,5 @@ export declare namespace Organization {
     type ProjectCreateParams as ProjectCreateParams,
     type ProjectUpdateParams as ProjectUpdateParams,
     type ProjectListParams as ProjectListParams,
-  };
-
-  export {
-    WorkloadIdentityProviders as WorkloadIdentityProviders,
-    type WorkloadIdentityProvider as WorkloadIdentityProvider,
-    type WorkloadIdentityProviderDeleted as WorkloadIdentityProviderDeleted,
-    type WorkloadIdentityProvidersPage as WorkloadIdentityProvidersPage,
-    type WorkloadIdentityProviderCreateParams as WorkloadIdentityProviderCreateParams,
-    type WorkloadIdentityProviderUpdateParams as WorkloadIdentityProviderUpdateParams,
-    type WorkloadIdentityProviderListParams as WorkloadIdentityProviderListParams,
   };
 }
