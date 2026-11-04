@@ -887,7 +887,7 @@
     },
     "src/resources/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "6375dba639cc201554da48c542bfd2aa0f03aa758a54dc7ffd2fe74b66ae969e"
+      "sha256": "096f8b75836632e8ee67636367c98621a7eaa9ca6eb106c400eea0d6a5ce5dc7"
     },
     "src/resources/responses/ws-base.ts": {
       "mode": "100644",
@@ -919,7 +919,7 @@
     },
     "src/resources/shared.ts": {
       "mode": "100644",
-      "sha256": "15cf6803634242502525c52098acddea16b9c2bb2439f85aa388dd43fa837455"
+      "sha256": "db6bd6d5d25ac35c6b1b8743fee424a5ae86db1bf7272df7fabfd6cee7481de5"
     },
     "src/resources/skills.ts": {
       "mode": "100644",

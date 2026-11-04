@@ -22,7 +22,8 @@ export type AllModels =
   | 'gpt-daybreak-blue-latest'
   | 'gpt-daybreak-red-latest'
   | 'gpt-5.6-cyber'
-  | 'gpt-rosalind-research';
+  | 'gpt-rosalind-research'
+  | 'gpt-6-rosalind';
 
 /**
  * Deprecated values:
@@ -614,4 +615,5 @@ export type ResponsesModel =
   | 'gpt-daybreak-blue-latest'
   | 'gpt-daybreak-red-latest'
   | 'gpt-5.6-cyber'
-  | 'gpt-rosalind-research';
+  | 'gpt-rosalind-research'
+  | 'gpt-6-rosalind';
