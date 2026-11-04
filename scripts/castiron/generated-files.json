@@ -11,7 +11,7 @@
     },
     "src/internal/data-residency.ts": {
       "mode": "100644",
-      "sha256": "64fb45d7b8d8f79173df704017bbd05e763d351c6608178f1f906c457c3bd9ef"
+      "sha256": "26f89740062fe80439bc1c170888eda61f3fcfae0d0721be83582e5bcfacd064"
     },
     "src/internal/multipart-encoding.ts": {
       "mode": "100644",
@@ -1459,7 +1459,7 @@
     },
     "tests/lib/data-residency.test.ts": {
       "mode": "100644",
-      "sha256": "f418a55b6de238e4063875124a84cc21ca667f946da197cbd6835e68842acbdc"
+      "sha256": "5253ad60c9758cde9a165127b9c95772dec527bd483fe71c030fc4be3b187e73"
     },
     "tests/lib/multipart-encoding.test.ts": {
       "mode": "100644",
