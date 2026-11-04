@@ -251,6 +251,8 @@ export class Projects extends APIResource {
   modelPermissions: ModelPermissionsAPI.ModelPermissions = new ModelPermissionsAPI.ModelPermissions(
     this._client,
   );
+  serviceTierSettings: ServiceTierSettingsAPI.ServiceTierSettings =
+    new ServiceTierSettingsAPI.ServiceTierSettings(this._client);
   hostedToolPermissions: HostedToolPermissionsAPI.HostedToolPermissions =
     new HostedToolPermissionsAPI.HostedToolPermissions(this._client);
   groups: GroupsAPI.Groups = new GroupsAPI.Groups(this._client);
@@ -259,8 +261,6 @@ export class Projects extends APIResource {
   spendLimit: SpendLimitAPI.SpendLimit = new SpendLimitAPI.SpendLimit(this._client);
   spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
   certificates: CertificatesAPI.Certificates = new CertificatesAPI.Certificates(this._client);
-  serviceTierSettings: ServiceTierSettingsAPI.ServiceTierSettings =
-    new ServiceTierSettingsAPI.ServiceTierSettings(this._client);
 
   /**
    * Create a new project in the organization. Projects can be created and archived,
@@ -596,6 +596,7 @@ Projects.ServiceAccounts = ServiceAccounts;
 Projects.APIKeys = APIKeys;
 Projects.RateLimits = RateLimits;
 Projects.ModelPermissions = ModelPermissions;
+Projects.ServiceTierSettings = ServiceTierSettings;
 Projects.HostedToolPermissions = HostedToolPermissions;
 Projects.Groups = Groups;
 Projects.Roles = Roles;
@@ -603,7 +604,6 @@ Projects.DataRetention = DataRetention;
 Projects.SpendLimit = SpendLimit;
 Projects.SpendAlerts = SpendAlerts;
 Projects.Certificates = Certificates;
-Projects.ServiceTierSettings = ServiceTierSettings;
 
 export declare namespace Projects {
   export {
@@ -664,6 +664,13 @@ export declare namespace Projects {
     type ProjectModelPermissions as ProjectModelPermissions,
     type ProjectModelPermissionsDeleted as ProjectModelPermissionsDeleted,
     type ModelPermissionUpdateParams as ModelPermissionUpdateParams,
+  };
+
+  export {
+    ServiceTierSettings as ServiceTierSettings,
+    type ProjectOptionalServiceTier as ProjectOptionalServiceTier,
+    type ProjectServiceTierSettings as ProjectServiceTierSettings,
+    type ServiceTierSettingUpdateParams as ServiceTierSettingUpdateParams,
   };
 
   export {
@@ -729,12 +736,5 @@ export declare namespace Projects {
     type CertificateListParams as CertificateListParams,
     type CertificateActivateParams as CertificateActivateParams,
     type CertificateDeactivateParams as CertificateDeactivateParams,
-  };
-
-  export {
-    ServiceTierSettings as ServiceTierSettings,
-    type ProjectOptionalServiceTier as ProjectOptionalServiceTier,
-    type ProjectServiceTierSettings as ProjectServiceTierSettings,
-    type ServiceTierSettingUpdateParams as ServiceTierSettingUpdateParams,
   };
 }
