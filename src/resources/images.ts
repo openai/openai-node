@@ -464,6 +464,8 @@ export type ImageModel =
   | 'gpt-image-2.5-sunburst-2026-09-08'
   | 'gpt-image-2.5-flare'
   | 'gpt-image-2.5-flare-2026-09-08'
+  | 'gpt-image-2.6-sunburst'
+  | 'gpt-image-2.6-flare'
   | 'gpt-image-1'
   | 'gpt-image-1-mini'
   | 'chatgpt-image-latest'
@@ -491,9 +493,9 @@ export interface ImagesResponse {
   data?: Array<Image>;
 
   /**
-   * The output format of the image generation. Either `png`, `webp`, or `jpeg`.
+   * The output format of the generated image.
    */
-  output_format?: 'png' | 'webp' | 'jpeg';
+  output_format?: 'png' | 'webp' | 'jpeg' | 'gif' | 'svg';
 
   /**
    * The quality of the image generated. One of `low`, `medium`, `high`, `xhigh`, or
@@ -514,12 +516,34 @@ export interface ImagesResponse {
   size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024';
 
   /**
+   * Token usage for the model that authored the SVG, separate from image rendering
+   * usage.
+   */
+  svg_usage?: ImagesResponse.SvgUsage;
+
+  /**
    * For `gpt-image-1` only, the token usage information for the image generation.
    */
   usage?: ImagesResponse.Usage;
 }
 
 export namespace ImagesResponse {
+  /**
+   * Token usage for the model that authored the SVG, separate from image rendering
+   * usage.
+   */
+  export interface SvgUsage {
+    input_tokens: number;
+
+    model: string;
+
+    output_tokens: number;
+
+    reasoning_tokens: number;
+
+    total_tokens: number;
+  }
+
   /**
    * For `gpt-image-1` only, the token usage information for the image generation.
    */
@@ -657,6 +681,29 @@ export interface ImageEditParamsBase {
   background?: 'transparent' | 'opaque' | 'auto' | null;
 
   /**
+   * Computation spent planning the image, independently of rendering quality. Uses
+   * the image model's configured default when omitted. For SVG output, controls the
+   * reference image, independently of the SVG author's reasoning.
+   */
+  complexity?: 'low' | 'medium' | 'high' | null;
+
+  /**
+   * Number of frames for GIF output. Accepts integers from 2 through 16. Defaults to
+   * 9 when omitted. Only supported with output_format=gif. The requested size must
+   * satisfy the selected model's GIF size limits. GIF output does not support
+   * streaming, partial images, masks, or custom output compression. Requires access
+   * to the GIF preview for the selected model.
+   */
+  frame_count?: number | null;
+
+  /**
+   * Requested delay per GIF frame, in milliseconds. Defaults to 200 when omitted.
+   * GIF output rounds to the nearest 10 ms and caps the encoded delay at 655,350 ms
+   * per frame. Only supported with output_format=gif.
+   */
+  frame_duration_ms?: number | null;
+
+  /**
    * Control how much effort the model will exert to match the style and features,
    * especially facial features, of input images. Supports `high` and `low` on
    * `gpt-image-1.5`; `gpt-image-1-mini` supports only `low`. For `gpt-image-2`, omit
@@ -683,8 +730,8 @@ export interface ImageEditParamsBase {
    * The GPT image model to use for image editing (`gpt-image-1-mini`,
    * `gpt-image-1.5`, `gpt-image-2`, `gpt-image-2-2026-04-21`,
    * `gpt-image-2.5-sunburst`, `gpt-image-2.5-sunburst-2026-09-08`,
-   * `gpt-image-2.5-flare`, `gpt-image-2.5-flare-2026-09-08`, or
-   * `chatgpt-image-latest`).
+   * `gpt-image-2.5-flare`, `gpt-image-2.5-flare-2026-09-08`,
+   * `gpt-image-2.6-sunburst`, `gpt-image-2.6-flare`, or `chatgpt-image-latest`).
    *
    * `gpt-image-1` was shut down on October 23, 2026. Use `gpt-image-2.5-sunburst` or
    * `gpt-image-2.5-flare` instead.
@@ -705,10 +752,9 @@ export interface ImageEditParamsBase {
 
   /**
    * The format in which the generated images are returned. This parameter is only
-   * supported for the GPT image models. Must be one of `png`, `jpeg`, or `webp`. The
-   * default value is `png`.
+   * supported for the GPT image models. The default value is `png`.
    */
-  output_format?: 'png' | 'jpeg' | 'webp' | null;
+  output_format?: 'png' | 'jpeg' | 'webp' | 'gif' | null;
 
   /**
    * The number of partial images to generate. This parameter is used for streaming
@@ -821,11 +867,35 @@ export interface ImageGenerateParamsBase {
   background?: 'transparent' | 'opaque' | 'auto' | null;
 
   /**
+   * Computation spent planning the image, independently of rendering quality. Uses
+   * the image model's configured default when omitted. For SVG output, controls the
+   * reference image, independently of the SVG author's reasoning.
+   */
+  complexity?: 'low' | 'medium' | 'high' | null;
+
+  /**
+   * Number of frames for GIF output. Accepts integers from 2 through 16. Defaults to
+   * 9 when omitted. Only supported with output_format=gif. The requested size must
+   * satisfy the selected model's GIF size limits. GIF output does not support
+   * streaming, partial images, masks, or custom output compression. Requires access
+   * to the GIF preview for the selected model.
+   */
+  frame_count?: number | null;
+
+  /**
+   * Requested delay per GIF frame, in milliseconds. Defaults to 200 when omitted.
+   * GIF output rounds to the nearest 10 ms and caps the encoded delay at 655,350 ms
+   * per frame. Only supported with output_format=gif.
+   */
+  frame_duration_ms?: number | null;
+
+  /**
    * The GPT image model to use for image generation. Specify a model explicitly.
    * Supported models include `gpt-image-1-mini`, `gpt-image-1.5`, `gpt-image-2`,
    * `gpt-image-2-2026-04-21`, `gpt-image-2.5-sunburst`,
    * `gpt-image-2.5-sunburst-2026-09-08`, `gpt-image-2.5-flare`,
-   * `gpt-image-2.5-flare-2026-09-08`, and `chatgpt-image-latest`.
+   * `gpt-image-2.5-flare-2026-09-08`, `gpt-image-2.6-sunburst`,
+   * `gpt-image-2.6-flare`, and `chatgpt-image-latest`.
    *
    * `gpt-image-1` was shut down on October 23, 2026. Use `gpt-image-2.5-sunburst` or
    * `gpt-image-2.5-flare` instead.
@@ -853,9 +923,9 @@ export interface ImageGenerateParamsBase {
 
   /**
    * The format in which the generated images are returned. This parameter is only
-   * supported for the GPT image models. Must be one of `png`, `jpeg`, or `webp`.
+   * supported for the GPT image models.
    */
-  output_format?: 'png' | 'jpeg' | 'webp' | null;
+  output_format?: 'png' | 'jpeg' | 'webp' | 'gif' | 'svg' | null;
 
   /**
    * The number of partial images to generate. This parameter is used for streaming
@@ -932,6 +1002,16 @@ export interface ImageGenerateParamsBase {
   style?: 'vivid' | 'natural' | null;
 
   /**
+   * Selects the model and reasoning effort used to author SVG output. Requires
+   * output_format=svg and access to SVG model selection. When model selection is
+   * enabled, supply svg.model. When model selection is disabled, omit this object.
+   * The top-level model selects the image model that creates the reference image.
+   * SVG generation requires n=1 and does not support streaming, partial images,
+   * prompt_rewriter, or output_compression. SVG edits are not supported.
+   */
+  svg?: ImageGenerateParams.Svg | null;
+
+  /**
    * @deprecated Deprecated: use `safety_identifier` instead. This parameter remains
    * accepted for backward compatibility and is used when `safety_identifier` is
    * omitted, null, or empty.
@@ -941,6 +1021,43 @@ export interface ImageGenerateParamsBase {
 }
 
 export namespace ImageGenerateParams {
+  /**
+   * Selects the model and reasoning effort used to author SVG output. Requires
+   * output_format=svg and access to SVG model selection. When model selection is
+   * enabled, supply svg.model. When model selection is disabled, omit this object.
+   * The top-level model selects the image model that creates the reference image.
+   * SVG generation requires n=1 and does not support streaming, partial images,
+   * prompt_rewriter, or output_compression. SVG edits are not supported.
+   */
+  export interface Svg {
+    /**
+     * Model used to author the SVG. Required when SVG model selection is enabled.
+     */
+    model: string;
+
+    /**
+     * Reasoning settings for the SVG author, independent of image complexity. Omitted
+     * or null effort uses the author model's default. Supported efforts depend on the
+     * selected author model.
+     */
+    reasoning?: Svg.Reasoning | null;
+  }
+
+  export namespace Svg {
+    /**
+     * Reasoning settings for the SVG author, independent of image complexity. Omitted
+     * or null effort uses the author model's default. Supported efforts depend on the
+     * selected author model.
+     */
+    export interface Reasoning {
+      /**
+       * Controls how much effort the SVG author spends on reasoning. Uses the author
+       * model's default when omitted or null.
+       */
+      effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
+    }
+  }
+
   export type ImageGenerateParamsNonStreaming = ImagesAPI.ImageGenerateParamsNonStreaming;
   export type ImageGenerateParamsStreaming = ImagesAPI.ImageGenerateParamsStreaming;
 }
