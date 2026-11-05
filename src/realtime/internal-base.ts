@@ -145,6 +145,7 @@ export abstract class OpenAIRealtimeEmitter extends EventEmitter<RealtimeEvents>
       );
       // @ts-ignore
       error.cause = cause;
+      // oxlint-disable-next-line promise/catch-or-return -- Surface an unobserved stream error as an unhandled rejection.
       Promise.reject(error);
       return;
     }

@@ -450,7 +450,7 @@ export class OpenAIRealtimeTranslationWS extends EventEmitter<TranslationEvents>
       this._emit('error', error);
     } else {
       error.message += " Bind an error listener, e.g. connection.on('error', (error) => ...).";
-      // oxlint-disable-next-line promise/no-promise-in-callback -- Match Realtime's explicit unhandled rejection contract when no SDK listener or completion operation observes the error.
+      // oxlint-disable-next-line promise/no-promise-in-callback, promise/catch-or-return -- Match Realtime's explicit unhandled rejection contract when no SDK listener or completion operation observes the error.
       Promise.reject(error);
     }
   }
