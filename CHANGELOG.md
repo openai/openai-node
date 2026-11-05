@@ -1,5 +1,17 @@
 # Changelog
 
+## [7.52.0](https://github.com/openai/openai-node/compare/v7.51.0...v7.52.0) (2026-11-05)
+
+
+### Features
+
+* **api:** add a model option for Responses ([#3116](https://github.com/openai/openai-node/issues/3116)) ([c05ed3e](https://github.com/openai/openai-node/commit/c05ed3e8aa0642b2f470e91be301da73f4a1b8f6))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump follow-redirects from 1.16.0 to 1.16.2 in /ecosystem-tests/cloudflare-worker ([#3113](https://github.com/openai/openai-node/issues/3113)) ([2d5b81c](https://github.com/openai/openai-node/commit/2d5b81c729b6d0b4f7da453026aaca6dedb2fb7e))
+
 ## [7.51.0](https://github.com/openai/openai-node/compare/v7.50.0...v7.51.0) (2026-11-05)
 
 
