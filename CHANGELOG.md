@@ -1,5 +1,20 @@
 # Changelog
 
+## [7.51.0](https://github.com/openai/openai-node/compare/v7.50.0...v7.51.0) (2026-11-05)
+
+
+### Features
+
+* **api:** add Australia, India, and Japan residency options ([#3112](https://github.com/openai/openai-node/issues/3112)) ([42c31dc](https://github.com/openai/openai-node/commit/42c31dc77cad76aae960c81ebc6cd6854a41a409))
+* **api:** add GPT-6 Rosalind to the model catalog ([#3109](https://github.com/openai/openai-node/issues/3109)) ([9854bd6](https://github.com/openai/openai-node/commit/9854bd60f7e2a5840baa61d86d9a288d2127ae8f))
+* **api:** add image complexity and GIF and SVG output controls ([#3114](https://github.com/openai/openai-node/issues/3114)) ([39b724a](https://github.com/openai/openai-node/commit/39b724a3b59eea71782b74ebe8319107d63afc81))
+* **api:** expand agent turn errors and image and audio options ([#3110](https://github.com/openai/openai-node/issues/3110)) ([c3f42fa](https://github.com/openai/openai-node/commit/c3f42fa9229cd837c24bfff53d93321216c34484))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump follow-redirects from 1.16.0 to 1.16.2 in /ecosystem-tests/ts-browser-webpack ([#3102](https://github.com/openai/openai-node/issues/3102)) ([934421d](https://github.com/openai/openai-node/commit/934421d0fc66c072116c4b4fde1e5c7e837aa982))
+
 ## [7.50.0](https://github.com/openai/openai-node/compare/v7.49.0...v7.50.0) (2026-11-03)
 
 
