@@ -3978,14 +3978,22 @@ describe('runner preflight and durable replay review', () => {
     expect(h.bodies[0]?.['tools']).toEqual([{ type: 'web_search' }]);
   });
 
-  test.each([false, true])(
-    'completed declared image result can finish without a message, stream=%s',
-    async (stream) => {
+  test.each([
+    [false, undefined],
+    [true, undefined],
+    [false, 'gif'],
+    [true, 'gif'],
+    [false, 'svg'],
+    [true, 'svg'],
+  ] as const)(
+    'completed declared image result can finish without a message, stream=%s, format=%s',
+    async (stream, format) => {
       const image: ResponseOutputItem = {
         id: 'img_fixture',
         type: 'image_generation_call',
         status: 'completed',
         result: 'cG5n',
+        ...(format && { output_format: format }),
       };
       const h = harness([{ output: [image] }]);
       const result = await new ResponsesToolRunner({}).run(
