@@ -75,6 +75,13 @@ module.exports = defineConfig({
   ignorePatterns: [...core.ignorePatterns, 'dist/**', 'coverage/**', ...generatedFiles],
   overrides: [
     {
+      // Test guards throw assertion failures when the observed value has the wrong type.
+      files: ['tests/**', 'ecosystem-tests/**'],
+      rules: {
+        'unicorn/prefer-type-error': 'off',
+      },
+    },
+    {
       // Runtime validation and host capability detection need typeof at the
       // boundary itself, including checks that throw instead of returning a predicate.
       files: [
