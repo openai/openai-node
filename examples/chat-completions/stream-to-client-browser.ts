@@ -9,11 +9,12 @@
  */
 import { ChatCompletionStream } from 'openai/lib/ChatCompletionStream';
 
-fetch('http://127.0.0.1:3000', {
-  method: 'POST',
-  body: 'Tell me why dogs are better than cats',
-  headers: { 'Content-Type': 'text/plain' },
-}).then(async (res) => {
+async function main() {
+  const res = await fetch('http://127.0.0.1:3000', {
+    method: 'POST',
+    body: 'Tell me why dogs are better than cats',
+    headers: { 'Content-Type': 'text/plain' },
+  });
   const stream = res.body;
   if (!stream) {
     throw new Error('Streaming response did not include a response body.');
@@ -29,4 +30,11 @@ fetch('http://127.0.0.1:3000', {
   });
 
   console.dir(await runner.finalChatCompletion(), { depth: null });
+}
+
+main().catch(() => {
+  console.error('Could not complete the chat stream.');
+  if (typeof process !== 'undefined') {
+    process.exitCode = 1;
+  }
 });

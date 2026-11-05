@@ -1442,6 +1442,7 @@ export class EventStream<EventTypes extends BaseEvents> {
     setTimeout(() => {
       let failed = false;
 
+      // oxlint-disable-next-line promise/catch-or-return -- Executor errors go through #handleError; exceptions thrown by user listeners must remain observable.
       Promise.resolve()
         .then(executor)
         .catch((error) => {
@@ -2015,6 +2016,7 @@ export class EventStream<EventTypes extends BaseEvents> {
       const error = args[0] as APIUserAbortError;
       this.#terminalFailure ??= { kind: 'abort', error };
       if (!this.#catchingPromiseCreated && !hasListeners) {
+        // oxlint-disable-next-line promise/catch-or-return -- Surface an unobserved stream error as an unhandled rejection.
         Promise.reject(error);
       }
       this.#rejectConnectedPromise(error);
@@ -2036,6 +2038,7 @@ export class EventStream<EventTypes extends BaseEvents> {
         // - await runner.done()
         // - await runner.finalChatCompletion()
         // - etc.
+        // oxlint-disable-next-line promise/catch-or-return -- Surface an unobserved stream error as an unhandled rejection.
         Promise.reject(error);
       }
       this.#rejectConnectedPromise(error);
