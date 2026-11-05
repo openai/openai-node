@@ -11,9 +11,7 @@ const array_prefix_generators = {
   indices(prefix: PropertyKey, key: string) {
     return String(prefix) + '[' + key + ']';
   },
-  repeat(prefix: PropertyKey) {
-    return String(prefix);
-  },
+  repeat: String,
 };
 
 const push_to_array = function push_to_array(arr: any[], value_or_array: any) {

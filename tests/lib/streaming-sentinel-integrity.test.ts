@@ -260,7 +260,7 @@ describe('SSE completion sentinel integrity', () => {
   it('ignores malformed and named provider-error frames after genuine completion', async () => {
     const successful = record(JSON.stringify({ id: 'safe' }));
     const providerFailure = record(JSON.stringify({ error: { message: 'too late' } }), { event: 'error' });
-    const wire = successful + record('[DONE]') + providerFailure + record('[DONE]' + credential);
+    const wire = successful + record('[DONE]') + providerFailure + record(`[DONE]${credential}`);
     const controller = new AbortController();
     const stream = Stream.fromSSEResponse(responseFor(wire), controller);
 
