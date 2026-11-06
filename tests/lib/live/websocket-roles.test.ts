@@ -203,7 +203,7 @@ test('sideband exposes typed transport events and retains unknown events', async
   const frames = [
     { type: 'session.input_audio.append', audio: 'AAE=' },
     { type: 'transport.dtmf.received', event_id: 'r1', event: '5' },
-    { type: 'transport.dtmf.send', event_id: 's1', event: '#', client_event_id: 'command1' },
+    { type: 'transport.dtmf.sent', event_id: 's1', event: '#', client_event_id: 'command1' },
     { type: 'transport.ringing', event_id: 'r2', session_id: 'live_test' },
     { type: 'transport.answered', event_id: 'a1', session_id: 'live_test' },
     {
@@ -218,8 +218,8 @@ test('sideband exposes typed transport events and retains unknown events', async
       },
     },
     // Null is outside the server schema; retain the existing lenient decode behavior.
-    { type: 'transport.dtmf.send', event_id: 's2', event: '#', client_event_id: null },
-    { type: 'transport.dtmf.send', event_id: 's3', event: '#' },
+    { type: 'transport.dtmf.sent', event_id: 's2', event: '#', client_event_id: null },
+    { type: 'transport.dtmf.sent', event_id: 's3', event: '#' },
     { type: 'session.output_audio.delta', delta: 'AAE=', start_ms: 10, end_ms: 20 },
     { type: 'future.transport.event', marker: 42 },
   ];
@@ -260,7 +260,7 @@ test('sideband exposes typed transport events and retains unknown events', async
           typedValues.push(event.event);
           break;
         }
-        case 'transport.dtmf.send': {
+        case 'transport.dtmf.sent': {
           typedValues.push(event.client_event_id);
           break;
         }

@@ -23,6 +23,8 @@ describe('resource agents', () => {
   test('create: required and optional params', async () => {
     await client.beta.agents.create({
       model: 'model',
+      compaction: { async: true },
+      experimental: { time_awareness: true },
       instructions: 'instructions',
       metadata: { foo: 'string' },
       multi_agent: { enabled: true, max_concurrent_subagents: 1 },
@@ -73,6 +75,8 @@ describe('resource agents', () => {
       client.beta.agents.update(
         'agent_id',
         {
+          compaction: { async: true },
+          experimental: { time_awareness: true },
           instructions: 'instructions',
           metadata: { foo: 'string' },
           model: 'model',

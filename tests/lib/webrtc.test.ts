@@ -502,6 +502,15 @@ it('excludes WebSocket-only fixture playback from Live WebRTC client events', ()
   >();
 });
 
+it('excludes SIP-only DTMF commands from both Live WebRTC entrypoints', () => {
+  interface Command {
+    type: 'transport.dtmf.send';
+    event: '#';
+  }
+  expectTypeOf<Command>().not.toMatchTypeOf<Parameters<OpenAILiveWebRTC['send']>[0]>();
+  expectTypeOf<Command>().not.toMatchTypeOf<Parameters<LiveDataChannel['send']>[0]>();
+});
+
 it('infers named payloads from each public helper’s generated server-event union', () => {
   const live = new OpenAILiveWebRTC();
   const realtime = new OpenAIRealtimeWebRTC();

@@ -143,6 +143,44 @@ The callback receives the client and validated connection target and returns the
 
 A full example can be found in [`examples/realtime/websocket.ts`](../examples/realtime/websocket.ts).
 
+### Create a response from selected items
+
+The GA helpers `OpenAIRealtimeWS` and `OpenAIRealtimeWebSocket` provide
+`sendResponseCreate()` for typed response inputs that refer to items already in
+the session. For example, call this function with an open connection and the
+ID of an item received in a `conversation.item.created` event on that connection:
+
+```ts
+import type { OpenAIRealtimeWS } from 'openai/realtime/ws';
+import type { OpenAIRealtimeWebSocket } from 'openai/realtime/websocket';
+
+function summarizeItem(rt: OpenAIRealtimeWS | OpenAIRealtimeWebSocket, itemId: string) {
+  rt.sendResponseCreate({
+    type: 'response.create',
+    event_id: 'selected-items-response',
+    response: {
+      input: [
+        { type: 'item_reference', id: itemId },
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Summarize this.' }] },
+      ],
+      instructions: 'Use the selected items.',
+      metadata: { request: 'summary' },
+    },
+  });
+}
+```
+
+The method preserves `event_id` and the other response parameters. References
+belong in response input; they cannot create a conversation item. Continue to
+use `send()` for its existing event types.
+
+If model-session recovery is enabled, every unsent event submitted with
+`sendResponseCreate()` appears as `{ type: 'raw', data: string }` in
+`takePending()` and the final `close` event, even when its input has no
+references. The string contains the complete JSON event captured when queued.
+An explicit `flushPending()` sends these frames in the same order as other
+retained events.
+
 ### Realtime error handling
 
 When an error is encountered, either on the client side or returned from the server through the [`error` event](https://platform.openai.com/docs/guides/realtime-model-capabilities#error-handling), the `error` event listener will be fired. However, if you haven't registered an `error` event listener then an `unhandled Promise rejection` error will be thrown.

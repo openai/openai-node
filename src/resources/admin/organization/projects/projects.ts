@@ -58,6 +58,13 @@ import {
   RoleUpdateParams,
   Roles,
 } from './roles';
+import * as ServiceTierSettingsAPI from './service-tier-settings';
+import {
+  ProjectOptionalServiceTier,
+  ProjectServiceTierSettings,
+  ServiceTierSettingUpdateParams,
+  ServiceTierSettings,
+} from './service-tier-settings';
 import * as SpendAlertsAPI from './spend-alerts';
 import {
   ProjectSpendAlert,
@@ -244,6 +251,8 @@ export class Projects extends APIResource {
   modelPermissions: ModelPermissionsAPI.ModelPermissions = new ModelPermissionsAPI.ModelPermissions(
     this._client,
   );
+  serviceTierSettings: ServiceTierSettingsAPI.ServiceTierSettings =
+    new ServiceTierSettingsAPI.ServiceTierSettings(this._client);
   hostedToolPermissions: HostedToolPermissionsAPI.HostedToolPermissions =
     new HostedToolPermissionsAPI.HostedToolPermissions(this._client);
   groups: GroupsAPI.Groups = new GroupsAPI.Groups(this._client);
@@ -587,6 +596,7 @@ Projects.ServiceAccounts = ServiceAccounts;
 Projects.APIKeys = APIKeys;
 Projects.RateLimits = RateLimits;
 Projects.ModelPermissions = ModelPermissions;
+Projects.ServiceTierSettings = ServiceTierSettings;
 Projects.HostedToolPermissions = HostedToolPermissions;
 Projects.Groups = Groups;
 Projects.Roles = Roles;
@@ -654,6 +664,13 @@ export declare namespace Projects {
     type ProjectModelPermissions as ProjectModelPermissions,
     type ProjectModelPermissionsDeleted as ProjectModelPermissionsDeleted,
     type ModelPermissionUpdateParams as ModelPermissionUpdateParams,
+  };
+
+  export {
+    ServiceTierSettings as ServiceTierSettings,
+    type ProjectOptionalServiceTier as ProjectOptionalServiceTier,
+    type ProjectServiceTierSettings as ProjectServiceTierSettings,
+    type ServiceTierSettingUpdateParams as ServiceTierSettingUpdateParams,
   };
 
   export {

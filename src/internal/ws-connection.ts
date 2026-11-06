@@ -22,8 +22,19 @@ export function sendWebSocketEvent<T>(
     throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
   }
 
-  if (isReconnecting() || owner.socket.readyState === ReadyState.CONNECTING) {
-    if (!queue.enqueue(event)) {
+  if (
+    isReconnecting() ||
+    owner.socket.readyState === ReadyState.CONNECTING ||
+    (owner.socket.readyState === ReadyState.OPEN && queue.isFlushing)
+  ) {
+    let enqueued: boolean;
+    try {
+      enqueued = queue.enqueue(event);
+    } catch (error) {
+      onError('could not send data', error);
+      return;
+    }
+    if (!enqueued) {
       onError('send queue is full, message discarded');
     }
     return;
@@ -51,8 +62,19 @@ export function sendRawWebSocketData<T>(
     throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
   }
 
-  if (isReconnecting() || owner.socket.readyState === ReadyState.CONNECTING) {
-    if (!queue.enqueueRaw(data)) {
+  if (
+    isReconnecting() ||
+    owner.socket.readyState === ReadyState.CONNECTING ||
+    (owner.socket.readyState === ReadyState.OPEN && queue.isFlushing)
+  ) {
+    let enqueued: boolean;
+    try {
+      enqueued = queue.enqueueRaw(data);
+    } catch (error) {
+      onError('could not send data', error);
+      return;
+    }
+    if (!enqueued) {
       onError('send queue is full, message discarded');
     }
     return;
@@ -74,16 +96,22 @@ export function flushWebSocketSendQueue<T>(
   queue: SendQueue<T>,
   onError: OnError,
   options?: { requeueFailed?: boolean },
-): void {
+): boolean {
   if (!owner.socket) {
     throw new OpenAIError('Internal error: failed to initialize socket. Please report this issue.');
   }
 
   try {
-    queue.flush((data) => owner.socket.send(flattenRawData(data)), options);
+    queue.flush((data) => owner.socket.send(flattenRawData(data)), {
+      ...options,
+      // A close during send must leave the unattempted tail for the next physical socket.
+      canSend: () => owner.socket.readyState === ReadyState.OPEN,
+    });
   } catch (error) {
     onError('could not send queued data', error);
+    return false;
   }
+  return true;
 }
 
 /** Resolves when the socket opens, or rejects if it errors or closes first. */

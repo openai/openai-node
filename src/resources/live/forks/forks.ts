@@ -59,7 +59,7 @@ export type ForkServerEvent =
   | LiveAPI.ErrorEvent
   | LiveAPI.InfoEvent
   | ForkServerEvent.TransportDtmfReceived
-  | ForkServerEvent.TransportDtmfSend
+  | ForkServerEvent.TransportDtmfSent
   | ForkServerEvent.TransportRinging
   | ForkServerEvent.TransportAnswered
   | ForkServerEvent.TransportFailed;
@@ -99,12 +99,12 @@ export namespace ForkServerEvent {
    * A SIP DTMF keypress successfully sent to the SIP trunk. Delivered only to
    * sideband observers; this is not a client command.
    */
-  export interface TransportDtmfSend {
+  export interface TransportDtmfSent {
     event: string;
 
     event_id: string;
 
-    type: 'transport.dtmf.send';
+    type: 'transport.dtmf.sent';
 
     /**
      * The event_id of the client command, when supplied.

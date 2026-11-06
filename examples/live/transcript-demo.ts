@@ -49,11 +49,19 @@ export async function prepareTranscriptDemo(client: OpenAI): Promise<Buffer[]> {
  * Send pre-generated PCM through the public Live WebSocket and group only its
  * public transcript events. This makes paid API requests; requires Live access.
  * No microphone, local TTS latency, internal API, or server turn events are used.
+ * The caller ends capture with finishSignal; transcript activity never ends it.
+ * This controls capture duration, not whether the model finished an answer.
+ * The result is returned only after the server confirms session.closed.
+ * Finishing before session startup rejects without returning an unconfirmed capture.
  */
 export async function runTranscriptDemo(
   client: OpenAI,
   audio: readonly Buffer[],
   options: {
+    /** End capture when the caller or user decides. This is separate from operation failures. */
+    finishSignal: AbortSignal;
+    /** Cancel capture and pending socket waits without returning a transcript. */
+    signal?: AbortSignal;
     /** Optional transport options, for example a local opt-in compatibility header. */
     websocketOptions?: LiveWSClientOptions | undefined;
     /** Interrupt the first answer instead of waiting for its projected completion. */
@@ -66,15 +74,20 @@ export async function runTranscriptDemo(
     onInputAudio?: (pcm: Buffer) => void;
     /** Observe incoming mono 24 kHz PCM independently of transcript grouping. */
     onOutputAudio?: (pcm: Buffer) => void;
-  } = {},
+  },
 ): Promise<TranscriptDemoResult> {
   const [firstAudio, secondAudio] = audio;
   if (!firstAudio?.length || !secondAudio?.length) {
     throw new Error('Generate both TTS clips before opening Live.');
   }
+  if (options.finishSignal.aborted) {
+    throw new Error('Live transcript capture stopped before session startup');
+  }
+  options.signal?.throwIfAborted();
   const live = new LiveWS(client, options.websocketOptions);
 
   const abort = new AbortController();
+  const signal = options.signal ? AbortSignal.any([abort.signal, options.signal]) : abort.signal;
   const timeout = setTimeout(
     () => abort.abort(new Error('Live transcript demo exceeded 120 seconds')),
     120_000,
@@ -89,6 +102,7 @@ export async function runTranscriptDemo(
   };
   let ready = false;
   let finishing = false;
+  let sessionClosed = false;
   let lastAudioAt = Number.NEGATIVE_INFINITY;
   let lastTextAt = Number.NEGATIVE_INFINITY;
   let assistantCharacters = 0;
@@ -117,12 +131,13 @@ export async function runTranscriptDemo(
 
   live.on('error', (error) => abort.abort(error));
   live.on('close', () => {
-    if (!finishing) {
+    if (!finishing || !sessionClosed) {
       abort.abort(new Error('Live transport closed before the demo completed'));
     }
   });
   const onEvent = (event: ServerEvent) => {
-    if (event.type === 'session.started') {
+    // A late start must not turn an earlier finish into a successful capture.
+    if (event.type === 'session.started' && !options.finishSignal.aborted) {
       ready = true;
     }
     if (event.type === 'session.input_transcript.delta') {
@@ -143,6 +158,12 @@ export async function runTranscriptDemo(
       }
       transcript.push(event);
       if (event.type === 'session.closed') {
+        if (!finishing) {
+          abort.abort(new Error('Live session ended before the demo completed'));
+        } else if (event.reason !== 'close_requested') {
+          abort.abort(new Error('Live session ended without confirming the requested close'));
+        }
+        sessionClosed = true;
         live.off('event', onEvent);
       }
     } catch (error) {
@@ -169,7 +190,10 @@ export async function runTranscriptDemo(
   async function sendPCM(pcm: Buffer): Promise<void> {
     const startedAt = performance.now();
     for (let offset = 0; offset < pcm.length; offset += CHUNK_BYTES) {
-      abort.signal.throwIfAborted();
+      signal.throwIfAborted();
+      if (options.finishSignal.aborted) {
+        return;
+      }
       const chunk = pcm.subarray(offset, offset + CHUNK_BYTES);
       live.send({
         type: 'session.input_audio.append',
@@ -177,7 +201,7 @@ export async function runTranscriptDemo(
       });
       options.onInputAudio?.(chunk);
       const sentMs = (Math.min(offset + CHUNK_BYTES, pcm.length) / (SAMPLE_RATE * 2)) * 1000;
-      await sleep(Math.max(0, startedAt + sentMs - performance.now()), undefined, { signal: abort.signal });
+      await sleep(Math.max(0, startedAt + sentMs - performance.now()), undefined, { signal });
     }
   }
 
@@ -185,7 +209,8 @@ export async function runTranscriptDemo(
   const silence = Buffer.alloc(CHUNK_BYTES * 5);
   async function waitWithAudio(predicate: () => boolean, description: string): Promise<void> {
     const deadline = performance.now() + 45_000;
-    while (!predicate()) {
+    while (!predicate() && !options.finishSignal.aborted) {
+      signal.throwIfAborted();
       if (performance.now() >= deadline) {
         throw new Error(
           `Timed out waiting for ${description} (${assistantCharacters} assistant characters, ${closedAssistant} closed assistant segments, ${Math.round(performance.now() - lastTextAt)} ms since the last output transcript)`,
@@ -199,8 +224,12 @@ export async function runTranscriptDemo(
     // The generated transport queues this until the socket opens.
     live.send({ type: 'session.start', session });
     // oxlint-disable-next-line no-unmodified-loop-condition -- The session.started event listener sets ready.
-    while (!ready) {
-      await sleep(20, undefined, { signal: abort.signal });
+    while (!ready && !options.finishSignal.aborted) {
+      await sleep(20, undefined, { signal });
+    }
+    signal.throwIfAborted();
+    if (!ready) {
+      throw new Error('Live transcript capture stopped before session startup');
     }
     await sendPCM(firstAudio);
     if (options.interrupt) {
@@ -211,27 +240,27 @@ export async function runTranscriptDemo(
           performance.now() - lastTextAt < 1000,
         'the assistant to speak before interrupting',
       );
-      result.interruptionSentDuringOutput = true;
+      result.interruptionSentDuringOutput = !options.finishSignal.aborted;
     } else {
       await waitWithAudio(
-        () => closedAssistant > 0 && performance.now() - lastTextAt >= 2500,
+        () => closedAssistant > 0 && performance.now() - Math.max(lastTextAt, lastAudioAt) >= 2500,
         'the first answer to settle',
       );
     }
     await sendPCM(secondAudio);
-    const beforeAnswer = assistantCharacters;
-    const beforeClose = closedAssistant;
-    await waitWithAudio(
-      () =>
-        assistantCharacters > beforeAnswer &&
-        closedAssistant > beforeClose &&
-        performance.now() - lastTextAt >= 2500,
-      'the final answer to settle',
-    );
+    // Live has no public turn-final marker. Keep the duplex input running until
+    // the caller explicitly ends capture instead of guessing from transcript gaps.
+    while (!options.finishSignal.aborted) {
+      await sendPCM(silence);
+    }
+    signal.throwIfAborted();
     finishing = true;
     live.send({ type: 'session.close' });
-    // Give the public session.closed event a chance to finalize remaining text.
-    await sleep(300, undefined, { signal: abort.signal });
+    // Confirm finalization before closing the transport or returning the transcript.
+    // oxlint-disable-next-line no-unmodified-loop-condition -- The session.closed event listener sets sessionClosed.
+    while (!sessionClosed) {
+      await sleep(20, undefined, { signal });
+    }
   } finally {
     finishing = true;
     clearTimeout(timeout);
@@ -242,6 +271,6 @@ export async function runTranscriptDemo(
       live.close();
     }
   }
-  abort.signal.throwIfAborted();
+  signal.throwIfAborted();
   return result;
 }

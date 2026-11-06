@@ -122,10 +122,32 @@ for (;;) {
 }
 ```
 
-`current` returns a detached full snapshot in phase `provisional`; if required
-scaffolding is missing, malformed or unrecognized, its phase is `unavailable`
-with an error. `outputAt()` returns `undefined` when no provisional item/part
-can be reconstructed. The output-item `type` is checked, but other provisional
+`current` returns a detached full snapshot in phase `provisional`. Sparse text,
+refusal, function arguments, MCP arguments and custom-tool input remain available
+in its optional `partialOutput` array before item or content scaffolds arrive.
+Caller-fed deltas or full items can also arrive before `response.created`:
+the preview then contains only observed output and derived text, with all
+response metadata absent.
+Each observation carries its wire `output_index` and `item_id`. It contains only
+received `arguments`, `input`, or indexed `content` fields; content `data` is raw
+and may lack a part `type`. Shell stdout/stderr and complete done arrays appear under `commands`, keyed by
+`command_index`. Done arrays are kept in `data.output`, with all chunks in received
+order. Empty arrays remain empty; absent stderr and outcomes remain absent.
+The helper leaves the canonical shell-item output list as received because its
+command boundaries are not known. Only an actual matching shell call establishes
+a command bound. Provisional `snapshot.output_text` includes observed sparse text.
+
+Items, content and observations use numeric wire order without allocating missing
+positions. `snapshot.output` contains actual received items; use the original wire
+index with `outputAt()`, even when the snapshot's compact array has fewer entries.
+A real item replaces observations for that output index; a real part replaces
+only its content index. `response.queued` and `response.in_progress` refresh
+response metadata. A supplied output array replaces provisional output, including
+an empty array; omitted output preserves it. These updates cannot reopen terminal
+state. Malformed or unrecognized output makes the phase `unavailable` with an error.
+
+`outputAt()` returns `undefined` when no actual provisional item/part can be
+selected. The output-item `type` is checked, but other provisional
 fields, parts and citations are raw values: check them before using them as
 typed data. For example, a message's `role` or `status` can be missing or
 different from a completed response. You can continue consuming raw events. A terminal event

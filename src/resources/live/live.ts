@@ -2266,18 +2266,18 @@ export interface ResponsesDelegationConfig {
     | 'auto'
     | 'none'
     | 'required'
-    | ResponsesDelegationConfig.Function
-    | ResponsesDelegationConfig.McpToolChoice
-    | ResponsesDelegationConfig.FileSearch
-    | ResponsesDelegationConfig.WebSearch
+    | ResponsesDelegationConfig.LiveFunctionToolChoiceParam
+    | ResponsesDelegationConfig.LiveMCPToolChoiceParam
+    | ResponsesDelegationConfig.FileSearchToolChoice
+    | ResponsesDelegationConfig.WebSearchToolChoice
     | ResponsesDelegationConfig.WebSearchPreview
-    | ResponsesDelegationConfig.ImageGeneration
-    | ResponsesDelegationConfig.Computer
-    | ResponsesDelegationConfig.CodeInterpreter
-    | ResponsesDelegationConfig.ProgrammaticToolCalling
+    | ResponsesDelegationConfig.ImageGenerationToolChoice
+    | ResponsesDelegationConfig.ComputerToolChoice
+    | ResponsesDelegationConfig.CodeInterpreterToolChoice
+    | ResponsesDelegationConfig.ProgrammaticToolCallingToolChoice
     | ResponsesDelegationConfig.ShellToolChoice
     | ResponsesDelegationConfig.CustomToolChoice
-    | ResponsesDelegationConfig.ApplyPatch
+    | ResponsesDelegationConfig.ApplyPatchToolChoice
     | ResponsesDelegationConfig.LiveAllowedToolsChoiceParam;
 
   /**
@@ -2330,7 +2330,7 @@ export namespace ResponsesDelegationConfig {
     verbosity?: 'low' | 'medium' | 'high' | null;
   }
 
-  export interface Function {
+  export interface LiveFunctionToolChoiceParam {
     /**
      * The name of the function tool to call.
      */
@@ -2342,7 +2342,7 @@ export namespace ResponsesDelegationConfig {
     type: 'function';
   }
 
-  export interface McpToolChoice {
+  export interface LiveMCPToolChoiceParam {
     /**
      * The label of the MCP server to call.
      */
@@ -2359,14 +2359,14 @@ export namespace ResponsesDelegationConfig {
     name?: string | null;
   }
 
-  export interface FileSearch {
+  export interface FileSearchToolChoice {
     /**
      * The tool to call. Always `file_search`.
      */
     type: 'file_search';
   }
 
-  export interface WebSearch {
+  export interface WebSearchToolChoice {
     /**
      * The tool to call. Always `web_search`.
      */
@@ -2380,28 +2380,28 @@ export namespace ResponsesDelegationConfig {
     type: 'web_search_preview';
   }
 
-  export interface ImageGeneration {
+  export interface ImageGenerationToolChoice {
     /**
      * The tool to call. Always `image_generation`.
      */
     type: 'image_generation';
   }
 
-  export interface Computer {
+  export interface ComputerToolChoice {
     /**
      * The tool to call. Always `computer`.
      */
     type: 'computer';
   }
 
-  export interface CodeInterpreter {
+  export interface CodeInterpreterToolChoice {
     /**
      * The tool to call. Always `code_interpreter`.
      */
     type: 'code_interpreter';
   }
 
-  export interface ProgrammaticToolCalling {
+  export interface ProgrammaticToolCallingToolChoice {
     /**
      * The tool to call. Always `programmatic_tool_calling`.
      */
@@ -2433,7 +2433,7 @@ export namespace ResponsesDelegationConfig {
   /**
    * Forces the model to call the apply_patch tool when executing a tool call.
    */
-  export interface ApplyPatch {
+  export interface ApplyPatchToolChoice {
     /**
      * The tool to call. Always `apply_patch`.
      */
@@ -2445,18 +2445,18 @@ export namespace ResponsesDelegationConfig {
      * The tools that the delegated Responses model may call.
      */
     tools: Array<
-      | LiveAllowedToolsChoiceParam.Function
-      | LiveAllowedToolsChoiceParam.McpToolChoice
-      | LiveAllowedToolsChoiceParam.FileSearch
-      | LiveAllowedToolsChoiceParam.WebSearch
+      | LiveAllowedToolsChoiceParam.LiveFunctionToolChoiceParam
+      | LiveAllowedToolsChoiceParam.LiveMCPToolChoiceParam
+      | LiveAllowedToolsChoiceParam.FileSearchToolChoice
+      | LiveAllowedToolsChoiceParam.WebSearchToolChoice
       | LiveAllowedToolsChoiceParam.WebSearchPreview
-      | LiveAllowedToolsChoiceParam.ImageGeneration
-      | LiveAllowedToolsChoiceParam.Computer
-      | LiveAllowedToolsChoiceParam.CodeInterpreter
-      | LiveAllowedToolsChoiceParam.ProgrammaticToolCalling
+      | LiveAllowedToolsChoiceParam.ImageGenerationToolChoice
+      | LiveAllowedToolsChoiceParam.ComputerToolChoice
+      | LiveAllowedToolsChoiceParam.CodeInterpreterToolChoice
+      | LiveAllowedToolsChoiceParam.ProgrammaticToolCallingToolChoice
       | LiveAllowedToolsChoiceParam.ShellToolChoice
       | LiveAllowedToolsChoiceParam.CustomToolChoice
-      | LiveAllowedToolsChoiceParam.ApplyPatch
+      | LiveAllowedToolsChoiceParam.ApplyPatchToolChoice
     >;
 
     /**
@@ -2471,7 +2471,7 @@ export namespace ResponsesDelegationConfig {
   }
 
   export namespace LiveAllowedToolsChoiceParam {
-    export interface Function {
+    export interface LiveFunctionToolChoiceParam {
       /**
        * The name of the function tool to call.
        */
@@ -2483,7 +2483,7 @@ export namespace ResponsesDelegationConfig {
       type: 'function';
     }
 
-    export interface McpToolChoice {
+    export interface LiveMCPToolChoiceParam {
       /**
        * The label of the MCP server to call.
        */
@@ -2500,14 +2500,14 @@ export namespace ResponsesDelegationConfig {
       name?: string | null;
     }
 
-    export interface FileSearch {
+    export interface FileSearchToolChoice {
       /**
        * The tool to call. Always `file_search`.
        */
       type: 'file_search';
     }
 
-    export interface WebSearch {
+    export interface WebSearchToolChoice {
       /**
        * The tool to call. Always `web_search`.
        */
@@ -2521,28 +2521,28 @@ export namespace ResponsesDelegationConfig {
       type: 'web_search_preview';
     }
 
-    export interface ImageGeneration {
+    export interface ImageGenerationToolChoice {
       /**
        * The tool to call. Always `image_generation`.
        */
       type: 'image_generation';
     }
 
-    export interface Computer {
+    export interface ComputerToolChoice {
       /**
        * The tool to call. Always `computer`.
        */
       type: 'computer';
     }
 
-    export interface CodeInterpreter {
+    export interface CodeInterpreterToolChoice {
       /**
        * The tool to call. Always `code_interpreter`.
        */
       type: 'code_interpreter';
     }
 
-    export interface ProgrammaticToolCalling {
+    export interface ProgrammaticToolCallingToolChoice {
       /**
        * The tool to call. Always `programmatic_tool_calling`.
        */
@@ -2574,7 +2574,7 @@ export namespace ResponsesDelegationConfig {
     /**
      * Forces the model to call the apply_patch tool when executing a tool call.
      */
-    export interface ApplyPatch {
+    export interface ApplyPatchToolChoice {
       /**
        * The tool to call. Always `apply_patch`.
        */
@@ -2849,18 +2849,18 @@ export interface ResponsesDelegationUpdateConfig {
     | 'auto'
     | 'none'
     | 'required'
-    | ResponsesDelegationUpdateConfig.Function
-    | ResponsesDelegationUpdateConfig.McpToolChoice
-    | ResponsesDelegationUpdateConfig.FileSearch
-    | ResponsesDelegationUpdateConfig.WebSearch
+    | ResponsesDelegationUpdateConfig.LiveFunctionToolChoiceParam
+    | ResponsesDelegationUpdateConfig.LiveMCPToolChoiceParam
+    | ResponsesDelegationUpdateConfig.FileSearchToolChoice
+    | ResponsesDelegationUpdateConfig.WebSearchToolChoice
     | ResponsesDelegationUpdateConfig.WebSearchPreview
-    | ResponsesDelegationUpdateConfig.ImageGeneration
-    | ResponsesDelegationUpdateConfig.Computer
-    | ResponsesDelegationUpdateConfig.CodeInterpreter
-    | ResponsesDelegationUpdateConfig.ProgrammaticToolCalling
+    | ResponsesDelegationUpdateConfig.ImageGenerationToolChoice
+    | ResponsesDelegationUpdateConfig.ComputerToolChoice
+    | ResponsesDelegationUpdateConfig.CodeInterpreterToolChoice
+    | ResponsesDelegationUpdateConfig.ProgrammaticToolCallingToolChoice
     | ResponsesDelegationUpdateConfig.ShellToolChoice
     | ResponsesDelegationUpdateConfig.CustomToolChoice
-    | ResponsesDelegationUpdateConfig.ApplyPatch
+    | ResponsesDelegationUpdateConfig.ApplyPatchToolChoice
     | ResponsesDelegationUpdateConfig.LiveAllowedToolsChoiceParam;
 
   /**
@@ -2913,7 +2913,7 @@ export namespace ResponsesDelegationUpdateConfig {
     verbosity?: 'low' | 'medium' | 'high' | null;
   }
 
-  export interface Function {
+  export interface LiveFunctionToolChoiceParam {
     /**
      * The name of the function tool to call.
      */
@@ -2925,7 +2925,7 @@ export namespace ResponsesDelegationUpdateConfig {
     type: 'function';
   }
 
-  export interface McpToolChoice {
+  export interface LiveMCPToolChoiceParam {
     /**
      * The label of the MCP server to call.
      */
@@ -2942,14 +2942,14 @@ export namespace ResponsesDelegationUpdateConfig {
     name?: string | null;
   }
 
-  export interface FileSearch {
+  export interface FileSearchToolChoice {
     /**
      * The tool to call. Always `file_search`.
      */
     type: 'file_search';
   }
 
-  export interface WebSearch {
+  export interface WebSearchToolChoice {
     /**
      * The tool to call. Always `web_search`.
      */
@@ -2963,28 +2963,28 @@ export namespace ResponsesDelegationUpdateConfig {
     type: 'web_search_preview';
   }
 
-  export interface ImageGeneration {
+  export interface ImageGenerationToolChoice {
     /**
      * The tool to call. Always `image_generation`.
      */
     type: 'image_generation';
   }
 
-  export interface Computer {
+  export interface ComputerToolChoice {
     /**
      * The tool to call. Always `computer`.
      */
     type: 'computer';
   }
 
-  export interface CodeInterpreter {
+  export interface CodeInterpreterToolChoice {
     /**
      * The tool to call. Always `code_interpreter`.
      */
     type: 'code_interpreter';
   }
 
-  export interface ProgrammaticToolCalling {
+  export interface ProgrammaticToolCallingToolChoice {
     /**
      * The tool to call. Always `programmatic_tool_calling`.
      */
@@ -3016,7 +3016,7 @@ export namespace ResponsesDelegationUpdateConfig {
   /**
    * Forces the model to call the apply_patch tool when executing a tool call.
    */
-  export interface ApplyPatch {
+  export interface ApplyPatchToolChoice {
     /**
      * The tool to call. Always `apply_patch`.
      */
@@ -3028,18 +3028,18 @@ export namespace ResponsesDelegationUpdateConfig {
      * The tools that the delegated Responses model may call.
      */
     tools: Array<
-      | LiveAllowedToolsChoiceParam.Function
-      | LiveAllowedToolsChoiceParam.McpToolChoice
-      | LiveAllowedToolsChoiceParam.FileSearch
-      | LiveAllowedToolsChoiceParam.WebSearch
+      | LiveAllowedToolsChoiceParam.LiveFunctionToolChoiceParam
+      | LiveAllowedToolsChoiceParam.LiveMCPToolChoiceParam
+      | LiveAllowedToolsChoiceParam.FileSearchToolChoice
+      | LiveAllowedToolsChoiceParam.WebSearchToolChoice
       | LiveAllowedToolsChoiceParam.WebSearchPreview
-      | LiveAllowedToolsChoiceParam.ImageGeneration
-      | LiveAllowedToolsChoiceParam.Computer
-      | LiveAllowedToolsChoiceParam.CodeInterpreter
-      | LiveAllowedToolsChoiceParam.ProgrammaticToolCalling
+      | LiveAllowedToolsChoiceParam.ImageGenerationToolChoice
+      | LiveAllowedToolsChoiceParam.ComputerToolChoice
+      | LiveAllowedToolsChoiceParam.CodeInterpreterToolChoice
+      | LiveAllowedToolsChoiceParam.ProgrammaticToolCallingToolChoice
       | LiveAllowedToolsChoiceParam.ShellToolChoice
       | LiveAllowedToolsChoiceParam.CustomToolChoice
-      | LiveAllowedToolsChoiceParam.ApplyPatch
+      | LiveAllowedToolsChoiceParam.ApplyPatchToolChoice
     >;
 
     /**
@@ -3054,7 +3054,7 @@ export namespace ResponsesDelegationUpdateConfig {
   }
 
   export namespace LiveAllowedToolsChoiceParam {
-    export interface Function {
+    export interface LiveFunctionToolChoiceParam {
       /**
        * The name of the function tool to call.
        */
@@ -3066,7 +3066,7 @@ export namespace ResponsesDelegationUpdateConfig {
       type: 'function';
     }
 
-    export interface McpToolChoice {
+    export interface LiveMCPToolChoiceParam {
       /**
        * The label of the MCP server to call.
        */
@@ -3083,14 +3083,14 @@ export namespace ResponsesDelegationUpdateConfig {
       name?: string | null;
     }
 
-    export interface FileSearch {
+    export interface FileSearchToolChoice {
       /**
        * The tool to call. Always `file_search`.
        */
       type: 'file_search';
     }
 
-    export interface WebSearch {
+    export interface WebSearchToolChoice {
       /**
        * The tool to call. Always `web_search`.
        */
@@ -3104,28 +3104,28 @@ export namespace ResponsesDelegationUpdateConfig {
       type: 'web_search_preview';
     }
 
-    export interface ImageGeneration {
+    export interface ImageGenerationToolChoice {
       /**
        * The tool to call. Always `image_generation`.
        */
       type: 'image_generation';
     }
 
-    export interface Computer {
+    export interface ComputerToolChoice {
       /**
        * The tool to call. Always `computer`.
        */
       type: 'computer';
     }
 
-    export interface CodeInterpreter {
+    export interface CodeInterpreterToolChoice {
       /**
        * The tool to call. Always `code_interpreter`.
        */
       type: 'code_interpreter';
     }
 
-    export interface ProgrammaticToolCalling {
+    export interface ProgrammaticToolCallingToolChoice {
       /**
        * The tool to call. Always `programmatic_tool_calling`.
        */
@@ -3157,7 +3157,7 @@ export namespace ResponsesDelegationUpdateConfig {
     /**
      * Forces the model to call the apply_patch tool when executing a tool call.
      */
-    export interface ApplyPatch {
+    export interface ApplyPatchToolChoice {
       /**
        * The tool to call. Always `apply_patch`.
        */
@@ -3411,7 +3411,7 @@ export type ServerEvent =
   | ErrorEvent
   | InfoEvent
   | ServerEvent.TransportDtmfReceived
-  | ServerEvent.TransportDtmfSend
+  | ServerEvent.TransportDtmfSent
   | ServerEvent.TransportRinging
   | ServerEvent.TransportAnswered
   | ServerEvent.TransportFailed;
@@ -3451,12 +3451,12 @@ export namespace ServerEvent {
    * A SIP DTMF keypress successfully sent to the SIP trunk. Delivered only to
    * sideband observers; this is not a client command.
    */
-  export interface TransportDtmfSend {
+  export interface TransportDtmfSent {
     event: string;
 
     event_id: string;
 
-    type: 'transport.dtmf.send';
+    type: 'transport.dtmf.sent';
 
     /**
      * The event_id of the client command, when supplied.
