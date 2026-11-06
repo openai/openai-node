@@ -18,7 +18,7 @@ describe('resource calls', () => {
         audio: {
           input: {
             format: { rate: 24000, type: 'audio/pcm' },
-            noise_reduction: { type: 'near_field' },
+            noise_reduction: { strength: 0, type: 'near_field' },
             transcription: {
               delay: 'minimal',
               keywords: ['string'],
@@ -87,7 +87,7 @@ describe('resource calls', () => {
       audio: {
         input: {
           format: { rate: 24000, type: 'audio/pcm' },
-          noise_reduction: { type: 'near_field' },
+          noise_reduction: { strength: 0, type: 'near_field' },
           transcription: {
             delay: 'minimal',
             keywords: ['string'],

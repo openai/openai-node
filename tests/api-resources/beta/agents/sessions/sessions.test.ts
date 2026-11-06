@@ -24,6 +24,8 @@ describe('resource sessions', () => {
     await client.beta.agents.sessions.create({
       environment: { type: 'none' },
       agent: {
+        compaction: { async: true },
+        experimental: { time_awareness: true },
         instructions: 'instructions',
         model: 'model',
         multi_agent: { enabled: true, max_concurrent_subagents: 1 },
@@ -46,6 +48,7 @@ describe('resource sessions', () => {
       agent_id: 'agent_id',
       input: 'x',
       metadata: { foo: 'string' },
+      review: 'none',
       spend_control: { limit: 1 },
       stream: false,
       vault_ids: ['string'],
@@ -84,8 +87,18 @@ describe('resource sessions', () => {
             model: 'model',
             reasoning: { effort: 'none' },
             service_tier: 'auto',
+            tools: [
+              {
+                description: 'description',
+                name: 'name',
+                parameters: { foo: 'bar' },
+                type: 'function',
+                defer_loading: true,
+              },
+            ],
           },
           metadata: { foo: 'string' },
+          review: 'none',
           spend_control: { limit: 1 },
         },
         { path: '/_stainless_unknown_path' },
@@ -112,6 +125,7 @@ describe('resource sessions', () => {
           after: 'after',
           agent_id: 'agent_id',
           limit: 1,
+          metadata: { foo: 'string' },
           order: 'asc',
         },
         { path: '/_stainless_unknown_path' },

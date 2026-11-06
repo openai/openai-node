@@ -1,7 +1,6 @@
-import { PassThrough } from 'node:stream';
-import { playAudio } from 'openai/helpers/audio';
+import { spawn } from 'node:child_process';
 
-/** Play the demo's mono, 24 kHz, 16-bit PCM using the SDK's existing ffplay helper. */
+/** Play the demo's mono, 24 kHz, 16-bit PCM and retain the child for cancellation. */
 export function createPCMPlayback() {
   // A streaming WAV header lets playAudio recognize raw Live/TTS PCM. The
   // unknown lengths are resolved by EOF, so playback can start before completion.
@@ -19,18 +18,30 @@ export function createPCMPlayback() {
   header.write('data', 36);
   header.writeUInt32LE(0xff_ff_ff_ff, 40);
 
-  const stream = new PassThrough();
-  stream.write(header);
+  // We own the child so close() can stop queued playback even after its input has ended.
+  const player = spawn('ffplay', ['-autoexit', '-nodisp', '-i', 'pipe:0']);
+  player.stdout.resume();
+  player.stderr.resume();
+  const stream = player.stdin;
   let failure: Error | undefined;
-  // Attach rejection handling immediately, including when ffplay is missing.
-  const finished = (async () => {
-    try {
-      await playAudio(stream);
-    } catch (error) {
-      failure = error instanceof Error ? error : new Error('Audio playback failed');
-      stream.destroy();
-    }
-  })();
+  // Record failures immediately and settle only when the child has exited.
+  // oxlint-disable-next-line promise/avoid-new -- Await child close even after spawn or stdin errors, so cleanup never leaves a player running.
+  const finished = new Promise<void>((resolve) => {
+    player.once('error', (error) => {
+      failure ??= error;
+    });
+    stream.once('error', (error) => {
+      failure ??= error;
+      player.kill();
+    });
+    player.once('close', (code) => {
+      if (code !== 0) {
+        failure ??= new Error(`ffplay process exited with code ${code}`);
+      }
+      resolve();
+    });
+  });
+  stream.write(header);
 
   return {
     /** Queue a PCM chunk without blocking the duplex transport. */
@@ -54,6 +65,7 @@ export function createPCMPlayback() {
     /** Stop playback on teardown, including after a failed Live session. */
     async close(): Promise<void> {
       stream.destroy();
+      player.kill();
       await finished;
     },
   };

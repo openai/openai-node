@@ -82,6 +82,12 @@ export {
   type ProjectServiceAccountsPage,
 } from './service-accounts/index';
 export {
+  ServiceTierSettings,
+  type ProjectOptionalServiceTier,
+  type ProjectServiceTierSettings,
+  type ServiceTierSettingUpdateParams,
+} from './service-tier-settings';
+export {
   SpendAlerts,
   type ProjectSpendAlert,
   type ProjectSpendAlertDeleted,

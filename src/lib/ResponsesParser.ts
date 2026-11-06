@@ -1,4 +1,6 @@
 import { OpenAIError } from '../error';
+import type { RequestOptions } from '../internal/request-options';
+import { hasOwn, isObj } from '../internal/utils/values';
 import type { ChatCompletionTool } from '../resources/chat/completions';
 import type {
   FunctionTool,
@@ -12,6 +14,7 @@ import type {
   ResponseCreateParamsNonStreaming,
   ResponseFormatTextJSONSchemaConfig,
   ResponseFunctionToolCall,
+  ResponseInputItem,
   ResponseTextConfig,
   Tool,
 } from '../resources/responses/responses';
@@ -25,12 +28,24 @@ export type ParseableToolsParams = Tool[] | ChatCompletionTool | null;
 export type ResponseCreateParamsWithTools = ResponseCreateParamsBase & {
   /** Tools available to the model while producing the response. */
   tools?: ParseableToolsParams;
+} & ResponseParsingInput;
+
+/** Include tuples so inline input histories retain their order for parser inference. */
+export type ResponseParsingInput = {
+  input?: ResponseCreateParamsBase['input'] | [ResponseInputItem, ...ResponseInputItem[]];
+};
+
+/** Local parser settings for Responses helpers, alongside ordinary request options. */
+export type ResponseParseOptions = RequestOptions & {
+  /** Parse with this format without sending it to the API. Pass null to leave output text unparsed. */
+  parseAs?: ResponseFormatTextJSONSchemaConfig | null | undefined;
 };
 
 /** Request fields that can select a plain-text or structured Responses API output format. */
 type TextConfigParams = {
   /** Optional text output configuration, including its structured JSON format. */
   text?: ResponseTextConfig;
+  input?: ResponseCreateParamsBase['input'];
 };
 
 /** Infers parsed output for each member of a possibly optional text-format union. */
@@ -42,6 +57,43 @@ type ParsedTextFormat<Format> = [Format] extends [never]
       ? unknown
       : null;
 
+type UpdatedContent<Item> = Item extends { type: 'configuration_update'; text?: infer Text }
+  ? NonNullable<Text> extends { format: infer Format }
+    ? ParsedTextFormat<Format>
+    : never
+  : never;
+
+// Track possible later formats. For very long tuples, use the remaining union before hitting
+// TypeScript's instantiation limit.
+type ParsedHistory<Input, Fallback, Later = never, Seen extends 0[] = []> = [Input] extends [never]
+  ? Fallback | Later
+  : Input extends readonly [...infer Earlier, infer Last]
+    ? Last extends { type: 'configuration_update'; text: { format: infer Format } }
+      ? ParsedTextFormat<Format> | Later
+      : Seen['length'] extends 256
+        ? Fallback | Later | UpdatedContent<Input[number]>
+        : ParsedHistory<Earlier, Fallback, Later | UpdatedContent<Last>, [...Seen, 0]>
+    : Input extends readonly (infer Item)[]
+      ? Fallback | Later | UpdatedContent<Item>
+      : Fallback | Later;
+
+type ParsedOverride<Format, Fallback> = Format extends undefined ? Fallback : ParsedTextFormat<Format>;
+
+/** An explicit local parser takes precedence over the request's inferred output type. */
+export type ParsedWithOptions<Options extends ResponseParseOptions, Fallback> = Options extends unknown
+  ? 'parseAs' extends keyof Options
+    ? ParsedOverride<Options['parseAs'], Fallback>
+    : Fallback
+  : never;
+
+// A spread create request has an optional, fully widened input. It carries no specific
+// update, so preserve its explicit top-level parser. A supplied history can refine it.
+type ParsingHistory<Params extends TextConfigParams> = Params extends { input: infer Input }
+  ? Input
+  : ResponseCreateParamsBase['input'] extends Params['input']
+    ? never
+    : Params['input'];
+
 /**
  * Resolves the type of `output_parsed` / `content[].parsed` for the given params.
  *
@@ -50,9 +102,85 @@ type ParsedTextFormat<Format> = [Format] extends [never]
  * type in the brand, while a raw `{ type: 'json_schema' }` format is parsed with
  * `JSON.parse()` and so can only be described as `unknown`.
  */
-export type ExtractParsedContentFromParams<Params extends TextConfigParams> = ParsedTextFormat<
-  NonNullable<Params['text']>['format']
+export type ExtractParsedContentFromParams<Params extends TextConfigParams> = ParsedHistory<
+  ParsingHistory<Params>,
+  ParsedTextFormat<NonNullable<Params['text']>['format']>
 >;
+
+/** Only the discriminator is required to select the parser carried by a format object. */
+export type ResponseParserTextFormat = { readonly type: string } | null;
+
+function isTextFormat(value: unknown): value is NonNullable<ResponseParserTextFormat> {
+  return isObj(value) && typeof value['type'] === 'string';
+}
+
+/** Select the last visible update to the text format, independently of reasoning updates. */
+function effectiveTextFormat(
+  { body }: RequestOptions,
+  parseAs?: ResponseParseOptions['parseAs'],
+): ResponseParserTextFormat {
+  if (parseAs === null || !isObj(body)) {
+    return parseAs ?? null;
+  }
+  const { input } = body;
+  if (Array.isArray(input)) {
+    for (let index = input.length - 1; index >= 0; index -= 1) {
+      const item: unknown = input[index];
+      if (!isObj(item) || item['type'] !== 'configuration_update') {
+        continue;
+      }
+      const { text } = item;
+      if (!isObj(text)) {
+        continue;
+      }
+      const { format } = text;
+      if (!isTextFormat(format)) {
+        continue;
+      }
+      if (format.type === 'text' && parseAs !== undefined) {
+        throw new OpenAIError('Cannot use parseAs with a plain-text format update.');
+      }
+      return parseAs ?? format;
+    }
+  }
+  const { text } = body;
+  const format = isObj(text) ? text['format'] : null;
+  return parseAs ?? (isTextFormat(format) ? format : null);
+}
+
+/** Strip local options before sending and resolve the format against the prepared request body. */
+export function resolveResponseParseOptions(params: TextConfigParams, options?: ResponseParseOptions) {
+  const parseAs = options && hasOwn(options, 'parseAs') ? options.parseAs : undefined;
+  // Reject a visible plain-text reset before making the request.
+  if (parseAs != null) {
+    effectiveTextFormat({ body: params }, parseAs);
+  }
+  const requestOptions = { ...options };
+  delete requestOptions.parseAs;
+  // Undefined means no body was serialized (e.g. a custom stream transport).
+  // Null means this particular request intentionally has no text parser.
+  let captured: ResponseParserTextFormat | undefined;
+  requestOptions.__metadata = {
+    ...options?.__metadata,
+    captureResponseParser(prepared: RequestOptions) {
+      const format = effectiveTextFormat(prepared, parseAs);
+      const selector =
+        format === null
+          ? null
+          : {
+              type: format.type,
+              $brand: '$brand' in format ? format.$brand : undefined,
+              $parseRaw: '$parseRaw' in format ? format.$parseRaw : undefined,
+            };
+      captured = selector;
+    },
+  };
+  return {
+    getTextFormat: (prepared: RequestOptions) =>
+      captured === undefined ? effectiveTextFormat(prepared, parseAs) : captured,
+    requestOptions,
+  };
+}
 
 /**
  * Adds parsed-output fields to a response, invoking parsers only when its request
@@ -61,8 +189,12 @@ export type ExtractParsedContentFromParams<Params extends TextConfigParams> = Pa
 export function maybeParseResponse<
   Params extends ResponseCreateParamsBase | null,
   ParsedT = Params extends null ? null : ExtractParsedContentFromParams<NonNullable<Params>>,
->(response: Response, params: Params): ParsedResponse<ParsedT> {
-  if (!params || !hasAutoParseableInput(params)) {
+>(
+  response: Response,
+  params: Params,
+  format = params && effectiveTextFormat({ body: params }),
+): ParsedResponse<ParsedT> {
+  if (!params || !hasAutoParseableInput(params, format)) {
     const parsed = {
       ...response,
       output_parsed: null,
@@ -95,7 +227,7 @@ export function maybeParseResponse<
     return parsed;
   }
 
-  return parseResponse(response, params);
+  return parseResponse(response, params, format);
 }
 
 /**
@@ -108,7 +240,11 @@ export function maybeParseResponse<
 export function parseResponse<
   Params extends ResponseCreateParamsBase,
   ParsedT = ExtractParsedContentFromParams<Params>,
->(response: Response, params: Params): ParsedResponse<ParsedT> {
+>(
+  response: Response,
+  params: Params,
+  format = effectiveTextFormat({ body: params }),
+): ParsedResponse<ParsedT> {
   const shouldParse = !response.status || response.status === 'completed';
   const output: ParsedResponseOutputItem<ParsedT>[] = response.output.map(
     (item): ParsedResponseOutputItem<ParsedT> => {
@@ -122,7 +258,7 @@ export function parseResponse<
               ...content,
               parsed:
                 shouldParse && (item.phase == null || item.phase === 'final_answer')
-                  ? parseTextFormat(params, content.text)
+                  ? parseResponseFormatContent<ParsedT>(format, content.text)
                   : null,
             };
           }
@@ -168,16 +304,12 @@ export function parseResponse<
   return parsed as ParsedResponse<ParsedT>;
 }
 
-function parseTextFormat<
-  Params extends ResponseCreateParamsBase,
-  ParsedT = ExtractParsedContentFromParams<Params>,
->(params: Params, content: string): ParsedT | null {
-  return parseResponseFormatContent<ParsedT>(params.text?.format, content);
-}
-
 /** Returns whether the request includes an auto-parseable text format or strict function tool. */
-export function hasAutoParseableInput(params: ResponseCreateParamsWithTools): boolean {
-  if (isParseableResponseFormat(params.text?.format)) {
+export function hasAutoParseableInput(
+  params: ResponseCreateParamsWithTools,
+  format = effectiveTextFormat({ body: params }),
+): boolean {
+  if (isParseableResponseFormat(format)) {
     return true;
   }
 

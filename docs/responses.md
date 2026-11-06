@@ -150,7 +150,6 @@ socket.send({
   type: 'response.create',
   model: 'gpt-5.5',
   input: 'Explain the difference between SSE and WebSockets.',
-  stream: true,
 });
 ```
 

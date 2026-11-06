@@ -38,6 +38,14 @@ export {
   type DataRetentionUpdateParams,
 } from './data-retention';
 export {
+  ExternalKeys,
+  type ExternalKey,
+  type ExternalKeyValidateResponse,
+  type ExternalKeyCreateParams,
+  type ExternalKeyListParams,
+  type ExternalKeysPage,
+} from './external-keys';
+export {
   ExternalStorage,
   type AwsExternalStorageProvider,
   type AzureExternalStorageProvider,
@@ -137,3 +145,12 @@ export {
   type UserListParams,
   type OrganizationUsersPage,
 } from './users/index';
+export {
+  WorkloadIdentityProviders,
+  type WorkloadIdentityProvider,
+  type WorkloadIdentityProviderDeleted,
+  type WorkloadIdentityProviderCreateParams,
+  type WorkloadIdentityProviderUpdateParams,
+  type WorkloadIdentityProviderListParams,
+  type WorkloadIdentityProvidersPage,
+} from './workload-identity-providers/index';

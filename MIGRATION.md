@@ -14,6 +14,16 @@ The minimum supported runtime and tooling versions are now:
 
 ## Breaking changes
 
+### Live DTMF server events use `transport.dtmf.sent`
+
+Live, Fork, and Sideband server-event unions now use `TransportDtmfSent` with
+`type: 'transport.dtmf.sent'` for successful SIP DTMF delivery. Replace
+`TransportDtmfSend` imports and `transport.dtmf.send` cases that handle server
+notifications with `TransportDtmfSent` and `transport.dtmf.sent`.
+
+Client commands still use `transport.dtmf.send`. Keep that discriminator when
+sending a DTMF command; only the server notification changes.
+
 ### Compaction output includes retained input messages
 
 `responses.compact()` now types its `output` as `ResponseItem[]`, including retained

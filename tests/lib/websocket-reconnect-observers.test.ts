@@ -9,10 +9,14 @@ const OpenAI = require(process.argv[1]).default;
 const { [process.argv[3]]: Socket } = require(process.argv[2]);
 const role = process.argv[4];
 const mode = process.argv[5];
+const flushFailure = mode.startsWith('flush ');
 const rejected = [];
 const received = [];
 const seen = [];
 const reported = [];
+const attempted = [];
+const publicCloses = [];
+const lateSends = [];
 const successFailure = new Error('synthetic success listener failure');
 const reportingFailure = { marker: 'synthetic error listener failure' };
 const staged = JSON.stringify({ type: 'synthetic.user_event', event_id: 'never_attempted' });
@@ -36,10 +40,43 @@ process.on('unhandledRejection', (error) => {
     baseURL: 'http://127.0.0.1:' + server.address().port + '/v1',
   });
   let connection;
+  let created = 0;
+  class FailingReplacement extends Socket {
+    _createSocket(...args) {
+      const socket = super._createSocket(...args);
+      created++;
+      if (created > 1) {
+        socket.send = (data) => {
+          attempted.push(String(data));
+          connection.sendRaw('accepted-during-write');
+          throw new Error('synthetic uncertain write');
+        };
+        if (mode === 'flush disposal throws') {
+          const close = socket.close.bind(socket);
+          let fail = true;
+          socket.close = (...closeArgs) => {
+            if (fail) {
+              fail = false;
+              throw new Error('synthetic transport close failure');
+            }
+            return close(...closeArgs);
+          };
+        }
+      }
+      return socket;
+    }
+  }
+  const SelectedSocket = flushFailure ? FailingReplacement : Socket;
   const options = {
     reconnect: {
       onReconnecting: () => {
-        connection.sendRaw(staged);
+        if (flushFailure) {
+          connection.send({ type: 'synthetic.user_event', event_id: 'uncertain' });
+          connection.send({ type: 'synthetic.user_event', event_id: 'waiting_typed' });
+          connection.sendRaw(staged);
+        } else {
+          connection.sendRaw(staged);
+        }
         return {};
       },
       maxRetries: 1,
@@ -48,19 +85,37 @@ process.on('unhandledRejection', (error) => {
     },
   };
   connection = role
-    ? new Socket(client, { session_id: 'synthetic-session' }, options)
-    : new Socket(client, options);
+    ? new SelectedSocket(client, { session_id: 'synthetic-session' }, options)
+    : new SelectedSocket(client, options);
   connection.on('error', (error) => {
     reported.push(error.message);
+    if (flushFailure) {
+      if (mode === 'flush explicit close' && error.message === 'could not send queued data') {
+        connection.close({ code: 1001, reason: 'synthetic user close' });
+      }
+      throw reportingFailure;
+    }
     if (mode === 'both throw' || mode === 'close also throws') throw reportingFailure;
   });
   connection.on('reconnecting', () => {
-    if (mode !== 'reconnected throws') throw Error('synthetic reconnecting listener failure');
+    if (!flushFailure && mode !== 'reconnected throws') throw Error('synthetic reconnecting listener failure');
   });
   connection.on('reconnected', () => {
     if (mode === 'reconnected throws') throw successFailure;
   });
-  if (mode === 'close also throws') {
+  if (flushFailure) {
+    connection.on('close', (code, reason, unsent) => {
+      publicCloses.push({ code, reason, unsent });
+      for (const send of [
+        () => connection.send({ type: 'synthetic.user_event', event_id: 'after_close' }),
+        () => connection.sendRaw('after-close-raw'),
+      ]) {
+        try { send(); lateSends.push(false); }
+        catch (error) { lateSends.push(error === reportingFailure); }
+      }
+      if (mode === 'flush close also throws') throw Error('synthetic later close listener failure');
+    });
+  } else if (mode === 'close also throws') {
     connection.on('close', () => { throw Error('synthetic later close listener failure'); });
   }
   const iterator = connection.stream();
@@ -101,6 +156,7 @@ process.on('unhandledRejection', (error) => {
     process.stdout.write(JSON.stringify({
       connections, seen, reported, rejected, received, staged, rejectedLateSend,
       unsent: terminal?.type === 'close' ? terminal.unsent : undefined,
+      attempted, publicCloses, lateSends,
       socketState: connection.socket.readyState,
     }));
   } finally {
@@ -165,4 +221,65 @@ describe.each([
       }
     },
   );
+
+  test.each([
+    'flush error throws',
+    'flush close also throws',
+    'flush explicit close',
+    'flush disposal throws',
+  ] as const)('%s completes recovery and exposes never-attempted typed/raw tails', (mode) => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        '-e',
+        observeRecovery,
+        compiledFixture('src/index.ts'),
+        compiledFixture(module),
+        className,
+        role,
+        mode,
+      ],
+      { encoding: 'utf-8', timeout: 12_000 },
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    const state = JSON.parse(result.stdout);
+    const unsent = [
+      { type: 'message', message: { type: 'synthetic.user_event', event_id: 'waiting_typed' } },
+      { type: 'raw', data: state.staged },
+      { type: 'raw', data: 'accepted-during-write' },
+    ];
+    expect(state).toMatchObject({
+      connections: 2,
+      unsent,
+      rejected: [true],
+      attempted: [JSON.stringify({ type: 'synthetic.user_event', event_id: 'uncertain' })],
+      publicCloses: [
+        {
+          code: mode === 'flush explicit close' ? 1001 : 1012,
+          reason:
+            mode === 'flush explicit close'
+              ? 'synthetic user close'
+              : 'reconnect interrupted by error observer',
+          unsent,
+        },
+      ],
+      lateSends: [true, true],
+      rejectedLateSend: true,
+      received: [],
+      reported: [
+        'could not send queued data',
+        'cannot send on a closed WebSocket',
+        'cannot send on a closed WebSocket',
+        'cannot send on a closed WebSocket',
+      ],
+    });
+    expect(state.seen).toContain('close');
+    expect(state.seen.at(-1)).toBe('done');
+    expect(state.seen).not.toContain('reconnected');
+    if (mode !== 'flush disposal throws') {
+      expect(state.socketState).toBe(3);
+    }
+  });
 });

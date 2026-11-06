@@ -52,7 +52,11 @@ describe('resource images', () => {
       image: await toFile(Buffer.from('Example data'), 'README.md'),
       prompt: 'A cute baby sea otter wearing a beret',
       background: 'transparent',
+      complexity: 'low',
+      frame_count: 2,
+      frame_duration_ms: 20,
       input_fidelity: 'high',
+      markup: await toFile(Buffer.from('Example data'), 'README.md'),
       mask: await toFile(Buffer.from('Example data'), 'README.md'),
       model: 'gpt-image-1.5',
       n: 1,
@@ -83,6 +87,9 @@ describe('resource images', () => {
     await client.images.generate({
       prompt: 'A cute baby sea otter',
       background: 'transparent',
+      complexity: 'low',
+      frame_count: 2,
+      frame_duration_ms: 20,
       model: 'gpt-image-2.5-flare',
       moderation: 'low',
       n: 1,
@@ -95,6 +102,10 @@ describe('resource images', () => {
       size: '1024x1024',
       stream: false,
       style: 'vivid',
+      svg: {
+        model: 'x',
+        reasoning: { effort: 'none' },
+      },
       user: 'user-1234',
     });
   });
