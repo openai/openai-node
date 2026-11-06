@@ -100,14 +100,18 @@ export class Stream<Item> implements AsyncIterable<Item> {
    * Decodes an SSE response into parsed JSON events.
    *
    * The resulting stream can be consumed only once, ignores events after `[DONE]`, and
-   * surfaces API error payloads as `APIError` instances. When
+   * surfaces API error payloads as `APIError` instances in the default `legacy` mode.
+   * In `events` mode, every parsed JSON payload remains a stream item. When
    * `synthesizeEventData` is enabled, each item also includes its SSE event name.
+   * Custom factories that wrap this method should forward the optional fifth
+   * argument to preserve the selected delivery mode.
    */
   static fromSSEResponse<Item>(
     response: Response,
     controller: AbortController,
     client?: OpenAI,
     synthesizeEventData?: boolean,
+    streamMode: 'legacy' | 'events' = 'legacy',
   ): Stream<Item> {
     let consumed = false;
     const logger = client ? loggerFor(client) : console;
@@ -135,15 +139,20 @@ export class Stream<Item> implements AsyncIterable<Item> {
             break;
           }
 
-          if (sse.event === null || !sse.event.startsWith('thread.')) {
-            let data;
+          let data;
+          try {
+            data = JSON.parse(sse.data);
+          } catch {
+            logger.error(`Could not parse message into JSON:`);
+            logger.error(`From chunk:`);
+            throw new SyntaxError('Error reading response: malformed server-sent event JSON.');
+          }
 
-            try {
-              data = JSON.parse(sse.data);
-            } catch {
-              logger.error(`Could not parse message into JSON:`);
-              logger.error(`From chunk:`);
-              throw new SyntaxError('Error reading response: malformed server-sent event JSON.');
+          if (streamMode === 'legacy') {
+            if (sse.event?.startsWith('thread.')) {
+              // SAFETY: Named SSE events use the public stream's event/data envelope; Item is the caller-selected API event contract.
+              yield { event: sse.event, data } as any;
+              continue;
             }
 
             if (sse.event === 'error') {
@@ -153,20 +162,8 @@ export class Stream<Item> implements AsyncIterable<Item> {
             if (data && data.error) {
               throw new APIError(undefined, data.error, undefined, response.headers);
             }
-
-            yield synthesizeEventData ? { event: sse.event, data } : data;
-          } else {
-            let data;
-            try {
-              data = JSON.parse(sse.data);
-            } catch {
-              logger.error(`Could not parse message into JSON:`);
-              logger.error(`From chunk:`);
-              throw new SyntaxError('Error reading response: malformed server-sent event JSON.');
-            }
-            // SAFETY: Named SSE events use the public stream's event/data envelope; Item is the caller-selected API event contract.
-            yield { event: sse.event, data } as any;
           }
+          yield synthesizeEventData ? { event: sse.event, data } : data;
         }
         done = true;
       } catch (e) {

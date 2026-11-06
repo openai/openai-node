@@ -34,6 +34,7 @@ export async function defaultParseResponse<T>(
           props.controller,
           client,
           props.options.__synthesizeEventData,
+          props.options.__streamMode,
         ) as any;
       }
 
@@ -42,6 +43,7 @@ export async function defaultParseResponse<T>(
         props.controller,
         client,
         props.options.__synthesizeEventData,
+        props.options.__streamMode,
       ) as any;
     }
 

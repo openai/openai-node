@@ -1,3 +1,4 @@
+/* oxlint-disable max-classes-per-file -- Independent forwarding and older nonforwarding stream overrides verify compatibility. */
 import * as mini from 'zod/v4-mini';
 import { inspect } from 'node:util';
 import { zodTextFormat, zodResponsesFunction } from 'openai/helpers/zod';
@@ -9,7 +10,7 @@ import { z as z4 } from 'zod/v4';
 import { zodAgentTextFormat } from 'openai/helpers/beta/agents/zod';
 import { AgentOutputParseError, agentOutputFormat } from 'openai/lib/beta/agents/output-format';
 import { describe, expect, test, vi } from 'vitest';
-import OpenAI, { BadRequestError } from 'openai';
+import OpenAI, { APIError, BadRequestError } from 'openai';
 import type { JSONSchema } from 'openai/lib/jsonschema';
 import { AgentTurnResultError } from 'openai/lib/beta/agents/agent-turn-result-error';
 import { AgentToolDispatcher } from 'openai/lib/beta/agents/tool-dispatcher';
@@ -130,8 +131,15 @@ class CustomStream<Item> extends Stream<Item> {
     controller: AbortController,
     client?: OpenAI,
     synthesizeEventData?: boolean,
+    streamMode?: 'legacy' | 'events',
   ): CustomStream<Item> {
-    const source = Stream.fromSSEResponse<Item>(response, controller, client, synthesizeEventData);
+    const source = Stream.fromSSEResponse<Item>(
+      response,
+      controller,
+      client,
+      synthesizeEventData,
+      streamMode,
+    );
     const custom = new CustomStream(() => source[Symbol.asyncIterator](), controller, client);
     CustomStream.last = custom;
     return custom;
@@ -367,16 +375,41 @@ describe('beta Agents finalResult', () => {
     expect(result.output_text).toBe('Final answer');
   });
 
-  test('preserves a delivery error as the collection error cause', async () => {
-    const { client } = setup([
-      created(),
-      message(),
-      event('error', { error: { message: 'synthetic failure' } }),
-    ]);
+  test('does not report a successful result after an in-band error and EOF', async () => {
+    const { client } = setup(
+      [created(), message(), event('error', { error: { message: 'synthetic failure' } })],
+      { eof: true },
+    );
+    const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    await expect(stream.finalResult()).rejects.toMatchObject({ reason: 'observation', turn_id: turn.id });
+  });
+
+  test('preserves a failing response body as the collection error cause', async () => {
+    const failure = new Error('synthetic delivery failure');
+    const events = [created(), message()];
+    let index = 0;
+    const client = new OpenAI({
+      apiKey: 'synthetic',
+      maxRetries: 0,
+      fetch: async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              if (index < events.length) {
+                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(events[index])}\n\n`));
+                index += 1;
+              } else {
+                controller.error(failure);
+              }
+            },
+          }),
+          { headers: { 'content-type': 'text/event-stream' } },
+        ),
+    });
     const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
     await expect(stream.finalResult()).rejects.toMatchObject({
       reason: 'observation',
-      cause: expect.objectContaining({ message: 'synthetic failure' }),
+      cause: failure,
       turn_id: turn.id,
     });
   });
@@ -398,24 +431,31 @@ describe('beta Agents finalResult', () => {
     const result = await stream.finalResult();
     expect(result.output_text).toBe('Final answer');
   });
-  test('a later raw transport failure does not poison the already completed selected turn', async () => {
-    const { client } = setup([
-      created(),
-      message(),
-      completed(),
-      idle(),
-      event('error', { error: { message: 'later failure' } }),
-    ]);
+  test('a later in-band error remains observable without poisoning the completed selected turn', async () => {
+    const { client } = setup(
+      [created(), message(), completed(), idle(), event('error', { error: { message: 'later failure' } })],
+      { eof: true },
+    );
     const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
     stream.withResultCollection();
-    await expect(collect(stream)).rejects.toThrow('later failure');
+    const events = await collect(stream);
+    expect(events.pop()).toMatchObject({ type: 'error', error: { message: 'later failure' } });
     const result = await stream.finalResult();
     expect(result.output_text).toBe('Final answer');
   });
   test.each(['iterate', 'tee', 'readable'])(
     'preserves custom stream identity and methods through %s consumption',
     async (mode) => {
-      const { client } = setup([created(), message(), completed(), idle()], { eof: true });
+      const { client } = setup(
+        [
+          created(),
+          message(),
+          event('error', { error: { message: 'in-band failure' } }),
+          completed(),
+          idle(),
+        ],
+        { eof: true },
+      );
       const { data: stream, request_id } = await client.beta.agents.sessions
         .create({ environment: { type: 'none' }, stream: true }, { __streamClass: CustomStream })
         .withResponse();
@@ -443,6 +483,51 @@ describe('beta Agents finalResult', () => {
       expect(result.output_text).toBe('Final answer');
     },
   );
+
+  test('an older nonforwarding custom stream retains its identity and legacy error handling', async () => {
+    class NonforwardingStream<Item> extends CustomStream<Item> {
+      static override fromSSEResponse<Item>(
+        response: Response,
+        controller: AbortController,
+        client?: OpenAI,
+        synthesizeEventData?: boolean,
+      ): NonforwardingStream<Item> {
+        const source = Stream.fromSSEResponse<Item>(response, controller, client, synthesizeEventData);
+        const custom = new NonforwardingStream(() => source[Symbol.asyncIterator](), controller, client);
+        NonforwardingStream.last = custom;
+        return custom;
+      }
+    }
+    const { client } = setup([event('error', { error: { message: 'legacy failure' } })], { eof: true });
+    const stream = await client.beta.agents.sessions.create(
+      { environment: { type: 'none' }, stream: true },
+      { __streamClass: NonforwardingStream },
+    );
+    expect(stream).toBe(NonforwardingStream.last);
+    expect(stream).toBeInstanceOf(NonforwardingStream);
+    if (!(stream instanceof NonforwardingStream)) {
+      throw new Error('Expected older configured stream class');
+    }
+    expect(stream.customMethod()).toBe('custom');
+    await expect(collect(stream)).rejects.toBeInstanceOf(APIError);
+  });
+
+  test('a forwarding custom stream preserves fatal errors on other APIs', async () => {
+    const { client } = setup([event('error', { error: { message: 'legacy failure' } })], { eof: true });
+    const stream = await client.responses.create(
+      { model: 'gpt-synthetic', input: 'hello', stream: true },
+      { __streamClass: CustomStream },
+    );
+    expect(stream).toBe(CustomStream.last);
+    expect(stream).toBeInstanceOf(CustomStream);
+    await expect(
+      (async () => {
+        for await (const item of stream) {
+          expect(item).toBeDefined();
+        }
+      })(),
+    ).rejects.toBeInstanceOf(APIError);
+  });
 
   test('excludes known unfinished commentary while preserving completed final output', async () => {
     const commentary = message('Thinking', 'commentary', 'commentary', 0, false);
