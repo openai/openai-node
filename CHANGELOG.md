@@ -1,5 +1,22 @@
 # Changelog
 
+## [7.53.0](https://github.com/openai/openai-node/compare/v7.52.0...v7.53.0) (2026-11-06)
+
+
+### Features
+
+* **agents:** deliver session errors as stream events ([#3120](https://github.com/openai/openai-node/issues/3120)) ([c48e5aa](https://github.com/openai/openai-node/commit/c48e5aa56c1f55ee8a19dab6578860d6a0ad1395))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump @aws-sdk/credential-provider-node from 3.972.84 to 3.972.88 ([#3099](https://github.com/openai/openai-node/issues/3099)) ([101175b](https://github.com/openai/openai-node/commit/101175bd5077dc8e7cb24435cefee0aac14dd1c3))
+* **deps-dev:** bump oxfmt from 0.72.0 to 0.75.0 ([#3091](https://github.com/openai/openai-node/issues/3091)) ([77012af](https://github.com/openai/openai-node/commit/77012aff4531c2939eb74a9ad2b14f0fb113a3ff))
+* **deps-dev:** bump oxlint from 1.87.0 to 1.90.0 ([#3096](https://github.com/openai/openai-node/issues/3096)) ([75903b2](https://github.com/openai/openai-node/commit/75903b20ef3959c0457e4cc6895339611cd2bd1e))
+* **deps-dev:** bump ultracite from 7.11.1 to 8.1.0 ([#3098](https://github.com/openai/openai-node/issues/3098)) ([a523d74](https://github.com/openai/openai-node/commit/a523d74b7c82fc4379259eb2352a13ee400d8b4b))
+* **deps:** bump @azure/identity from 4.13.3 to 4.14.0 ([#3094](https://github.com/openai/openai-node/issues/3094)) ([6a3d573](https://github.com/openai/openai-node/commit/6a3d5739c85511bba0e6f581d3bfeac72fd7922f))
+* **deps:** bump @azure/identity from 4.13.3 to 4.14.0 ([#3094](https://github.com/openai/openai-node/issues/3094)) ([3f56f57](https://github.com/openai/openai-node/commit/3f56f574f87a7c7117db0ae75a19cfc4025864fd))
+
 ## [7.52.0](https://github.com/openai/openai-node/compare/v7.51.0...v7.52.0) (2026-11-05)
 
 
