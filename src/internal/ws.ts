@@ -380,7 +380,9 @@ export function rawByteLength(data: RawWebSocketData): number {
  * whenever they would exceed the configured byte budget.
  */
 export class SendQueue<T = unknown> {
-  private _queue: QueueEntry[] = [];
+  private _queue: (QueueEntry | undefined)[] = [];
+  private _cursor = 0;
+  private _flushing = false;
   private _bytes = 0;
   private _maxBytes: number;
 
@@ -392,6 +394,15 @@ export class SendQueue<T = unknown> {
     this._maxBytes = maxBytes;
   }
 
+  /** New open-socket writes must queue behind an active flush. */
+  get isFlushing(): boolean {
+    return this._flushing;
+  }
+
+  get hasPending(): boolean {
+    return this._queue.length > this._cursor;
+  }
+
   /**
    * Serializes and snapshots a JSON message before queueing it.
    *
@@ -399,14 +410,18 @@ export class SendQueue<T = unknown> {
    * when adding it to a nonempty queue would exceed the byte budget.
    */
   enqueue(event: T): boolean {
+    const pending = this._queue;
     const data = JSON.stringify(event);
     if (data === undefined) {
       throw new TypeError('WebSocket event could not be serialized as JSON');
     }
+    if (this._queue !== pending) {
+      throw new Error('WebSocket send queue was drained during serialization');
+    }
     const byteLength = encodeUTF8(data).byteLength;
     if (
       this._bytes + byteLength > this._maxBytes &&
-      (!this.allowOversizedFirstMessage || this._queue.length > 0)
+      (!this.allowOversizedFirstMessage || this._queue.length > this._cursor)
     ) {
       return false;
     }
@@ -423,11 +438,15 @@ export class SendQueue<T = unknown> {
    * when adding it to a nonempty queue would exceed the byte budget.
    */
   enqueueRaw(data: RawWebSocketData): boolean {
+    const pending = this._queue;
     const snapshot = snapshotRawData(data);
+    if (this._queue !== pending) {
+      throw new Error('WebSocket send queue was drained during raw snapshot');
+    }
     const byteLength = rawByteLength(snapshot);
     if (
       this._bytes + byteLength > this._maxBytes &&
-      (!this.allowOversizedFirstMessage || this._queue.length > 0)
+      (!this.allowOversizedFirstMessage || this._queue.length > this._cursor)
     ) {
       return false;
     }
@@ -443,18 +462,38 @@ export class SendQueue<T = unknown> {
    * an attempted write use `requeueFailed: false`. Never-attempted messages
    * remain queued, including messages enqueued during the failed send.
    */
-  flush(send: (data: RawWebSocketData) => void, options?: { requeueFailed?: boolean }): void {
-    const pending = this._queue.splice(0);
-    this._bytes = 0;
-    for (let i = 0; i < pending.length; i++) {
-      try {
-        send(pending[i]!.data);
-      } catch (err) {
-        const remaining = pending.slice(options?.requeueFailed === false ? i + 1 : i);
-        this._queue = [...remaining, ...this._queue];
-        this._bytes = this._queue.reduce((sum, item) => sum + item.byteLength, 0);
-        throw err;
+  flush(
+    send: (data: RawWebSocketData) => void,
+    options?: { requeueFailed?: boolean; canSend?: () => boolean },
+  ): void {
+    if (this._flushing) {
+      return;
+    }
+    this._flushing = true;
+    const pending = this._queue;
+    try {
+      // Reentrant enqueue appends to this queue. Drain detaches it, canceling this flush.
+      while (this._queue === pending && this._cursor < pending.length && (options?.canSend?.() ?? true)) {
+        const entry = pending[this._cursor]!;
+        // Release sent payloads as we go, including during long reentrant append chains.
+        pending[this._cursor++] = undefined;
+        this._bytes -= entry.byteLength;
+        try {
+          send(entry.data);
+        } catch (err) {
+          if (this._queue === pending && options?.requeueFailed !== false) {
+            pending[--this._cursor] = entry;
+            this._bytes += entry.byteLength;
+          }
+          throw err;
+        }
       }
+    } finally {
+      if (this._queue === pending) {
+        pending.splice(0, this._cursor);
+      }
+      this._cursor = 0;
+      this._flushing = false;
     }
   }
 
@@ -463,7 +502,9 @@ export class SendQueue<T = unknown> {
    * deserialized back to their original form. Resets byte tracking to zero.
    */
   drain(): UnsentMessage<T>[] {
-    const unsent = this._queue.map((entry): UnsentMessage<T> => {
+    const unsent = this._queue.slice(this._cursor).map((item): UnsentMessage<T> => {
+      // Only entries before the cursor have been consumed.
+      const entry = item!;
       if (entry.kind === 'raw') {
         return { type: 'raw', data: entry.data };
       }
@@ -471,6 +512,8 @@ export class SendQueue<T = unknown> {
       return { type: 'message', message: JSON.parse(entry.data) as T };
     });
     this._queue = [];
+    this._cursor = 0;
+    this._flushing = false;
     this._bytes = 0;
     return unsent;
   }

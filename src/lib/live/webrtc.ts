@@ -16,8 +16,11 @@ export type {
   WebRTCState,
 } from '../webrtc/types';
 
-/** Fixture playback requires a primary WebSocket or server sideband. */
-type ClientEvent = Exclude<ConnectClientEvent, { type: 'session.output_audio.fixture.play' }>;
+/** Fixture playback requires WebSocket; DTMF commands require a SIP sideband. */
+type ClientEvent = Exclude<
+  ConnectClientEvent,
+  { type: 'session.output_audio.fixture.play' | 'transport.dtmf.send' }
+>;
 
 /** Browser Live connection with application-owned SDP exchange and typed server-event subscriptions. */
 export class OpenAILiveWebRTC extends WebRTCConnection<ClientEvent, ServerEvent> {}

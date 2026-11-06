@@ -2369,6 +2369,11 @@ export class OpenAI {
       stopObserving?.();
     }
     const { bodyHeaders, body, isStreamingBody } = encodedBody;
+    // Capture the local response parser after serialization and before dispatch.
+    const captureResponseParser = options.__metadata?.['captureResponseParser'];
+    if (typeof captureResponseParser === 'function') {
+      captureResponseParser(options);
+    }
 
     // Choose the parser from the encoded payload. Opaque bodies retain the
     // caller's parser choice; JSON and multipart fields reflect serialization.

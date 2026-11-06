@@ -7,7 +7,7 @@
     },
     "src/client.ts": {
       "mode": "100644",
-      "sha256": "2c261bd7faffbd847f45acaa5f0dbd433764b638431ad05d4e841cae6061b0f5"
+      "sha256": "ad27a23b9f869472bbd20b922b55fdc0d095f9be8a25b44def7ef5a8f0fd53ad"
     },
     "src/internal/data-residency.ts": {
       "mode": "100644",
@@ -455,7 +455,7 @@
     },
     "src/resources/beta/responses/ws-base.ts": {
       "mode": "100644",
-      "sha256": "aa3ce6134773924112e7ffa9591dd373c57cfa05e22a0e1f3b8f189e5eedbbc8"
+      "sha256": "2169c7e44c99aae1d5ed84e006149ae1c885a0d039783f09c9304bc4ba0afff2"
     },
     "src/resources/beta/responses/ws.ts": {
       "mode": "100644",
@@ -687,7 +687,7 @@
     },
     "src/resources/graders/grader-models.ts": {
       "mode": "100644",
-      "sha256": "be76da9508d463b5201d7a85ca728c2f7eaaef466c5341dd0867dafdee330545"
+      "sha256": "5f6691d98dbe62f7321e914dc85ecb27b51a80a1d03eda1b585b9a9e674929f6"
     },
     "src/resources/graders/graders.ts": {
       "mode": "100644",
@@ -863,11 +863,11 @@
     },
     "src/resources/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "ca37ee6291a30c25bbf23a1612b7d042391c03158fe29155fa3a8f228982f3c5"
+      "sha256": "31888d46d3c934ad6901fc820d35a1f7ebaf70b7139415529082bcc479adf38e"
     },
     "src/resources/responses/ws-base.ts": {
       "mode": "100644",
-      "sha256": "63d87ead2d5d55d065920a21d6d8e4c70ce5130e5051d7fbe290b25ce938f165"
+      "sha256": "276db652f3752669697cdb95ff1b5579c89b8750d11611e439bd2c661b033cb4"
     },
     "src/resources/responses/ws.ts": {
       "mode": "100644",

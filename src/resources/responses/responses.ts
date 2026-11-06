@@ -16,7 +16,10 @@ import { path } from '../../internal/utils/path';
 
 import {
   type ExtractParsedContentFromParams,
+  type ParsedWithOptions,
   parseResponse,
+  resolveResponseParseOptions,
+  type ResponseParseOptions,
   type ResponseCreateParamsWithTools,
   addOutputText,
 } from '../../lib/ResponsesParser';
@@ -453,23 +456,31 @@ export class Responses extends APIResource {
     );
   }
 
-  parse<Params extends ResponseCreateParamsWithTools, ParsedT = ExtractParsedContentFromParams<Params>>(
-    body: Params,
-    options?: RequestOptions,
-  ): APIPromise<ParsedResponse<ParsedT>> {
+  /** Parses completed text using the last format update or the local `parseAs` option. */
+  parse<
+    Params extends ResponseCreateParamsWithTools,
+    ParsedT = ExtractParsedContentFromParams<Params>,
+    Options extends ResponseParseOptions = RequestOptions,
+  >(body: Params, options?: Options): APIPromise<ParsedResponse<ParsedWithOptions<Options, ParsedT>>> {
+    const { getTextFormat, requestOptions } = resolveResponseParseOptions(body, options);
     return this._client.responses
-      .create(body, options)
-      ._thenUnwrap((response) => parseResponse(response as Response, body));
+      .create(body, requestOptions)
+      ._thenUnwrap((response, { options: prepared }) =>
+        parseResponse<Params, ParsedWithOptions<Options, ParsedT>>(
+          response as Response,
+          body,
+          getTextFormat(prepared),
+        ),
+      );
   }
 
-  /**
-   * Creates a model response stream
-   */
-  stream<Params extends ResponseStreamParams, ParsedT = ExtractParsedContentFromParams<Params>>(
-    body: Params,
-    options?: RequestOptions,
-  ): ResponseStream<ParsedT> {
-    return ResponseStream.createResponse<ParsedT>(this._client, body, options);
+  /** Creates a response stream with the same local parsing options as `parse()`. */
+  stream<
+    Params extends ResponseStreamParams,
+    ParsedT = ExtractParsedContentFromParams<Params>,
+    Options extends ResponseParseOptions = RequestOptions,
+  >(body: Params, options?: Options): ResponseStream<ParsedWithOptions<Options, ParsedT>> {
+    return ResponseStream.createResponse<ParsedWithOptions<Options, ParsedT>>(this._client, body, options);
   }
 }
 

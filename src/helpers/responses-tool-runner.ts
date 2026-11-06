@@ -960,7 +960,7 @@ export class ResponsesToolRunner {
           (typeof item.result === 'string' || item.result === null) &&
           [undefined, null, 'generate', 'edit', 'auto'].includes(action) &&
           [undefined, null, 'transparent', 'opaque', 'auto'].includes(background) &&
-          [undefined, null, 'png', 'webp', 'jpeg'].includes(format) &&
+          [undefined, null, 'png', 'webp', 'jpeg', 'gif', 'svg'].includes(format) &&
           [undefined, null, 'low', 'medium', 'high', 'xhigh', 'max', 'auto'].includes(quality) &&
           (prompt === undefined || prompt === null || typeof prompt === 'string') &&
           (size === undefined || size === null || typeof size === 'string');

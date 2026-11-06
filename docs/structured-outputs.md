@@ -52,6 +52,34 @@ matches the Zod version in your application.
 
 See the complete [Responses Structured Outputs example](../examples/responses/structured-outputs.ts).
 
+## Changing formats during a conversation
+
+`responses.parse()` and `responses.stream()` use the last `configuration_update` in the input that sets
+`text.format`. A format built with `zodTextFormat()` or `standardTextFormat()` carries its parser. A raw
+`json_schema` format yields a JSON value typed as `unknown`. Switching to `{ type: 'text' }` leaves
+`output_parsed` null.
+
+If an earlier turn changed the format, a continuation using only `previous_response_id` cannot see that
+update. Pass `parseAs` in the request options to select the parser locally:
+
+```ts
+const format = zodTextFormat(MathResponse, 'math_response');
+const next = await client.responses.parse(
+  { previous_response_id: response.id, input: 'Show the steps again.' },
+  { parseAs: format },
+);
+```
+
+Spreading a request typed as `ResponseCreateParamsNonStreaming` preserves its explicit top-level parser
+type. If that request can contain an update to a different format, pass `parseAs` or retain the more
+specific input type. For dynamic or very long input histories, TypeScript may infer several possible result types. An explicit
+parser also gives the result its precise type. The API receives the same request body. Pass `{ parseAs: null }` to read `output_text` without parsing it.
+
+Automatic parser selection uses the format metadata on your local input objects. If an object's custom
+`toJSON()` returns a different `text.format` or omits it, pass `{ parseAs: format }` for the response you
+expect, or pass `{ parseAs: null }` and parse `output_text` yourself. These options do not alter the request
+body. A locally visible `{ type: 'text' }` format update still cannot be combined with a non-null `parseAs`.
+
 ## Parse function arguments with Zod
 
 Use `zodResponsesFunction()` for Responses API function tools. Passing the tool to `responses.parse()` adds
