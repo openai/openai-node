@@ -1,5 +1,17 @@
 # Changelog
 
+## [7.53.1](https://github.com/openai/openai-node/compare/v7.53.0...v7.53.1) (2026-11-07)
+
+
+### Chores
+
+* **api:** retain agent scheduling support ([#3123](https://github.com/openai/openai-node/issues/3123)) ([47bade0](https://github.com/openai/openai-node/commit/47bade063b0277e56a8352997a55e857424d482c))
+
+
+### Documentation
+
+* consolidate AGENTS.md guidance ([#3121](https://github.com/openai/openai-node/issues/3121)) ([9ba922c](https://github.com/openai/openai-node/commit/9ba922c5cc88c49120de36ebb9920df466b628b1))
+
 ## [7.53.0](https://github.com/openai/openai-node/compare/v7.52.0...v7.53.0) (2026-11-06)
 
 
