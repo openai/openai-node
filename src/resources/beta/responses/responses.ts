@@ -1639,6 +1639,7 @@ export interface BetaResponse {
     | 'gpt-5.6-cyber'
     | 'gpt-6-cyber'
     | 'gpt-rosalind-research'
+    | 'gpt-6-rosalind'
     | (string & {});
 
   /**
@@ -13241,6 +13242,7 @@ export namespace BetaResponsesClientEvent {
       | 'gpt-5.6-cyber'
       | 'gpt-6-cyber'
       | 'gpt-rosalind-research'
+      | 'gpt-6-rosalind'
       | (string & {});
 
     /**
@@ -15695,6 +15697,7 @@ export interface ResponseCreateParamsBase {
     | 'gpt-5.6-cyber'
     | 'gpt-6-cyber'
     | 'gpt-rosalind-research'
+    | 'gpt-6-rosalind'
     | (string & {});
 
   /**
@@ -16402,6 +16405,7 @@ export interface ResponseCompactParams {
     | 'gpt-5.6-cyber'
     | 'gpt-6-cyber'
     | 'gpt-rosalind-research'
+    | 'gpt-6-rosalind'
     | (string & {})
     | null;
 
