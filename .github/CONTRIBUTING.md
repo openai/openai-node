@@ -76,40 +76,13 @@ This will install all the required dependencies and build output files to `dist/
 
 ## Modifying/Adding code
 
-Most of the SDK is generated code. Never edit generated files by hand; change
-the authoritative generation inputs or compiler and regenerate instead. The generator will never
-modify the contents of the `src/lib/` and `examples/` directories.
+Look up the repository-relative path in the [Castiron generated-file inventory](../scripts/castiron/generated-files.json). To [report a bug](#contribution-policy), include the SDK version, affected call, and a small, sanitized reproduction.
 
-<a id="custom-code-budget"></a>
+- **Incorrect API field.** If the API schema gives a field the wrong type or marks it required incorrectly, fix the schema and regenerate the SDK.
+- **Incorrect generated code.** If the schema is correct but the SDK exposes the wrong type or sends the wrong value, fix the generation configuration or compiler and regenerate. Verify the fix with a regression test that calls the public SDK.
+- **Handwritten helper or example.** Keep SDK-specific extensions in handwritten files and test them directly. For instance, [polling.ts](../src/lib/polling.ts) is handwritten. The [examples directory](../examples/) contains handwritten examples.
 
-## Generated-file ownership
-
-Do not edit generated SDK files by hand. Fix the API schema, generation
-configuration, or compiler and regenerate instead. Put SDK-specific behavior in
-separately owned handwritten helpers and extension points.
-
-Regeneration replaces generated files and removes retired generated paths.
-Handwritten edits to generated output are overwritten, not carried forward.
-Separately owned handwritten files are preserved. Resolve ownership conflicts
-explicitly before regeneration. Follow the ownership rules in `AGENTS.md`
-and review generated output and inventory changes together. Generated-file
-ownership relies on contributor guidance and code review. Fix violations in the
-generation inputs/compiler and regenerate; do not edit inventory hashes to
-accept a handwritten patch.
-
-### Transition on `next`
-
-Canonical regeneration retires the legacy budget/reporting workflows,
-privileged status publisher, checker, and `scripts/castiron/CUSTOM_CODE.md`.
-The files present depend on the revision: while a checkout still contains the
-legacy tooling, preserve its security checks and satisfy required statuses.
-After regeneration removes it, do not recreate it or introduce a replacement
-budget system.
-
-Repository rules and hosted workflow settings are configured separately from
-these files. Inspect the actual settings and check results before merging;
-this guidance neither disables workflows nor bypasses a required check.
-Never add handwritten edits to generated output.
+Regeneration replaces owned files, including generated tests, docs, and workflows, and removes retired paths. Review the output and inventory together. Resolve ownership collisions before regenerating. Never hand-edit generated output or its inventory. Maintainers enforce this policy in code review.
 
 ## Security requirements
 
@@ -332,10 +305,6 @@ requires GitHub Actions OIDC trusted publishing; local token-based publishing is
 
 The table describes workflow execution and npm publication dependencies for changes targeting `main`
 in `openai/openai-node`.
-It describes main after the tooling retirement. A `next` revision may still
-contain legacy Castiron PR/merge-group and privileged publication workflow
-definitions until canonical regeneration removes them. Inspect the checkout and
-hosted workflow settings to determine which checks apply.
 Required merge checks are configured in repository rules. The `test matrix` check requires the Node.js
 tests, benchmarks, credential-free ecosystem job, and Windows build to succeed.
 
