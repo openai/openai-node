@@ -743,7 +743,7 @@
     },
     "src/resources/live/forks/forks.ts": {
       "mode": "100644",
-      "sha256": "92affe978e781d898444b36bdec49ac998e82adef2801f1735c7b71b457f3ce0"
+      "sha256": "1afce6dd42f7218b11a2619dab597b1b3d2e30b6868defcd02029cfc3419fc6c"
     },
     "src/resources/live/forks/index.ts": {
       "mode": "100644",
@@ -771,7 +771,7 @@
     },
     "src/resources/live/live.ts": {
       "mode": "100644",
-      "sha256": "e68368685fc60ac36b9bf2d8065862f8de5c08ce959520f310d36ae8012468ef"
+      "sha256": "3e7b061dc62ca5cc2acf7247bc248c7b865c522de16ca91ae9cef390e820fe51"
     },
     "src/resources/live/sessions.ts": {
       "mode": "100644",

@@ -4,6 +4,9 @@ import { WebSocketServer } from 'ws';
 import OpenAI from 'openai';
 import { SidebandWS } from 'openai/resources/live/sideband/ws';
 import type { LiveWS } from 'openai/resources/live/ws';
+import type { ForksWS } from 'openai/resources/live/forks/ws';
+import type { ServerEvent } from 'openai/resources/live/live';
+import type { ForkServerEvent } from 'openai/resources/live/forks/forks';
 
 it('sends SIP DTMF commands and receives current and historical notifications', async () => {
   const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
@@ -80,8 +83,19 @@ it('sends SIP DTMF commands and receives current and historical notifications', 
   }
 });
 
-it('keeps the SIP command out of primary Live socket inputs', () => {
+it('retains historical DTMF server types on primary and fork sockets', () => {
+  const notification = { type: 'transport.dtmf.send', event_id: 'saved-event', event: '#' } as const;
+  expectTypeOf(notification).toMatchTypeOf<ServerEvent.TransportDtmfSend>();
+  expectTypeOf(notification).toMatchTypeOf<ServerEvent>();
+  expectTypeOf(notification).toMatchTypeOf<ForkServerEvent.TransportDtmfSend>();
+  expectTypeOf(notification).toMatchTypeOf<ForkServerEvent>();
+});
+
+it('keeps the SIP command out of primary and fork Live socket inputs', () => {
   expectTypeOf<{ type: 'transport.dtmf.send'; event: '#' }>().not.toMatchTypeOf<
     Parameters<LiveWS['send']>[0]
+  >();
+  expectTypeOf<{ type: 'transport.dtmf.send'; event: '#' }>().not.toMatchTypeOf<
+    Parameters<ForksWS['send']>[0]
   >();
 });

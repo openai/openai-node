@@ -3414,7 +3414,8 @@ export type ServerEvent =
   | ServerEvent.TransportDtmfSent
   | ServerEvent.TransportRinging
   | ServerEvent.TransportAnswered
-  | ServerEvent.TransportFailed;
+  | ServerEvent.TransportFailed
+  | ServerEvent.TransportDtmfSend;
 
 export namespace ServerEvent {
   /**
@@ -3527,6 +3528,24 @@ export namespace ServerEvent {
        */
       param?: string;
     }
+  }
+
+  /**
+   * Legacy SIP DTMF delivery notification retained for SDK compatibility and saved
+   * events. Current servers confirm delivery with transport.dtmf.sent;
+   * transport.dtmf.send is now the client command.
+   */
+  export interface TransportDtmfSend {
+    event: string;
+
+    event_id: string;
+
+    type: 'transport.dtmf.send';
+
+    /**
+     * The event_id of the client command, when supplied.
+     */
+    client_event_id?: string;
   }
 }
 
