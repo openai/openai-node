@@ -567,6 +567,44 @@ describe('bedrock provider', () => {
     },
   );
 
+  test.each(['mantle', 'runtime'] as const)(
+    'signs prototype-named headers through the %s transport',
+    async (endpoint) => {
+      const fetch = vi.fn(async (_url: RequestInfo, _init?: RequestInit) => jsonResponse());
+      const client = new OpenAI({
+        provider: bedrock({
+          endpoint,
+          region: 'us-east-1',
+          accessKeyId: 'synthetic-access-key',
+          secretAccessKey: 'synthetic-secret-key',
+        }),
+        fetch,
+        maxRetries: 0,
+      });
+
+      await client.request({
+        method: 'get',
+        path: '/models',
+        headers: new Headers([
+          ['constructor', 'constructor-value'],
+          ['__proto__', 'prototype-value'],
+          ['toString', 'to-string-value'],
+        ]),
+      });
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+      const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+      expect(headers.get('constructor')).toBe('constructor-value');
+      expect(headers.get('__proto__')).toBe('prototype-value');
+      expect(headers.get('toString')).toBe('to-string-value');
+      const signedHeaders = headers
+        .get('authorization')
+        ?.match(/SignedHeaders=(?<names>[^, ]+)/)
+        ?.groups?.['names']?.split(';');
+      expect(signedHeaders).toEqual(expect.arrayContaining(['constructor', '__proto__', 'tostring']));
+    },
+  );
+
   test('supports the alternative Runtime /v1 root without changing the SigV4 service', async () => {
     let requestedURL: RequestInfo | undefined;
     let requestedInit: RequestInit | undefined;
