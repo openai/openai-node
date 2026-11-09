@@ -1,5 +1,22 @@
 # Changelog
 
+## [7.54.0](https://github.com/openai/openai-node/compare/v7.53.0...v7.54.0) (2026-11-08)
+
+
+### Features
+
+* **api:** recognize gpt-6-rosalind in beta Responses ([#3126](https://github.com/openai/openai-node/issues/3126)) ([8fb5a99](https://github.com/openai/openai-node/commit/8fb5a99e7fa3245b53307762317484eee10a49f7))
+
+
+### Chores
+
+* **api:** retain agent scheduling support ([#3123](https://github.com/openai/openai-node/issues/3123)) ([47bade0](https://github.com/openai/openai-node/commit/47bade063b0277e56a8352997a55e857424d482c))
+
+
+### Documentation
+
+* consolidate AGENTS.md guidance ([#3121](https://github.com/openai/openai-node/issues/3121)) ([9ba922c](https://github.com/openai/openai-node/commit/9ba922c5cc88c49120de36ebb9920df466b628b1))
+
 ## [7.53.0](https://github.com/openai/openai-node/compare/v7.52.0...v7.53.0) (2026-11-06)
 
 

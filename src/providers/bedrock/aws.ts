@@ -246,7 +246,8 @@ class BedrockSigV4Auth implements BedrockRequestAuth {
       apply: (signed) => {
         request.method = method;
         request.redirect = 'manual';
-        request.headers = new Headers(signed.headers);
+        // Entry tuples preserve names such as __proto__ that a Headers record conversion can drop.
+        request.headers = new Headers(Object.entries(signed.headers));
       },
     });
   }
