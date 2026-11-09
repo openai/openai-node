@@ -83,6 +83,7 @@ describe('resource responses', () => {
   test('compact: required and optional params', async () => {
     await client.responses.compact({
       model: 'gpt-6-astra',
+      image: { context_compression: 'auto' },
       input: 'string',
       instructions: 'instructions',
       previous_response_id: 'resp_123',

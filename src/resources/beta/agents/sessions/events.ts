@@ -90,6 +90,7 @@ export class Events extends APIResource {
           options?.headers,
         ]),
         stream: true,
+        __streamMode: 'events',
         __security: { bearerAuth: true },
       })),
     ) as APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;

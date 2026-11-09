@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'v
 import { LiveDataChannel, OpenAILiveWebRTC, WebRTCError } from 'openai/live/webrtc';
 import { OpenAIRealtimeWebRTC, RealtimeDataChannel } from 'openai/realtime/webrtc';
 import type { ServerEvent } from 'openai/resources/live/live';
+import type { ConnectServerEvent } from 'openai/resources/live/sideband/sideband';
 import { DataChannel } from '../../src/lib/webrtc/data-channel';
 import { WebRTCConnection } from '../../src/lib/webrtc/connection';
 import type {
@@ -502,6 +503,15 @@ it('excludes WebSocket-only fixture playback from Live WebRTC client events', ()
   >();
 });
 
+it('excludes SIP-only DTMF commands from both Live WebRTC entrypoints', () => {
+  interface Command {
+    type: 'transport.dtmf.send';
+    event: '#';
+  }
+  expectTypeOf<Command>().not.toMatchTypeOf<Parameters<OpenAILiveWebRTC['send']>[0]>();
+  expectTypeOf<Command>().not.toMatchTypeOf<Parameters<LiveDataChannel['send']>[0]>();
+});
+
 it('infers named payloads from each public helper’s generated server-event union', () => {
   const live = new OpenAILiveWebRTC();
   const realtime = new OpenAIRealtimeWebRTC();
@@ -551,7 +561,7 @@ it('delivers named and catch-all subscriptions in registration order with the sa
   const channel = new FakeChannel();
   const live = new LiveDataChannel(channel);
   const order: string[] = [];
-  let received: ServerEvent | undefined;
+  let received: ConnectServerEvent | undefined;
   live.onEvent((event) => {
     received = event;
     order.push('all first');

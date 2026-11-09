@@ -18,6 +18,7 @@ export type ConnectClientEvent =
   | LiveAPI.InputAudioMuteEvent
   | LiveAPI.InputAudioUnmuteEvent
   | LiveAPI.OutputAudioFixturePlayEvent
+  | ConnectClientEvent.TransportDtmfSend
   | LiveAPI.InstructionsAppendEvent
   | LiveAPI.ThinkingAppendEvent
   | LiveAPI.CommentaryAppendEvent
@@ -28,6 +29,30 @@ export type ConnectClientEvent =
   | LiveAPI.ResponseCreateEvent
   | LiveAPI.SessionCloseEvent;
 
+export namespace ConnectClientEvent {
+  /**
+   * Send one DTMF keypress to the SIP trunk through a Live sideband connection. This
+   * command is supported only for SIP calls. A successful send emits
+   * `transport.dtmf.sent` on sideband. If you provide `event_id`, the success
+   * notification includes it as `client_event_id`; a failure includes it as
+   * `error.client_event_id`. Send separate events for multiple keypresses.
+   */
+  export interface TransportDtmfSend {
+    /**
+     * The DTMF key to send: one of `0`–`9`, `A`–`D`, `*`, or `#`.
+     */
+    event: string;
+
+    type: 'transport.dtmf.send';
+
+    /**
+     * Optional client identifier for correlating this command with a server event's
+     * client_event_id or error.client_event_id.
+     */
+    event_id?: string | null;
+  }
+}
+
 /**
  * Server events received by an attached Live sideband WebSocket. Audio deltas are
  * delivered over the primary connection.
@@ -36,6 +61,7 @@ export type ConnectServerEvent =
   | ConnectServerEvent.TransportRinging
   | ConnectServerEvent.TransportAnswered
   | ConnectServerEvent.TransportFailed
+  | ConnectServerEvent.TransportDtmfSent
   | LiveAPI.SessionStartedEvent
   | LiveAPI.SessionUpdatedEvent
   | LiveAPI.InputAudioMutedEvent
@@ -128,6 +154,23 @@ export namespace ConnectServerEvent {
   }
 
   /**
+   * A SIP DTMF keypress successfully sent to the SIP trunk. Delivered only to
+   * sideband observers; this is not a client command.
+   */
+  export interface TransportDtmfSent {
+    event: string;
+
+    event_id: string;
+
+    type: 'transport.dtmf.sent';
+
+    /**
+     * The event_id of the client command, when supplied.
+     */
+    client_event_id?: string;
+  }
+
+  /**
    * Input audio received from the primary transport and reflected to a Live sideband
    * connection before model-input muting.
    */
@@ -158,8 +201,9 @@ export namespace ConnectServerEvent {
   }
 
   /**
-   * A SIP DTMF keypress successfully sent to the SIP trunk. Delivered only to
-   * sideband observers; this is not a client command.
+   * Legacy SIP DTMF delivery notification retained for SDK compatibility and saved
+   * events. Current servers confirm delivery with transport.dtmf.sent;
+   * transport.dtmf.send is now the client command.
    */
   export interface TransportDtmfSend {
     event: string;

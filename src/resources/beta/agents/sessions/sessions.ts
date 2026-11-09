@@ -78,6 +78,7 @@ const normalizeRequestOptionsForQueryKeys = new Set([
   '__binaryRequest',
   '__binaryResponse',
   '__streamClass',
+  '__streamMode',
   '__security',
   '__synthesizeEventData',
 ]);
@@ -103,6 +104,7 @@ function normalizeRequestOptionsForQuery(
           | '__binaryRequest'
           | '__binaryResponse'
           | '__streamClass'
+          | '__streamMode'
           | '__security'
           | '__synthesizeEventData'
       ]?: never;
@@ -159,6 +161,7 @@ function normalizeRequestOptionsForQuery(
         | '__binaryRequest'
         | '__binaryResponse'
         | '__streamClass'
+        | '__streamMode'
         | '__security'
         | '__synthesizeEventData'
     ]?: never;
@@ -212,6 +215,7 @@ export class Sessions extends APIResource {
               ...options,
               headers: buildHeaders([{ 'OpenAI-Beta': 'agents=v1' }, options?.headers]),
               stream: body.stream ?? false,
+              __streamMode: 'events',
               __security: { bearerAuth: true },
             },
             { streamFromBody: true },
@@ -254,7 +258,7 @@ export class Sessions extends APIResource {
   }
 
   /**
-   * Updates session metadata, model, reasoning effort, or service tier. Model
+   * Updates session tools, metadata, model, reasoning effort, or service tier. Model
    * settings apply to subsequent turns. Omitted fields are unchanged. See
    * [managing sessions](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage).
    *
@@ -317,6 +321,7 @@ export class Sessions extends APIResource {
                     | '__binaryRequest'
                     | '__binaryResponse'
                     | '__streamClass'
+                    | '__streamMode'
                     | '__security'
                     | '__synthesizeEventData'
                 ]?: never;
@@ -345,6 +350,7 @@ export class Sessions extends APIResource {
           | '__binaryRequest'
           | '__binaryResponse'
           | '__streamClass'
+          | '__streamMode'
           | '__security'
           | '__synthesizeEventData'
       ]?: never;
@@ -371,6 +377,7 @@ export class Sessions extends APIResource {
               | '__binaryRequest'
               | '__binaryResponse'
               | '__streamClass'
+              | '__streamMode'
               | '__security'
               | '__synthesizeEventData'
           ]?: never;
@@ -381,7 +388,7 @@ export class Sessions extends APIResource {
   ): PagePromise<AgentSessionsPage, AgentsAPI.AgentSession> {
     const normalizeRequestOptionsForQueryOptions = normalizeRequestOptionsForQuery(
       query,
-      ['after', 'agent_id', 'limit', 'order'],
+      ['after', 'agent_id', 'limit', 'metadata', 'order'],
       options,
     );
     if (normalizeRequestOptionsForQueryOptions !== undefined) {
@@ -470,6 +477,15 @@ export interface SessionCreateParamsBase {
   metadata?: { [key: string]: string } | null;
 
   /**
+   * Action review mode. Omit to use none.
+   *
+   * - `none` - Keep the existing execution behavior without automatic action review.
+   * - `auto_review` - Review eligible actions automatically. Deny manual approval
+   *   fallbacks.
+   */
+  review?: 'none' | 'auto_review';
+
+  /**
    * Optional spending limit in USD cents. Omission or null creates an unlimited
    * session.
    */
@@ -492,6 +508,19 @@ export namespace SessionCreateParams {
    * for this session. Without `agent_id`, `model` is required.
    */
   export interface Agent {
+    /**
+     * Context compaction settings. Omit to keep the current settings. A supplied
+     * object replaces the settings; null or an empty object enables background
+     * compaction.
+     */
+    compaction?: Agent.Compaction | null;
+
+    /**
+     * Experimental settings to merge by key. Omitted settings keep their current
+     * values.
+     */
+    experimental?: Agent.Experimental;
+
     /**
      * Additional instructions appended to the agent's default base instructions. Omit
      * to leave unchanged.
@@ -539,6 +568,34 @@ export namespace SessionCreateParams {
     tools?: Array<AgentsAPI.AgentToolParam> | null;
   }
 
+  export namespace Agent {
+    /**
+     * Context compaction settings. Omit to keep the current settings. A supplied
+     * object replaces the settings; null or an empty object enables background
+     * compaction.
+     */
+    export interface Compaction {
+      /**
+       * Whether to compact context in the background. Omission or null defaults to true.
+       * Set to false to use blocking compaction. Background compaction may increase
+       * token usage.
+       */
+      async?: boolean | null;
+    }
+
+    /**
+     * Experimental settings to merge by key. Omitted settings keep their current
+     * values.
+     */
+    export interface Experimental {
+      /**
+       * Whether to give the model periodic current-time reminders. Omit to keep the
+       * current setting.
+       */
+      time_awareness?: boolean;
+    }
+  }
+
   /**
    * Optional spending limit in USD cents. Omission or null creates an unlimited
    * session.
@@ -570,7 +627,7 @@ export interface SessionCreateParamsStreaming extends SessionCreateParamsBase {
 
 export interface SessionUpdateParams {
   /**
-   * Model settings for subsequent turns. Omitted fields stay unchanged.
+   * Agent settings to update on this session. Omitted fields stay unchanged.
    */
   agent?: SessionUpdateParams.Agent;
 
@@ -582,6 +639,16 @@ export interface SessionUpdateParams {
   metadata?: { [key: string]: string } | null;
 
   /**
+   * Default action review for new root turns. Existing turns and their subagents
+   * keep their review mode.
+   *
+   * - `none` - Keep the existing execution behavior without automatic action review.
+   * - `auto_review` - Review eligible actions automatically. Deny manual approval
+   *   fallbacks.
+   */
+  review?: 'none' | 'auto_review';
+
+  /**
    * Omit to retain the limit; null or a null limit removes it without resetting
    * spend.
    */
@@ -590,7 +657,7 @@ export interface SessionUpdateParams {
 
 export namespace SessionUpdateParams {
   /**
-   * Model settings for subsequent turns. Omitted fields stay unchanged.
+   * Agent settings to update on this session. Omitted fields stay unchanged.
    */
   export interface Agent {
     /**
@@ -614,6 +681,13 @@ export namespace SessionUpdateParams {
      * - `ultrafast` - Uses the ultrafast service tier.
      */
     service_tier?: 'auto' | 'default' | 'flex' | 'priority' | 'fast' | 'ultrafast' | null;
+
+    /**
+     * Replaces the session tools. Functions and MCP servers change on the next model
+     * call. Built-in tools change by the next turn. Omit to keep the current tools, or
+     * pass null or an empty array to clear them.
+     */
+    tools?: Array<AgentsAPI.AgentToolParam> | null;
   }
 
   export namespace Agent {
@@ -646,6 +720,14 @@ export interface SessionListParams extends CursorPageParams {
    * all agents.
    */
   agent_id?: string;
+
+  /**
+   * Exact string matches supplied as `metadata[key]=value`. All supplied pairs must
+   * match. Up to 16 pairs, with keys from 1 to 64 characters and values up to 512
+   * characters. New sessions and metadata updates may take time to appear in
+   * filtered results.
+   */
+  metadata?: { [key: string]: string };
 
   /**
    * The order in which resources are returned. Defaults to `desc`.

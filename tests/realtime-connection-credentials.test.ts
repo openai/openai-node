@@ -1,3 +1,4 @@
+// oxlint-disable max-classes-per-file -- The transport fixture and real client subclasses test emitted protocols and inherited header-hook compatibility.
 import { vi } from 'vitest';
 import OpenAI, { AzureOpenAI } from 'openai';
 import { OpenAIRealtimeWS as StableNodeRealtime } from 'openai/realtime/ws';
@@ -52,7 +53,7 @@ function credential(connection: { socket: unknown }): string | undefined {
   // SAFETY: The case selects the matching Azure/client constructor and injected MockSocket; the helper reads only the recorded credential options.
   const socket = connection.socket as InstanceType<typeof MockSocket>;
   return (
-    socket.headers['Authorization']?.replace(/^Bearer /u, '') ??
+    new Headers(socket.headers).get('authorization')?.replace(/^Bearer /u, '') ??
     socket.headers['api-key'] ??
     socket.protocols.find((protocol) => protocol.startsWith('openai-insecure-api-key.'))?.slice(24)
   );
@@ -130,7 +131,7 @@ describe.each([
       if (!socket) {
         throw new Error('Expected a Realtime connection');
       }
-      expect(Object.getOwnPropertyDescriptor(socket.headers, header)).toEqual({
+      expect(Object.getOwnPropertyDescriptor(socket.headers, header.toLowerCase())).toEqual({
         value: source === 'Azure key' ? apiKey : `Bearer ${apiKey}`,
         enumerable: true,
         configurable: true,
@@ -154,15 +155,106 @@ describe.each([
   });
 });
 
-test('bypasses inherited setters for the beta protocol header', async () => {
+test.each(['OpenAI-Beta', 'openai-beta'])('bypasses inherited setters for %s', async (header) => {
   const client = new OpenAI({ apiKey: 'synthetic-beta-protocol-key' });
 
-  const { setter } = await withInheritedSetter('OpenAI-Beta', () =>
+  const { setter } = await withInheritedSetter(header, () =>
     BetaNodeRealtime.create(client, { model: 'gpt-realtime' }),
   );
 
   expect(setter).not.toHaveBeenCalled();
-  expect(sockets[0]?.headers['OpenAI-Beta']).toBe('realtime=v1');
+  expect(sockets[0]?.headers['openai-beta']).toBe('realtime=v1');
+});
+
+describe.each([
+  { name: 'stable', Realtime: StableNodeRealtime, beta: false },
+  { name: 'beta', Realtime: BetaNodeRealtime, beta: true },
+])('$name Node protocol header', ({ Realtime, beta }) => {
+  test.each([
+    { source: 'default', value: 'assistants=v2' },
+    { source: 'default', value: null },
+    { source: 'transport', value: 'assistants=v2' },
+    { source: 'transport', value: null },
+    { source: 'hook', value: 'assistants=v2' },
+    { source: 'hook', value: null },
+  ])('preserves the protocol contract with $source value $value', ({ source, value }) => {
+    class ProtocolClient extends OpenAI {
+      override _buildWebSocketHeaders(authHeaders: Record<string, string>) {
+        const headers = super._buildWebSocketHeaders(authHeaders);
+        if (source === 'hook') {
+          delete headers['openai-beta'];
+          if (value !== null) {
+            headers['OPENAI-BETA'] = value;
+          }
+        }
+        return headers;
+      }
+    }
+    const client = new ProtocolClient({
+      apiKey: 'synthetic-key',
+      defaultHeaders: source === 'default' ? { 'OpenAI-Beta': value } : {},
+    });
+    const headers = {
+      Authorization: 'Bearer synthetic-override',
+      'OpenAI-Project': 'project-override',
+      ...(source === 'transport' ? { 'OPENAI-Beta': value } : {}),
+    };
+    const connection = new Realtime(
+      {
+        model: 'gpt-realtime',
+        options: {
+          // @ts-expect-error Verify supported runtime null removals without widening the ws header types.
+          headers,
+        },
+      },
+      client,
+    );
+    expect(connection.socket).toBe(sockets[0]);
+    const actual = new Headers(sockets[0]?.headers);
+    expect(actual.get('openai-beta')).toBe(beta ? 'realtime=v1' : value);
+    expect(
+      Object.keys(sockets[0]?.headers ?? {}).filter((name) => name.toLowerCase() === 'openai-beta'),
+    ).toEqual(beta || value !== null ? ['openai-beta'] : []);
+    expect(actual.get('authorization')).toBe('Bearer synthetic-override');
+    expect(actual.get('openai-project')).toBe('project-override');
+  });
+});
+
+describe.each([
+  { name: 'stable', Realtime: StableNodeRealtime, beta: false },
+  { name: 'beta', Realtime: BetaNodeRealtime, beta: true },
+])('$name Node repeated transport headers', ({ Realtime, beta }) => {
+  test.each([false, true])('preserves values and normalized overrides (full client: %s)', (full) => {
+    const config = { apiKey: 'synthetic-key', baseURL: 'https://api.example/v1/' };
+    const client = full ? new OpenAI(config) : config;
+    const transportHeaders = {
+      'x-repeated': ['superseded'],
+      'X-Repeated': ['first', 'second'],
+      'X-Empty': [],
+      'X-Remove': ['removed'],
+      'x-remove': null,
+      Authorization: undefined,
+      'OpenAI-Beta': ['alternate=v1', 'extra=v1'],
+    };
+    const connection = new Realtime(
+      {
+        model: 'gpt-realtime',
+        options: {
+          // @ts-expect-error ws supports repeated headers and the SDK honors runtime null removals.
+          headers: transportHeaders,
+        },
+      },
+      client,
+    );
+    expect(connection.socket).toBe(sockets[0]);
+    const headers = sockets[0]?.headers;
+    expect(headers?.['x-repeated']).toEqual(['first', 'second']);
+    expect(headers?.['x-empty']).toEqual([]);
+    expect(headers).not.toHaveProperty('x-remove');
+    expect(headers?.['authorization']).toBe('Bearer synthetic-key');
+    expect(headers?.['openai-beta']).toEqual(beta ? 'realtime=v1' : ['alternate=v1', 'extra=v1']);
+    expect(Object.keys(headers ?? {}).every((name) => name === name.toLowerCase())).toBe(true);
+  });
 });
 
 describe.each([
@@ -350,5 +442,200 @@ describe.each([
 
     expect(credential(connection)).toBe('synthetic-resolved-key');
     expect(buildRealtimeURL).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe.each([
+  { name: 'stable ws', Realtime: StableNodeRealtime, beta: false },
+  { name: 'beta ws', Realtime: BetaNodeRealtime, beta: true },
+])('$name client routing', ({ Realtime, beta }) => {
+  test('uses client defaults and explicit transport headers at the handshake', () => {
+    const client = new OpenAI({
+      apiKey: 'synthetic-key',
+      baseURL: 'https://api.example/v1/',
+      organization: 'org-from-client',
+      project: 'project-from-client',
+      defaultHeaders: { 'X-Route': 'default', 'X-Remove': 'default', 'OpenAI-Project': 'project-default' },
+    });
+    const connection = new Realtime(
+      {
+        model: 'gpt-realtime',
+        options: {
+          // @ts-expect-error ws only declares string headers; the SDK also honors explicit runtime removals.
+          headers: { authorization: 'Bearer synthetic-explicit', 'x-remove': null, 'X-Route': 'call' },
+        },
+      },
+      client,
+    );
+    expect(connection.socket).toBe(sockets[0]);
+    const headers = new Headers(sockets[0]?.headers);
+    expect(headers.get('authorization')).toBe('Bearer synthetic-explicit');
+    expect(headers.get('openai-organization')).toBe('org-from-client');
+    expect(headers.get('openai-project')).toBe('project-default');
+    expect(headers.get('x-route')).toBe('call');
+    expect(headers.has('x-remove')).toBe(false);
+    expect(headers.get('openai-beta')).toBe(beta ? 'realtime=v1' : null);
+  });
+
+  test('supports default and per-connection removal with case-insensitive auth and routing', () => {
+    const client = new OpenAI({
+      apiKey: 'synthetic-key',
+      baseURL: 'https://api.example/v1/',
+      organization: 'org-from-client',
+      project: 'project-from-client',
+      defaultHeaders: { 'OPENAI-Organization': null, Authorization: 'Bearer default-credential' },
+    });
+    const connection = new Realtime(
+      // @ts-expect-error Verify untyped null removals without widening the published ws options.
+      { model: 'gpt-realtime', options: { headers: { Authorization: null, 'OpenAI-Project': null } } },
+      client,
+    );
+    expect(connection.socket).toBe(sockets[0]);
+    const headers = new Headers(sockets[0]?.headers);
+    expect(headers.has('authorization')).toBe(false);
+    expect(headers.has('openai-organization')).toBe(false);
+    expect(headers.has('openai-project')).toBe(false);
+  });
+
+  test('preserves structural partial clients with static credentials', () => {
+    const connection = new Realtime(
+      { model: 'gpt-realtime', options: { headers: { Authorization: 'Bearer partial-override' } } },
+      { apiKey: 'synthetic-partial', baseURL: 'https://api.example/v1/' },
+    );
+    expect(connection.socket).toBe(sockets[0]);
+    const headers = new Headers(sockets[0]?.headers);
+    expect(headers.get('authorization')).toBe('Bearer partial-override');
+    expect(headers.get('user-agent')).toMatch(/^Object\/JS /u);
+  });
+});
+
+describe.each(surfaces)('$name effective client routing', ({ Realtime }) => {
+  test("uses a one-argument header hook with each connection's captured credential", async () => {
+    class RoutingClient extends OpenAI {
+      override _buildWebSocketHeaders(authHeaders: Record<string, string>) {
+        const authorization = authHeaders['Authorization'];
+        if (!authorization) {
+          throw new Error('Expected the connection credential');
+        }
+        return {
+          ...super._buildWebSocketHeaders(authHeaders),
+          'OpenAI-Project': authorization.slice('Bearer '.length),
+        };
+      }
+    }
+    let calls = 0;
+    const client = new RoutingClient({
+      apiKey: async () => {
+        calls += 1;
+        return `synthetic-route-${calls}`;
+      },
+      baseURL: 'https://api.example/v1/',
+      organization: 'routing-client',
+      defaultHeaders: { 'OpenAI-Organization': null },
+    });
+
+    await Promise.all([
+      Realtime.create(client, { model: 'gpt-realtime' }),
+      Realtime.create(client, { model: 'gpt-realtime' }),
+    ]);
+
+    expect(sockets).toHaveLength(2);
+    for (const [index, socket] of sockets.entries()) {
+      const headers = new Headers(socket.headers);
+      const prefix = 'openai-project.';
+      const protocol = socket.protocols.find((entry) => entry.startsWith(prefix));
+      expect(protocol?.slice(prefix.length) ?? headers.get('openai-project')).toBe(
+        `synthetic-route-${index + 1}`,
+      );
+      expect(headers.has('openai-organization')).toBe(false);
+      expect(socket.protocols.some((entry) => entry.startsWith('openai-organization.'))).toBe(false);
+    }
+  });
+
+  test.each([
+    { name: 'overrides', value: 'routing-override', expected: 'routing-override' },
+    { name: 'removals', value: null, expected: undefined },
+    { name: 'omitted overrides', value: undefined, expected: 'routing-client' },
+    { name: 'empty values', value: '', expected: '' },
+  ])('honors case-insensitive $name', ({ value, expected }) => {
+    const client = new OpenAI({
+      apiKey: 'synthetic-key',
+      baseURL: 'https://api.example/v1/',
+      organization: 'routing-client',
+      project: 'routing-client',
+      defaultHeaders: { 'openai-organization': value, 'OPENAI-PROJECT': value },
+    });
+
+    const connection = new Realtime({ model: 'gpt-realtime' }, client);
+
+    const [socket] = sockets;
+    if (!socket) {
+      throw new Error('Expected a Realtime connection');
+    }
+    expect(connection.socket).toBe(socket);
+    const headers = new Headers(socket.headers);
+    for (const field of ['organization', 'project']) {
+      const prefix = `openai-${field}.`;
+      const protocol = socket.protocols.find((entry) => entry.startsWith(prefix));
+      expect(protocol?.slice(prefix.length) ?? headers.get(`openai-${field}`) ?? undefined).toBe(expected);
+    }
+  });
+});
+
+describe.each([
+  { name: 'stable native', Realtime: StableNativeRealtime },
+  { name: 'beta native', Realtime: BetaNativeRealtime },
+])('$name client routing', ({ Realtime }) => {
+  test('preserves routing fields on structural partial clients', () => {
+    const client = {
+      apiKey: 'synthetic-partial',
+      baseURL: 'https://api.example/v1/',
+      organization: 'org-partial',
+      project: 'proj-partial',
+    };
+    const connection = new Realtime({ model: 'gpt-realtime' }, client);
+
+    expect(connection.socket).toBe(sockets[0]);
+    expect(sockets[0]?.protocols).toEqual(
+      expect.arrayContaining(['openai-organization.org-partial', 'openai-project.proj-partial']),
+    );
+  });
+
+  test('passes supported routing protocols only for non-Azure clients', () => {
+    const connection = new Realtime(
+      { model: 'gpt-realtime' },
+      new OpenAI({
+        apiKey: 'synthetic-key',
+        baseURL: 'https://api.example/v1/',
+        organization: 'org-client',
+        project: 'proj-client',
+        defaultHeaders: { 'X-Private': 'never-a-protocol' },
+      }),
+    );
+    expect(connection.socket).toBe(sockets[0]);
+    expect(sockets[0]?.protocols).toEqual(
+      expect.arrayContaining([
+        'realtime',
+        'openai-insecure-api-key.synthetic-key',
+        'openai-organization.org-client',
+        'openai-project.proj-client',
+      ]),
+    );
+    expect(sockets[0]?.protocols.join(',')).not.toContain('never-a-protocol');
+  });
+
+  test('keeps native Azure credentials out of routing protocols', async () => {
+    const client = new AzureOpenAI({
+      apiKey: 'synthetic-azure',
+      apiVersion: '2024-10-01-preview',
+      baseURL: 'https://azure.example/openai/',
+      deployment: 'synthetic-deployment',
+      organization: 'org-client',
+      project: 'proj-client',
+    });
+    await Realtime.azure(client);
+    expect(sockets[0]?.protocols.join(',')).not.toMatch(
+      /synthetic-azure|openai-organization|openai-project/u,
+    );
   });
 });

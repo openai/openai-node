@@ -33,6 +33,15 @@ import {
 } from './certificates';
 import * as DataRetentionAPI from './data-retention';
 import { DataRetention, DataRetentionUpdateParams, OrganizationDataRetention } from './data-retention';
+import * as ExternalKeysAPI from './external-keys';
+import {
+  ExternalKey,
+  ExternalKeyCreateParams,
+  ExternalKeyListParams,
+  ExternalKeyValidateResponse,
+  ExternalKeys,
+  ExternalKeysPage,
+} from './external-keys';
 import * as ExternalStorageAPI from './external-storage';
 import {
   AwsExternalStorageProvider,
@@ -141,6 +150,16 @@ import {
   UserUpdateParams,
   Users,
 } from './users/users';
+import * as WorkloadIdentityProvidersAPI from './workload-identity-providers/workload-identity-providers';
+import {
+  WorkloadIdentityProvider,
+  WorkloadIdentityProviderCreateParams,
+  WorkloadIdentityProviderDeleted,
+  WorkloadIdentityProviderListParams,
+  WorkloadIdentityProviderUpdateParams,
+  WorkloadIdentityProviders,
+  WorkloadIdentityProvidersPage,
+} from './workload-identity-providers/workload-identity-providers';
 
 export class Organization extends APIResource {
   auditLogs: AuditLogsAPI.AuditLogs = new AuditLogsAPI.AuditLogs(this._client);
@@ -151,6 +170,9 @@ export class Organization extends APIResource {
   groups: GroupsAPI.Groups = new GroupsAPI.Groups(this._client);
   roles: RolesAPI.Roles = new RolesAPI.Roles(this._client);
   dataRetention: DataRetentionAPI.DataRetention = new DataRetentionAPI.DataRetention(this._client);
+  externalKeys: ExternalKeysAPI.ExternalKeys = new ExternalKeysAPI.ExternalKeys(this._client);
+  workloadIdentityProviders: WorkloadIdentityProvidersAPI.WorkloadIdentityProviders =
+    new WorkloadIdentityProvidersAPI.WorkloadIdentityProviders(this._client);
   externalStorage: ExternalStorageAPI.ExternalStorage = new ExternalStorageAPI.ExternalStorage(this._client);
   spendLimit: SpendLimitAPI.SpendLimit = new SpendLimitAPI.SpendLimit(this._client);
   spendAlerts: SpendAlertsAPI.SpendAlerts = new SpendAlertsAPI.SpendAlerts(this._client);
@@ -166,6 +188,8 @@ Organization.Users = Users;
 Organization.Groups = Groups;
 Organization.Roles = Roles;
 Organization.DataRetention = DataRetention;
+Organization.ExternalKeys = ExternalKeys;
+Organization.WorkloadIdentityProviders = WorkloadIdentityProviders;
 Organization.ExternalStorage = ExternalStorage;
 Organization.SpendLimit = SpendLimit;
 Organization.SpendAlerts = SpendAlerts;
@@ -262,6 +286,25 @@ export declare namespace Organization {
     DataRetention as DataRetention,
     type OrganizationDataRetention as OrganizationDataRetention,
     type DataRetentionUpdateParams as DataRetentionUpdateParams,
+  };
+
+  export {
+    ExternalKeys as ExternalKeys,
+    type ExternalKey as ExternalKey,
+    type ExternalKeyValidateResponse as ExternalKeyValidateResponse,
+    type ExternalKeysPage as ExternalKeysPage,
+    type ExternalKeyCreateParams as ExternalKeyCreateParams,
+    type ExternalKeyListParams as ExternalKeyListParams,
+  };
+
+  export {
+    WorkloadIdentityProviders as WorkloadIdentityProviders,
+    type WorkloadIdentityProvider as WorkloadIdentityProvider,
+    type WorkloadIdentityProviderDeleted as WorkloadIdentityProviderDeleted,
+    type WorkloadIdentityProvidersPage as WorkloadIdentityProvidersPage,
+    type WorkloadIdentityProviderCreateParams as WorkloadIdentityProviderCreateParams,
+    type WorkloadIdentityProviderUpdateParams as WorkloadIdentityProviderUpdateParams,
+    type WorkloadIdentityProviderListParams as WorkloadIdentityProviderListParams,
   };
 
   export {

@@ -16,7 +16,10 @@ import { path } from '../../internal/utils/path';
 
 import {
   type ExtractParsedContentFromParams,
+  type ParsedWithOptions,
   parseResponse,
+  resolveResponseParseOptions,
+  type ResponseParseOptions,
   type ResponseCreateParamsWithTools,
   addOutputText,
 } from '../../lib/ResponsesParser';
@@ -56,6 +59,7 @@ const normalizeRequestOptionsForQueryKeys = new Set([
   '__binaryRequest',
   '__binaryResponse',
   '__streamClass',
+  '__streamMode',
   '__security',
   '__synthesizeEventData',
 ]);
@@ -81,6 +85,7 @@ function normalizeRequestOptionsForQuery(
           | '__binaryRequest'
           | '__binaryResponse'
           | '__streamClass'
+          | '__streamMode'
           | '__security'
           | '__synthesizeEventData'
       ]?: never;
@@ -137,6 +142,7 @@ function normalizeRequestOptionsForQuery(
         | '__binaryRequest'
         | '__binaryResponse'
         | '__streamClass'
+        | '__streamMode'
         | '__security'
         | '__synthesizeEventData'
     ]?: never;
@@ -232,6 +238,7 @@ export class Responses extends APIResource {
                 | '__binaryRequest'
                 | '__binaryResponse'
                 | '__streamClass'
+                | '__streamMode'
                 | '__security'
                 | '__synthesizeEventData'
             ]?: never;
@@ -264,6 +271,7 @@ export class Responses extends APIResource {
                 | '__binaryRequest'
                 | '__binaryResponse'
                 | '__streamClass'
+                | '__streamMode'
                 | '__security'
                 | '__synthesizeEventData'
             ]?: never;
@@ -297,6 +305,7 @@ export class Responses extends APIResource {
                     | '__binaryRequest'
                     | '__binaryResponse'
                     | '__streamClass'
+                    | '__streamMode'
                     | '__security'
                     | '__synthesizeEventData'
                 ]?: never;
@@ -325,6 +334,7 @@ export class Responses extends APIResource {
           | '__binaryRequest'
           | '__binaryResponse'
           | '__streamClass'
+          | '__streamMode'
           | '__security'
           | '__synthesizeEventData'
       ]?: never;
@@ -352,6 +362,7 @@ export class Responses extends APIResource {
               | '__binaryRequest'
               | '__binaryResponse'
               | '__streamClass'
+              | '__streamMode'
               | '__security'
               | '__synthesizeEventData'
           ]?: never;
@@ -453,23 +464,31 @@ export class Responses extends APIResource {
     );
   }
 
-  parse<Params extends ResponseCreateParamsWithTools, ParsedT = ExtractParsedContentFromParams<Params>>(
-    body: Params,
-    options?: RequestOptions,
-  ): APIPromise<ParsedResponse<ParsedT>> {
+  /** Parses completed text using the last format update or the local `parseAs` option. */
+  parse<
+    Params extends ResponseCreateParamsWithTools,
+    ParsedT = ExtractParsedContentFromParams<Params>,
+    Options extends ResponseParseOptions = RequestOptions,
+  >(body: Params, options?: Options): APIPromise<ParsedResponse<ParsedWithOptions<Options, ParsedT>>> {
+    const { getTextFormat, requestOptions } = resolveResponseParseOptions(body, options);
     return this._client.responses
-      .create(body, options)
-      ._thenUnwrap((response) => parseResponse(response as Response, body));
+      .create(body, requestOptions)
+      ._thenUnwrap((response, { options: prepared }) =>
+        parseResponse<Params, ParsedWithOptions<Options, ParsedT>>(
+          response as Response,
+          body,
+          getTextFormat(prepared),
+        ),
+      );
   }
 
-  /**
-   * Creates a model response stream
-   */
-  stream<Params extends ResponseStreamParams, ParsedT = ExtractParsedContentFromParams<Params>>(
-    body: Params,
-    options?: RequestOptions,
-  ): ResponseStream<ParsedT> {
-    return ResponseStream.createResponse<ParsedT>(this._client, body, options);
+  /** Creates a response stream with the same local parsing options as `parse()`. */
+  stream<
+    Params extends ResponseStreamParams,
+    ParsedT = ExtractParsedContentFromParams<Params>,
+    Options extends ResponseParseOptions = RequestOptions,
+  >(body: Params, options?: Options): ResponseStream<ParsedWithOptions<Options, ParsedT>> {
+    return ResponseStream.createResponse<ParsedWithOptions<Options, ParsedT>>(this._client, body, options);
   }
 }
 
@@ -517,6 +536,17 @@ export interface CompactedResponse {
    * tokens.
    */
   usage: ResponseUsage;
+
+  image?: CompactedResponse.Image;
+}
+
+export namespace CompactedResponse {
+  export interface Image {
+    /**
+     * Effective image context optimization policy.
+     */
+    context_compression: 'enabled' | 'disabled';
+  }
 }
 
 /**
@@ -1415,6 +1445,8 @@ export interface Response {
    */
   conversation?: Response.Conversation | null;
 
+  image?: Response.Image;
+
   /**
    * An upper bound for the number of tokens that can be generated for a response,
    * including visible output tokens and
@@ -1555,6 +1587,22 @@ export interface Response {
   text?: ResponseTextConfig;
 
   /**
+   * Usage reported by hosted tools, separate from base model `usage`. The field can
+   * be omitted when tool usage is unavailable. When present, tool families with no
+   * recorded usage have zero counts.
+   *
+   * `image_gen` sums available token counts across image generation calls. Calls
+   * with missing or incomplete usage records may be skipped. Output token details
+   * and cached input counts can be omitted. An omitted cache count means cache usage
+   * is unknown.
+   *
+   * `web_search.num_requests` counts billable searches. Discounted searches and
+   * actions such as opening a page are excluded. Use billing records to reconcile
+   * final charges.
+   */
+  tool_usage?: Response.ToolUsage;
+
+  /**
    * An integer between 0 and 20 specifying the maximum number of most likely tokens
    * to return at each token position, each with an associated log probability. In
    * some cases, the number of returned tokens may be fewer than requested.
@@ -1625,6 +1673,13 @@ export namespace Response {
      * The unique ID of the conversation that this response was associated with.
      */
     id: string;
+  }
+
+  export interface Image {
+    /**
+     * Effective image context optimization policy.
+     */
+    context_compression: 'enabled' | 'disabled';
   }
 
   /**
@@ -1813,12 +1868,122 @@ export namespace Response {
     /**
      * The minimum lifetime applied to each cache breakpoint.
      */
-    ttl: '30m';
+    ttl: '30m' | '12h';
 
     /**
      * The response ID supplied as the prompt cache diagnostics comparison.
      */
     comparison_response_id?: string | null;
+  }
+
+  /**
+   * Usage reported by hosted tools, separate from base model `usage`. The field can
+   * be omitted when tool usage is unavailable. When present, tool families with no
+   * recorded usage have zero counts.
+   *
+   * `image_gen` sums available token counts across image generation calls. Calls
+   * with missing or incomplete usage records may be skipped. Output token details
+   * and cached input counts can be omitted. An omitted cache count means cache usage
+   * is unknown.
+   *
+   * `web_search.num_requests` counts billable searches. Discounted searches and
+   * actions such as opening a page are excluded. Use billing records to reconcile
+   * final charges.
+   */
+  export interface ToolUsage {
+    /**
+     * Aggregated usage statistics for image generation tool calls.
+     */
+    image_gen: ToolUsage.ImageGen;
+
+    /**
+     * Aggregated billable usage statistics for web search tool calls.
+     */
+    web_search: ToolUsage.WebSearch;
+  }
+
+  export namespace ToolUsage {
+    /**
+     * Aggregated usage statistics for image generation tool calls.
+     */
+    export interface ImageGen {
+      /**
+       * The number of tokens (images and text) in the input prompt.
+       */
+      input_tokens: number;
+
+      /**
+       * The input tokens detailed information for the image generation.
+       */
+      input_tokens_details: ImageGen.InputTokensDetails;
+
+      /**
+       * The number of output tokens generated by the model.
+       */
+      output_tokens: number;
+
+      /**
+       * The total number of tokens (images and text) used for the image generation.
+       */
+      total_tokens: number;
+
+      cached_tokens?: number;
+
+      cached_tokens_details?: ImageGen.CachedTokensDetails;
+
+      /**
+       * The output token details for the image generation.
+       */
+      output_tokens_details?: ImageGen.OutputTokensDetails;
+    }
+
+    export namespace ImageGen {
+      /**
+       * The input tokens detailed information for the image generation.
+       */
+      export interface InputTokensDetails {
+        /**
+         * The number of image tokens in the input prompt.
+         */
+        image_tokens: number;
+
+        /**
+         * The number of text tokens in the input prompt.
+         */
+        text_tokens: number;
+      }
+
+      export interface CachedTokensDetails {
+        cached_image_tokens: number;
+
+        cached_text_tokens: number;
+      }
+
+      /**
+       * The output token details for the image generation.
+       */
+      export interface OutputTokensDetails {
+        /**
+         * The number of image output tokens generated by the model.
+         */
+        image_tokens: number;
+
+        /**
+         * The number of text output tokens generated by the model.
+         */
+        text_tokens: number;
+      }
+    }
+
+    /**
+     * Aggregated billable usage statistics for web search tool calls.
+     */
+    export interface WebSearch {
+      /**
+       * The number of billable web search requests issued.
+       */
+      num_requests: number;
+    }
   }
 }
 
@@ -2742,8 +2907,8 @@ export interface ResponseComputerToolCallOutputScreenshot {
 }
 
 /**
- * A configuration update that applies to subsequent responses until it is replaced
- * by another configuration update.
+ * A configuration update for subsequent responses. Each setting stays in effect
+ * until a later update replaces that setting.
  */
 export interface ResponseConfigurationUpdateItem {
   /**
@@ -2760,6 +2925,11 @@ export interface ResponseConfigurationUpdateItem {
    * The reasoning configuration applied by this update.
    */
   reasoning?: ResponseConfigurationUpdateItem.Reasoning;
+
+  /**
+   * The text output configuration for subsequent responses.
+   */
+  text?: ResponseConfigurationUpdateItem.Text;
 }
 
 export namespace ResponseConfigurationUpdateItem {
@@ -2773,12 +2943,21 @@ export namespace ResponseConfigurationUpdateItem {
      */
     effort?: Shared.ReasoningEffort | null;
   }
+
+  /**
+   * The text output configuration for subsequent responses.
+   */
+  export interface Text {
+    /**
+     * Use a JSON schema for structured output or text to return to plain text.
+     */
+    format: Shared.ResponseFormatText | ResponsesAPI.ResponseFormatTextJSONSchemaConfig;
+  }
 }
 
 /**
- * An update to the conversation's response configuration. The configuration
- * remains in effect for subsequent responses until it is replaced by another
- * configuration update.
+ * An update to the conversation's response configuration. Supply reasoning, text,
+ * or both. Each setting stays in effect until a later update replaces it.
  */
 export interface ResponseConfigurationUpdateItemParam {
   /**
@@ -2795,6 +2974,11 @@ export interface ResponseConfigurationUpdateItemParam {
    * Updates to reasoning configuration. Only effort is supported.
    */
   reasoning?: ResponseConfigurationUpdateItemParam.Reasoning;
+
+  /**
+   * The text output configuration for subsequent responses.
+   */
+  text?: ResponseConfigurationUpdateItemParam.Text;
 }
 
 export namespace ResponseConfigurationUpdateItemParam {
@@ -2807,6 +2991,16 @@ export namespace ResponseConfigurationUpdateItemParam {
      * update replaces it.
      */
     effort?: Shared.ReasoningEffort | null;
+  }
+
+  /**
+   * The text output configuration for subsequent responses.
+   */
+  export interface Text {
+    /**
+     * Use a JSON schema for structured output or text to return to plain text.
+     */
+    format: Shared.ResponseFormatText | ResponsesAPI.ResponseFormatTextJSONSchemaConfig;
   }
 }
 
@@ -4900,7 +5094,7 @@ export namespace ResponseInputItem {
     /**
      * The output format used for generation.
      */
-    output_format?: 'png' | 'webp' | 'jpeg' | null;
+    output_format?: 'png' | 'webp' | 'jpeg' | 'gif' | 'svg' | null;
 
     /**
      * The quality of the image generated by the image generation tool call. One of
@@ -4917,6 +5111,8 @@ export namespace ResponseInputItem {
      * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
      */
     size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
+
+    svg_usage?: ImageGenerationCall.SvgUsage;
   }
 
   export namespace ImageGenerationCall {
@@ -4965,6 +5161,18 @@ export namespace ResponseInputItem {
          */
         moderation_stage: 'input' | 'output' | 'unknown';
       }
+    }
+
+    export interface SvgUsage {
+      input_tokens: number;
+
+      model: string;
+
+      output_tokens: number;
+
+      reasoning_tokens: number;
+
+      total_tokens: number;
     }
   }
 
@@ -5906,7 +6114,7 @@ export namespace ResponseItem {
     /**
      * The output format used for generation.
      */
-    output_format?: 'png' | 'webp' | 'jpeg' | null;
+    output_format?: 'png' | 'webp' | 'jpeg' | 'gif' | 'svg' | null;
 
     /**
      * The quality of the image generated by the image generation tool call. One of
@@ -5923,6 +6131,8 @@ export namespace ResponseItem {
      * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
      */
     size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
+
+    svg_usage?: ImageGenerationCall.SvgUsage;
   }
 
   export namespace ImageGenerationCall {
@@ -5971,6 +6181,18 @@ export namespace ResponseItem {
          */
         moderation_stage: 'input' | 'output' | 'unknown';
       }
+    }
+
+    export interface SvgUsage {
+      input_tokens: number;
+
+      model: string;
+
+      output_tokens: number;
+
+      reasoning_tokens: number;
+
+      total_tokens: number;
     }
   }
 
@@ -6632,7 +6854,7 @@ export namespace ResponseOutputItem {
     /**
      * The output format used for generation.
      */
-    output_format?: 'png' | 'webp' | 'jpeg' | null;
+    output_format?: 'png' | 'webp' | 'jpeg' | 'gif' | 'svg' | null;
 
     /**
      * The quality of the image generated by the image generation tool call. One of
@@ -6649,6 +6871,8 @@ export namespace ResponseOutputItem {
      * The image dimensions as a `WIDTHxHEIGHT` string, for example `1536x864`.
      */
     size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | null;
+
+    svg_usage?: ImageGenerationCall.SvgUsage;
   }
 
   export namespace ImageGenerationCall {
@@ -6697,6 +6921,18 @@ export namespace ResponseOutputItem {
          */
         moderation_stage: 'input' | 'output' | 'unknown';
       }
+    }
+
+    export interface SvgUsage {
+      input_tokens: number;
+
+      model: string;
+
+      output_tokens: number;
+
+      reasoning_tokens: number;
+
+      total_tokens: number;
     }
   }
 
@@ -9241,10 +9477,30 @@ export namespace ResponseToolSearchOutputItemParam {
     background?: 'transparent' | 'opaque' | 'auto';
 
     /**
+     * Computation spent planning the image, independently of rendering quality.
+     * Overrides the outer response's `reasoning.effort` for image generation. When
+     * omitted, inherits a supported outer reasoning effort or uses the image model's
+     * configured default. For SVG output, controls the reference image, not the SVG
+     * author's reasoning.
+     */
+    complexity?: 'low' | 'medium' | 'high';
+
+    /**
+     * Number of GIF frames. Requires `output_format` to be `gif`. Default: 9.
+     */
+    frame_count?: number;
+
+    /**
+     * Duration of each GIF frame in milliseconds, rounded to 10 ms. Requires
+     * `output_format` to be `gif`. Default: 200.
+     */
+    frame_duration_ms?: number;
+
+    /**
      * Control how much effort the model will exert to match the style and features,
      * especially facial features, of input images. Supports `high` and `low` on
-     * `gpt-image-1` and `gpt-image-1.5`; `gpt-image-1-mini` supports only `low`. For
-     * `gpt-image-2`, omit this parameter. Defaults to `low` on supported models.
+     * `gpt-image-1.5`; `gpt-image-1-mini` supports only `low`. For `gpt-image-2`, omit
+     * this parameter. Defaults to `low` on supported models.
      */
     input_fidelity?: 'high' | 'low' | null;
 
@@ -9258,8 +9514,8 @@ export namespace ResponseToolSearchOutputItemParam {
      * The image generation model to use. One of `gpt-image-1-mini`, `gpt-image-1.5`,
      * `gpt-image-2`, `gpt-image-2-2026-04-21`, `gpt-image-2.5-sunburst`,
      * `gpt-image-2.5-sunburst-2026-09-08`, `gpt-image-2.5-flare`,
-     * `gpt-image-2.5-flare-2026-09-08`, or `chatgpt-image-latest`. Default:
-     * `gpt-image-2`.
+     * `gpt-image-2.5-flare-2026-09-08`, `gpt-image-2.6-sunburst`,
+     * `gpt-image-2.6-flare`, or `chatgpt-image-latest`. Default: `gpt-image-2`.
      *
      * `gpt-image-1` was shut down on October 23, 2026. Use `gpt-image-2.5-sunburst` or
      * `gpt-image-2.5-flare` instead.
@@ -9279,6 +9535,8 @@ export namespace ResponseToolSearchOutputItemParam {
       | 'gpt-image-2.5-sunburst-2026-09-08'
       | 'gpt-image-2.5-flare'
       | 'gpt-image-2.5-flare-2026-09-08'
+      | 'gpt-image-2.6-sunburst'
+      | 'gpt-image-2.6-flare'
       | 'gpt-image-1.5'
       | 'chatgpt-image-latest';
 
@@ -9293,10 +9551,14 @@ export namespace ResponseToolSearchOutputItemParam {
     output_compression?: number;
 
     /**
-     * The output format of the generated image. One of `png`, `webp`, or `jpeg`.
-     * Default: `png`.
+     * The output format of the generated image. One of `png`, `webp`, `jpeg`, `gif`,
+     * or `svg`. Default: `png`. GIF and SVG output require a model that supports the
+     * selected format. GIF output does not support partial image streaming
+     * (`partial_images` greater than `0`), `input_image_mask`, or custom
+     * `output_compression`. Responses lifecycle events can still be streamed for GIF
+     * output.
      */
-    output_format?: 'png' | 'webp' | 'jpeg';
+    output_format?: 'png' | 'webp' | 'jpeg' | 'gif' | 'svg';
 
     /**
      * Number of partial images to generate in streaming mode, from 0 (default value)
@@ -9325,6 +9587,14 @@ export namespace ResponseToolSearchOutputItemParam {
      * `auto` is supported for models that allow automatic sizing.
      */
     size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+
+    /**
+     * SVG author model settings. Requires `output_format` to be `svg`. When SVG model
+     * selection is enabled, omitting this object uses the outer response model.
+     * Otherwise, the default SVG author is used and explicit model overrides are
+     * unavailable.
+     */
+    svg?: ImageGeneration.Svg;
   }
 
   export namespace ImageGeneration {
@@ -9342,6 +9612,35 @@ export namespace ResponseToolSearchOutputItemParam {
        * Base64-encoded mask image.
        */
       image_url?: string;
+    }
+
+    /**
+     * SVG author model settings. Requires `output_format` to be `svg`. When SVG model
+     * selection is enabled, omitting this object uses the outer response model.
+     * Otherwise, the default SVG author is used and explicit model overrides are
+     * unavailable.
+     */
+    export interface Svg {
+      model?: string;
+
+      /**
+       * Reasoning effort for SVG authoring. When omitted, uses the author model's
+       * default in both Images and Responses.
+       */
+      reasoning?: Svg.Reasoning | null;
+    }
+
+    export namespace Svg {
+      /**
+       * Reasoning effort for SVG authoring. When omitted, uses the author model's
+       * default in both Images and Responses.
+       */
+      export interface Reasoning {
+        /**
+         * Controls how much effort the model should spend on reasoning for this request.
+         */
+        effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+      }
     }
   }
 
@@ -9402,6 +9701,22 @@ export namespace ResponseUsage {
      * [More on prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching).
      */
     cached_tokens: number;
+
+    cache_write_tokens_details?: InputTokensDetails.CacheWriteTokensDetails;
+  }
+
+  export namespace InputTokensDetails {
+    export interface CacheWriteTokensDetails {
+      /**
+       * The number of input tokens written with 12-hour retention.
+       */
+      ttl_12h_tokens: number;
+
+      /**
+       * The number of input tokens written with 30-minute retention.
+       */
+      ttl_30m_tokens: number;
+    }
   }
 
   /**
@@ -9538,6 +9853,18 @@ export namespace ResponsesClientEvent {
     conversation?: string | ResponsesAPI.ResponseConversationParam | null;
 
     /**
+     * Whether to generate output for this response. Defaults to true when omitted. Set
+     * to false to prepare request state without model output; the response ID can be
+     * used as previous_response_id on a later turn.
+     */
+    generate?: boolean;
+
+    /**
+     * Request level image options.
+     */
+    image?: ResponseCreate.Image;
+
+    /**
      * Specify additional output data to include in the model response. Currently
      * supported values are:
      *
@@ -9653,7 +9980,7 @@ export namespace ResponsesClientEvent {
      * request can write up to four breakpoints. For cache matching, OpenAI considers
      * up to the latest 80 breakpoints in the conversation, without a content-block
      * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-     * `ttl` defaults to `30m`, which is currently the only supported value. See the
+     * `ttl` defaults to `30m`. Supported lifetimes depend on the API. See the
      * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
      * for current details.
      */
@@ -9886,6 +10213,18 @@ export namespace ResponsesClientEvent {
     }
 
     /**
+     * Request level image options.
+     */
+    export interface Image {
+      /**
+       * Controls image context optimization. Defaults to `auto`, which uses the model,
+       * transport, and input to select a policy. Use `enabled` to require compression
+       * support or `disabled` to turn it off.
+       */
+      context_compression?: 'auto' | 'enabled' | 'disabled';
+    }
+
+    /**
      * Configuration for running moderation on the input and output of this response.
      */
     export interface Moderation {
@@ -9941,7 +10280,7 @@ export namespace ResponsesClientEvent {
      * request can write up to four breakpoints. For cache matching, OpenAI considers
      * up to the latest 80 breakpoints in the conversation, without a content-block
      * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-     * `ttl` defaults to `30m`, which is currently the only supported value. See the
+     * `ttl` defaults to `30m`. Supported lifetimes depend on the API. See the
      * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
      * for current details.
      */
@@ -9970,10 +10309,10 @@ export namespace ResponsesClientEvent {
 
       /**
        * The minimum lifetime applied to every implicit and explicit cache breakpoint
-       * written by the request. Defaults to `30m`, which is currently the only supported
-       * value. The backend may retain cache entries for longer.
+       * written by the request. Supported values are `30m` (the default) and `12h`. The
+       * backend may retain cache entries for longer.
        */
-      ttl?: '30m';
+      ttl?: '30m' | '12h';
     }
 
     /**
@@ -11163,10 +11502,30 @@ export namespace Tool {
     background?: 'transparent' | 'opaque' | 'auto';
 
     /**
+     * Computation spent planning the image, independently of rendering quality.
+     * Overrides the outer response's `reasoning.effort` for image generation. When
+     * omitted, inherits a supported outer reasoning effort or uses the image model's
+     * configured default. For SVG output, controls the reference image, not the SVG
+     * author's reasoning.
+     */
+    complexity?: 'low' | 'medium' | 'high';
+
+    /**
+     * Number of GIF frames. Requires `output_format` to be `gif`. Default: 9.
+     */
+    frame_count?: number;
+
+    /**
+     * Duration of each GIF frame in milliseconds, rounded to 10 ms. Requires
+     * `output_format` to be `gif`. Default: 200.
+     */
+    frame_duration_ms?: number;
+
+    /**
      * Control how much effort the model will exert to match the style and features,
      * especially facial features, of input images. Supports `high` and `low` on
-     * `gpt-image-1` and `gpt-image-1.5`; `gpt-image-1-mini` supports only `low`. For
-     * `gpt-image-2`, omit this parameter. Defaults to `low` on supported models.
+     * `gpt-image-1.5`; `gpt-image-1-mini` supports only `low`. For `gpt-image-2`, omit
+     * this parameter. Defaults to `low` on supported models.
      */
     input_fidelity?: 'high' | 'low' | null;
 
@@ -11180,8 +11539,8 @@ export namespace Tool {
      * The image generation model to use. One of `gpt-image-1-mini`, `gpt-image-1.5`,
      * `gpt-image-2`, `gpt-image-2-2026-04-21`, `gpt-image-2.5-sunburst`,
      * `gpt-image-2.5-sunburst-2026-09-08`, `gpt-image-2.5-flare`,
-     * `gpt-image-2.5-flare-2026-09-08`, or `chatgpt-image-latest`. Default:
-     * `gpt-image-2`.
+     * `gpt-image-2.5-flare-2026-09-08`, `gpt-image-2.6-sunburst`,
+     * `gpt-image-2.6-flare`, or `chatgpt-image-latest`. Default: `gpt-image-2`.
      *
      * `gpt-image-1` was shut down on October 23, 2026. Use `gpt-image-2.5-sunburst` or
      * `gpt-image-2.5-flare` instead.
@@ -11201,6 +11560,8 @@ export namespace Tool {
       | 'gpt-image-2.5-sunburst-2026-09-08'
       | 'gpt-image-2.5-flare'
       | 'gpt-image-2.5-flare-2026-09-08'
+      | 'gpt-image-2.6-sunburst'
+      | 'gpt-image-2.6-flare'
       | 'gpt-image-1.5'
       | 'chatgpt-image-latest';
 
@@ -11215,10 +11576,14 @@ export namespace Tool {
     output_compression?: number;
 
     /**
-     * The output format of the generated image. One of `png`, `webp`, or `jpeg`.
-     * Default: `png`.
+     * The output format of the generated image. One of `png`, `webp`, `jpeg`, `gif`,
+     * or `svg`. Default: `png`. GIF and SVG output require a model that supports the
+     * selected format. GIF output does not support partial image streaming
+     * (`partial_images` greater than `0`), `input_image_mask`, or custom
+     * `output_compression`. Responses lifecycle events can still be streamed for GIF
+     * output.
      */
-    output_format?: 'png' | 'webp' | 'jpeg';
+    output_format?: 'png' | 'webp' | 'jpeg' | 'gif' | 'svg';
 
     /**
      * Number of partial images to generate in streaming mode, from 0 (default value)
@@ -11247,6 +11612,14 @@ export namespace Tool {
      * `auto` is supported for models that allow automatic sizing.
      */
     size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+
+    /**
+     * SVG author model settings. Requires `output_format` to be `svg`. When SVG model
+     * selection is enabled, omitting this object uses the outer response model.
+     * Otherwise, the default SVG author is used and explicit model overrides are
+     * unavailable.
+     */
+    svg?: ImageGeneration.Svg;
   }
 
   export namespace ImageGeneration {
@@ -11264,6 +11637,35 @@ export namespace Tool {
        * Base64-encoded mask image.
        */
       image_url?: string;
+    }
+
+    /**
+     * SVG author model settings. Requires `output_format` to be `svg`. When SVG model
+     * selection is enabled, omitting this object uses the outer response model.
+     * Otherwise, the default SVG author is used and explicit model overrides are
+     * unavailable.
+     */
+    export interface Svg {
+      model?: string;
+
+      /**
+       * Reasoning effort for SVG authoring. When omitted, uses the author model's
+       * default in both Images and Responses.
+       */
+      reasoning?: Svg.Reasoning | null;
+    }
+
+    export namespace Svg {
+      /**
+       * Reasoning effort for SVG authoring. When omitted, uses the author model's
+       * default in both Images and Responses.
+       */
+      export interface Reasoning {
+        /**
+         * Controls how much effort the model should spend on reasoning for this request.
+         */
+        effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+      }
     }
   }
 
@@ -11698,6 +12100,11 @@ export interface ResponseCreateParamsBase {
   conversation?: string | ResponseConversationParam | null;
 
   /**
+   * Request level image options.
+   */
+  image?: ResponseCreateParams.Image;
+
+  /**
    * Specify additional output data to include in the model response. Currently
    * supported values are:
    *
@@ -11813,7 +12220,7 @@ export interface ResponseCreateParamsBase {
    * request can write up to four breakpoints. For cache matching, OpenAI considers
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * `ttl` defaults to `30m`. Supported lifetimes depend on the API. See the
    * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
@@ -12037,6 +12444,18 @@ export namespace ResponseCreateParams {
   }
 
   /**
+   * Request level image options.
+   */
+  export interface Image {
+    /**
+     * Controls image context optimization. Defaults to `auto`, which uses the model,
+     * transport, and input to select a policy. Use `enabled` to require compression
+     * support or `disabled` to turn it off.
+     */
+    context_compression?: 'auto' | 'enabled' | 'disabled';
+  }
+
+  /**
    * Configuration for running moderation on the input and output of this response.
    */
   export interface Moderation {
@@ -12092,7 +12511,7 @@ export namespace ResponseCreateParams {
    * request can write up to four breakpoints. For cache matching, OpenAI considers
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * `ttl` defaults to `30m`. Supported lifetimes depend on the API. See the
    * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
@@ -12121,10 +12540,10 @@ export namespace ResponseCreateParams {
 
     /**
      * The minimum lifetime applied to every implicit and explicit cache breakpoint
-     * written by the request. Defaults to `30m`, which is currently the only supported
-     * value. The backend may retain cache entries for longer.
+     * written by the request. Supported values are `30m` (the default) and `12h`. The
+     * backend may retain cache entries for longer.
      */
-    ttl?: '30m';
+    ttl?: '30m' | '12h';
   }
 
   /**
@@ -12359,9 +12778,16 @@ export interface ResponseCompactParams {
     | 'gpt-daybreak-blue-latest'
     | 'gpt-daybreak-red-latest'
     | 'gpt-5.6-cyber'
+    | 'gpt-6-cyber'
     | 'gpt-rosalind-research'
+    | 'gpt-6-rosalind'
     | (string & {})
     | null;
+
+  /**
+   * Request level image options.
+   */
+  image?: ResponseCompactParams.Image;
 
   /**
    * Text, image, or file inputs to the model, used to generate a response
@@ -12396,7 +12822,7 @@ export interface ResponseCompactParams {
    * request can write up to four breakpoints. For cache matching, OpenAI considers
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * `ttl` defaults to `30m`. Supported lifetimes depend on the API. See the
    * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */
@@ -12430,13 +12856,25 @@ export interface ResponseCompactParams {
 
 export namespace ResponseCompactParams {
   /**
+   * Request level image options.
+   */
+  export interface Image {
+    /**
+     * Controls image context optimization. Defaults to `auto`, which uses the model,
+     * transport, and input to select a policy. Use `enabled` to require compression
+     * support or `disabled` to turn it off.
+     */
+    context_compression?: 'auto' | 'enabled' | 'disabled';
+  }
+
+  /**
    * Options for prompt caching. Supported for `gpt-5.6` and later models. By
    * default, OpenAI automatically chooses one implicit cache breakpoint. You can add
    * explicit breakpoints to content blocks with `prompt_cache_breakpoint`. Each
    * request can write up to four breakpoints. For cache matching, OpenAI considers
    * up to the latest 80 breakpoints in the conversation, without a content-block
    * lookback limit. Set `mode` to `explicit` to disable the implicit breakpoint. The
-   * `ttl` defaults to `30m`, which is currently the only supported value. See the
+   * `ttl` defaults to `30m`. Supported lifetimes depend on the API. See the
    * [prompt caching guide](https://developers.openai.com/api/docs/guides/prompt-caching)
    * for current details.
    */

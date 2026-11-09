@@ -3411,7 +3411,7 @@ export type ServerEvent =
   | ErrorEvent
   | InfoEvent
   | ServerEvent.TransportDtmfReceived
-  | ServerEvent.TransportDtmfSend
+  | ServerEvent.TransportDtmfSent
   | ServerEvent.TransportRinging
   | ServerEvent.TransportAnswered
   | ServerEvent.TransportFailed;
@@ -3451,12 +3451,12 @@ export namespace ServerEvent {
    * A SIP DTMF keypress successfully sent to the SIP trunk. Delivered only to
    * sideband observers; this is not a client command.
    */
-  export interface TransportDtmfSend {
+  export interface TransportDtmfSent {
     event: string;
 
     event_id: string;
 
-    type: 'transport.dtmf.send';
+    type: 'transport.dtmf.sent';
 
     /**
      * The event_id of the client command, when supplied.

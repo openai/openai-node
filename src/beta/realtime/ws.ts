@@ -1,10 +1,10 @@
 import { resolveRealtimeAPIKey } from '../../internal/realtime-credentials';
+import { buildRealtimeWebSocketHeaders } from '../../internal/ws-adapter-node';
 import * as WS from 'ws';
 import { assertBedrockWebSocketOrigin } from '../../internal/bedrock';
 import { protectWebSocketOptionsFromCredentialRedirects } from '../../internal/ws';
 import type { AzureOpenAI } from '../../index';
 import { OpenAI } from '../../index';
-import { VERSION } from '../../version';
 import type { RealtimeClientEvent } from '../../resources/beta/realtime/realtime';
 import { OpenAIRealtimeEmitter, buildRealtimeURL, isAzure, parseRealtimeEvent } from './internal-base';
 import type { RealtimeConnectionConfig } from './internal-base';
@@ -78,12 +78,18 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     this.url = buildRealtimeURL(client, props);
     assertTrustedRealtimeURL(client, this.url);
     assertBedrockWebSocketOrigin(client, this.url);
+    const azureKey = isAzure(client) && !props.__resolvedApiKey;
     const headers = {
-      'User-Agent': `${client.constructor.name}/JS ${VERSION}`,
-      ...props.options?.headers,
-      // A credential must be an own data property without invoking an inherited setter.
-      ...(isAzure(client) && !props.__resolvedApiKey ? {} : { Authorization: `Bearer ${apiKey}` }),
-      'OpenAI-Beta': 'realtime=v1',
+      ...buildRealtimeWebSocketHeaders(
+        client,
+        {
+          ...(azureKey && props.__apiKey !== undefined ? { 'api-key': apiKey ?? '' } : {}),
+          ...(azureKey ? {} : { Authorization: `Bearer ${apiKey}` }),
+          'OpenAI-Beta': 'realtime=v1',
+        },
+        props.options,
+      ),
+      'openai-beta': 'realtime=v1',
     };
 
     const { maxPayload, ...nativeOptions } = props.options ?? {};
@@ -191,14 +197,7 @@ export class OpenAIRealtimeWS extends OpenAIRealtimeEmitter {
     return new OpenAIRealtimeWS(
       {
         model: deploymentName,
-        options: {
-          ...props.options,
-          headers: {
-            ...props.options?.headers,
-            // A credential must be an own data property without invoking an inherited setter.
-            ...(isApiKeyProvider ? {} : { 'api-key': apiKey }),
-          },
-        },
+        options: props.options,
         __resolvedApiKey: isApiKeyProvider,
         __apiKey: apiKey,
       },

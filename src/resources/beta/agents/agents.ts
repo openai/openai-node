@@ -84,6 +84,7 @@ const normalizeRequestOptionsForQueryKeys = new Set([
   '__binaryRequest',
   '__binaryResponse',
   '__streamClass',
+  '__streamMode',
   '__security',
   '__synthesizeEventData',
 ]);
@@ -109,6 +110,7 @@ function normalizeRequestOptionsForQuery(
           | '__binaryRequest'
           | '__binaryResponse'
           | '__streamClass'
+          | '__streamMode'
           | '__security'
           | '__synthesizeEventData'
       ]?: never;
@@ -165,6 +167,7 @@ function normalizeRequestOptionsForQuery(
         | '__binaryRequest'
         | '__binaryResponse'
         | '__streamClass'
+        | '__streamMode'
         | '__security'
         | '__synthesizeEventData'
     ]?: never;
@@ -281,6 +284,7 @@ export class Agents extends APIResource {
                     | '__binaryRequest'
                     | '__binaryResponse'
                     | '__streamClass'
+                    | '__streamMode'
                     | '__security'
                     | '__synthesizeEventData'
                 ]?: never;
@@ -309,6 +313,7 @@ export class Agents extends APIResource {
           | '__binaryRequest'
           | '__binaryResponse'
           | '__streamClass'
+          | '__streamMode'
           | '__security'
           | '__synthesizeEventData'
       ]?: never;
@@ -335,6 +340,7 @@ export class Agents extends APIResource {
               | '__binaryRequest'
               | '__binaryResponse'
               | '__streamClass'
+              | '__streamMode'
               | '__security'
               | '__synthesizeEventData'
           ]?: never;
@@ -465,6 +471,38 @@ export interface Agent {
    * The Unix timestamp, in seconds, when the agent was last updated.
    */
   updated_at: number;
+
+  /**
+   * The effective context compaction settings.
+   */
+  compaction?: Agent.Compaction;
+
+  /**
+   * The effective experimental settings for the agent.
+   */
+  experimental?: Agent.Experimental;
+}
+
+export namespace Agent {
+  /**
+   * The effective context compaction settings.
+   */
+  export interface Compaction {
+    /**
+     * Whether context is compacted in the background. Defaults to true.
+     */
+    async: boolean;
+  }
+
+  /**
+   * The effective experimental settings for the agent.
+   */
+  export interface Experimental {
+    /**
+     * Whether the model receives periodic current-time reminders.
+     */
+    time_awareness: boolean;
+  }
 }
 
 export interface AgentBrowserAuthenticationCancelParam {
@@ -1288,6 +1326,12 @@ export interface AgentSession {
   vault_ids: Array<string>;
 
   /**
+   * Review applied to eligible actions in this session. Omitted when review is none
+   * and automatic review is not enabled. Omission means none.
+   */
+  review?: 'none' | 'auto_review';
+
+  /**
    * Configured spending limit and best-effort consumption, in USD cents. Unlimited
    * sessions omit this object.
    */
@@ -1344,6 +1388,38 @@ export namespace AgentSession {
      * Tools available to the agent.
      */
     tools: Array<AgentsAPI.AgentTool>;
+
+    /**
+     * The effective context compaction settings.
+     */
+    compaction?: Agent.Compaction;
+
+    /**
+     * The effective experimental settings for the agent.
+     */
+    experimental?: Agent.Experimental;
+  }
+
+  export namespace Agent {
+    /**
+     * The effective context compaction settings.
+     */
+    export interface Compaction {
+      /**
+       * Whether context is compacted in the background. Defaults to true.
+       */
+      async: boolean;
+    }
+
+    /**
+     * The effective experimental settings for the agent.
+     */
+    export interface Experimental {
+      /**
+       * Whether the model receives periodic current-time reminders.
+       */
+      time_awareness: boolean;
+    }
   }
 
   /**
@@ -5164,6 +5240,8 @@ export interface SessionTurnError {
    * A stable, machine-readable failure category.
    *
    * - `context_length_exceeded` - The request exceeds the model's context window.
+   * - `max_output_tokens` - The model reached its output token limit before
+   *   finishing the response.
    * - `session_budget_exceeded` - The session has reached its usage budget.
    * - `usage_limit_exceeded` - The organization has reached a usage, plan, or
    *   billing limit.
@@ -5198,6 +5276,7 @@ export interface SessionTurnError {
    */
   code:
     | 'context_length_exceeded'
+    | 'max_output_tokens'
     | 'session_budget_exceeded'
     | 'usage_limit_exceeded'
     | 'project_spend_limit_exceeded'
@@ -5512,6 +5591,16 @@ export interface AgentCreateParams {
   model: string;
 
   /**
+   * Context compaction settings. Omission or null enables background compaction.
+   */
+  compaction?: AgentCreateParams.Compaction | null;
+
+  /**
+   * Experimental agent settings. All experimental features default to disabled.
+   */
+  experimental?: AgentCreateParams.Experimental;
+
+  /**
    * Additional instructions appended to the agent's default base instructions. Omit
    * or set to null to add no custom instructions.
    */
@@ -5564,7 +5653,44 @@ export interface AgentCreateParams {
   tools?: Array<PersistedAgentToolParam> | null;
 }
 
+export namespace AgentCreateParams {
+  /**
+   * Context compaction settings. Omission or null enables background compaction.
+   */
+  export interface Compaction {
+    /**
+     * Whether to compact context in the background. Omission or null defaults to true.
+     * Set to false to use blocking compaction. Background compaction may increase
+     * token usage.
+     */
+    async?: boolean | null;
+  }
+
+  /**
+   * Experimental agent settings. All experimental features default to disabled.
+   */
+  export interface Experimental {
+    /**
+     * Whether to give the model periodic current-time reminders. Defaults to false.
+     */
+    time_awareness?: boolean;
+  }
+}
+
 export interface AgentUpdateParams {
+  /**
+   * Context compaction settings. Omit to keep the current settings. A supplied
+   * object replaces the settings; null or an empty object enables background
+   * compaction.
+   */
+  compaction?: AgentUpdateParams.Compaction | null;
+
+  /**
+   * Experimental settings to merge by key. Omitted settings keep their current
+   * values.
+   */
+  experimental?: AgentUpdateParams.Experimental;
+
   /**
    * Additional instructions appended to the agent's default base instructions. Omit
    * to leave unchanged.
@@ -5621,6 +5747,34 @@ export interface AgentUpdateParams {
    * The replacement must fit within 3 MiB (3,145,728 bytes) of compact UTF-8 JSON.
    */
   tools?: Array<PersistedAgentToolParam> | null;
+}
+
+export namespace AgentUpdateParams {
+  /**
+   * Context compaction settings. Omit to keep the current settings. A supplied
+   * object replaces the settings; null or an empty object enables background
+   * compaction.
+   */
+  export interface Compaction {
+    /**
+     * Whether to compact context in the background. Omission or null defaults to true.
+     * Set to false to use blocking compaction. Background compaction may increase
+     * token usage.
+     */
+    async?: boolean | null;
+  }
+
+  /**
+   * Experimental settings to merge by key. Omitted settings keep their current
+   * values.
+   */
+  export interface Experimental {
+    /**
+     * Whether to give the model periodic current-time reminders. Omit to keep the
+     * current setting.
+     */
+    time_awareness?: boolean;
+  }
 }
 
 export interface AgentListParams extends CursorPageParams {

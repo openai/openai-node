@@ -1,4 +1,8 @@
-import { getRealtimeAPIKey, resolveRealtimeAPIKey } from '../../internal/realtime-credentials';
+import {
+  getRealtimeAPIKey,
+  realtimeRoutingProtocols,
+  resolveRealtimeAPIKey,
+} from '../../internal/realtime-credentials';
 import type { AzureOpenAI } from '../../index';
 import { assertBedrockWebSocketOrigin } from '../../internal/bedrock';
 import { OpenAI } from '../../index';
@@ -226,7 +230,7 @@ export class OpenAIRealtimeWebSocket extends OpenAIRealtimeEmitter {
     const azure = isAzure(client);
     const protocols = [
       'realtime',
-      ...(azure ? [] : [`openai-insecure-api-key.${apiKey}`]),
+      ...(azure ? [] : [`openai-insecure-api-key.${apiKey}`, ...realtimeRoutingProtocols(client, apiKey)]),
       'openai-beta.realtime-v1',
     ];
 

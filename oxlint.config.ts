@@ -9,6 +9,11 @@ const generatedFiles = requireConfig('./scripts/generated-files.cjs');
 const compatibilityRules = [
   'func-style',
   'sort-keys',
+  // Let the formatter handle spacing and allow separate filtering and mapping steps.
+  'anti-slop/require-readable-spacing',
+  'anti-slop/no-array-filter-map',
+  // Completion callbacks can perform a side effect and resolve to void.
+  'promise/always-return',
   // Conditional literal fields preserve omission and create own data properties,
   // keeping complete request and wire fixtures visible in one construction.
   'anti-slop/no-conditional-empty-object-spread',
@@ -69,6 +74,13 @@ module.exports = defineConfig({
   },
   ignorePatterns: [...core.ignorePatterns, 'dist/**', 'coverage/**', ...generatedFiles],
   overrides: [
+    {
+      // Test guards throw assertion failures when the observed value has the wrong type.
+      files: ['tests/**', 'ecosystem-tests/**'],
+      rules: {
+        'unicorn/prefer-type-error': 'off',
+      },
+    },
     {
       // Runtime validation and host capability detection need typeof at the
       // boundary itself, including checks that throw instead of returning a predicate.

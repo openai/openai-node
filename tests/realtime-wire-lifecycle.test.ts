@@ -6,9 +6,11 @@ import OpenAI, { AzureOpenAI } from 'openai';
 import { OpenAIRealtimeWS as StableWS } from 'openai/realtime/ws';
 import { OpenAIRealtimeWebSocket as StableNative } from 'openai/realtime/websocket';
 import type { RealtimeConnectionConfig } from 'openai/realtime/internal-base';
+import type { ResponseCreateEventWithReferencesParam } from 'openai/resources/realtime/realtime';
 import { OpenAIRealtimeWS as BetaWS } from 'openai/beta/realtime/ws';
 import { OpenAIRealtimeWebSocket as BetaNative } from 'openai/beta/realtime/websocket';
 import { WebSocket, WebSocketServer } from 'ws';
+import { expect } from 'vitest';
 import { createX509TestLab } from './utils/x509-test-lab';
 
 const lab = createX509TestLab();
@@ -460,6 +462,258 @@ test.each([StableWS, StableNative])(
     }
   },
 );
+
+test.each([StableWS, StableNative])(
+  'sendResponseCreate sends the complete typed event (%s)',
+  async (Realtime) => {
+    const connected = once(peers, 'connection');
+    const client = new OpenAI({ baseURL, apiKey: 'ek_synthetic_reference' });
+    const realtime = await Realtime.create(client, settings);
+    const errors: Error[] = [];
+    realtime.on('error', (error) => errors.push(error));
+    const [peer] = await connected;
+    await rawEvent(realtime.socket, 'open');
+    const event = {
+      type: 'response.create',
+      event_id: 'fixture-complete',
+      response: {
+        input: [
+          { type: 'item_reference', id: 'fixture_prior' },
+          { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'fixture' }] },
+        ],
+        instructions: 'Use only the selected input.',
+        metadata: { source: 'reference-test' },
+        max_output_tokens: 128,
+      },
+    } satisfies ResponseCreateEventWithReferencesParam;
+    try {
+      const message = once(peer, 'message', { signal: AbortSignal.timeout(5000) });
+      realtime.sendResponseCreate(event);
+      const [data] = await message;
+      expect(JSON.parse(String(data))).toEqual(event);
+      const serializationError = realtime.emitted('error');
+      Object.defineProperty(event, 'response', {
+        get() {
+          throw new Error('fixture serialization failure');
+        },
+      });
+      realtime.sendResponseCreate(event);
+      await expect(serializationError).resolves.toEqual(
+        expect.objectContaining({ message: expect.stringContaining('could not send data') }),
+      );
+      expect(errors).toHaveLength(1);
+    } finally {
+      realtime.close();
+    }
+  },
+);
+
+describe.each([StableWS, StableNative])('sendResponseCreate recovery (%s)', (Realtime) => {
+  test('propagates an admission error listener exception once', async () => {
+    const client = new OpenAI({ baseURL, apiKey: 'ek_synthetic_reference_listener' });
+    const connected = once(peers, 'connection');
+    const realtime = await Realtime.create(client, {
+      ...settings,
+      reconnect: true,
+      maxQueueBytes: 4096,
+    });
+    const errors: Error[] = [];
+    const listenerFailure = new Error('fixture listener failed');
+    const throwListener = (error: Error) => {
+      errors.push(error);
+      throw listenerFailure;
+    };
+    realtime.on('error', throwListener);
+    try {
+      expect(realtime.socket.readyState).toBe(0);
+      expect(() =>
+        realtime.sendResponseCreate({
+          type: 'response.create',
+          response: { input: [{ type: 'item_reference', id: 'fixture_prior' }] },
+        }),
+      ).toThrow(listenerFailure);
+      expect(errors.map((error) => error.message)).toEqual(['cannot send before the WebSocket is open']);
+      expect(realtime.takePending()).toEqual([]);
+      await connected;
+      await rawEvent(realtime.socket, 'open');
+    } finally {
+      realtime.off('error', throwListener);
+      realtime.on('error', () => {});
+      realtime.close();
+    }
+  });
+
+  test.each(['initial connection', 'closed during recovery'] as const)(
+    'rejects new and released sends on %s',
+    async (phase) => {
+      const client = new OpenAI({ baseURL, apiKey: 'ek_synthetic_reference_admission' });
+      const connected = once(peers, 'connection');
+      const realtime = await Realtime.create(client, {
+        ...settings,
+        reconnect: true,
+        maxQueueBytes: 4096,
+        reconnectInitialDelay: 1,
+      });
+      const errors: Error[] = [];
+      realtime.on('error', (error) => errors.push(error));
+      const released = { type: 'response.create', event_id: 'rejected-released' } as const;
+      const request = {
+        type: 'response.create',
+        event_id: 'rejected-request',
+        response: { input: [{ type: 'item_reference', id: 'fixture_prior' }] },
+      } satisfies ResponseCreateEventWithReferencesParam;
+      try {
+        if (phase === 'initial connection') {
+          expect(realtime.socket.readyState).toBe(0);
+          realtime.send(released);
+          realtime.sendResponseCreate(request);
+          expect(errors.map((error) => error.message)).toEqual([
+            'cannot send before the WebSocket is open',
+            'cannot send before the WebSocket is open',
+          ]);
+          expect(realtime.takePending()).toEqual([]);
+          await connected;
+          await rawEvent(realtime.socket, 'open');
+        } else {
+          const [first] = await connected;
+          await rawEvent(realtime.socket, 'open');
+          const started = realtime.emitted('reconnecting');
+          realtime.on('reconnecting', () => {
+            realtime.close();
+            realtime.send(released);
+            realtime.sendResponseCreate(request);
+          });
+          first.close(1012, 'fixture recovery');
+          await started;
+          expect(errors.map((error) => error.message)).toEqual([
+            'cannot send on a closed WebSocket',
+            'cannot send on a closed WebSocket',
+          ]);
+          expect(realtime.takePending()).toEqual([]);
+        }
+      } finally {
+        realtime.close();
+      }
+    },
+  );
+
+  test.each(['take', 'flush', 'close'] as const)(
+    'retains old typed work and new raw event snapshots for %s',
+    async (operation) => {
+      const connected = once(peers, 'connection');
+      const client = new OpenAI({ baseURL, apiKey: 'ek_synthetic_reference_recovery' });
+      const realtime = await Realtime.create(client, {
+        ...settings,
+        reconnect: true,
+        maxQueueBytes: 4096,
+        reconnectInitialDelay: 1,
+      });
+      const errors: Error[] = [];
+      realtime.on('error', (error) => errors.push(error));
+      const [first] = await connected;
+      await rawEvent(realtime.socket, 'open');
+      const legacy = { type: 'response.create', event_id: 'fixture-legacy' } as const;
+      const reference = {
+        type: 'response.create',
+        event_id: 'fixture-ref',
+        response: { input: [{ type: 'item_reference', id: 'fixture_prior' }], metadata: { case: 'queued' } },
+      } satisfies ResponseCreateEventWithReferencesParam;
+      const ordinary = {
+        type: 'response.create',
+        event_id: 'fixture-new-ordinary',
+        response: { instructions: 'Sent with the new request method.' },
+      } satisfies ResponseCreateEventWithReferencesParam;
+      const snapshot = JSON.stringify(reference);
+      realtime.on('reconnecting', () => {
+        realtime.send(legacy);
+        realtime.sendResponseCreate(reference);
+        realtime.sendResponseCreate(ordinary);
+        reference.event_id = 'mutation-after-queue';
+      });
+      const replacement = once(peers, 'connection', { signal: AbortSignal.timeout(5000) });
+      const recovered = realtime.emitted('reconnected');
+      first.close(1012);
+      const [next] = await replacement;
+      const commands: unknown[] = [];
+      next.on('message', (data: Buffer) => commands.push(JSON.parse(String(data))));
+      await recovered;
+      const pending = [
+        { type: 'message', message: legacy },
+        { type: 'raw', data: snapshot },
+        { type: 'raw', data: JSON.stringify(ordinary) },
+      ];
+      try {
+        expect(commands).toEqual([]);
+        if (operation === 'take') {
+          expect(realtime.takePending()).toEqual(pending);
+          expect(realtime.takePending()).toEqual([]);
+        } else if (operation === 'close') {
+          const closed = realtime.emitted('close');
+          next.close(1000, 'fixture terminal close');
+          await expect(closed).resolves.toEqual([1000, 'fixture terminal close', pending]);
+        } else {
+          realtime.flushPending();
+          await expect.poll(() => commands.length).toBe(3);
+          expect(commands).toEqual([legacy, JSON.parse(snapshot), ordinary]);
+          expect(realtime.takePending()).toEqual([]);
+        }
+        expect(errors).toEqual([]);
+      } finally {
+        realtime.close();
+      }
+    },
+  );
+});
+
+test('taking pending Realtime work during an explicit flush releases new sends on the open socket', async () => {
+  const client = new OpenAI({ baseURL, apiKey: 'ek_synthetic_recovery' });
+  const connected = once(peers, 'connection');
+  const realtime = await StableWS.create(client, {
+    ...settings,
+    reconnect: true,
+    maxQueueBytes: 1024,
+    reconnectInitialDelay: 1,
+  });
+  const errors: Error[] = [];
+  realtime.on('error', (error) => errors.push(error));
+  const [first] = await connected;
+  await rawEvent(realtime.socket, 'open');
+  realtime.on('reconnecting', () => {
+    realtime.send({ type: 'response.create', event_id: 'held-first' });
+    realtime.send({ type: 'response.create', event_id: 'held-second' });
+  });
+  const replacement = once(peers, 'connection');
+  const recovered = realtime.emitted('reconnected');
+  first.close(1012);
+  const [next] = await replacement;
+  const commands: unknown[] = [];
+  next.on('message', (data: Buffer) => commands.push(JSON.parse(String(data))));
+  await recovered;
+  const submit = realtime.socket.send.bind(realtime.socket);
+  try {
+    realtime.socket.send = (data) => {
+      submit(data);
+      if (String(data).includes('held-first')) {
+        expect(realtime.takePending()).toEqual([
+          { type: 'message', message: { type: 'response.create', event_id: 'held-second' } },
+        ]);
+        realtime.send({ type: 'response.create', event_id: 'new-after-take' });
+      }
+    };
+    realtime.flushPending();
+    await expect
+      .poll(() => commands)
+      .toEqual([
+        { type: 'response.create', event_id: 'held-first' },
+        { type: 'response.create', event_id: 'new-after-take' },
+      ]);
+    expect(realtime.takePending()).toEqual([]);
+    expect(errors).toEqual([]);
+  } finally {
+    realtime.socket.send = submit;
+    realtime.close();
+  }
+});
 
 test('recovery captures ws options before refreshing credentials', async () => {
   const options = {

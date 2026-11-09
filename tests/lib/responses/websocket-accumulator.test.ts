@@ -275,7 +275,8 @@ test.each(['response.completed', 'response.failed', 'response.incomplete', 'erro
       content_index: 0,
       delta: 'Must not be a final output',
     });
-    expect(accumulator.current?.phase).toBe('unavailable');
+    expect(accumulator.current?.phase).toBe('provisional');
+    expect(accumulator.current).toMatchObject({ snapshot: { output_text: 'Must not be a final output' } });
     expect(accumulator.outputAt(0)).toBeUndefined();
     const terminal: ResponsesWebSocketEvent =
       type === 'error'

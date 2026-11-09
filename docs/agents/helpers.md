@@ -24,9 +24,13 @@ for await (const event of stream) {
 
 `outputText(message)` joins that message's `output_text` content blocks in order. It works on messages from streaming events and REST results, preserves both commentary and final-answer phases, and does not modify or fetch anything.
 
+## Handle stream errors
+
+When you create a session with `stream: true` or subscribe with `client.beta.agents.sessions.events.stream()`, the default decoder yields server-sent error events instead of throwing `APIError`. Handle `type: 'error'` in your iteration loop to keep receiving later lifecycle events, such as `agent.session.idle`. HTTP errors, network failures, and malformed JSON still throw.
+
 ## Collect a final answer (beta)
 
-Call `finalResult()` on streamed creation with initial input or a follow-up to collect the completed turn's final answer.
+Call `finalResult()` on streamed creation with initial input or a follow-up to collect the completed turn's final answer. It rejects if the stream ends without a completed turn.
 
 ```ts
 const stream = await client.beta.agents.sessions.create({
