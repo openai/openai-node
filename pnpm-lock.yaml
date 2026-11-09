@@ -3242,8 +3242,6 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
-  tslib@2.9.1:
-    resolution: {integrity: sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA==}
 
   type-detect@4.0.8:
     resolution: {integrity: sha512-0fr/mIH1dlO+x7TlcMy+bIDqKPsw/70tVyeHW787goQjhmqaZe10uwLujubK9q9Lg6Fiho1KUKDYz0Z7k7g5/g==}
@@ -4013,7 +4011,7 @@ snapshots:
   '@emnapi/core@1.11.1':
     dependencies:
       '@emnapi/wasi-threads': 1.2.2
-      tslib: 2.9.1
+      tslib: 2.8.1
     optional: true
 
   '@emnapi/runtime@1.10.0':
@@ -4023,7 +4021,7 @@ snapshots:
 
   '@emnapi/runtime@1.11.1':
     dependencies:
-      tslib: 2.9.1
+      tslib: 2.8.1
     optional: true
 
   '@emnapi/wasi-threads@1.2.1':
@@ -4033,7 +4031,7 @@ snapshots:
 
   '@emnapi/wasi-threads@1.2.2':
     dependencies:
-      tslib: 2.9.1
+      tslib: 2.8.1
     optional: true
 
   '@isaacs/cliui@8.0.2':
@@ -4674,7 +4672,7 @@ snapshots:
 
   '@swc/helpers@0.5.23':
     dependencies:
-      tslib: 2.9.1
+      tslib: 2.8.1
     optional: true
 
   '@swc/jest@0.2.39(@swc/core@1.16.18(@swc/helpers@0.5.23))':
@@ -4703,7 +4701,7 @@ snapshots:
 
   '@tybys/wasm-util@0.10.4':
     dependencies:
-      tslib: 2.9.1
+      tslib: 2.8.1
     optional: true
 
   '@types/babel__core@7.20.5':
@@ -6820,8 +6818,6 @@ snapshots:
 
   tslib@2.8.1: {}
 
-  tslib@2.9.1:
-    optional: true
 
   type-detect@4.0.8: {}
 
