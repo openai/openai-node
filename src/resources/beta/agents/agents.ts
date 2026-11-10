@@ -3396,6 +3396,11 @@ export namespace AgentTool {
      * The type of the object. Always `function`.
      */
     type: 'function';
+
+    /**
+     * Whether the agent continues without waiting for the function result.
+     */
+    async?: boolean;
   }
 
   /**
@@ -3578,6 +3583,12 @@ export namespace AgentToolParam {
      * The type of the object. Always `function`.
      */
     type: 'function';
+
+    /**
+     * Whether the agent continues without waiting for the function result. Defaults to
+     * `false`.
+     */
+    async?: boolean;
 
     /**
      * Whether this function is deferred and discovered through tool search. Defaults
@@ -4728,6 +4739,11 @@ export namespace PersistedAgentTool {
      * The type of the object. Always `function`.
      */
     type: 'function';
+
+    /**
+     * Whether the agent continues without waiting for the function result.
+     */
+    async?: boolean;
   }
 
   /**
@@ -4919,6 +4935,12 @@ export namespace PersistedAgentToolParam {
      * The type of the object. Always `function`.
      */
     type: 'function';
+
+    /**
+     * Whether the agent continues without waiting for the function result. Defaults to
+     * `false`.
+     */
+    async?: boolean;
 
     /**
      * Whether this function is deferred and discovered through tool search. Defaults

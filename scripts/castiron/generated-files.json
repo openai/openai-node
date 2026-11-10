@@ -287,7 +287,7 @@
     },
     "src/resources/beta/agents/agents.ts": {
       "mode": "100644",
-      "sha256": "49b36cf8c58408821a46c0308394a8b4b2d4b65edd22758891c2674ef6c7e7d7"
+      "sha256": "0a55323d34adb58c0248a20199bdbc44e75451c12810b1bb7940bc63bd149e3f"
     },
     "src/resources/beta/agents/automations.ts": {
       "mode": "100644",
@@ -1179,11 +1179,11 @@
     },
     "tests/api-resources/beta/agents/agents.test.ts": {
       "mode": "100644",
-      "sha256": "e35f1f11b769faeaa5312fd0279c3155df14854e72368f3fa8e4e07bd4102f38"
+      "sha256": "e24c9e057d3512fdf1a3372e739a046498188875e03bd76960c1656719aa63c7"
     },
     "tests/api-resources/beta/agents/automations/automations.test.ts": {
       "mode": "100644",
-      "sha256": "5af2390b9fae369c521eb6993d40177932b206cffd04c71a0248fea3b70de539"
+      "sha256": "101678c43d8abb5d91ee6a77cae160f74b81d32ae5d503cfcacd4429fe5d06ce"
     },
     "tests/api-resources/beta/agents/automations/invocations.test.ts": {
       "mode": "100644",
@@ -1215,7 +1215,7 @@
     },
     "tests/api-resources/beta/agents/sessions/sessions.test.ts": {
       "mode": "100644",
-      "sha256": "568e01b98b4a21bfda46488c2cbb654c8ebd218fa8bcac19f82a42eff0a572ae"
+      "sha256": "fa119e4c9f638a887e942e024a92bce5b4baed1b964ee718deb4f7ff60f23b6b"
     },
     "tests/api-resources/beta/agents/sessions/subagents/items.test.ts": {
       "mode": "100644",
