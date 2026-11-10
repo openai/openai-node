@@ -863,7 +863,7 @@ TypeScript >= 4.9 is supported.
 
 The following runtimes are supported:
 
-- Node.js 22 and 24 LTS. Node.js 22 is the minimum supported version.
+- Node.js 22, 24, and 26 LTS. Node.js 22 is the minimum supported version.
 - Deno v1.28.0 or higher.
 - Bun 1.0 or later.
 - Cloudflare Workers.
@@ -898,6 +898,9 @@ Previously published SDK releases remain available, but receive no guaranteed
 fixes or security backports for unsupported Node.js versions. See the
 [Node.js version support policy](https://github.com/openai/openai-node/blob/main/NODE_VERSION_POLICY.md)
 for lifecycle, deprecation, and release rules.
+
+Node.js 22 support is scheduled to end when it reaches upstream end of life on
+April 30, 2027. Upgrade to Node.js 24 or 26 before then.
 
 ## Contributing
 
