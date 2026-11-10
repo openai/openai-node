@@ -87158,6 +87158,9 @@ components:
         defer_loading:
           type: boolean
           description: Whether the function is deferred and discovered through tool search.
+        async:
+          type: boolean
+          description: Whether the agent continues without waiting for the function result.
       required:
       - type
       - name
@@ -88574,6 +88577,10 @@ components:
           type: boolean
           default: false
           description: Whether this function is deferred and discovered through tool search. Defaults to `false`.
+        async:
+          type: boolean
+          default: false
+          description: Whether the agent continues without waiting for the function result. Defaults to `false`.
       required:
       - type
       - name
@@ -92115,6 +92122,9 @@ components:
         defer_loading:
           type: boolean
           description: Whether the function is deferred and discovered through tool search.
+        async:
+          type: boolean
+          description: Whether the agent continues without waiting for the function result.
       required:
       - type
       - name
@@ -92569,6 +92579,10 @@ components:
           type: boolean
           default: false
           description: Whether this function is deferred and discovered through tool search. Defaults to `false`.
+        async:
+          type: boolean
+          default: false
+          description: Whether the agent continues without waiting for the function result. Defaults to `false`.
       required:
       - type
       - name

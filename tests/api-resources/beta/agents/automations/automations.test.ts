@@ -68,6 +68,7 @@ describe('resource automations', () => {
               name: 'name',
               parameters: { foo: 'bar' },
               type: 'function',
+              async: true,
               defer_loading: true,
             },
           ],
