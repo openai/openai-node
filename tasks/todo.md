@@ -15,9 +15,7 @@ CI, required review and compiler-before-promotion rules remain required.
 - [x] Verify current-main snapshot and all 47 mixed-file counts.
 - [x] Map each mixed file to an owning workstream and compatibility constraints.
 - [x] Merge reviewed transition plan: [#2985](https://github.com/openai/openai-node/pull/2985), merge `bd036b4c3d9ae78982ed0c632d54da6f9cd7f6d3`.
-- [x] Post a deduplicated root #sdk-reviews request covering all three initial changes.
 - [x] Use Conductor state updates for continuation; do not poll independently.
-- [ ] For every subsequent PR/Delta, request review in root #sdk-reviews and record its receipt.
 
 ## First parallel compiler slices
 
@@ -46,8 +44,7 @@ CI, required review and compiler-before-promotion rules remain required.
       Verify pinned Markdown formatting, section/link comparisons and independent
       review. Expected reduction: 8 custom patch lines, unchanged mixed-file count.
       Depends on: merged plan only; independent of pending compiler approvals.
-      Published ready as [#2987](https://github.com/openai/openai-node/pull/2987); root
-      #sdk-reviews and native SDK team review requested on 2026-10-19.
+      Published ready as [#2987](https://github.com/openai/openai-node/pull/2987).
       Completion requires normal review/CI and actual merge.
       The legacy fragment anchors remain custom until emitted by their owning
       reference generator; preserve them in later drawdown slices.
