@@ -1741,6 +1741,11 @@ export interface BetaResponse {
   image?: BetaResponse.Image;
 
   /**
+   * Reasoning inputs withheld from the model, in input order.
+   */
+  input_transformations?: Array<BetaResponse.InputTransformation>;
+
+  /**
    * An upper bound for the number of tokens that can be generated for a response,
    * including visible output tokens and
    * [reasoning tokens](https://developers.openai.com/api/docs/guides/reasoning).
@@ -1973,6 +1978,24 @@ export namespace BetaResponse {
      * Effective image context optimization policy.
      */
     context_compression: 'enabled' | 'disabled';
+  }
+
+  export interface InputTransformation {
+    /**
+     * The original reasoning item ID.
+     */
+    id: string;
+
+    action: 'removed';
+
+    reason:
+      | 'organization_mismatch'
+      | 'end_user_mismatch'
+      | 'model_mismatch'
+      | 'prefix_mismatch'
+      | 'turn_boundary';
+
+    type: 'reasoning';
   }
 
   /**
