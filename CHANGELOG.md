@@ -1,5 +1,23 @@
 # Changelog
 
+## [7.55.0](https://github.com/openai/openai-node/compare/v7.54.0...v7.55.0) (2026-11-10)
+
+
+### Features
+
+* **api:** add typed async function tools ([#3140](https://github.com/openai/openai-node/issues/3140)) ([5bc31e1](https://github.com/openai/openai-node/commit/5bc31e1b29afb54b9e41161f92ffdef2ff3b4366))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump @smithy/signature-v4 from 5.7.4 to 5.7.5 ([#3129](https://github.com/openai/openai-node/issues/3129)) ([d780d4c](https://github.com/openai/openai-node/commit/d780d4c052d69697c2796981b3e3914525e3be49))
+* **deps-dev:** bump @types/node from 26.6.5 to 26.6.6 ([#3130](https://github.com/openai/openai-node/issues/3130)) ([bd9862b](https://github.com/openai/openai-node/commit/bd9862baacd89b680f7b770098811642858aaf13))
+* **deps-dev:** bump start-server-and-test from 3.0.12 to 3.0.13 in /ecosystem-tests/vercel-edge ([#3133](https://github.com/openai/openai-node/issues/3133)) ([c2e007c](https://github.com/openai/openai-node/commit/c2e007cbd85bf8cb336140a119f008c7af71c0cb))
+* **deps-dev:** bump ts-jest from 29.4.12 to 29.4.15 ([#3135](https://github.com/openai/openai-node/issues/3135)) ([2528b6d](https://github.com/openai/openai-node/commit/2528b6db07b842d1d779bb0a84ddf55120cfdff7))
+* **deps-dev:** bump wrangler from 4.152.0 to 4.156.0 in /ecosystem-tests/cloudflare-worker ([#3128](https://github.com/openai/openai-node/issues/3128)) ([df6dc96](https://github.com/openai/openai-node/commit/df6dc96dcf0bc23cdddd2eedf2530eb6af9c285b))
+* **deps-dev:** bump ws from 8.22.0 to 8.22.1 ([#3132](https://github.com/openai/openai-node/issues/3132)) ([63f3f98](https://github.com/openai/openai-node/commit/63f3f98251e34c6d668957809df3920d6ae5dca2))
+* **deps:** bump zod from 4.6.5 to 4.6.7 ([#3134](https://github.com/openai/openai-node/issues/3134)) ([d82bc5b](https://github.com/openai/openai-node/commit/d82bc5b354d90f1b0c8ebbcfce632260dca94bec))
+
 ## [7.54.0](https://github.com/openai/openai-node/compare/v7.53.0...v7.54.0) (2026-11-08)
 
 

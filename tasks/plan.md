@@ -439,10 +439,8 @@ Before an SDK promotion:
 - Obtain independent code review; require relevant maintainer/security review for
   sensitive boundaries. Open ready PRs, preserve normal CI/review/merge gates,
   and never use agent credentials to approve a budget increase.
-- Request review for every PR and Delta in a deduplicated root message in
-  `#sdk-reviews`, including compiler changes. Native reviewer requests supplement
-  this Slack request. Wait for Conductor state updates and react to them; do not
-  set up independent polling.
+- Request native reviews for every PR and Delta. Wait for Conductor state updates
+  and react to them; do not set up independent polling.
 
 ### Final ownership certification — mandatory
 
@@ -479,11 +477,9 @@ full ownership certification may not be deferred.
 | E export projection        | Published ready upstream          | Independently reviewed; normal hooks passed; consumer type/runtime regressions added; local Bazel blocked before compilation                                                        |
 | SDK drawdown               | Compiler-dependent slices waiting | Both initial compiler Deltas remain open and require human contract approval; no SDK output promoted                                                                                |
 | D: duplicate API reference | Published ready for review        | [PR #2987](https://github.com/openai/openai-node/pull/2987); preserve legacy fragment links; diagnostic candidate: 47 mixed files / 2,735 patch lines, pending trusted CI and merge |
-| Continuation               | Awaiting Conductor state updates  | Every PR/Delta requires a deduplicated root request in #sdk-reviews; no independent polling                                                                                         |
+| Continuation               | Awaiting Conductor state updates  | No independent polling                                                                                                                                                              |
 
-A deduplicated root `#sdk-reviews` request was posted on 2026-10-19 covering the
-plan PR and both initial compiler Deltas. Future changes require the same review
-request. Conductor delivered an ownership-verified message for this visible
+Conductor delivered an ownership-verified message for this visible
 conversation
 at head `ebb2d08aeadfff247380ba8cb3bf1b8ceaebd99f` on 2026-10-19, establishing the
 routing receipt. Continue to wait for Conductor state messages and react here;
@@ -510,8 +506,7 @@ trusted candidate-budget pass is claimed. Trusted CI and actual merge must confi
 the reduction before it is recorded as achieved. The historical baseline above
 stays fixed. Pinned Oxfmt and whitespace checks, canonical-section/helper/link
 comparisons, GitHub GFM rendering of the legacy anchors, and independent review
-passed. A deduplicated root `#sdk-reviews` request and native SDK team review
-request were posted for #2987 on 2026-10-19. Continue reacting to Conductor state
+passed. Continue reacting to Conductor state
 notifications; no independent polling is requested.
 
 Validation recorded during this audit:
