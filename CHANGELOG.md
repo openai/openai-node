@@ -1,5 +1,23 @@
 # Changelog
 
+## [7.56.0](https://github.com/openai/openai-node/compare/v7.55.0...v7.56.0) (2026-11-12)
+
+
+### Features
+
+* **api:** type reasoning input transformations on responses ([#3145](https://github.com/openai/openai-node/issues/3145)) ([94e2c6d](https://github.com/openai/openai-node/commit/94e2c6d5d77f633afbce90ad2ba171e0d23b351c))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump @cloudflare/workers-types from 5.20261025.1 to 5.20261101.1 in /ecosystem-tests/cloudflare-worker ([#3127](https://github.com/openai/openai-node/issues/3127)) ([ece9199](https://github.com/openai/openai-node/commit/ece91995999abe8f5dcbc16012ab183e7e33a70a))
+* **deps-dev:** bump webpack from 5.111.1 to 5.112.2 in /ecosystem-tests/ts-browser-webpack ([#3131](https://github.com/openai/openai-node/issues/3131)) ([08cc5e9](https://github.com/openai/openai-node/commit/08cc5e9a83df66a8ab7c88afce444849870b9c01))
+
+
+### Documentation
+
+* simplify review handoff instructions ([#3142](https://github.com/openai/openai-node/issues/3142)) ([b579bcb](https://github.com/openai/openai-node/commit/b579bcb3e586d22269ffe6fe504653a0e05acbe8))
+
 ## [7.55.0](https://github.com/openai/openai-node/compare/v7.54.0...v7.55.0) (2026-11-10)
 
 

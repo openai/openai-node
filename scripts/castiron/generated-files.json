@@ -475,7 +475,7 @@
     },
     "src/resources/beta/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "eb2f677a9400ae333c6b9f2539ac46b7a8d88938223bc437768f618eeaddee7d"
+      "sha256": "19ef541714eb3e06cc4288fe8d70e9eb8ce6169e7ab5e085e2a1382c8dcdd183"
     },
     "src/resources/beta/responses/ws-base.ts": {
       "mode": "100644",
@@ -887,7 +887,7 @@
     },
     "src/resources/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "14c0c11daf825d5e12f47fa9303ee57859eef2aed18da01ca5fbba9d0110e7b6"
+      "sha256": "e308902a690aadd1777f96606a2bb2bbdcf549462a4101f64ef4cebf3165c9f5"
     },
     "src/resources/responses/ws-base.ts": {
       "mode": "100644",
