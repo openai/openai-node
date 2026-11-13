@@ -40,6 +40,7 @@ describe('resource live', () => {
           },
         ],
         instructions: 'instructions',
+        safety_identifier: 'safety_identifier',
         store: true,
         triggers: [
           {

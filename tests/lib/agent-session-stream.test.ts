@@ -203,6 +203,13 @@ describe('agents sessions.stream public transport', () => {
     expect(signalGetter).toHaveBeenCalledOnce();
     expect(requests).toHaveLength(4);
     expect(requests.every(({ request }) => request.headers.get('x-application') === 'first')).toBe(true);
+    expect(
+      requests
+        .filter(
+          ({ request }) => request.method === 'GET' && new URL(request.url).pathname.endsWith('/events'),
+        )
+        .map(({ request }) => new URL(request.url).search),
+    ).toEqual(['']);
   });
 
   test('subscribes before normalized input and waits for selected coordinator terminal then idle', async () => {

@@ -23,6 +23,7 @@ Types:
 - <code><a href="../../../src/resources/webhooks/webhooks.ts">FineTuningJobFailedWebhookEvent</a></code>
 - <code><a href="../../../src/resources/webhooks/webhooks.ts">FineTuningJobSucceededWebhookEvent</a></code>
 - <code><a href="../../../src/resources/webhooks/webhooks.ts">LiveCallIncomingWebhookEvent</a></code>
+- <code><a href="../../../src/resources/webhooks/webhooks.ts">LiveTransportConnectedWebhookEvent</a></code>
 - <code><a href="../../../src/resources/webhooks/webhooks.ts">LiveTransportIncomingWebhookEvent</a></code>
 - <code><a href="../../../src/resources/webhooks/webhooks.ts">RealtimeCallIncomingWebhookEvent</a></code>
 - <code><a href="../../../src/resources/webhooks/webhooks.ts">ResponseCancelledWebhookEvent</a></code>

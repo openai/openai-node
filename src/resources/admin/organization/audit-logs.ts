@@ -897,6 +897,11 @@ export namespace AuditLogListResponse {
      */
     export interface ChangesRequested {
       /**
+       * Number of seconds from the update request until the API key expires.
+       */
+      expires_in_seconds?: number;
+
+      /**
        * A list of scopes allowed for the API key, e.g. `["api.model.request"]`
        */
       scopes?: Array<string>;

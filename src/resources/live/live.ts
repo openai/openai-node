@@ -1862,6 +1862,12 @@ export interface MediaSessionConfig {
   instructions?: string | null;
 
   /**
+   * A stable identifier for your end user, used for safety monitoring and abuse
+   * detection.
+   */
+  safety_identifier?: string | null;
+
+  /**
    * Whether to store the session for later forking and recording download. Defaults
    * to false for new sessions.
    */

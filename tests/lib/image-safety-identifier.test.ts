@@ -347,3 +347,45 @@ for (const operation of ['generate', 'edit'] as const) {
     }
   }
 }
+
+for (const svg of [
+  null,
+  Object.freeze({ model: 'synthetic-svg-model', reasoning: null }),
+  Object.freeze({ model: 'synthetic-svg-model', reasoning: Object.freeze({ effort: 'high' as const }) }),
+]) {
+  for (const override of [false, true]) {
+    test(`edit omits nullable SVG fields (svg=${JSON.stringify(svg)}, override=${override})`, async () => {
+      let requests = 0;
+      const client = new OpenAI({
+        apiKey: 'synthetic-key',
+        baseURL: 'https://example.com/v1',
+        maxRetries: 0,
+        fetch: async (input, init) => {
+          if (input === 'data:,') {
+            return new Response();
+          }
+          requests += 1;
+          const form = await new Request(input, init).formData();
+          expect(form.has('svg')).toBe(false);
+          expect(form.has('svg[reasoning]')).toBe(false);
+          expect(form.get('svg[model]')).toBe(svg?.model ?? null);
+          expect(form.get('svg[reasoning][effort]')).toBe(svg?.reasoning?.effort ?? null);
+          expect(form.get('prompt')).toBe('Synthetic SVG');
+          expect(form.get('image')).toBeInstanceOf(File);
+          return Response.json({ created: 1_620_000_000, data: [] });
+        },
+      });
+      const params = Object.freeze({
+        image: await toFile(new Uint8Array([1]), 'test.png'),
+        prompt: 'Synthetic SVG',
+        svg,
+      });
+      await client.images.edit(params, override ? { body: params } : undefined);
+      expect(requests).toBe(1);
+      expect(params.svg).toBe(svg);
+      if (svg !== null) {
+        expect(params.svg?.reasoning).toBe(svg.reasoning);
+      }
+    });
+  }
+}

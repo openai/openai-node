@@ -675,7 +675,11 @@ export namespace AgentSessionActionRequiredWebhookEvent {
      * The action type. Retrieve the session for action details.
      */
     export interface RequiredAction {
-      type: 'computer_use_approval_request' | 'function_call' | 'environment_connection';
+      type:
+        | 'computer_use_approval_request'
+        | 'mcp_approval_request'
+        | 'function_call'
+        | 'environment_connection';
     }
   }
 }
@@ -1393,6 +1397,42 @@ export namespace LiveCallIncomingWebhookEvent {
 }
 
 /**
+ * Sent when a direct Live WebRTC session is created or an Instant Connect session
+ * activates. Use its session ID to attach a sideband observer.
+ */
+export interface LiveTransportConnectedWebhookEvent {
+  /**
+   * The webhook event ID.
+   */
+  id: string;
+
+  /**
+   * Unix time in seconds when the event was created.
+   */
+  created_at: number;
+
+  data: LiveTransportConnectedWebhookEvent.Data;
+
+  object: 'event';
+
+  type: 'live.transport.connected';
+}
+
+export namespace LiveTransportConnectedWebhookEvent {
+  export interface Data {
+    /**
+     * The Live session ID to use with the sideband attach endpoint.
+     */
+    session_id: string;
+
+    /**
+     * The session transport.
+     */
+    type: 'webrtc';
+  }
+}
+
+/**
  * Sent when an incoming API SIP session is available for Live acceptance. The same
  * pending session can also emit `realtime.call.incoming`; the first successful
  * Realtime or Live accept endpoint selects the runtime surface.
@@ -1888,6 +1928,7 @@ export type UnwrapWebhookEvent =
   | FineTuningJobFailedWebhookEvent
   | FineTuningJobSucceededWebhookEvent
   | LiveCallIncomingWebhookEvent
+  | LiveTransportConnectedWebhookEvent
   | LiveTransportIncomingWebhookEvent
   | RealtimeCallIncomingWebhookEvent
   | ResponseCancelledWebhookEvent
@@ -2222,6 +2263,7 @@ export declare namespace Webhooks {
     type FineTuningJobFailedWebhookEvent as FineTuningJobFailedWebhookEvent,
     type FineTuningJobSucceededWebhookEvent as FineTuningJobSucceededWebhookEvent,
     type LiveCallIncomingWebhookEvent as LiveCallIncomingWebhookEvent,
+    type LiveTransportConnectedWebhookEvent as LiveTransportConnectedWebhookEvent,
     type LiveTransportIncomingWebhookEvent as LiveTransportIncomingWebhookEvent,
     type RealtimeCallIncomingWebhookEvent as RealtimeCallIncomingWebhookEvent,
     type ResponseCancelledWebhookEvent as ResponseCancelledWebhookEvent,
