@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.57.0](https://github.com/openai/openai-node/compare/v7.56.0...v7.57.0) (2026-11-13)
+
+
+### Features
+
+* **api:** update Agents, Live, Images, and admin types ([#3147](https://github.com/openai/openai-node/issues/3147)) ([543ed94](https://github.com/openai/openai-node/commit/543ed94e6451d2eaf43f1a4a16a0fc8c8f42eade))
+
 ## [7.56.0](https://github.com/openai/openai-node/compare/v7.55.0...v7.56.0) (2026-11-12)
 
 
