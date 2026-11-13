@@ -39,6 +39,7 @@ describe('resource sessions', () => {
           },
         ],
         instructions: 'instructions',
+        safety_identifier: 'safety_identifier',
         store: true,
         triggers: [
           {

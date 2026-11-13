@@ -914,6 +914,11 @@ export interface AgentOutputCommandExecutionOutputDeltaEvent {
    * The type of the object. Always `agent.output.command_execution_output.delta`.
    */
   type: 'agent.output.command_execution_output.delta';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -1298,6 +1303,7 @@ export interface AgentSession {
    * Actions that must be completed before the session can continue.
    */
   required_actions: Array<
+    | AgentSession.SessionRequiredActionResourceMcpApprovalRequest
     | AgentSession.SessionRequiredActionResourceComputerUseApprovalRequest
     | AgentSession.SessionRequiredActionResourceFunctionCall
     | AgentSession.SessionRequiredActionResourceEnvironmentConnection
@@ -1324,6 +1330,11 @@ export interface AgentSession {
    * The IDs of vaults made available to the session.
    */
   vault_ids: Array<string>;
+
+  /**
+   * Default prompt cache lifetime for turns in this session, when configured.
+   */
+  prompt_cache_options?: AgentSession.PromptCacheOptions | null;
 
   /**
    * Review applied to eligible actions in this session. Omitted when review is none
@@ -1419,6 +1430,57 @@ export namespace AgentSession {
        * Whether the model receives periodic current-time reminders.
        */
       time_awareness: boolean;
+    }
+  }
+
+  /**
+   * Respond to an MCP tool-call approval request.
+   */
+  export interface SessionRequiredActionResourceMcpApprovalRequest {
+    /**
+     * Information for presenting an MCP approval.
+     */
+    request: SessionRequiredActionResourceMcpApprovalRequest.Request;
+
+    /**
+     * The opaque approval ID to echo when responding.
+     */
+    request_id: string;
+
+    /**
+     * The turn that requested approval.
+     */
+    turn_id: string;
+
+    /**
+     * The type of the object. Always `mcp_approval_request`.
+     */
+    type: 'mcp_approval_request';
+  }
+
+  export namespace SessionRequiredActionResourceMcpApprovalRequest {
+    /**
+     * Information for presenting an MCP approval.
+     */
+    export interface Request {
+      /**
+       * The tool arguments as JSON, or null when CCA does not provide them.
+       */
+      arguments: unknown;
+
+      message: string;
+
+      /**
+       * The tool name, or null when CCA does not provide it.
+       */
+      name: string | null;
+
+      server_label: string;
+
+      /**
+       * The type of the object. Always `mcp_tool_call`.
+       */
+      type: 'mcp_tool_call';
     }
   }
 
@@ -1594,6 +1656,13 @@ export namespace AgentSession {
   }
 
   /**
+   * Default prompt cache lifetime for turns in this session, when configured.
+   */
+  export interface PromptCacheOptions {
+    ttl: '30m' | '12h';
+  }
+
+  /**
    * Configured spending limit and best-effort consumption, in USD cents. Unlimited
    * sessions omit this object.
    */
@@ -1671,6 +1740,11 @@ export interface AgentSessionCreatedEvent {
    * The type of the object. Always `agent.session.created`.
    */
   type: 'agent.session.created';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -1723,6 +1797,11 @@ export interface AgentSessionEnvironmentConnectedEvent {
    * The type of the object. Always `agent.session.environment.connected`.
    */
   type: 'agent.session.environment.connected';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -1753,6 +1832,11 @@ export interface AgentSessionEnvironmentDisconnectedEvent {
    * The type of the object. Always `agent.session.environment.disconnected`.
    */
   type: 'agent.session.environment.disconnected';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -1783,6 +1867,11 @@ export interface AgentSessionEnvironmentExpiredEvent {
    * The type of the object. Always `agent.session.environment.expired`.
    */
   type: 'agent.session.environment.expired';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -1813,6 +1902,11 @@ export interface AgentSessionEnvironmentFailedEvent {
    * The type of the object. Always `agent.session.environment.failed`.
    */
   type: 'agent.session.environment.failed';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -1843,6 +1937,11 @@ export interface AgentSessionEnvironmentPendingEvent {
    * The type of the object. Always `agent.session.environment.pending`.
    */
   type: 'agent.session.environment.pending';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -1873,6 +1972,11 @@ export interface AgentSessionEnvironmentReadyEvent {
    * The type of the object. Always `agent.session.environment.ready`.
    */
   type: 'agent.session.environment.ready';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -1909,6 +2013,11 @@ export interface AgentSessionEnvironmentResetEvent {
    * The type of the object. Always `agent.session.environment.reset`.
    */
   type: 'agent.session.environment.reset';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -1995,6 +2104,11 @@ export interface AgentSessionEnvironmentSuspendedEvent {
    * The type of the object. Always `agent.session.environment.suspended`.
    */
   type: 'agent.session.environment.suspended';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2020,6 +2134,11 @@ export interface AgentSessionErrorEvent {
    * The type of the object. Always `error`.
    */
   type: 'error';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2078,6 +2197,11 @@ export interface AgentSessionFailedEvent {
    * The type of the object. Always `agent.session.failed`.
    */
   type: 'agent.session.failed';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2098,6 +2222,11 @@ export interface AgentSessionIdleEvent {
    * The type of the object. Always `agent.session.idle`.
    */
   type: 'agent.session.idle';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2118,6 +2247,11 @@ export interface AgentSessionInProgressEvent {
    * The type of the object. Always `agent.session.in_progress`.
    */
   type: 'agent.session.in_progress';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2144,12 +2278,51 @@ export interface AgentSessionInputMessageParam {
  * Input submitted to an existing session.
  */
 export type AgentSessionInputParam =
+  | AgentSessionInputParam.SessionInputParamAgentSessionInputMcpApprovalRequestResult
   | AgentSessionInputParam.SessionInputParamAgentSessionInputComputerUseApprovalRequestResult
   | AgentSessionInputParam.SessionInputParamAgentSessionInputMessage
   | AgentSessionInputParam.SessionInputParamAgentSessionInputCancel
   | AgentSessionInputParam.SessionInputParamAgentSessionInputToolResult;
 
 export namespace AgentSessionInputParam {
+  /**
+   * Responds to a pending MCP tool-call approval request.
+   */
+  export interface SessionInputParamAgentSessionInputMcpApprovalRequestResult {
+    /**
+     * The opaque approval ID from the required action.
+     */
+    request_id: string;
+
+    /**
+     * The user's decision for a pending MCP tool call.
+     */
+    response: SessionInputParamAgentSessionInputMcpApprovalRequestResult.Response;
+
+    /**
+     * The type of the object. Always
+     * `agent.session.input.mcp_approval_request_result`.
+     */
+    type: 'agent.session.input.mcp_approval_request_result';
+  }
+
+  export namespace SessionInputParamAgentSessionInputMcpApprovalRequestResult {
+    /**
+     * The user's decision for a pending MCP tool call.
+     */
+    export interface Response {
+      /**
+       * Cancel dismisses this request without cancelling the session or turn.
+       */
+      decision: 'approve' | 'deny' | 'cancel';
+
+      /**
+       * The type of the object. Always `mcp_tool_call`.
+       */
+      type: 'mcp_tool_call';
+    }
+  }
+
   /**
    * Responds to a pending Computer Use approval request.
    */
@@ -2657,6 +2830,11 @@ export interface AgentSessionRequiresActionEvent {
    * The type of the object. Always `agent.session.requires_action`.
    */
   type: 'agent.session.requires_action';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2677,6 +2855,11 @@ export interface AgentSessionSubagentActiveEvent {
    * The type of the object. Always `agent.session.subagent.active`.
    */
   type: 'agent.session.subagent.active';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2697,6 +2880,11 @@ export interface AgentSessionSubagentClosedEvent {
    * The type of the object. Always `agent.session.subagent.closed`.
    */
   type: 'agent.session.subagent.closed';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2717,6 +2905,11 @@ export interface AgentSessionSubagentCreatedEvent {
    * The type of the object. Always `agent.session.subagent.created`.
    */
   type: 'agent.session.subagent.created';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2752,6 +2945,11 @@ export interface AgentSessionTurnCancelledEvent {
    * Token usage by the root agent during the turn, when available.
    */
   usage: TokenUsage | null;
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2787,6 +2985,11 @@ export interface AgentSessionTurnCompletedEvent {
    * Token usage by the root agent during the turn, when available.
    */
   usage: TokenUsage | null;
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2832,6 +3035,11 @@ export interface AgentSessionTurnContentPartAddedEvent {
    * The type of the object. Always `agent.session.turn.content_part.added`.
    */
   type: 'agent.session.turn.content_part.added';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2877,6 +3085,11 @@ export interface AgentSessionTurnContentPartDoneEvent {
    * The type of the object. Always `agent.session.turn.content_part.done`.
    */
   type: 'agent.session.turn.content_part.done';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2907,6 +3120,11 @@ export interface AgentSessionTurnCreatedEvent {
    * The type of the object. Always `agent.session.turn.created`.
    */
   type: 'agent.session.turn.created';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2942,6 +3160,11 @@ export interface AgentSessionTurnFailedEvent {
    * Token usage by the root agent during the turn, when available.
    */
   usage: TokenUsage | null;
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -2972,6 +3195,11 @@ export interface AgentSessionTurnInProgressEvent {
    * The type of the object. Always `agent.session.turn.in_progress`.
    */
   type: 'agent.session.turn.in_progress';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -3007,6 +3235,11 @@ export interface AgentSessionTurnItemAddedEvent {
    * The type of the object. Always `agent.session.turn.item.added`.
    */
   type: 'agent.session.turn.item.added';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -3042,6 +3275,11 @@ export interface AgentSessionTurnItemDoneEvent {
    * The type of the object. Always `agent.session.turn.item.done`.
    */
   type: 'agent.session.turn.item.done';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -3087,6 +3325,11 @@ export interface AgentSessionTurnOutputTextDeltaEvent {
    * The type of the object. Always `agent.session.turn.output_text.delta`.
    */
   type: 'agent.session.turn.output_text.delta';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -3132,6 +3375,11 @@ export interface AgentSessionTurnOutputTextDoneEvent {
    * The type of the object. Always `agent.session.turn.output_text.done`.
    */
   type: 'agent.session.turn.output_text.done';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -3178,6 +3426,11 @@ export interface AgentSessionTurnReasoningSummaryPartAddedEvent {
    * `agent.session.turn.reasoning_summary_part.added`.
    */
   type: 'agent.session.turn.reasoning_summary_part.added';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -3228,6 +3481,11 @@ export interface AgentSessionTurnReasoningSummaryPartDoneEvent {
    * The type of the object. Always `agent.session.turn.reasoning_summary_part.done`.
    */
   type: 'agent.session.turn.reasoning_summary_part.done';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -3274,6 +3532,11 @@ export interface AgentSessionTurnReasoningSummaryTextDeltaEvent {
    * `agent.session.turn.reasoning_summary_text.delta`.
    */
   type: 'agent.session.turn.reasoning_summary_text.delta';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**
@@ -3319,6 +3582,11 @@ export interface AgentSessionTurnReasoningSummaryTextDoneEvent {
    * The type of the object. Always `agent.session.turn.reasoning_summary_text.done`.
    */
   type: 'agent.session.turn.reasoning_summary_text.done';
+
+  /**
+   * Random alphanumeric padding. Present when stream obfuscation is enabled.
+   */
+  obfuscation?: string;
 }
 
 /**

@@ -34,14 +34,11 @@ export class Events extends APIResource {
    *       {
    *         request_id: 'request_id',
    *         response: {
-   *           action: 'submit',
-   *           fields: [
-   *             { field_id: 'field_id', value: 'value' },
-   *           ],
-   *           type: 'browser_authentication',
+   *           decision: 'approve',
+   *           type: 'mcp_tool_call',
    *         },
    *         type:
-   *           'agent.session.input.computer_use_approval_request_result',
+   *           'agent.session.input.mcp_approval_request_result',
    *       },
    *     ],
    *   },
@@ -80,10 +77,26 @@ export class Events extends APIResource {
    *   );
    * ```
    */
-  stream(sessionID: string, options?: RequestOptions): APIPromise<Stream<AgentsAPI.AgentSessionEvent>> {
+  stream(sessionID: string, options?: RequestOptions): APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
+  stream(
+    sessionID: string,
+    query: EventStreamParams | undefined,
+    options: RequestOptions | undefined,
+  ): APIPromise<Stream<AgentsAPI.AgentSessionEvent>>;
+  stream(
+    sessionID: string,
+    query: EventStreamParams | RequestOptions | undefined = {},
+    options?: RequestOptions,
+  ): APIPromise<Stream<AgentsAPI.AgentSessionEvent>> {
+    if (arguments.length < 3) {
+      options = query as RequestOptions | undefined;
+      query = {};
+    }
+    query = query as EventStreamParams | undefined;
     return this._client.get(
       path`/agents/sessions/${sessionID}/events`,
       resolveResourceRequestOptions(options, (options) => ({
+        query,
         ...options,
         headers: buildHeaders([
           { 'OpenAI-Beta': 'agents=v1', Accept: 'text/event-stream' },
@@ -110,6 +123,14 @@ export interface EventCreateParams {
   'Idempotency-Key'?: string;
 }
 
+export interface EventStreamParams {
+  /**
+   * Whether to include obfuscation padding in events on this connection. Defaults to
+   * `true`.
+   */
+  include_obfuscation?: boolean;
+}
+
 export declare namespace Events {
-  export { type EventCreateParams as EventCreateParams };
+  export { type EventCreateParams as EventCreateParams, type EventStreamParams as EventStreamParams };
 }

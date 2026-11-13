@@ -16,7 +16,7 @@ import {
   SessionArtifactsPage,
 } from './artifacts';
 import * as EventsAPI from './events';
-import { EventCreateParams, Events } from './events';
+import { EventCreateParams, EventStreamParams, Events } from './events';
 import * as ItemsAPI from './items';
 import { ItemListParams, Items } from './items';
 import * as TracesAPI from './traces';
@@ -258,8 +258,9 @@ export class Sessions extends APIResource {
   }
 
   /**
-   * Updates session tools, metadata, model, reasoning effort, or service tier. Model
-   * settings apply to subsequent turns. Omitted fields are unchanged. See
+   * Updates session tools, metadata, model, reasoning effort, service tier, or the
+   * default prompt cache lifetime. Model settings apply to subsequent turns. Omitted
+   * fields are unchanged. See
    * [managing sessions](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage).
    *
    * @example
@@ -477,6 +478,12 @@ export interface SessionCreateParamsBase {
   metadata?: { [key: string]: string } | null;
 
   /**
+   * Default prompt cache lifetime for turns in this session. Omit to use the model
+   * default.
+   */
+  prompt_cache_options?: SessionCreateParams.PromptCacheOptions | null;
+
+  /**
    * Action review mode. Omit to use none.
    *
    * - `none` - Keep the existing execution behavior without automatic action review.
@@ -495,6 +502,11 @@ export interface SessionCreateParamsBase {
    * Whether to stream session events as server-sent events. Defaults to `false`.
    */
   stream?: boolean;
+
+  /**
+   * Options for the event stream. Only allowed when `stream` is `true`.
+   */
+  stream_options?: SessionCreateParams.StreamOptions;
 
   /**
    * The IDs of vaults made available to the session.
@@ -597,6 +609,17 @@ export namespace SessionCreateParams {
   }
 
   /**
+   * Default prompt cache lifetime for turns in this session. Omit to use the model
+   * default.
+   */
+  export interface PromptCacheOptions {
+    /**
+     * Minimum lifetime for new prompt cache entries. Defaults to 30 minutes.
+     */
+    ttl?: '30m' | '12h';
+  }
+
+  /**
    * Optional spending limit in USD cents. Omission or null creates an unlimited
    * session.
    */
@@ -605,6 +628,17 @@ export namespace SessionCreateParams {
      * Positive USD cents, or null to remove the limit.
      */
     limit: number | null;
+  }
+
+  /**
+   * Options for the event stream. Only allowed when `stream` is `true`.
+   */
+  export interface StreamOptions {
+    /**
+     * Whether to include obfuscation padding in events on this connection. Defaults to
+     * `true`.
+     */
+    include_obfuscation?: boolean;
   }
 
   export type SessionCreateParamsNonStreaming = SessionsAPI.SessionCreateParamsNonStreaming;
@@ -637,6 +671,12 @@ export interface SessionUpdateParams {
    * characters.
    */
   metadata?: { [key: string]: string } | null;
+
+  /**
+   * Default prompt cache lifetime for future turns. Send null to clear the session
+   * default.
+   */
+  prompt_cache_options?: SessionUpdateParams.PromptCacheOptions | null;
 
   /**
    * Default action review for new root turns. Existing turns and their subagents
@@ -700,6 +740,17 @@ export namespace SessionUpdateParams {
        */
       effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null;
     }
+  }
+
+  /**
+   * Default prompt cache lifetime for future turns. Send null to clear the session
+   * default.
+   */
+  export interface PromptCacheOptions {
+    /**
+     * Minimum lifetime for new prompt cache entries. Defaults to 30 minutes.
+     */
+    ttl?: '30m' | '12h';
   }
 
   /**
@@ -781,7 +832,11 @@ export declare namespace Sessions {
 
   export { Items as Items, type ItemListParams as ItemListParams };
 
-  export { Events as Events, type EventCreateParams as EventCreateParams };
+  export {
+    Events as Events,
+    type EventCreateParams as EventCreateParams,
+    type EventStreamParams as EventStreamParams,
+  };
 
   export {
     Traces as Traces,

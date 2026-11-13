@@ -14,12 +14,8 @@ describe('resource events', () => {
       events: [
         {
           request_id: 'request_id',
-          response: {
-            action: 'submit',
-            fields: [{ field_id: 'field_id', value: 'value' }],
-            type: 'browser_authentication',
-          },
-          type: 'agent.session.input.computer_use_approval_request_result',
+          response: { decision: 'approve', type: 'mcp_tool_call' },
+          type: 'agent.session.input.mcp_approval_request_result',
         },
       ],
     });
@@ -37,13 +33,8 @@ describe('resource events', () => {
       events: [
         {
           request_id: 'request_id',
-          response: {
-            action: 'submit',
-            fields: [{ field_id: 'field_id', value: 'value' }],
-            type: 'browser_authentication',
-            selected_option: 'selected_option',
-          },
-          type: 'agent.session.input.computer_use_approval_request_result',
+          response: { decision: 'approve', type: 'mcp_tool_call' },
+          type: 'agent.session.input.mcp_approval_request_result',
         },
       ],
       'Idempotency-Key': 'x',
@@ -59,5 +50,16 @@ describe('resource events', () => {
     const dataAndResponse = await responsePromise.withResponse();
     expect(dataAndResponse.data).toBe(response);
     expect(dataAndResponse.response).toBe(rawResponse);
+  });
+
+  test('stream: request options and params are passed correctly', async () => {
+    // ensure the request options are being passed correctly by passing an invalid HTTP method in order to cause an error
+    await expect(
+      client.beta.agents.sessions.events.stream(
+        'session_id',
+        { include_obfuscation: true },
+        { path: '/_stainless_unknown_path' },
+      ),
+    ).rejects.toThrow(OpenAI.NotFoundError);
   });
 });

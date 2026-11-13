@@ -49,9 +49,11 @@ describe('resource sessions', () => {
       agent_id: 'agent_id',
       input: 'x',
       metadata: { foo: 'string' },
+      prompt_cache_options: { ttl: '30m' },
       review: 'none',
       spend_control: { limit: 1 },
       stream: false,
+      stream_options: { include_obfuscation: true },
       vault_ids: ['string'],
     });
   });
@@ -100,6 +102,7 @@ describe('resource sessions', () => {
             ],
           },
           metadata: { foo: 'string' },
+          prompt_cache_options: { ttl: '30m' },
           review: 'none',
           spend_control: { limit: 1 },
         },
