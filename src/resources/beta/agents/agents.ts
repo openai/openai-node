@@ -489,7 +489,7 @@ export namespace Agent {
    */
   export interface Compaction {
     /**
-     * Whether context is compacted in the background. Defaults to true.
+     * Whether context is compacted in the background. Defaults to false.
      */
     async: boolean;
   }
@@ -1417,7 +1417,7 @@ export namespace AgentSession {
      */
     export interface Compaction {
       /**
-       * Whether context is compacted in the background. Defaults to true.
+       * Whether context is compacted in the background. Defaults to false.
        */
       async: boolean;
     }
@@ -5881,7 +5881,7 @@ export interface AgentCreateParams {
   model: string;
 
   /**
-   * Context compaction settings. Omission or null enables background compaction.
+   * Context compaction settings. Omission or null uses blocking compaction.
    */
   compaction?: AgentCreateParams.Compaction | null;
 
@@ -5945,13 +5945,13 @@ export interface AgentCreateParams {
 
 export namespace AgentCreateParams {
   /**
-   * Context compaction settings. Omission or null enables background compaction.
+   * Context compaction settings. Omission or null uses blocking compaction.
    */
   export interface Compaction {
     /**
-     * Whether to compact context in the background. Omission or null defaults to true.
-     * Set to false to use blocking compaction. Background compaction may increase
-     * token usage.
+     * Whether to compact context in the background. Omission or null defaults to
+     * false. Set to true to enable background compaction. Background compaction may
+     * increase token usage.
      */
     async?: boolean | null;
   }
@@ -5970,8 +5970,7 @@ export namespace AgentCreateParams {
 export interface AgentUpdateParams {
   /**
    * Context compaction settings. Omit to keep the current settings. A supplied
-   * object replaces the settings; null or an empty object enables background
-   * compaction.
+   * object replaces the settings; null or an empty object uses blocking compaction.
    */
   compaction?: AgentUpdateParams.Compaction | null;
 
@@ -6042,14 +6041,13 @@ export interface AgentUpdateParams {
 export namespace AgentUpdateParams {
   /**
    * Context compaction settings. Omit to keep the current settings. A supplied
-   * object replaces the settings; null or an empty object enables background
-   * compaction.
+   * object replaces the settings; null or an empty object uses blocking compaction.
    */
   export interface Compaction {
     /**
-     * Whether to compact context in the background. Omission or null defaults to true.
-     * Set to false to use blocking compaction. Background compaction may increase
-     * token usage.
+     * Whether to compact context in the background. Omission or null defaults to
+     * false. Set to true to enable background compaction. Background compaction may
+     * increase token usage.
      */
     async?: boolean | null;
   }
