@@ -477,7 +477,7 @@ export namespace AutomationAgentConfig {
    */
   export interface Compaction {
     /**
-     * Whether context is compacted in the background. Defaults to true.
+     * Whether context is compacted in the background. Defaults to false.
      */
     async: boolean;
   }
@@ -920,8 +920,7 @@ export namespace AutomationTargetParam {
     export interface Agent {
       /**
        * Context compaction settings. Omit to keep the current settings. A supplied
-       * object replaces the settings; null or an empty object enables background
-       * compaction.
+       * object replaces the settings; null or an empty object uses blocking compaction.
        */
       compaction?: Agent.Compaction | null;
 
@@ -981,14 +980,13 @@ export namespace AutomationTargetParam {
     export namespace Agent {
       /**
        * Context compaction settings. Omit to keep the current settings. A supplied
-       * object replaces the settings; null or an empty object enables background
-       * compaction.
+       * object replaces the settings; null or an empty object uses blocking compaction.
        */
       export interface Compaction {
         /**
-         * Whether to compact context in the background. Omission or null defaults to true.
-         * Set to false to use blocking compaction. Background compaction may increase
-         * token usage.
+         * Whether to compact context in the background. Omission or null defaults to
+         * false. Set to true to enable background compaction. Background compaction may
+         * increase token usage.
          */
         async?: boolean | null;
       }
@@ -1081,6 +1079,11 @@ export interface OneTimeAutomation {
    * The type of the object. Always `once`.
    */
   type: 'once';
+
+  /**
+   * Why the service paused this schedule, or null for other schedules.
+   */
+  pause_reason?: 'target_session_failed' | null;
 }
 
 /**
@@ -1141,6 +1144,11 @@ export interface PeriodicAutomation {
    * The type of the object. Always `periodic`.
    */
   type: 'periodic';
+
+  /**
+   * Why the service paused this schedule, or null for other schedules.
+   */
+  pause_reason?: 'target_session_failed' | null;
 }
 
 export type AutomationCreateParams = CreateAutomationParamsPeriodic | CreateAutomationParamsOnce;
