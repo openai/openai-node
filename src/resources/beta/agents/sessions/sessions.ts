@@ -522,8 +522,7 @@ export namespace SessionCreateParams {
   export interface Agent {
     /**
      * Context compaction settings. Omit to keep the current settings. A supplied
-     * object replaces the settings; null or an empty object enables background
-     * compaction.
+     * object replaces the settings; null or an empty object uses blocking compaction.
      */
     compaction?: Agent.Compaction | null;
 
@@ -583,14 +582,13 @@ export namespace SessionCreateParams {
   export namespace Agent {
     /**
      * Context compaction settings. Omit to keep the current settings. A supplied
-     * object replaces the settings; null or an empty object enables background
-     * compaction.
+     * object replaces the settings; null or an empty object uses blocking compaction.
      */
     export interface Compaction {
       /**
-       * Whether to compact context in the background. Omission or null defaults to true.
-       * Set to false to use blocking compaction. Background compaction may increase
-       * token usage.
+       * Whether to compact context in the background. Omission or null defaults to
+       * false. Set to true to enable background compaction. Background compaction may
+       * increase token usage.
        */
       async?: boolean | null;
     }
