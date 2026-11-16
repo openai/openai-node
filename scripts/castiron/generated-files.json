@@ -287,7 +287,7 @@
     },
     "src/resources/beta/agents/agents.ts": {
       "mode": "100644",
-      "sha256": "33cf560a418884ce6190c082ed158994fd03b6251f8722864ed24f8115e31d04"
+      "sha256": "b56f5edf48bf499a03b6f45041829022a7019cf7e2250a1af7d753660cf0515f"
     },
     "src/resources/beta/agents/automations.ts": {
       "mode": "100644",
@@ -295,7 +295,7 @@
     },
     "src/resources/beta/agents/automations/automations.ts": {
       "mode": "100644",
-      "sha256": "d93d9ebe699eea989363795af27378542ddb9bb863389ee3fc98c5c59d7bf5fa"
+      "sha256": "a6b9e13e6b611e5bb120beb84459da62e68bfa89f95ddbefcd04cf82c6535541"
     },
     "src/resources/beta/agents/automations/index.ts": {
       "mode": "100644",
@@ -351,7 +351,7 @@
     },
     "src/resources/beta/agents/sessions/sessions.ts": {
       "mode": "100644",
-      "sha256": "f330b5e20b6794d5a1facd4be3b3ccad63c535cea65326f55d60755715178552"
+      "sha256": "4f7c50049b1dfac1570ec8203ccada89e890edb1ae1b1b3b9b11e40148d2cfd6"
     },
     "src/resources/beta/agents/sessions/subagents.ts": {
       "mode": "100644",
@@ -771,7 +771,7 @@
     },
     "src/resources/live/live.ts": {
       "mode": "100644",
-      "sha256": "bcab2971e36f42e238e666843541610d395e9d5f860117631e258a222cbd1ad8"
+      "sha256": "8955f8d2e05f6f322e6e7a259bb41497c48115cd3e34fc1bc7797df5d176e0e6"
     },
     "src/resources/live/sessions.ts": {
       "mode": "100644",
