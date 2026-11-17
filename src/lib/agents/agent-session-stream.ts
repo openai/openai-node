@@ -197,7 +197,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
         if (!state.accept(event)) {
           continue;
         }
-        const terminal = state.terminal(event);
+        const terminal = state.terminal(event, this.#sessionID);
         const dispatch = this.#dispatcher.prepare(state.call(event), this.#sessionID);
         if (terminal) {
           this.#stream.controller.abort();
