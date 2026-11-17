@@ -9866,6 +9866,13 @@ export namespace ResponsesClientEvent {
     background?: boolean | null;
 
     /**
+     * Options for background execution on HTTP requests. The `2h` and `8h` completion
+     * windows require `background: true`, Standard processing, and `stream: false` or
+     * omitted.
+     */
+    background_options?: ResponseCreate.BackgroundOptions;
+
+    /**
      * Context management configuration for this request.
      */
     context_management?: Array<ResponseCreate.ContextManagement> | null;
@@ -10226,6 +10233,25 @@ export namespace ResponsesClientEvent {
        * field, rather than an explicit Standard selection.
        */
       cyber?: 'standard' | 'daybreak_blue' | 'daybreak_red';
+    }
+
+    /**
+     * Options for background execution on HTTP requests. The `2h` and `8h` completion
+     * windows require `background: true`, Standard processing, and `stream: false` or
+     * omitted.
+     */
+    export interface BackgroundOptions {
+      /**
+       * The completion window for background execution. Defaults to `soonest`; `2h` and
+       * `8h` select discounted background execution.
+       */
+      completion_window?: 'soonest' | '2h' | '8h';
+
+      /**
+       * A customer-provided opaque identifier used to prioritize related background
+       * requests. It does not add prior history to the input.
+       */
+      continuation_id?: string;
     }
 
     export interface ContextManagement {
@@ -12116,6 +12142,13 @@ export interface ResponseCreateParamsBase {
   background?: boolean | null;
 
   /**
+   * Options for background execution on HTTP requests. The `2h` and `8h` completion
+   * windows require `background: true`, Standard processing, and `stream: false` or
+   * omitted.
+   */
+  background_options?: ResponseCreateParams.BackgroundOptions;
+
+  /**
    * Context management configuration for this request.
    */
   context_management?: Array<ResponseCreateParams.ContextManagement> | null;
@@ -12462,6 +12495,25 @@ export namespace ResponseCreateParams {
     cyber?: 'standard' | 'daybreak_blue' | 'daybreak_red';
   }
 
+  /**
+   * Options for background execution on HTTP requests. The `2h` and `8h` completion
+   * windows require `background: true`, Standard processing, and `stream: false` or
+   * omitted.
+   */
+  export interface BackgroundOptions {
+    /**
+     * The completion window for background execution. Defaults to `soonest`; `2h` and
+     * `8h` select discounted background execution.
+     */
+    completion_window?: 'soonest' | '2h' | '8h';
+
+    /**
+     * A customer-provided opaque identifier used to prioritize related background
+     * requests. It does not add prior history to the input.
+     */
+    continuation_id?: string;
+  }
+
   export interface ContextManagement {
     /**
      * The context management entry type. Currently only 'compaction' is supported.
@@ -12701,7 +12753,9 @@ export interface ResponseCompactParams {
    */
   model:
     | 'gpt-6-astra'
+    | 'gpt-6.2-astra'
     | 'gpt-6.1-sol'
+    | 'gpt-6.2-sol'
     | 'gpt-6.1-terra'
     | 'gpt-6-sol'
     | 'gpt-6-luna'
@@ -12812,6 +12866,7 @@ export interface ResponseCompactParams {
     | 'gpt-6-cyber'
     | 'gpt-rosalind-research'
     | 'gpt-6-rosalind'
+    | 'gpt-6.2-astra-law'
     | (string & {})
     | null;
 
