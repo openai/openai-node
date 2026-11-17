@@ -493,6 +493,7 @@ Types:
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSendSubagentInputCallItem</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSession</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionAssistantMessage</a></code>
+- <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionBudgetReachedEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionCreatedEvent</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionDeleted</a></code>
 - <code><a href="./src/resources/beta/agents/agents.ts">AgentSessionEnvironmentConnectedEvent</a></code>

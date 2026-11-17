@@ -27,6 +27,7 @@ export {
   type AgentSendSubagentInputCallItem,
   type AgentSession,
   type AgentSessionAssistantMessage,
+  type AgentSessionBudgetReachedEvent,
   type AgentSessionCreatedEvent,
   type AgentSessionDeleted,
   type AgentSessionEnvironmentConnectedEvent,

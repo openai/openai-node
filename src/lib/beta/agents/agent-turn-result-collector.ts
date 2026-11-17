@@ -33,7 +33,11 @@ export class AgentTurnResultCollector {
       this.#requiredActions = structuredClone(event.session.required_actions ?? []);
       this.#checkedActionsFor = undefined;
       this.#sessionFailed ||= event.type === 'agent.session.failed';
-      this.#idle ||= event.type === 'agent.session.idle' && this.#terminal;
+      this.#idle ||=
+        (event.type === 'agent.session.idle' && this.#terminal) ||
+        (event.type === 'agent.session.budget_reached' &&
+          event.session.id === this.#sessionID &&
+          (!this.#turn || this.#terminal));
     }
     if (event.type === 'agent.session.turn.created' && event.turn.subagent_id === null && !this.#turn) {
       this.#turn = structuredClone(event.turn);
@@ -111,7 +115,7 @@ export class AgentTurnResultCollector {
   }
 
   get ready(): boolean {
-    return this.#terminal && this.#idle;
+    return this.#idle;
   }
 
   release(): void {

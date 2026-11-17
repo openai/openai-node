@@ -41,8 +41,14 @@ export class TurnState {
   }
 
   /** Checks session termination after updating the selected turn state. */
-  terminal(event: AgentSessionEvent): boolean {
-    return event.type === 'agent.session.failed' || (event.type === 'agent.session.idle' && this.#turnEnded);
+  terminal(event: AgentSessionEvent, sessionID: string): boolean {
+    return (
+      event.type === 'agent.session.failed' ||
+      (event.type === 'agent.session.budget_reached' &&
+        event.session.id === sessionID &&
+        (this.#turnID === undefined || this.#turnEnded)) ||
+      (event.type === 'agent.session.idle' && this.#turnEnded)
+    );
   }
 
   /** Returns each tool call once for the full invocation, including subagent turns. */

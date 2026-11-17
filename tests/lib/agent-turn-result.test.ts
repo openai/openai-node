@@ -147,6 +147,83 @@ class CustomStream<Item> extends Stream<Item> {
 }
 
 describe('beta Agents finalResult', () => {
+  test.each([
+    [false, false],
+    [false, true],
+    [true, false],
+    [true, true],
+  ])('budget before a root turn rejects observation (known session: %s, error: %s)', async (known, error) => {
+    const { client, requests, cancel, body } = setup([
+      ...(known ? [event('agent.session.created', { session: { id: turn.session_id } })] : []),
+      ...(error
+        ? [event('error', { error: { type: 'server_error', message: 'Synthetic budget failure.' } })]
+        : []),
+      event('agent.session.budget_reached', {
+        session: { id: turn.session_id, status: 'budget_reached', required_actions: [] },
+      }),
+      event('agent.session.failed', { session: { id: turn.session_id } }),
+    ]);
+    const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    await expect(stream.finalResult()).rejects.toMatchObject({
+      reason: 'observation',
+      session_id: turn.session_id,
+    });
+    expect(requests.map((request) => request.method)).toEqual(['POST']);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(body.locked).toBe(false);
+  });
+
+  test.each([
+    ['no turn', false],
+    ['active turn', false],
+    ['terminal turn', false],
+    ['active turn', true],
+  ] as const)('continues observation with %s and matching budget: %s', async (state, matching) => {
+    const { client, cancel, body } = setup([
+      event('agent.session.created', { session: { id: turn.session_id } }),
+      ...(state === 'no turn' ? [idle()] : [created()]),
+      ...(state === 'terminal turn' ? [message(), completed()] : []),
+      event('agent.session.budget_reached', {
+        session: { id: matching ? turn.session_id : 'session_other', required_actions: [] },
+      }),
+      event('agent.session.failed', { session: { id: turn.session_id } }),
+    ]);
+    const stream = await client.beta.agents.sessions.create({ environment: { type: 'none' }, stream: true });
+    await expect(stream.finalResult()).rejects.toMatchObject({ reason: 'failed' });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(body.locked).toBe(false);
+  });
+
+  test.each([false, true])('budget exhaustion completes a result, follow-up: %s', async (followup) => {
+    const budget = event('agent.session.budget_reached', {
+      session: { id: turn.session_id, status: 'budget_reached', required_actions: [] },
+    });
+    const { client, cancel, body } = setup(
+      [
+        created(),
+        message(),
+        completed(),
+        budget,
+        event('agent.session.failed', { session: { id: turn.session_id } }),
+      ],
+      { followup },
+    );
+    const stream = followup
+      ? client.beta.agents.sessions.stream(turn.session_id, { input: 'Question' })
+      : await client.beta.agents.sessions.create({
+          environment: { type: 'none' },
+          input: 'Question',
+          stream: true,
+        });
+
+    const result = await stream.finalResult();
+    expect(result.output_text).toBe('Final answer');
+    expect(result.turn.status).toBe('completed');
+    expect(await stream.finalResult()).toBe(result);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(body.locked).toBe(false);
+  });
+
   test('creation collects its answer without waiting for the still-live stream to close', async () => {
     const { client, cancel, requests } = setup([created(), message(), completed(), idle()]);
     const request = client.beta.agents.sessions.create({
