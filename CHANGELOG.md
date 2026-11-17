@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.59.0](https://github.com/openai/openai-node/compare/v7.58.0...v7.59.0) (2026-11-17)
+
+
+### Features
+
+* **api:** type Managed Agents budget events ([#3162](https://github.com/openai/openai-node/issues/3162)) ([bc12de0](https://github.com/openai/openai-node/commit/bc12de08afb6fb3605e90e7288d0a666c5348381))
+
 ## [7.58.0](https://github.com/openai/openai-node/compare/v7.57.0...v7.58.0) (2026-11-17)
 
 
