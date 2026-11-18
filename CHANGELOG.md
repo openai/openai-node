@@ -1,5 +1,28 @@
 # Changelog
 
+## [7.60.0](https://github.com/openai/openai-node/compare/v7.59.0...v7.60.0) (2026-11-18)
+
+
+### Features
+
+* **api:** add Live MCP server configuration ([#3160](https://github.com/openai/openai-node/issues/3160)) ([015ddc9](https://github.com/openai/openai-node/commit/015ddc917420df528d19866c135634cd7e5f8e3a))
+* **api:** add standalone CSAM moderation types ([#3167](https://github.com/openai/openai-node/issues/3167)) ([b844556](https://github.com/openai/openai-node/commit/b844556d6387f66ec812d0b990487c628d559bad))
+* **api:** hide Managed Agents session budget controls and events ([#3166](https://github.com/openai/openai-node/issues/3166)) ([d4ea74a](https://github.com/openai/openai-node/commit/d4ea74a63584b3b53e46193e2c7f76940c37c824))
+
+
+### Bug Fixes
+
+* **deps-dev:** bump @aws-sdk/credential-provider-node from 3.972.88 to 3.972.94 ([#3154](https://github.com/openai/openai-node/issues/3154)) ([6f6ce11](https://github.com/openai/openai-node/commit/6f6ce1162dcd524fafcd64edaffcf397658344b8))
+* **deps-dev:** bump @babel/core from 7.29.7 to 7.29.13 in /ecosystem-tests/ts-browser-webpack ([#3155](https://github.com/openai/openai-node/issues/3155)) ([6a03f1a](https://github.com/openai/openai-node/commit/6a03f1ae4102bac5b178c00fbece945c54c008db))
+* **deps-dev:** bump @cloudflare/workers-types from 5.20261101.1 to 5.20261108.1 in /ecosystem-tests/cloudflare-worker ([#3149](https://github.com/openai/openai-node/issues/3149)) ([d15a100](https://github.com/openai/openai-node/commit/d15a100d945fe73f8f99f1ebb7e41dc6d7df697a))
+* **deps-dev:** bump execa from 5.1.1 to 10.2.1 ([#3151](https://github.com/openai/openai-node/issues/3151)) ([b704c3f](https://github.com/openai/openai-node/commit/b704c3fd514532ef0d86e365e498515f50ebf343))
+* **deps-dev:** bump follow-redirects from 1.16.0 to 1.16.3 in /ecosystem-tests/browser-direct-import ([#3138](https://github.com/openai/openai-node/issues/3138)) ([94c6474](https://github.com/openai/openai-node/commit/94c6474a125abff5e58ca2828f9efd7cfa7f9e54))
+* **deps-dev:** bump google-auth-library from 11.3.1 to 11.3.3 ([#3157](https://github.com/openai/openai-node/issues/3157)) ([fa31777](https://github.com/openai/openai-node/commit/fa3177710de8e5e66076fdd282c844b3f731dceb))
+* **deps-dev:** bump wrangler from 4.156.0 to 4.158.0 in /ecosystem-tests/cloudflare-worker ([#3150](https://github.com/openai/openai-node/issues/3150)) ([cddad61](https://github.com/openai/openai-node/commit/cddad618153be9335466fd95de7981ed714cf562))
+* **deps-dev:** bump ws from 8.22.1 to 8.22.2 ([#3156](https://github.com/openai/openai-node/issues/3156)) ([9b78a37](https://github.com/openai/openai-node/commit/9b78a3780cc779b20fa7d1ba876e784d75563a3c))
+* **deps:** bump dotenv from 18.0.7 to 18.0.9 ([#3153](https://github.com/openai/openai-node/issues/3153)) ([8fe3423](https://github.com/openai/openai-node/commit/8fe34238d5608f9768377e4471c3e260c093e8e9))
+* **deps:** bump undici from 7.30.1 to 7.30.2 in /ecosystem-tests/node-ts-cjs ([#3152](https://github.com/openai/openai-node/issues/3152)) ([1c9c0cb](https://github.com/openai/openai-node/commit/1c9c0cbaf9fc0b208d9b177b482dca199aef50b0))
+
 ## [7.59.0](https://github.com/openai/openai-node/compare/v7.58.0...v7.59.0) (2026-11-17)
 
 
