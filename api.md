@@ -260,6 +260,8 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/moderations.ts">CsamModeration</a></code>
+- <code><a href="./src/resources/moderations.ts">CsamModerationResponse</a></code>
 - <code><a href="./src/resources/moderations.ts">Moderation</a></code>
 - <code><a href="./src/resources/moderations.ts">ModerationImageURLInput</a></code>
 - <code><a href="./src/resources/moderations.ts">ModerationModel</a></code>

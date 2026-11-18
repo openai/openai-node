@@ -32,6 +32,65 @@ export class Moderations extends APIResource {
   }
 }
 
+export interface CsamModeration {
+  /**
+   * Whether the image was flagged in each category.
+   */
+  categories: CsamModeration.Categories;
+
+  /**
+   * The input types evaluated for each category.
+   */
+  category_applied_input_types: CsamModeration.CategoryAppliedInputTypes;
+
+  /**
+   * The classifier score for each category.
+   */
+  category_scores: CsamModeration.CategoryScores;
+
+  /**
+   * Whether either CSAM category was flagged.
+   */
+  flagged: boolean;
+}
+
+export namespace CsamModeration {
+  /**
+   * Whether the image was flagged in each category.
+   */
+  export interface Categories {
+    'likely-csam': boolean;
+
+    'likely-csam/gen-ai': boolean;
+  }
+
+  /**
+   * The input types evaluated for each category.
+   */
+  export interface CategoryAppliedInputTypes {
+    'likely-csam': Array<'image'>;
+
+    'likely-csam/gen-ai': Array<'image'>;
+  }
+
+  /**
+   * The classifier score for each category.
+   */
+  export interface CategoryScores {
+    'likely-csam': number;
+
+    'likely-csam/gen-ai': number;
+  }
+}
+
+export interface CsamModerationResponse {
+  id: string;
+
+  model: 'omni-moderation-csam-latest';
+
+  results: Array<CsamModeration>;
+}
+
 export interface Moderation {
   /**
    * A list of the categories, and whether they are flagged or not.
@@ -374,6 +433,8 @@ export interface ModerationCreateParams {
 
 export declare namespace Moderations {
   export {
+    type CsamModeration as CsamModeration,
+    type CsamModerationResponse as CsamModerationResponse,
     type Moderation as Moderation,
     type ModerationImageURLInput as ModerationImageURLInput,
     type ModerationModel as ModerationModel,
