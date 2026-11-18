@@ -28,14 +28,15 @@ export class AgentTurnResultCollector {
     if (this.ready) {
       return;
     }
-    if ('session' in event) {
+    if ('session' in event && event.session) {
       this.#sessionID ??= event.session.id;
       this.#requiredActions = structuredClone(event.session.required_actions ?? []);
       this.#checkedActionsFor = undefined;
       this.#sessionFailed ||= event.type === 'agent.session.failed';
+      const type: string = event.type;
       this.#idle ||=
         (event.type === 'agent.session.idle' && this.#terminal) ||
-        (event.type === 'agent.session.budget_reached' &&
+        (type === 'agent.session.budget_reached' &&
           event.session.id === this.#sessionID &&
           (!this.#turn || this.#terminal));
     }

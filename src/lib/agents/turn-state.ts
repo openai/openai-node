@@ -42,10 +42,12 @@ export class TurnState {
 
   /** Checks session termination after updating the selected turn state. */
   terminal(event: AgentSessionEvent, sessionID: string): boolean {
+    const type: string = event.type;
     return (
       event.type === 'agent.session.failed' ||
-      (event.type === 'agent.session.budget_reached' &&
-        event.session.id === sessionID &&
+      (type === 'agent.session.budget_reached' &&
+        'session' in event &&
+        event.session?.id === sessionID &&
         (this.#turnID === undefined || this.#turnEnded)) ||
       (event.type === 'agent.session.idle' && this.#turnEnded)
     );
