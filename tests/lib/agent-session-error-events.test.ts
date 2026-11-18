@@ -1,10 +1,5 @@
 import OpenAI, { APIError } from 'openai';
-import type {
-  AgentSession,
-  AgentSessionBudgetReachedEvent,
-  AgentSessionErrorEvent,
-  AgentSessionEvent,
-} from 'openai/resources/beta/agents/agents';
+import type { AgentSessionErrorEvent } from 'openai/resources/beta/agents/agents';
 import { Stream } from 'openai/streaming';
 
 const domainError: AgentSessionErrorEvent = {
@@ -13,7 +8,7 @@ const domainError: AgentSessionErrorEvent = {
   session_id: 'session_test',
   error: {
     type: 'server_error',
-    code: null,
+    code: 'session_budget_exceeded',
     param: null,
     message: 'Synthetic session failure.',
   },
@@ -23,7 +18,7 @@ const sessionIdle = {
   event_id: 'event_idle',
   session: { id: 'session_test', status: 'idle' },
 };
-const budgetReached: AgentSessionBudgetReachedEvent = {
+const budgetReached = {
   type: 'agent.session.budget_reached',
   event_id: 'event_budget_reached',
   session: {
@@ -83,9 +78,9 @@ describe.each(['subscription', 'creation'] as const)('Agents %s error events', (
     [false, null],
     [true, null],
   ] as const)(
-    'delivers a domain error followed by a typed budget snapshot (named: %s, limit: %s)',
+    'delivers a domain error followed by an unknown budget payload (named: %s, limit: %s)',
     async (named, limit) => {
-      const wireBudgetEvent: AgentSessionBudgetReachedEvent = {
+      const wireBudgetEvent = {
         ...budgetReached,
         session: {
           ...budgetReached.session,
@@ -95,20 +90,7 @@ describe.each(['subscription', 'creation'] as const)('Agents %s error events', (
       const events = [domainError, wireBudgetEvent];
       const wire = events.map((event) => record(event, named ? event.type : undefined)).join('');
       const stream = await requestFor(wire, surface);
-      const received: AgentSessionEvent[] = [];
-      let snapshot: AgentSession | undefined;
-      for await (const event of stream) {
-        received.push(event);
-        if (event.type === 'agent.session.budget_reached') {
-          const budgetEvent: AgentSessionBudgetReachedEvent = event;
-          snapshot = budgetEvent.session;
-        }
-      }
-      expect(received).toEqual(events);
-      expect(snapshot).toEqual(wireBudgetEvent.session);
-      expect(snapshot?.status).toBe('budget_reached');
-      expect(snapshot?.spend_control).toEqual({ limit, consumed: 100 });
-      expect(snapshot?.spend_control?.limit).toBe(limit);
+      await expect(collect(stream)).resolves.toEqual(events);
       expect(stream.controller.signal.aborted).toBe(false);
     },
   );

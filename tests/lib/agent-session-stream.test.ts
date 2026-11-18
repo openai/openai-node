@@ -252,6 +252,9 @@ describe('agents sessions.stream public transport', () => {
 
   test.each([false, true])('budget exhaustion terminates with selected turn: %s', async (withTurn) => {
     const events = [
+      event('agent.session.future', 'unknown', { session: { id: 'session_test' } }),
+      event('agent.session.budget_reached', 'missing-session', { session: undefined }),
+      event('agent.session.budget_reached', 'null-session', { session: null }),
       ...(withTurn
         ? [
             turn(),

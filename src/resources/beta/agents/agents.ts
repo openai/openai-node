@@ -1317,10 +1317,8 @@ export interface AgentSession {
    * - `in_progress` - The session is processing a turn.
    * - `requires_action` - The session is waiting for one or more required actions.
    * - `failed` - The session failed.
-   * - `budget_reached` - The session is paused because its spending limit was
-   *   reached.
    */
-  status: 'idle' | 'in_progress' | 'requires_action' | 'failed' | 'budget_reached';
+  status: 'idle' | 'in_progress' | 'requires_action' | 'failed';
 
   /**
    * Best-effort token usage for the session, or null if unknown. Recorded usage may
@@ -1343,13 +1341,6 @@ export interface AgentSession {
    * and automatic review is not enabled. Omission means none.
    */
   review?: 'none' | 'auto_review';
-
-  /**
-   * Spending limit and best-effort consumption, in USD cents. Present when
-   * spending-control visibility is enabled; limit is null without a cap. Older
-   * server responses may omit this object.
-   */
-  spend_control?: AgentSession.SpendControl;
 }
 
 export namespace AgentSession {
@@ -1664,23 +1655,6 @@ export namespace AgentSession {
   export interface PromptCacheOptions {
     ttl: '30m' | '12h';
   }
-
-  /**
-   * Spending limit and best-effort consumption, in USD cents. Present when
-   * spending-control visibility is enabled; limit is null without a cap. Older
-   * server responses may omit this object.
-   */
-  export interface SpendControl {
-    /**
-     * Best-effort recorded spend floored to whole USD cents, or null when unavailable.
-     */
-    consumed: number | null;
-
-    /**
-     * The configured positive limit in USD cents, or null when unlimited.
-     */
-    limit: number | null;
-  }
 }
 
 /**
@@ -1724,31 +1698,6 @@ export interface AgentSessionAssistantMessage {
    * The item type. Always `message`.
    */
   type: 'message';
-}
-
-/**
- * Emitted when a session pauses because its spending limit was reached.
- */
-export interface AgentSessionBudgetReachedEvent {
-  /**
-   * The unique ID of the event.
-   */
-  event_id: string;
-
-  /**
-   * The paused session.
-   */
-  session: AgentSession;
-
-  /**
-   * The type of the object. Always `agent.session.budget_reached`.
-   */
-  type: 'agent.session.budget_reached';
-
-  /**
-   * Random alphanumeric padding. Present when stream obfuscation is enabled.
-   */
-  obfuscation?: string;
 }
 
 /**
@@ -2188,7 +2137,6 @@ export type AgentSessionEvent =
   | AgentSessionTurnCancelledEvent
   | AgentSessionTurnItemAddedEvent
   | AgentSessionIdleEvent
-  | AgentSessionBudgetReachedEvent
   | AgentSessionInProgressEvent
   | AgentSessionRequiresActionEvent
   | AgentSessionFailedEvent
@@ -5562,7 +5510,6 @@ export interface SessionTurnError {
    * - `context_length_exceeded` - The request exceeds the model's context window.
    * - `max_output_tokens` - The model reached its output token limit before
    *   finishing the response.
-   * - `session_budget_exceeded` - The session has reached its usage budget.
    * - `usage_limit_exceeded` - The organization has reached a usage, plan, or
    *   billing limit.
    * - `project_spend_limit_exceeded` - The project has reached its enforced spend
@@ -5597,7 +5544,6 @@ export interface SessionTurnError {
   code:
     | 'context_length_exceeded'
     | 'max_output_tokens'
-    | 'session_budget_exceeded'
     | 'usage_limit_exceeded'
     | 'project_spend_limit_exceeded'
     | 'organization_spend_limit_exceeded'
@@ -6144,7 +6090,6 @@ export declare namespace Agents {
     type AgentSendSubagentInputCallItem as AgentSendSubagentInputCallItem,
     type AgentSession as AgentSession,
     type AgentSessionAssistantMessage as AgentSessionAssistantMessage,
-    type AgentSessionBudgetReachedEvent as AgentSessionBudgetReachedEvent,
     type AgentSessionCreatedEvent as AgentSessionCreatedEvent,
     type AgentSessionDeleted as AgentSessionDeleted,
     type AgentSessionEnvironmentConnectedEvent as AgentSessionEnvironmentConnectedEvent,
