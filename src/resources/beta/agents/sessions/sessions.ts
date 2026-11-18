@@ -493,12 +493,6 @@ export interface SessionCreateParamsBase {
   review?: 'none' | 'auto_review';
 
   /**
-   * Optional spending limit in USD cents. Omission or null creates an unlimited
-   * session.
-   */
-  spend_control?: SessionCreateParams.SpendControl | null;
-
-  /**
    * Whether to stream session events as server-sent events. Defaults to `false`.
    */
   stream?: boolean;
@@ -618,17 +612,6 @@ export namespace SessionCreateParams {
   }
 
   /**
-   * Optional spending limit in USD cents. Omission or null creates an unlimited
-   * session.
-   */
-  export interface SpendControl {
-    /**
-     * Positive USD cents, or null to remove the limit.
-     */
-    limit: number | null;
-  }
-
-  /**
    * Options for the event stream. Only allowed when `stream` is `true`.
    */
   export interface StreamOptions {
@@ -685,12 +668,6 @@ export interface SessionUpdateParams {
    *   fallbacks.
    */
   review?: 'none' | 'auto_review';
-
-  /**
-   * Omit to retain the limit; null or a null limit removes it without resetting
-   * spend.
-   */
-  spend_control?: SessionUpdateParams.SpendControl | null;
 }
 
 export namespace SessionUpdateParams {
@@ -749,17 +726,6 @@ export namespace SessionUpdateParams {
      * Minimum lifetime for new prompt cache entries. Defaults to 30 minutes.
      */
     ttl?: '30m' | '12h';
-  }
-
-  /**
-   * Omit to retain the limit; null or a null limit removes it without resetting
-   * spend.
-   */
-  export interface SpendControl {
-    /**
-     * Positive USD cents, or null to remove the limit.
-     */
-    limit: number | null;
   }
 }
 

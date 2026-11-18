@@ -8,7 +8,7 @@ const domainError: AgentSessionErrorEvent = {
   session_id: 'session_test',
   error: {
     type: 'server_error',
-    code: null,
+    code: 'session_budget_exceeded',
     param: null,
     message: 'Synthetic session failure.',
   },
@@ -17,6 +17,35 @@ const sessionIdle = {
   type: 'agent.session.idle',
   event_id: 'event_idle',
   session: { id: 'session_test', status: 'idle' },
+};
+const budgetReached = {
+  type: 'agent.session.budget_reached',
+  event_id: 'event_budget_reached',
+  session: {
+    id: 'session_test',
+    object: 'agent.session',
+    agent: {
+      id: 'agent_test',
+      instructions: null,
+      model: 'synthetic-model',
+      multi_agent: { enabled: false, max_concurrent_subagents: null },
+      name: null,
+      reasoning: { effort: null, summary: null },
+      service_tier: 'auto',
+      text: { format: { type: 'text' }, verbosity: 'medium' },
+      tools: [],
+    },
+    created_at: 1,
+    environment: { type: 'none' },
+    error: null,
+    last_active_at: 2,
+    metadata: { purpose: 'budget-regression' },
+    required_actions: [],
+    status: 'budget_reached',
+    usage: null,
+    vault_ids: [],
+    spend_control: { limit: 100, consumed: 100 },
+  },
 };
 
 function requestFor(wire: string, surface: 'subscription' | 'creation') {
@@ -43,6 +72,29 @@ async function collect(stream: AsyncIterable<unknown>): Promise<unknown[]> {
 }
 
 describe.each(['subscription', 'creation'] as const)('Agents %s error events', (surface) => {
+  test.each([
+    [false, 100],
+    [true, 100],
+    [false, null],
+    [true, null],
+  ] as const)(
+    'delivers a domain error followed by an unknown budget payload (named: %s, limit: %s)',
+    async (named, limit) => {
+      const wireBudgetEvent = {
+        ...budgetReached,
+        session: {
+          ...budgetReached.session,
+          spend_control: { limit, consumed: 100 },
+        },
+      };
+      const events = [domainError, wireBudgetEvent];
+      const wire = events.map((event) => record(event, named ? event.type : undefined)).join('');
+      const stream = await requestFor(wire, surface);
+      await expect(collect(stream)).resolves.toEqual(events);
+      expect(stream.controller.signal.aborted).toBe(false);
+    },
+  );
+
   test.each([false, true])(
     'delivers errors and subsequent session-idle notifications (named: %s)',
     async (named) => {

@@ -120,6 +120,8 @@ import {
 } from './resources/images';
 import { Model, ModelDeleted, Models, ModelsPage } from './resources/models';
 import {
+  CsamModeration,
+  CsamModerationResponse,
   Moderation,
   ModerationCreateParams,
   ModerationCreateResponse,
@@ -2919,6 +2921,8 @@ export declare namespace OpenAI {
 
   export {
     Moderations as Moderations,
+    type CsamModeration as CsamModeration,
+    type CsamModerationResponse as CsamModerationResponse,
     type Moderation as Moderation,
     type ModerationImageURLInput as ModerationImageURLInput,
     type ModerationModel as ModerationModel,
