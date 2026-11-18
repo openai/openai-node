@@ -1,5 +1,23 @@
 # Changelog
 
+## [7.59.0](https://github.com/openai/openai-node/compare/v7.58.0...v7.59.0) (2026-11-17)
+
+
+### Features
+
+* **api:** type Managed Agents budget events ([#3162](https://github.com/openai/openai-node/issues/3162)) ([bc12de0](https://github.com/openai/openai-node/commit/bc12de08afb6fb3605e90e7288d0a666c5348381))
+
+## [7.58.0](https://github.com/openai/openai-node/compare/v7.57.0...v7.58.0) (2026-11-17)
+
+
+### Features
+
+* **api:** add 2-hour and 8-hour Responses background windows ([77e77ad](https://github.com/openai/openai-node/commit/77e77ad235e2dcaf981f1bb680ddeb66e9b53979))
+* **api:** add schedule pause reasons ([#3158](https://github.com/openai/openai-node/issues/3158)) ([4517ca8](https://github.com/openai/openai-node/commit/4517ca801b79a93ccc17826b0b63ba2313355307))
+* **api:** add the GPT-6.2 Astra Law Responses model identifier ([77e77ad](https://github.com/openai/openai-node/commit/77e77ad235e2dcaf981f1bb680ddeb66e9b53979))
+* **api:** add the GPT-6.2 Astra model identifier ([77e77ad](https://github.com/openai/openai-node/commit/77e77ad235e2dcaf981f1bb680ddeb66e9b53979))
+* **api:** add the GPT-6.2 Sol model identifier ([77e77ad](https://github.com/openai/openai-node/commit/77e77ad235e2dcaf981f1bb680ddeb66e9b53979))
+
 ## [7.57.0](https://github.com/openai/openai-node/compare/v7.56.0...v7.57.0) (2026-11-13)
 
 
