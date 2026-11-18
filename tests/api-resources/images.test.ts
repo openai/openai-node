@@ -68,6 +68,10 @@ describe('resource images', () => {
       safety_identifier: 'user-1234',
       size: '1024x1024',
       stream: false,
+      svg: {
+        model: 'x',
+        reasoning: { effort: 'none' },
+      },
       user: 'user-1234',
     });
   });

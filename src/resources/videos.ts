@@ -587,8 +587,9 @@ export interface VideoCreateError {
   message: string;
 
   /**
-   * The Retry-After and Retry-After-Ms headers returned with the original error, if
-   * any.
+   * Headers returned with the original error. These can include Retry-After,
+   * Retry-After-Ms, and, on opted-in deployments,
+   * x-openai-inference-capacity-reason.
    */
   headers?: { [key: string]: string };
 

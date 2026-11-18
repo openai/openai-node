@@ -356,6 +356,22 @@ export interface Turn {
    * change.
    */
   usage: AgentsAPI.TokenUsage | null;
+
+  /**
+   * Prompt cache lifetime selected when this turn started, including an inherited
+   * session TTL. Null when the turn used the model default or no TTL was recorded.
+   */
+  prompt_cache_options?: Turn.PromptCacheOptions | null;
+}
+
+export namespace Turn {
+  /**
+   * Prompt cache lifetime selected when this turn started, including an inherited
+   * session TTL. Null when the turn used the model default or no TTL was recorded.
+   */
+  export interface PromptCacheOptions {
+    ttl: '30m' | '12h';
+  }
 }
 
 export interface TurnRetrieveParams {

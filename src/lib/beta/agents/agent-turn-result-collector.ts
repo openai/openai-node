@@ -28,12 +28,17 @@ export class AgentTurnResultCollector {
     if (this.ready) {
       return;
     }
-    if ('session' in event) {
+    if ('session' in event && event.session) {
       this.#sessionID ??= event.session.id;
       this.#requiredActions = structuredClone(event.session.required_actions ?? []);
       this.#checkedActionsFor = undefined;
       this.#sessionFailed ||= event.type === 'agent.session.failed';
-      this.#idle ||= event.type === 'agent.session.idle' && this.#terminal;
+      const type: string = event.type;
+      this.#idle ||=
+        (event.type === 'agent.session.idle' && this.#terminal) ||
+        (type === 'agent.session.budget_reached' &&
+          event.session.id === this.#sessionID &&
+          (!this.#turn || this.#terminal));
     }
     if (event.type === 'agent.session.turn.created' && event.turn.subagent_id === null && !this.#turn) {
       this.#turn = structuredClone(event.turn);
@@ -111,7 +116,7 @@ export class AgentTurnResultCollector {
   }
 
   get ready(): boolean {
-    return this.#terminal && this.#idle;
+    return this.#idle;
   }
 
   release(): void {

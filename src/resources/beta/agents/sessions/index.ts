@@ -10,7 +10,7 @@ export {
   type ArtifactContentParams,
   type SessionArtifactsPage,
 } from './artifacts';
-export { Events, type EventCreateParams } from './events';
+export { Events, type EventCreateParams, type EventStreamParams } from './events';
 export { Items, type ItemListParams } from './items';
 export {
   Sessions,

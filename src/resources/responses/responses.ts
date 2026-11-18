@@ -1619,7 +1619,9 @@ export interface Response {
    *
    * - `auto`: If the input to this Response exceeds the model's context window size,
    *   the model will truncate the response to fit the context window by dropping
-   *   items from the beginning of the conversation.
+   *   items from the beginning of the conversation. On some models, trimming can
+   *   begin earlier because the API subtracts the model's maximum output allowance
+   *   from its input limit, even if you set a lower `max_output_tokens`.
    * - `disabled` (default): If the input size will exceed the context window size
    *   for a model, the request will fail with a 400 error.
    */
@@ -9538,7 +9540,8 @@ export namespace ResponseToolSearchOutputItemParam {
      * `gpt-image-2`, `gpt-image-2-2026-04-21`, `gpt-image-2.5-sunburst`,
      * `gpt-image-2.5-sunburst-2026-09-08`, `gpt-image-2.5-flare`,
      * `gpt-image-2.5-flare-2026-09-08`, `gpt-image-2.6-sunburst`,
-     * `gpt-image-2.6-flare`, or `chatgpt-image-latest`. Default: `gpt-image-2`.
+     * `gpt-image-2.6-flare`, or `chatgpt-image-latest`. Default:
+     * `gpt-image-2.6-sunburst`.
      *
      * `gpt-image-1` was shut down on October 23, 2026. Use `gpt-image-2.5-sunburst` or
      * `gpt-image-2.5-flare` instead.
@@ -9861,6 +9864,13 @@ export namespace ResponsesClientEvent {
      * [Learn more](https://developers.openai.com/api/docs/guides/background).
      */
     background?: boolean | null;
+
+    /**
+     * Options for background execution on HTTP requests. The `2h` and `8h` completion
+     * windows require `background: true`, Standard processing, and `stream: false` or
+     * omitted.
+     */
+    background_options?: ResponseCreate.BackgroundOptions;
 
     /**
      * Context management configuration for this request.
@@ -10186,7 +10196,9 @@ export namespace ResponsesClientEvent {
      *
      * - `auto`: If the input to this Response exceeds the model's context window size,
      *   the model will truncate the response to fit the context window by dropping
-     *   items from the beginning of the conversation.
+     *   items from the beginning of the conversation. On some models, trimming can
+     *   begin earlier because the API subtracts the model's maximum output allowance
+     *   from its input limit, even if you set a lower `max_output_tokens`.
      * - `disabled` (default): If the input size will exceed the context window size
      *   for a model, the request will fail with a 400 error.
      */
@@ -10221,6 +10233,25 @@ export namespace ResponsesClientEvent {
        * field, rather than an explicit Standard selection.
        */
       cyber?: 'standard' | 'daybreak_blue' | 'daybreak_red';
+    }
+
+    /**
+     * Options for background execution on HTTP requests. The `2h` and `8h` completion
+     * windows require `background: true`, Standard processing, and `stream: false` or
+     * omitted.
+     */
+    export interface BackgroundOptions {
+      /**
+       * The completion window for background execution. Defaults to `soonest`; `2h` and
+       * `8h` select discounted background execution.
+       */
+      completion_window?: 'soonest' | '2h' | '8h';
+
+      /**
+       * A customer-provided opaque identifier used to prioritize related background
+       * requests. It does not add prior history to the input.
+       */
+      continuation_id?: string;
     }
 
     export interface ContextManagement {
@@ -11563,7 +11594,8 @@ export namespace Tool {
      * `gpt-image-2`, `gpt-image-2-2026-04-21`, `gpt-image-2.5-sunburst`,
      * `gpt-image-2.5-sunburst-2026-09-08`, `gpt-image-2.5-flare`,
      * `gpt-image-2.5-flare-2026-09-08`, `gpt-image-2.6-sunburst`,
-     * `gpt-image-2.6-flare`, or `chatgpt-image-latest`. Default: `gpt-image-2`.
+     * `gpt-image-2.6-flare`, or `chatgpt-image-latest`. Default:
+     * `gpt-image-2.6-sunburst`.
      *
      * `gpt-image-1` was shut down on October 23, 2026. Use `gpt-image-2.5-sunburst` or
      * `gpt-image-2.5-flare` instead.
@@ -12110,6 +12142,13 @@ export interface ResponseCreateParamsBase {
   background?: boolean | null;
 
   /**
+   * Options for background execution on HTTP requests. The `2h` and `8h` completion
+   * windows require `background: true`, Standard processing, and `stream: false` or
+   * omitted.
+   */
+  background_options?: ResponseCreateParams.BackgroundOptions;
+
+  /**
    * Context management configuration for this request.
    */
   context_management?: Array<ResponseCreateParams.ContextManagement> | null;
@@ -12417,7 +12456,9 @@ export interface ResponseCreateParamsBase {
    *
    * - `auto`: If the input to this Response exceeds the model's context window size,
    *   the model will truncate the response to fit the context window by dropping
-   *   items from the beginning of the conversation.
+   *   items from the beginning of the conversation. On some models, trimming can
+   *   begin earlier because the API subtracts the model's maximum output allowance
+   *   from its input limit, even if you set a lower `max_output_tokens`.
    * - `disabled` (default): If the input size will exceed the context window size
    *   for a model, the request will fail with a 400 error.
    */
@@ -12452,6 +12493,25 @@ export namespace ResponseCreateParams {
      * field, rather than an explicit Standard selection.
      */
     cyber?: 'standard' | 'daybreak_blue' | 'daybreak_red';
+  }
+
+  /**
+   * Options for background execution on HTTP requests. The `2h` and `8h` completion
+   * windows require `background: true`, Standard processing, and `stream: false` or
+   * omitted.
+   */
+  export interface BackgroundOptions {
+    /**
+     * The completion window for background execution. Defaults to `soonest`; `2h` and
+     * `8h` select discounted background execution.
+     */
+    completion_window?: 'soonest' | '2h' | '8h';
+
+    /**
+     * A customer-provided opaque identifier used to prioritize related background
+     * requests. It does not add prior history to the input.
+     */
+    continuation_id?: string;
   }
 
   export interface ContextManagement {
@@ -12693,7 +12753,9 @@ export interface ResponseCompactParams {
    */
   model:
     | 'gpt-6-astra'
+    | 'gpt-6.2-astra'
     | 'gpt-6.1-sol'
+    | 'gpt-6.2-sol'
     | 'gpt-6.1-terra'
     | 'gpt-6-sol'
     | 'gpt-6-luna'
@@ -12804,6 +12866,7 @@ export interface ResponseCompactParams {
     | 'gpt-6-cyber'
     | 'gpt-rosalind-research'
     | 'gpt-6-rosalind'
+    | 'gpt-6.2-astra-law'
     | (string & {})
     | null;
 
@@ -12818,10 +12881,10 @@ export interface ResponseCompactParams {
   input?: string | Array<ResponseInputItem> | null;
 
   /**
-   * A system (or developer) message inserted into the model's context. When used
-   * along with `previous_response_id`, the instructions from a previous response
-   * will not be carried over to the next response. This makes it simple to swap out
-   * system (or developer) messages in new responses.
+   * @deprecated A system (or developer) message inserted into the model's context.
+   * When used along with `previous_response_id`, the instructions from a previous
+   * response will not be carried over to the next response. This makes it simple to
+   * swap out system (or developer) messages in new responses.
    */
   instructions?: string | null;
 

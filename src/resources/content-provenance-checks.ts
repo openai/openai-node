@@ -129,6 +129,7 @@ export namespace ContentProvenanceCheck {
 export interface ContentProvenanceCheckCreateParams {
   /**
    * The image or audio file to check for supported OpenAI provenance signals.
+   * Supported image formats are PNG, JPEG, WebP, and GIF (including animated GIFs).
    */
   file: Uploadable;
 }

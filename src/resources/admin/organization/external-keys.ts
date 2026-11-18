@@ -358,7 +358,11 @@ export interface ExternalKey {
 
   key_name?: string;
 
+  key_ocid?: string;
+
   key_version?: string;
+
+  key_version_ocid?: string;
 
   kms_arn?: string;
 
@@ -374,9 +378,13 @@ export interface ExternalKey {
 
   purpose?: 'ekm' | 'psp_decryption';
 
+  region?: string;
+
   role_arn?: string;
 
   tenant_id?: string;
+
+  vault_ocid?: string;
 
   vault_uri?: string;
 
@@ -394,7 +402,8 @@ export interface ExternalKeyValidateResponse {
 export type ExternalKeyCreateParams =
   | ExternalKeyCreateParams.AwsExternalKeyParams
   | ExternalKeyCreateParams.GcpExternalKeyParams
-  | ExternalKeyCreateParams.AzureExternalKeyParams;
+  | ExternalKeyCreateParams.AzureExternalKeyParams
+  | ExternalKeyCreateParams.OciExternalKeyParams;
 
 export declare namespace ExternalKeyCreateParams {
   export interface AwsExternalKeyParams {
@@ -513,6 +522,37 @@ export declare namespace ExternalKeyCreateParams {
      * for EKM.
      */
     key_version?: string;
+
+    purpose?: 'ekm' | 'psp_decryption';
+  }
+
+  export interface OciExternalKeyParams {
+    /**
+     * The OCI Vault key OCID
+     */
+    key_ocid: string;
+
+    /**
+     * A friendly name to identify this config
+     */
+    name: string;
+
+    /**
+     * The OCI region containing the vault
+     */
+    region: string;
+
+    type: 'oci';
+
+    /**
+     * The customer OCI Vault OCID
+     */
+    vault_ocid: string;
+
+    /**
+     * The exact OCI key version OCID for PSP decryption.
+     */
+    key_version_ocid?: string;
 
     purpose?: 'ekm' | 'psp_decryption';
   }

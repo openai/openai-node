@@ -203,6 +203,13 @@ describe('agents sessions.stream public transport', () => {
     expect(signalGetter).toHaveBeenCalledOnce();
     expect(requests).toHaveLength(4);
     expect(requests.every(({ request }) => request.headers.get('x-application') === 'first')).toBe(true);
+    expect(
+      requests
+        .filter(
+          ({ request }) => request.method === 'GET' && new URL(request.url).pathname.endsWith('/events'),
+        )
+        .map(({ request }) => new URL(request.url).search),
+    ).toEqual(['']);
   });
 
   test('subscribes before normalized input and waits for selected coordinator terminal then idle', async () => {
@@ -241,6 +248,29 @@ describe('agents sessions.stream public transport', () => {
     const events = [turn(), turn(status), idle()];
     const { client } = transport(events);
     expect(await collect(client.beta.agents.sessions.stream('session_test', { input: 'x' }))).toEqual(events);
+  });
+
+  test.each([false, true])('budget exhaustion terminates with selected turn: %s', async (withTurn) => {
+    const events = [
+      event('agent.session.future', 'unknown', { session: { id: 'session_test' } }),
+      event('agent.session.budget_reached', 'missing-session', { session: undefined }),
+      event('agent.session.budget_reached', 'null-session', { session: null }),
+      ...(withTurn
+        ? [
+            turn(),
+            event('agent.session.budget_reached', 'early_budget', {
+              session: { ...session, status: 'budget_reached' },
+            }),
+            turn('failed'),
+          ]
+        : []),
+      event('agent.session.budget_reached', 'budget', { session: { ...session, status: 'budget_reached' } }),
+    ];
+    const { client, cancel, body } = transport([...events, event('agent.session.failed', 'after_budget')]);
+
+    expect(await collect(client.beta.agents.sessions.stream('session_test', { input: 'x' }))).toEqual(events);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(body.locked).toBe(false);
   });
 
   test('session failure terminates without a turn', async () => {

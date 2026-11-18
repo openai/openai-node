@@ -1862,6 +1862,12 @@ export interface MediaSessionConfig {
   instructions?: string | null;
 
   /**
+   * A stable identifier for your end user, used for safety monitoring and abuse
+   * detection.
+   */
+  safety_identifier?: string | null;
+
+  /**
    * Whether to store the session for later forking and recording download. Defaults
    * to false for new sessions.
    */
@@ -2770,6 +2776,121 @@ export namespace ResponsesDelegationConfig {
 
   export interface Mcp {
     type: 'mcp';
+
+    /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+    /**
+     * A list of MCP tool names that are allowed for this server.
+     */
+    allowed_tools?: Array<string> | Mcp.LiveMCPToolFilterParam | null;
+
+    /**
+     * This value is omitted from returned Live session data.
+     */
+    authorization?: string | null;
+
+    /**
+     * @deprecated The ID of a built-in MCP connector. This field is deprecated for
+     * models released after September 1, 2026. Use `server_url` to connect to a remote
+     * MCP server, or `tunnel_id` to connect to a local MCP server.
+     */
+    connector_id?: string | null;
+
+    /**
+     * Whether this MCP tool should be deferred and discovered via tool search.
+     */
+    defer_loading?: boolean | null;
+
+    /**
+     * Optional HTTP headers to send when connecting to the MCP server.
+     */
+    headers?: { [key: string]: string } | null;
+
+    /**
+     * Controls which MCP tools require explicit user approval before execution.
+     */
+    require_approval?: Mcp.LiveMCPRequireApprovalFilterParam | 'always' | 'never' | null;
+
+    /**
+     * An optional human-readable description of the MCP server.
+     */
+    server_description?: string | null;
+
+    /**
+     * A label used to identify the MCP server.
+     */
+    server_label?: string;
+
+    /**
+     * The URL of the MCP server to connect to.
+     */
+    server_url?: string | null;
+
+    /**
+     * The Secure MCP Tunnel ID to use instead of a direct server URL.
+     */
+    tunnel_id?: string | null;
+  }
+
+  export namespace Mcp {
+    export interface LiveMCPToolFilterParam {
+      /**
+       * Whether to allow only read-only tools for matching entries.
+       */
+      read_only?: boolean | null;
+
+      /**
+       * A list of tool names to match against.
+       */
+      tool_names?: Array<string> | null;
+    }
+
+    export interface LiveMCPRequireApprovalFilterParam {
+      /**
+       * A filter that forces approval for matching tools.
+       */
+      always?: LiveMCPRequireApprovalFilterParam.Always | null;
+
+      /**
+       * A filter that skips approval for matching tools.
+       */
+      never?: LiveMCPRequireApprovalFilterParam.Never | null;
+    }
+
+    export namespace LiveMCPRequireApprovalFilterParam {
+      /**
+       * A filter that forces approval for matching tools.
+       */
+      export interface Always {
+        /**
+         * Whether to allow only read-only tools for matching entries.
+         */
+        read_only?: boolean | null;
+
+        /**
+         * A list of tool names to match against.
+         */
+        tool_names?: Array<string> | null;
+      }
+
+      /**
+       * A filter that skips approval for matching tools.
+       */
+      export interface Never {
+        /**
+         * Whether to allow only read-only tools for matching entries.
+         */
+        read_only?: boolean | null;
+
+        /**
+         * A list of tool names to match against.
+         */
+        tool_names?: Array<string> | null;
+      }
+    }
   }
 
   export interface Custom {
@@ -3353,6 +3474,121 @@ export namespace ResponsesDelegationUpdateConfig {
 
   export interface Mcp {
     type: 'mcp';
+
+    /**
+     * The tool invocation context(s).
+     */
+    allowed_callers?: Array<'direct' | 'programmatic'> | null;
+
+    /**
+     * A list of MCP tool names that are allowed for this server.
+     */
+    allowed_tools?: Array<string> | Mcp.LiveMCPToolFilterParam | null;
+
+    /**
+     * This value is omitted from returned Live session data.
+     */
+    authorization?: string | null;
+
+    /**
+     * @deprecated The ID of a built-in MCP connector. This field is deprecated for
+     * models released after September 1, 2026. Use `server_url` to connect to a remote
+     * MCP server, or `tunnel_id` to connect to a local MCP server.
+     */
+    connector_id?: string | null;
+
+    /**
+     * Whether this MCP tool should be deferred and discovered via tool search.
+     */
+    defer_loading?: boolean | null;
+
+    /**
+     * Optional HTTP headers to send when connecting to the MCP server.
+     */
+    headers?: { [key: string]: string } | null;
+
+    /**
+     * Controls which MCP tools require explicit user approval before execution.
+     */
+    require_approval?: Mcp.LiveMCPRequireApprovalFilterParam | 'always' | 'never' | null;
+
+    /**
+     * An optional human-readable description of the MCP server.
+     */
+    server_description?: string | null;
+
+    /**
+     * A label used to identify the MCP server.
+     */
+    server_label?: string;
+
+    /**
+     * The URL of the MCP server to connect to.
+     */
+    server_url?: string | null;
+
+    /**
+     * The Secure MCP Tunnel ID to use instead of a direct server URL.
+     */
+    tunnel_id?: string | null;
+  }
+
+  export namespace Mcp {
+    export interface LiveMCPToolFilterParam {
+      /**
+       * Whether to allow only read-only tools for matching entries.
+       */
+      read_only?: boolean | null;
+
+      /**
+       * A list of tool names to match against.
+       */
+      tool_names?: Array<string> | null;
+    }
+
+    export interface LiveMCPRequireApprovalFilterParam {
+      /**
+       * A filter that forces approval for matching tools.
+       */
+      always?: LiveMCPRequireApprovalFilterParam.Always | null;
+
+      /**
+       * A filter that skips approval for matching tools.
+       */
+      never?: LiveMCPRequireApprovalFilterParam.Never | null;
+    }
+
+    export namespace LiveMCPRequireApprovalFilterParam {
+      /**
+       * A filter that forces approval for matching tools.
+       */
+      export interface Always {
+        /**
+         * Whether to allow only read-only tools for matching entries.
+         */
+        read_only?: boolean | null;
+
+        /**
+         * A list of tool names to match against.
+         */
+        tool_names?: Array<string> | null;
+      }
+
+      /**
+       * A filter that skips approval for matching tools.
+       */
+      export interface Never {
+        /**
+         * Whether to allow only read-only tools for matching entries.
+         */
+        read_only?: boolean | null;
+
+        /**
+         * A list of tool names to match against.
+         */
+        tool_names?: Array<string> | null;
+      }
+    }
   }
 
   export interface Custom {
@@ -3673,6 +3909,12 @@ export interface SessionConfig {
   instructions?: string | null;
 
   /**
+   * A stable identifier for your end user, used for safety monitoring and abuse
+   * detection.
+   */
+  safety_identifier?: string | null;
+
+  /**
    * Whether to store the session for later forking and recording download. Defaults
    * to false for new sessions.
    */
@@ -3826,6 +4068,12 @@ export interface SessionResource {
    * server defaults. Immutable after startup.
    */
   instructions?: string | null;
+
+  /**
+   * A stable identifier for your end user, used for safety monitoring and abuse
+   * detection.
+   */
+  safety_identifier?: string | null;
 
   /**
    * Whether to store the session for later forking and recording download. Defaults

@@ -109,6 +109,8 @@ export { Live } from './live/live';
 export { Models, type Model, type ModelDeleted, type ModelsPage } from './models';
 export {
   Moderations,
+  type CsamModeration,
+  type CsamModerationResponse,
   type Moderation,
   type ModerationImageURLInput,
   type ModerationModel,

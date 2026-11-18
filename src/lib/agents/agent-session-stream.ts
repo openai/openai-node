@@ -174,7 +174,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
           'sessions.stream requires an idle session; use sessions.events.stream for active sessions',
         );
       }
-      const subscription = await this.#sessions.events.stream(this.#sessionID, options).withResponse();
+      const subscription = await this.#sessions.events.stream(this.#sessionID, {}, options).withResponse();
       this.#stream = subscription.data;
       this.#response = subscription.response;
       this.#checkAbort();
@@ -197,7 +197,7 @@ export class AgentSessionStream<T = never> implements AsyncIterable<AgentSession
         if (!state.accept(event)) {
           continue;
         }
-        const terminal = state.terminal(event);
+        const terminal = state.terminal(event, this.#sessionID);
         const dispatch = this.#dispatcher.prepare(state.call(event), this.#sessionID);
         if (terminal) {
           this.#stream.controller.abort();

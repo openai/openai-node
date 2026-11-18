@@ -69,15 +69,30 @@ export class Images extends APIResource {
       resolveResourceRequestOptions(options, (options) =>
         multipartFormRequestOptions(
           withBodyFinalization(
-            ((requestOptions) => ({
-              ...requestOptions,
-              body: Object.fromEntries(
-                Object.entries(requestOptions.body ?? {}).map(([key, value]) => [
-                  key,
-                  key === 'safety_identifier' && value === null ? undefined : value,
+            ((requestOptions) => {
+              const omitNulls = (value: unknown, paths: ReadonlyArray<ReadonlyArray<string>>): unknown => {
+                if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+                return Object.fromEntries(
+                  Object.entries(value).map(([key, field]) => {
+                    const selected = paths.filter((path) => path[0] === key);
+                    if (field === null && selected.some((path) => path.length === 1)) return [key, undefined];
+                    const children = selected.filter((path) => path.length > 1).map((path) => path.slice(1));
+                    return [key, children.length === 0 ? field : omitNulls(field, children)];
+                  }),
+                );
+              };
+              return {
+                ...requestOptions,
+                body: omitNulls(requestOptions.body ?? {}, [
+                  ['safety_identifier'],
+                  ['complexity'],
+                  ['frame_count'],
+                  ['frame_duration_ms'],
+                  ['svg'],
+                  ['svg', 'reasoning'],
                 ]),
-              ),
-            }))({
+              };
+            })({
               body,
               ...options,
               stream: body.stream ?? false,
@@ -493,7 +508,7 @@ export interface ImagesResponse {
   data?: Array<Image>;
 
   /**
-   * The output format of the generated image.
+   * The output format of the generated or edited image.
    */
   output_format?: 'png' | 'webp' | 'jpeg' | 'gif' | 'svg';
 
@@ -516,21 +531,19 @@ export interface ImagesResponse {
   size?: (string & {}) | '1024x1024' | '1024x1536' | '1536x1024';
 
   /**
-   * Token usage for the model that authored the SVG, separate from image rendering
-   * usage.
+   * Token usage for SVG authoring, separate from image rendering usage.
    */
   svg_usage?: ImagesResponse.SvgUsage;
 
   /**
-   * For `gpt-image-1` only, the token usage information for the image generation.
+   * Token usage information for image generation with GPT Image models.
    */
   usage?: ImagesResponse.Usage;
 }
 
 export namespace ImagesResponse {
   /**
-   * Token usage for the model that authored the SVG, separate from image rendering
-   * usage.
+   * Token usage for SVG authoring, separate from image rendering usage.
    */
   export interface SvgUsage {
     input_tokens: number;
@@ -545,7 +558,7 @@ export namespace ImagesResponse {
   }
 
   /**
-   * For `gpt-image-1` only, the token usage information for the image generation.
+   * Token usage information for image generation with GPT Image models.
    */
   export interface Usage {
     /**
@@ -752,9 +765,10 @@ export interface ImageEditParamsBase {
 
   /**
    * The format in which the generated images are returned. This parameter is only
-   * supported for the GPT image models. The default value is `png`.
+   * supported for the GPT image models. The default value is `png`. SVG output
+   * requires a supported image model and project access.
    */
-  output_format?: 'png' | 'jpeg' | 'webp' | 'gif' | null;
+  output_format?: 'png' | 'webp' | 'jpeg' | 'gif' | 'svg' | null;
 
   /**
    * The number of partial images to generate. This parameter is used for streaming
@@ -813,6 +827,14 @@ export interface ImageEditParamsBase {
   stream?: boolean | null;
 
   /**
+   * Selects the author model and reasoning effort for `output_format=svg`. Supply
+   * `svg.model` when SVG model selection is enabled. Otherwise, omit this object.
+   * SVG output requires `n=1` and cannot use streaming, partial images, or output
+   * compression. Use multipart fields such as `svg[model]`.
+   */
+  svg?: ImageEditParams.Svg | null;
+
+  /**
    * @deprecated Deprecated: use `safety_identifier` instead. This parameter remains
    * accepted for backward compatibility and is used when `safety_identifier` is
    * omitted, null, or empty.
@@ -822,6 +844,35 @@ export interface ImageEditParamsBase {
 }
 
 export namespace ImageEditParams {
+  /**
+   * Selects the author model and reasoning effort for `output_format=svg`. Supply
+   * `svg.model` when SVG model selection is enabled. Otherwise, omit this object.
+   * SVG output requires `n=1` and cannot use streaming, partial images, or output
+   * compression. Use multipart fields such as `svg[model]`.
+   */
+  export interface Svg {
+    model?: string;
+
+    /**
+     * Reasoning effort for SVG authoring. When omitted, uses the author model's
+     * default in both Images and Responses.
+     */
+    reasoning?: Svg.Reasoning | null;
+  }
+
+  export namespace Svg {
+    /**
+     * Reasoning effort for SVG authoring. When omitted, uses the author model's
+     * default in both Images and Responses.
+     */
+    export interface Reasoning {
+      /**
+       * Controls how much effort the model should spend on reasoning for this request.
+       */
+      effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+    }
+  }
+
   export type ImageEditParamsNonStreaming = ImagesAPI.ImageEditParamsNonStreaming;
   export type ImageEditParamsStreaming = ImagesAPI.ImageEditParamsStreaming;
 }
@@ -925,7 +976,7 @@ export interface ImageGenerateParamsBase {
    * The format in which the generated images are returned. This parameter is only
    * supported for the GPT image models.
    */
-  output_format?: 'png' | 'jpeg' | 'webp' | 'gif' | 'svg' | null;
+  output_format?: 'png' | 'webp' | 'jpeg' | 'gif' | 'svg' | null;
 
   /**
    * The number of partial images to generate. This parameter is used for streaming
@@ -1007,7 +1058,7 @@ export interface ImageGenerateParamsBase {
    * enabled, supply svg.model. When model selection is disabled, omit this object.
    * The top-level model selects the image model that creates the reference image.
    * SVG generation requires n=1 and does not support streaming, partial images,
-   * prompt_rewriter, or output_compression. SVG edits are not supported.
+   * prompt_rewriter, or output_compression.
    */
   svg?: ImageGenerateParams.Svg | null;
 
@@ -1027,7 +1078,7 @@ export namespace ImageGenerateParams {
    * enabled, supply svg.model. When model selection is disabled, omit this object.
    * The top-level model selects the image model that creates the reference image.
    * SVG generation requires n=1 and does not support streaming, partial images,
-   * prompt_rewriter, or output_compression. SVG edits are not supported.
+   * prompt_rewriter, or output_compression.
    */
   export interface Svg {
     /**

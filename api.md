@@ -260,6 +260,8 @@ Methods:
 
 Types:
 
+- <code><a href="./src/resources/moderations.ts">CsamModeration</a></code>
+- <code><a href="./src/resources/moderations.ts">CsamModerationResponse</a></code>
 - <code><a href="./src/resources/moderations.ts">Moderation</a></code>
 - <code><a href="./src/resources/moderations.ts">ModerationImageURLInput</a></code>
 - <code><a href="./src/resources/moderations.ts">ModerationModel</a></code>
@@ -755,7 +757,7 @@ Methods:
 Methods:
 
 - <code title="post /agents/sessions/{session_id}/events">client.beta.agents.sessions.events.<a href="./src/resources/beta/agents/sessions/events.ts">create</a>(sessionID, { ...params }) -> void</code>
-- <code title="get /agents/sessions/{session_id}/events">client.beta.agents.sessions.events.<a href="./src/resources/beta/agents/sessions/events.ts">stream</a>(sessionID) -> AgentSessionEvent</code>
+- <code title="get /agents/sessions/{session_id}/events">client.beta.agents.sessions.events.<a href="./src/resources/beta/agents/sessions/events.ts">stream</a>(sessionID, { ...params }, undefined) -> AgentSessionEvent</code>
 
 #### Traces
 
