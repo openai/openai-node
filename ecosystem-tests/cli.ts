@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { lstatSync, renameSync, unlinkSync } from 'node:fs';
 import fs from 'node:fs/promises';
-import execa from 'execa';
+import type { Options } from 'execa';
+import { execa } from 'execa';
 import yargs from 'yargs';
 import assert from 'node:assert';
 import path from 'node:path';
@@ -899,7 +900,6 @@ async function main() {
                     ],
                     {
                       stdio: 'pipe',
-                      encoding: 'utf-8',
                       maxBuffer: 100 * 1024 * 1024,
                       env: {
                         DISABLE_V8_COMPILE_CACHE: process.env['DISABLE_V8_COMPILE_CACHE'] ?? '1',
@@ -1076,6 +1076,7 @@ async function buildPackage() {
     alwaysPipe: true,
   });
 
+  assert.ok(typeof proc.stdout === 'string', 'Expected npm pack to produce text output');
   const pack = JSON.parse(proc.stdout);
   assert.ok(Array.isArray(pack), `Expected pack output to be an array but got ${typeof pack}`);
   assert.ok(pack.length === 1, `Expected pack output to be an array of length 1 but got ${pack.length}`);
@@ -1112,12 +1113,13 @@ function getPackFile() {
 
 // ------------------ helpers ------------------
 
-interface RunOpts extends execa.Options {
+type RunOpts = Pick<Options, 'cwd' | 'env'> & {
+  stdio?: 'inherit' | 'pipe';
   alwaysPipe?: boolean;
   allowApiKey?: boolean;
-}
+};
 
-async function run(command: string, args: string[], config?: RunOpts): Promise<execa.ExecaReturnValue> {
+async function run(command: string, args: string[], config?: RunOpts) {
   const { allowApiKey = false, alwaysPipe = false, ...options } = config ?? {};
   const env = Object.fromEntries(
     Object.entries({ ...process.env, ...options.env }).filter(
