@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.61.0](https://github.com/openai/openai-node/compare/v7.60.0...v7.61.0) (2026-11-19)
+
+
+### Features
+
+* **api:** add gpt-live-1.1 to Live model choices ([#3168](https://github.com/openai/openai-node/issues/3168)) ([23b2dc1](https://github.com/openai/openai-node/commit/23b2dc1db6480dc425afded049eec055c01135dd))
+
 ## [7.60.0](https://github.com/openai/openai-node/compare/v7.59.0...v7.60.0) (2026-11-18)
 
 
