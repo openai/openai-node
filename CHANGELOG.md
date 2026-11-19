@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.62.0](https://github.com/openai/openai-node/compare/v7.61.0...v7.62.0) (2026-11-19)
+
+
+### Features
+
+* **api:** support Live WebRTC standby ([#3170](https://github.com/openai/openai-node/issues/3170)) ([85d01e6](https://github.com/openai/openai-node/commit/85d01e6bebf223ca0de89eb1ce88912498b750e5))
+
 ## [7.61.0](https://github.com/openai/openai-node/compare/v7.60.0...v7.61.0) (2026-11-19)
 
 
