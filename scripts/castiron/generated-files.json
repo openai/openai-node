@@ -743,7 +743,7 @@
     },
     "src/resources/live/forks/forks.ts": {
       "mode": "100644",
-      "sha256": "c831a57bcda720bf08b19f004404d38d1c1e64cb496818df0a957b8033162c13"
+      "sha256": "916a98e6e3cb33bc32df9a2e1beda1e0a62e16aacd7bab31ba9218f9297c11f1"
     },
     "src/resources/live/forks/index.ts": {
       "mode": "100644",
@@ -771,7 +771,7 @@
     },
     "src/resources/live/live.ts": {
       "mode": "100644",
-      "sha256": "c63f05df4486240b045a1d007d6d6a00fe6b5716b68befb6ef0a243f020ef39e"
+      "sha256": "785dbaca56509d20053c076bf466705d04e71be655947bfb518b3da467477c25"
     },
     "src/resources/live/sessions.ts": {
       "mode": "100644",
@@ -791,7 +791,7 @@
     },
     "src/resources/live/sideband/sideband.ts": {
       "mode": "100644",
-      "sha256": "7427d197611427644800e40965e1f954e987dc3df40ac62de914e66b0f9df726"
+      "sha256": "a0796ab02cc76e16fc6b80e335c81ea35fddf67b3c8ad4a307f791876396450c"
     },
     "src/resources/live/sideband/ws-base.ts": {
       "mode": "100644",
@@ -1375,7 +1375,7 @@
     },
     "tests/api-resources/live/live.test.ts": {
       "mode": "100644",
-      "sha256": "9473335a536e90027eb09270cf6a18a3f8a4994b19539368b178f5d860f44738"
+      "sha256": "830d46ea451f6e62a8906261aadf2bbd0cb54cbad5a986544cf5e77d8640050e"
     },
     "tests/api-resources/live/sessions.test.ts": {
       "mode": "100644",
