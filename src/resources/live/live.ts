@@ -46,7 +46,7 @@ export class Live extends APIResource {
    * @example
    * ```ts
    * const live = await client.live.create({
-   *   session: { model: 'gpt-live-1' },
+   *   session: { model: 'gpt-live-1.1' },
    *   transport: { sdp: 'x', type: 'webrtc' },
    * });
    * ```
@@ -1822,7 +1822,7 @@ export interface MediaSessionConfig {
    * The Live model. Required in the session configuration for every transport; do
    * not pass it as a URL query parameter.
    */
-  model: (string & {}) | 'gpt-live-1';
+  model: (string & {}) | 'gpt-live-1' | 'gpt-live-1.1';
 
   /**
    * Startup audio configuration. WebRTC and SIP negotiate their audio format on the
@@ -3808,7 +3808,7 @@ export interface SessionConfig {
    * The Live model. Required in the session configuration for every transport; do
    * not pass it as a URL query parameter.
    */
-  model: (string & {}) | 'gpt-live-1';
+  model: (string & {}) | 'gpt-live-1' | 'gpt-live-1.1';
 
   /**
    * Startup audio configuration. Only primary WebSockets accept audio.format; WebRTC
@@ -3962,7 +3962,7 @@ export interface SessionResource {
    * The Live model. Required in the session configuration for every transport; do
    * not pass it as a URL query parameter.
    */
-  model: (string & {}) | 'gpt-live-1';
+  model: (string & {}) | 'gpt-live-1' | 'gpt-live-1.1';
 
   /**
    * The status of the session snapshot. Always `active`, including the final
