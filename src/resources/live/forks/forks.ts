@@ -38,6 +38,8 @@ export type ForkClientEvent =
 export type ForkServerEvent =
   | LiveAPI.SessionStartedEvent
   | LiveAPI.SessionUpdatedEvent
+  | ForkServerEvent.SessionResumed
+  | ForkServerEvent.SessionPaused
   | LiveAPI.InputAudioMutedEvent
   | LiveAPI.InputAudioUnmutedEvent
   | LiveAPI.OutputAudioFixturePlayingEvent
@@ -66,6 +68,46 @@ export type ForkServerEvent =
   | ForkServerEvent.TransportFailed;
 
 export namespace ForkServerEvent {
+  /**
+   * Sent when speech resumes paused inference and it is ready for audio in a Live
+   * WebRTC session. Delivered to the sideband and, when permitted by its event
+   * settings, the data channel.
+   */
+  export interface SessionResumed {
+    /**
+     * The unique ID of the Live server event.
+     */
+    event_id: string;
+
+    type: 'session.resumed';
+
+    /**
+     * The event_id of the client command associated with this server event, when
+     * supplied.
+     */
+    client_event_id?: string;
+  }
+
+  /**
+   * Sent when the idle timeout pauses inference in a Live WebRTC session. The WebRTC
+   * connection, sideband, and session ID persist. Delivered to the sideband and,
+   * when permitted by its event settings, the data channel.
+   */
+  export interface SessionPaused {
+    /**
+     * The unique ID of the Live server event.
+     */
+    event_id: string;
+
+    type: 'session.paused';
+
+    /**
+     * The event_id of the client command associated with this server event, when
+     * supplied.
+     */
+    client_event_id?: string;
+  }
+
   /**
    * Input audio received from the primary transport and reflected to a Live sideband
    * connection before model-input muting.

@@ -30,6 +30,7 @@ describe('resource live', () => {
         audio: { output: { voice: 'string' } },
         client: { data_channel: { allowed_client_events: 'all', allowed_server_events: 'all' } },
         delegation: { type: 'client', acknowledgement_delay_ms: 0 },
+        idle_timeout_s: 5,
         input: [
           {
             content: [{ text: 'text', type: 'input_text' }],
@@ -58,6 +59,7 @@ describe('resource live', () => {
             type: 'decisions',
           },
         ],
+        wake_policy: { type: 'speech', vad_threshold: 0 },
       },
       transport: { sdp: 'x', type: 'webrtc' },
     });

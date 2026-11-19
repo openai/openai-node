@@ -1844,6 +1844,13 @@ export interface MediaSessionConfig {
   delegation?: ClientDelegation | MediaSessionConfig.Responses | MediaSessionConfig.Decisions | null;
 
   /**
+   * Whole seconds of inactivity after which a Live WebRTC session with a speech wake
+   * policy pauses inference. The connection and conversation history are retained.
+   * Omit to keep inference active until the session ends.
+   */
+  idle_timeout_s?: number;
+
+  /**
    * Ordered text-only history supplied before startup. Supports developer, user, and
    * assistant messages with one text part each; at most 128 messages and a
    * configured rendered-token limit (8,192 by default).
@@ -1880,6 +1887,12 @@ export interface MediaSessionConfig {
    * triggers.
    */
   triggers?: Array<DecisionTrigger>;
+
+  /**
+   * Inference starts when the Live WebRTC session connects. After an idle pause,
+   * microphone speech resumes inference.
+   */
+  wake_policy?: MediaSessionConfig.WakePolicy;
 }
 
 export namespace MediaSessionConfig {
@@ -1948,6 +1961,24 @@ export namespace MediaSessionConfig {
      * delegations.
      */
     acknowledgement_delay_ms?: number;
+  }
+
+  /**
+   * Inference starts when the Live WebRTC session connects. After an idle pause,
+   * microphone speech resumes inference.
+   */
+  export interface WakePolicy {
+    /**
+     * The wake policy type, always `speech`.
+     */
+    type: 'speech';
+
+    /**
+     * The speech detection threshold for resuming paused inference, from 0 to 1
+     * inclusive. Defaults to 0.5. Higher values require stronger evidence of speech.
+     * This setting is independent of active turn detection.
+     */
+    vad_threshold?: number;
   }
 }
 
@@ -3566,6 +3597,8 @@ export namespace ResponsesDelegationUpdateConfig {
 export type ServerEvent =
   | SessionStartedEvent
   | SessionUpdatedEvent
+  | ServerEvent.SessionResumed
+  | ServerEvent.SessionPaused
   | InputAudioMutedEvent
   | InputAudioUnmutedEvent
   | OutputAudioFixturePlayingEvent
@@ -3594,6 +3627,46 @@ export type ServerEvent =
   | ServerEvent.TransportFailed;
 
 export namespace ServerEvent {
+  /**
+   * Sent when speech resumes paused inference and it is ready for audio in a Live
+   * WebRTC session. Delivered to the sideband and, when permitted by its event
+   * settings, the data channel.
+   */
+  export interface SessionResumed {
+    /**
+     * The unique ID of the Live server event.
+     */
+    event_id: string;
+
+    type: 'session.resumed';
+
+    /**
+     * The event_id of the client command associated with this server event, when
+     * supplied.
+     */
+    client_event_id?: string;
+  }
+
+  /**
+   * Sent when the idle timeout pauses inference in a Live WebRTC session. The WebRTC
+   * connection, sideband, and session ID persist. Delivered to the sideband and,
+   * when permitted by its event settings, the data channel.
+   */
+  export interface SessionPaused {
+    /**
+     * The unique ID of the Live server event.
+     */
+    event_id: string;
+
+    type: 'session.paused';
+
+    /**
+     * The event_id of the client command associated with this server event, when
+     * supplied.
+     */
+    client_event_id?: string;
+  }
+
   /**
    * Input audio received from the primary transport and reflected to a Live sideband
    * connection before model-input muting.
@@ -4271,15 +4344,27 @@ export interface SessionUpdatedEvent {
 }
 
 /**
- * Cumulative audio duration for a Live session. Values are totals for the session,
- * not increments to sum across usage events.
+ * Cumulative billable duration for a Live session. Eligible WebRTC sessions also
+ * report the active and paused breakdown. Do not sum values across usage events.
  */
 export interface SessionUsage {
   /**
-   * The cumulative Live audio duration in seconds. Do not sum this value across
-   * usage events.
+   * The cumulative billable duration in whole seconds. When present, the active and
+   * paused breakdown adds up to this total.
    */
   seconds: number;
+
+  /**
+   * The remaining billable seconds attributed to active audio and any unused prepaid
+   * duration.
+   */
+  active_seconds?: number;
+
+  /**
+   * Billable time attributed to paused inference at the configured rate, rounded
+   * down to whole seconds.
+   */
+  paused_seconds?: number;
 }
 
 /**
