@@ -25,7 +25,7 @@ export class Sessions extends APIResource {
    * @example
    * ```ts
    * await client.live.sessions.accept('session_id', {
-   *   session: { model: 'gpt-live-1', type: 'live' },
+   *   session: { model: 'gpt-live-1.1', type: 'live' },
    * });
    * ```
    */
@@ -221,7 +221,7 @@ export namespace SessionAcceptParams {
     /**
      * The Live model to use for the accepted call.
      */
-    model: (string & {}) | 'gpt-live-1';
+    model: (string & {}) | 'gpt-live-1' | 'gpt-live-1.1';
 
     /**
      * The session type. Always `live`.

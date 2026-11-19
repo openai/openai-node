@@ -11,7 +11,7 @@ const client = new OpenAI({
 describe('resource sessions', () => {
   test('accept: only required params', async () => {
     const responsePromise = client.live.sessions.accept('session_id', {
-      session: { model: 'gpt-live-1', type: 'live' },
+      session: { model: 'gpt-live-1.1', type: 'live' },
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -25,7 +25,7 @@ describe('resource sessions', () => {
   test('accept: required and optional params', async () => {
     await client.live.sessions.accept('session_id', {
       session: {
-        model: 'gpt-live-1',
+        model: 'gpt-live-1.1',
         type: 'live',
         audio: { output: { voice: 'string' } },
         delegation: { type: 'client', acknowledgement_delay_ms: 0 },
