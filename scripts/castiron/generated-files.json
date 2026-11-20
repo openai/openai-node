@@ -531,7 +531,7 @@
     },
     "src/resources/chat/completions/completions.ts": {
       "mode": "100644",
-      "sha256": "1751d26318234a39ff4f476c54fc8e81a6456488216d1ed36f0a2ec899fa7b1c"
+      "sha256": "588cd5994d03a4e41374fcd9ffa864f9a2237266f607591062b72e0ac1028d93"
     },
     "src/resources/chat/completions/index.ts": {
       "mode": "100644",
@@ -547,7 +547,7 @@
     },
     "src/resources/completions.ts": {
       "mode": "100644",
-      "sha256": "3b521c000d4d2c7cb6fb2eeec64568f4ef9e3aafcb4472202f05e23c972b9807"
+      "sha256": "fd42a6e105bb8dd09a84e2c1d01a00afab531eae1cb19c196bc3697165106b7c"
     },
     "src/resources/containers.ts": {
       "mode": "100644",

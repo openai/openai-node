@@ -317,7 +317,8 @@ export interface CompletionCreateParamsBase {
   max_tokens?: number | null;
 
   /**
-   * How many completions to generate for each prompt.
+   * How many completions to generate for each prompt. Omit `n` to generate one
+   * completion per prompt.
    *
    * **Note:** Because this parameter generates many completions, it can quickly
    * consume your token quota. Use carefully and ensure that you have reasonable
