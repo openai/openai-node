@@ -1,5 +1,13 @@
 # Changelog
 
+## [7.62.1](https://github.com/openai/openai-node/compare/v7.62.0...v7.62.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **api:** clarify when to omit completion choice count ([#3174](https://github.com/openai/openai-node/issues/3174)) ([2442a0c](https://github.com/openai/openai-node/commit/2442a0ca8a934aa4b41fe1c797717e4713568739))
+* **deps:** bump next from 15.5.28 to 15.5.29 in /ecosystem-tests/vercel-edge ([#3172](https://github.com/openai/openai-node/issues/3172)) ([5c947ce](https://github.com/openai/openai-node/commit/5c947ce664a9986c05745f902ba74f8bc403ce17))
+
 ## [7.62.0](https://github.com/openai/openai-node/compare/v7.61.0...v7.62.0) (2026-11-19)
 
 
