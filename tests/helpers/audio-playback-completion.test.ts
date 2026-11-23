@@ -73,6 +73,7 @@ describe('playAudio completion', () => {
     });
     let settled = false;
     const playback = playAudio(source);
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     void playback.then(
       () => {
         settled = true;

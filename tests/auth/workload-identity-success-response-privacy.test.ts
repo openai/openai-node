@@ -479,6 +479,7 @@ describe('successful workload OAuth response JSON privacy', () => {
 
   it.each(surfaces)('preserves native UTF-8 BOM decoding behavior on %s', async (surface) => {
     const body = `\uFEFF${JSON.stringify({ access_token: 'safe-body-token', expires_in: 3600 })}`;
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const nativeParsesBOM = await new Response(body).json().then(
       () => true,
       () => false,

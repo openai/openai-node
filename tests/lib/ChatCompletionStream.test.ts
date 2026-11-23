@@ -1144,6 +1144,7 @@ describe('.stream()', () => {
     }, new AbortController()).toReadableStream();
 
     const stream = ChatCompletionStream.fromReadableStream(readable);
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await stream.done().then(
       () => null,
       (error: unknown) => error,
@@ -1225,6 +1226,7 @@ describe('.stream()', () => {
 
     await expect(iterator.next()).resolves.toMatchObject({ done: false });
     await expect(iterator.next()).resolves.toMatchObject({ done: false });
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const caught = await iterator.next().then(
       () => null,
       (error) => error,

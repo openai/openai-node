@@ -83,6 +83,7 @@ async function collect(source: AsyncIterable<unknown>): Promise<unknown[]> {
 
 // oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function rejection(source: AsyncIterable<unknown>): Promise<unknown> {
+  // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
   return await collect(source).then(
     () => {},
     (error: unknown) => error,

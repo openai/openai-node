@@ -292,6 +292,7 @@ describe('bedrock Runtime provider', () => {
 
     const runtimeError = await client.chat.completions
       .create({ model: RUNTIME_MODEL, messages: [{ role: 'user', content: 'Say hello' }] })
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       .then(
         () => null,
         (error: unknown) => error,

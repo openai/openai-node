@@ -1950,6 +1950,7 @@ test('collects steadily consumed responses larger than the queue byte budget', a
       maxBufferedBytes: 1024,
     });
     const lane = session.lane();
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const final = lane.finalResponse().then(
       (value) => ({ value }),
       (error: unknown) => ({ error }),

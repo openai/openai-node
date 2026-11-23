@@ -123,6 +123,7 @@ describe('malformed SSE diagnostic privacy', () => {
       const logger = createLogger();
       const stream = await createPublicStream(surface, { logger, data: secret });
 
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       const thrown = await collect(stream).then(
         () => {
           throw new Error('Expected the malformed SSE payload to be rejected.');

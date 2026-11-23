@@ -1472,6 +1472,7 @@ describe('AssistantStream factories and async iteration', () => {
     }, new AbortController()).toReadableStream();
 
     const runner = AssistantStream.fromReadableStream(readable);
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await runner.done().then(
       () => null,
       (error: unknown) => error,
@@ -1493,6 +1494,7 @@ describe('AssistantStream factories and async iteration', () => {
     }, new AbortController()).toReadableStream();
 
     const runner = AssistantStream.fromReadableStream(readable);
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await runner.done().then(
       () => null,
       (error: unknown) => error,

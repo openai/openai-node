@@ -1650,6 +1650,7 @@ describe('.stream()', () => {
     const listenerErrors: OpenAIError[] = [];
     stream.on('error', (error) => listenerErrors.push(error));
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const rejection = await stream.finalResponse().then(
       () => {
         throw new Error('expected finalResponse() to reject');
@@ -1678,6 +1679,7 @@ describe('.stream()', () => {
     } satisfies ResponseStreamEvent;
     const stream = ResponseStream.fromReadableStream(readableStreamFromEvents([event]));
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const rejection = await stream.finalResponse().then(
       () => {
         throw new Error('expected finalResponse() to reject');
@@ -1723,6 +1725,7 @@ describe('.stream()', () => {
       stream.on('event', (event) => emittedEvents.push(event));
       stream.on('error', (streamError) => emittedErrors.push(streamError));
 
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       const rejection = await stream.finalResponse().then(
         () => {
           throw new Error('expected finalResponse() to reject');
@@ -2186,6 +2189,7 @@ describe('.stream()', () => {
     await expect(iterator.next()).resolves.toEqual({ value: validEvents[0], done: false });
     await expect(iterator.next()).resolves.toEqual({ value: validEvents[1], done: false });
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await iterator.next().then(
       () => {
         throw new Error('Expected the response iterator to reject');

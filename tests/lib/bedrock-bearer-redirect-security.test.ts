@@ -215,6 +215,7 @@ describe('Bedrock bearer redirect security', () => {
             },
             { fetchOptions: { redirect: 'follow' } },
           )
+          // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
           .then(
             () => null,
             (error: unknown) => error,
