@@ -1,5 +1,23 @@
 # Changelog
 
+## [7.63.0](https://github.com/openai/openai-node/compare/v7.62.0...v7.63.0) (2026-11-23)
+
+
+### Features
+
+* **api:** add spending limits to agent sessions ([#3187](https://github.com/openai/openai-node/issues/3187)) ([b2c99ad](https://github.com/openai/openai-node/commit/b2c99adafc70e17fb4f8c2df77f6c28b3ce1351f))
+
+
+### Bug Fixes
+
+* **api:** clarify when to omit completion choice count ([#3174](https://github.com/openai/openai-node/issues/3174)) ([2442a0c](https://github.com/openai/openai-node/commit/2442a0ca8a934aa4b41fe1c797717e4713568739))
+* **deps-dev:** bump @babel/preset-env from 7.29.7 to 7.29.14 in /ecosystem-tests/ts-browser-webpack ([#3182](https://github.com/openai/openai-node/issues/3182)) ([adae8fd](https://github.com/openai/openai-node/commit/adae8fd1592e65297635d3ce4248222453a00f33))
+* **deps-dev:** bump @cloudflare/workers-types from 5.20261108.1 to 5.20261115.1 in /ecosystem-tests/cloudflare-worker ([#3178](https://github.com/openai/openai-node/issues/3178)) ([67e4f46](https://github.com/openai/openai-node/commit/67e4f4661788700eb979877f37432e07abc38f02))
+* **deps-dev:** bump puppeteer from 25.16.0 to 25.17.0 in /ecosystem-tests/browser-direct-import ([#3177](https://github.com/openai/openai-node/issues/3177)) ([8e69318](https://github.com/openai/openai-node/commit/8e693181dc1987c07ff3e6fe45c81a3095f502bf))
+* **deps-dev:** bump puppeteer from 25.16.0 to 25.17.0 in /ecosystem-tests/ts-browser-webpack ([#3184](https://github.com/openai/openai-node/issues/3184)) ([1cb07cb](https://github.com/openai/openai-node/commit/1cb07cb72808d4200fd83d7af3a09d551935c452))
+* **deps-dev:** bump wrangler from 4.158.0 to 4.162.0 in /ecosystem-tests/cloudflare-worker ([#3180](https://github.com/openai/openai-node/issues/3180)) ([1a8a0ec](https://github.com/openai/openai-node/commit/1a8a0ecab1b2fe7cc113f0d19e8c41b3cdfb63ed))
+* **deps:** bump next from 15.5.28 to 15.5.29 in /ecosystem-tests/vercel-edge ([#3172](https://github.com/openai/openai-node/issues/3172)) ([5c947ce](https://github.com/openai/openai-node/commit/5c947ce664a9986c05745f902ba74f8bc403ce17))
+
 ## [7.62.0](https://github.com/openai/openai-node/compare/v7.61.0...v7.62.0) (2026-11-19)
 
 
