@@ -26,6 +26,7 @@ const session: AgentSession = {
   status: 'idle',
   usage: null,
   vault_ids: [],
+  spend_control: { limit: null, consumed: null },
 };
 
 const turn: Turn = {
