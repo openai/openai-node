@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.64.0](https://github.com/openai/openai-node/compare/v7.63.0...v7.64.0) (2026-11-24)
+
+
+### Features
+
+* **api:** add healthcare model IDs for Responses ([#3188](https://github.com/openai/openai-node/issues/3188)) ([ff563a0](https://github.com/openai/openai-node/commit/ff563a08dbd66325130cb5c4d64226bd90e18d27))
+
 ## [7.63.0](https://github.com/openai/openai-node/compare/v7.62.0...v7.63.0) (2026-11-23)
 
 
