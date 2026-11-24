@@ -25,7 +25,11 @@ export type AllModels =
   | 'gpt-6-cyber'
   | 'gpt-rosalind-research'
   | 'gpt-6-rosalind'
-  | 'gpt-6.2-astra-law';
+  | 'gpt-6.2-astra-law'
+  | 'gpt-6-astra-healthcare'
+  | 'gpt-6.1-sol-healthcare'
+  | 'gpt-6.2-astra-healthcare'
+  | 'gpt-6.2-sol-healthcare';
 
 /**
  * Deprecated values:
@@ -622,4 +626,8 @@ export type ResponsesModel =
   | 'gpt-6-cyber'
   | 'gpt-rosalind-research'
   | 'gpt-6-rosalind'
-  | 'gpt-6.2-astra-law';
+  | 'gpt-6.2-astra-law'
+  | 'gpt-6-astra-healthcare'
+  | 'gpt-6.1-sol-healthcare'
+  | 'gpt-6.2-astra-healthcare'
+  | 'gpt-6.2-sol-healthcare';

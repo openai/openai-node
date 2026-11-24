@@ -475,7 +475,7 @@
     },
     "src/resources/beta/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "54a43554ac9d750304aea22430f9ebd38dcf0e80b9aeea5813a36a13c1d80943"
+      "sha256": "0bdbb6e692cfd396a18ea2621030df6a64fe63fb2efc3500f5219058316c5955"
     },
     "src/resources/beta/responses/ws-base.ts": {
       "mode": "100644",
@@ -887,7 +887,7 @@
     },
     "src/resources/responses/responses.ts": {
       "mode": "100644",
-      "sha256": "a46991b245798b3e79a680852467f7c788f31ada7d321e4f63a623415942fc10"
+      "sha256": "e13cdbf9cd73772218537f626399f0803990ef42e6101f3a12528ac4b56d67d6"
     },
     "src/resources/responses/ws-base.ts": {
       "mode": "100644",
@@ -919,7 +919,7 @@
     },
     "src/resources/shared.ts": {
       "mode": "100644",
-      "sha256": "8a380968b4555c2fede966e67e601aee1f37252d7134362ea529cf495813a373"
+      "sha256": "9ad9c81c22189c6c50c31e226f8d94e6b297ca5604c338ec9c412d44b5aa6428"
     },
     "src/resources/skills.ts": {
       "mode": "100644",
