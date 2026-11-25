@@ -275,7 +275,7 @@
     },
     "src/resources/batches.ts": {
       "mode": "100644",
-      "sha256": "61828d5544e118580e1de99025c70dfdb78569938dd10b9aaa0cdd506d75cf0b"
+      "sha256": "31c303ead5ece4faf9cac9c9598438181abdfed8f84002bf4cf9f78642c4dd08"
     },
     "src/resources/beta.ts": {
       "mode": "100644",
@@ -339,7 +339,7 @@
     },
     "src/resources/beta/agents/sessions/events.ts": {
       "mode": "100644",
-      "sha256": "771bf9b1a46f374e22c40738f2e93da6b6ecc5cc7bcb1647fccb3fd2031a410c"
+      "sha256": "afc14d5884d98cbc973ed39744c160692adb23cfc4c95b1ddc27143d2be7aecd"
     },
     "src/resources/beta/agents/sessions/index.ts": {
       "mode": "100644",
