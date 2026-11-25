@@ -1227,9 +1227,10 @@ export interface RealtimeAudioConfigInput {
   format?: RealtimeAudioFormats;
 
   /**
-   * Configuration for input audio noise reduction. This can be set to `null` to turn
-   * off. Noise reduction filters audio added to the input audio buffer before it is
-   * sent to VAD and the model. Filtering the audio can improve VAD and turn
+   * When you supply a `noise_reduction` object, you must set `type` to `near_field`
+   * or `far_field`. Set `noise_reduction` to `null` to turn off input audio noise
+   * reduction. Noise reduction filters audio added to the input audio buffer before
+   * it is sent to VAD and the model. Filtering the audio can improve VAD and turn
    * detection accuracy (reducing false positives) and model performance by improving
    * perception of the input audio.
    */
@@ -1270,9 +1271,10 @@ export interface RealtimeAudioConfigInput {
 
 export namespace RealtimeAudioConfigInput {
   /**
-   * Configuration for input audio noise reduction. This can be set to `null` to turn
-   * off. Noise reduction filters audio added to the input audio buffer before it is
-   * sent to VAD and the model. Filtering the audio can improve VAD and turn
+   * When you supply a `noise_reduction` object, you must set `type` to `near_field`
+   * or `far_field`. Set `noise_reduction` to `null` to turn off input audio noise
+   * reduction. Noise reduction filters audio added to the input audio buffer before
+   * it is sent to VAD and the model. Filtering the audio can improve VAD and turn
    * detection accuracy (reducing false positives) and model performance by improving
    * perception of the input audio.
    */
