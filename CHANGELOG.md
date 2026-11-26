@@ -1,5 +1,21 @@
 # Changelog
 
+## [7.65.0](https://github.com/openai/openai-node/compare/v7.64.0...v7.65.0) (2026-11-26)
+
+
+### Features
+
+* **api:** add spend alerts and response compaction fields ([#3196](https://github.com/openai/openai-node/issues/3196)) ([60103ca](https://github.com/openai/openai-node/commit/60103ca01e379edb22d2b6428fa91f6074591fce))
+* **api:** support updating session vaults ([#3194](https://github.com/openai/openai-node/issues/3194)) ([b6ea5b6](https://github.com/openai/openai-node/commit/b6ea5b6fd91d8f1d1d91d070fe757667d6d289e2))
+
+
+### Chores
+
+* **api:** clarify message retries and Batch endpoints ([#3193](https://github.com/openai/openai-node/issues/3193)) ([93f5f1c](https://github.com/openai/openai-node/commit/93f5f1ca7420fe711ed559eca6405044199f5c50))
+* **api:** clarify Realtime audio noise reduction ([#3192](https://github.com/openai/openai-node/issues/3192)) ([be6cf76](https://github.com/openai/openai-node/commit/be6cf76e14988df37b8c280fdc01184bb2c7d52e))
+* **api:** correct metadata documentation ([#3190](https://github.com/openai/openai-node/issues/3190)) ([5466eb9](https://github.com/openai/openai-node/commit/5466eb9ef1a98a9d23a6bd1751c60f118331c444))
+* **api:** document inline skill upload limits ([#3175](https://github.com/openai/openai-node/issues/3175)) ([106b828](https://github.com/openai/openai-node/commit/106b828b42fff434305e7808558563af1b601819))
+
 ## [7.64.0](https://github.com/openai/openai-node/compare/v7.63.0...v7.64.0) (2026-11-24)
 
 
