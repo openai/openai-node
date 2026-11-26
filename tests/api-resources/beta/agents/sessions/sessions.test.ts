@@ -105,6 +105,7 @@ describe('resource sessions', () => {
           prompt_cache_options: { ttl: '30m' },
           review: 'none',
           spend_control: { limit: 1 },
+          vault_ids: ['string'],
         },
         { path: '/_stainless_unknown_path' },
       ),
