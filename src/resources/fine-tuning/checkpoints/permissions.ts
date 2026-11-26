@@ -143,7 +143,7 @@ export class Permissions extends APIResource {
    * ```ts
    * // Automatically fetches more pages as needed.
    * for await (const permissionCreateResponse of client.fineTuning.checkpoints.permissions.create(
-   *   'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+   *   'ft:gpt-4.1-mini-2025-04-14:org:weather:B7R9VjQd',
    *   { project_ids: ['string'] },
    * )) {
    *   // ...
@@ -432,7 +432,7 @@ export class Permissions extends APIResource {
    *     'cp_zc4Q7MP6XxulcVzj4MZdwsAB',
    *     {
    *       fine_tuned_model_checkpoint:
-   *         'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+   *         'ft:gpt-4.1-mini-2025-04-14:org:weather:B7R9VjQd',
    *     },
    *   );
    * ```

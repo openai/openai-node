@@ -50,7 +50,10 @@ export class Images extends APIResource {
    * ```ts
    * const imagesResponse = await client.images.edit({
    *   image: fs.createReadStream('path/to/file'),
-   *   prompt: 'A cute baby sea otter wearing a beret',
+   *   prompt: 'Add a watercolor effect to this image',
+   *   model: 'gpt-image-2.6-flare',
+   *   quality: 'high',
+   *   size: '1024x1024',
    * });
    * ```
    */
@@ -115,6 +118,7 @@ export class Images extends APIResource {
    * ```ts
    * const imagesResponse = await client.images.generate({
    *   prompt: 'A cute baby sea otter',
+   *   model: 'gpt-image-2.6-flare',
    * });
    * ```
    */

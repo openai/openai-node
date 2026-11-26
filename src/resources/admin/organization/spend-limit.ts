@@ -104,6 +104,11 @@ export interface OrganizationSpendLimit {
    * The hard spend limit amount, in cents.
    */
   threshold_amount: number;
+
+  /**
+   * Email notifications sent when the hard spend limit is reached.
+   */
+  notification_channel?: OrganizationSpendLimit.NotificationChannel;
 }
 
 export namespace OrganizationSpendLimit {
@@ -115,6 +120,17 @@ export namespace OrganizationSpendLimit {
      * Whether the hard spend limit is currently enforcing.
      */
     status: (string & {}) | 'inactive' | 'enforcing';
+  }
+
+  /**
+   * Email notifications sent when the hard spend limit is reached.
+   */
+  export interface NotificationChannel {
+    recipients: Array<string>;
+
+    type: 'email';
+
+    subject_prefix?: string | null;
   }
 }
 
@@ -149,6 +165,33 @@ export interface SpendLimitUpdateParams {
    * The hard spend limit amount, in cents.
    */
   threshold_amount: number;
+
+  /**
+   * Configure email notifications when the spend limit is reached. Leave this out to
+   * keep the current settings, or send null to reset to owner-only notifications.
+   */
+  notification_channel?: SpendLimitUpdateParams.NotificationChannel | null;
+}
+
+export namespace SpendLimitUpdateParams {
+  /**
+   * Configure email notifications when the spend limit is reached. Leave this out to
+   * keep the current settings, or send null to reset to owner-only notifications.
+   */
+  export interface NotificationChannel {
+    type: 'email';
+
+    /**
+     * Additional email recipients. Omit to keep them unchanged; send [] to clear them.
+     */
+    recipients?: Array<string>;
+
+    /**
+     * Email subject prefix. Omit to keep it unchanged; send null or an empty string to
+     * clear it.
+     */
+    subject_prefix?: string | null;
+  }
 }
 
 export declare namespace SpendLimit {

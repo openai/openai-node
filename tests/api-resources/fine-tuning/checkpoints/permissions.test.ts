@@ -11,7 +11,7 @@ const client = new OpenAI({
 describe('resource permissions', () => {
   test('create: only required params', async () => {
     const responsePromise = client.fineTuning.checkpoints.permissions.create(
-      'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+      'ft:gpt-4.1-mini-2025-04-14:org:weather:B7R9VjQd',
       { project_ids: ['string'] },
     );
     const rawResponse = await responsePromise.asResponse();
@@ -24,9 +24,10 @@ describe('resource permissions', () => {
   });
 
   test('create: required and optional params', async () => {
-    await client.fineTuning.checkpoints.permissions.create('ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd', {
-      project_ids: ['string'],
-    });
+    await client.fineTuning.checkpoints.permissions.create(
+      'ft:gpt-4.1-mini-2025-04-14:org:weather:B7R9VjQd',
+      { project_ids: ['string'] },
+    );
   });
 
   test('retrieve', async () => {
@@ -85,7 +86,7 @@ describe('resource permissions', () => {
 
   test('delete: only required params', async () => {
     const responsePromise = client.fineTuning.checkpoints.permissions.delete('cp_zc4Q7MP6XxulcVzj4MZdwsAB', {
-      fine_tuned_model_checkpoint: 'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+      fine_tuned_model_checkpoint: 'ft:gpt-4.1-mini-2025-04-14:org:weather:B7R9VjQd',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -98,7 +99,7 @@ describe('resource permissions', () => {
 
   test('delete: required and optional params', async () => {
     await client.fineTuning.checkpoints.permissions.delete('cp_zc4Q7MP6XxulcVzj4MZdwsAB', {
-      fine_tuned_model_checkpoint: 'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+      fine_tuned_model_checkpoint: 'ft:gpt-4.1-mini-2025-04-14:org:weather:B7R9VjQd',
     });
   });
 });

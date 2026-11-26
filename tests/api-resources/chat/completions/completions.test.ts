@@ -11,8 +11,8 @@ const client = new OpenAI({
 describe('resource completions', () => {
   test('create: only required params', async () => {
     const responsePromise = client.chat.completions.create({
-      messages: [{ content: 'string', role: 'developer' }],
-      model: 'gpt-6-astra',
+      model: 'gpt-6.2-astra',
+      messages: [{ role: 'user', content: 'Say hello in one sentence.' }],
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -25,14 +25,14 @@ describe('resource completions', () => {
 
   test('create: required and optional params', async () => {
     await client.chat.completions.create({
+      model: 'gpt-6.2-astra',
       messages: [
         {
-          content: 'string',
-          role: 'developer',
+          role: 'user',
+          content: 'Say hello in one sentence.',
           name: 'name',
         },
       ],
-      model: 'gpt-6-astra',
       audio: { format: 'wav', voice: 'alloy' },
       frequency_penalty: -2,
       function_call: 'none',

@@ -11,7 +11,7 @@ const client = new OpenAI({
 describe('resource jobs', () => {
   test('create: only required params', async () => {
     const responsePromise = client.fineTuning.jobs.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini-2025-04-14',
       training_file: 'file-abc123',
     });
     const rawResponse = await responsePromise.asResponse();
@@ -25,7 +25,7 @@ describe('resource jobs', () => {
 
   test('create: required and optional params', async () => {
     await client.fineTuning.jobs.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini-2025-04-14',
       training_file: 'file-abc123',
       hyperparameters: {
         batch_size: 'auto',

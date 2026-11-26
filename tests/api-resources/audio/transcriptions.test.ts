@@ -12,7 +12,7 @@ describe('resource transcriptions', () => {
   test('create: only required params', async () => {
     const responsePromise = client.audio.transcriptions.create({
       file: await toFile(Buffer.from('Example data'), 'README.md'),
-      model: 'gpt-4o-transcribe',
+      model: 'gpt-transcribe',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -26,7 +26,7 @@ describe('resource transcriptions', () => {
   test('create: required and optional params', async () => {
     await client.audio.transcriptions.create({
       file: await toFile(Buffer.from('Example data'), 'README.md'),
-      model: 'gpt-4o-transcribe',
+      model: 'gpt-transcribe',
       chunking_strategy: 'auto',
       include: ['logprobs'],
       keywords: ['string'],

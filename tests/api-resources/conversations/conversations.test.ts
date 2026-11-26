@@ -34,6 +34,7 @@ describe('resource conversations', () => {
             },
           ],
           metadata: { foo: 'string' },
+          safety_identifier: 'safety_identifier',
         },
         { path: '/_stainless_unknown_path' },
       ),

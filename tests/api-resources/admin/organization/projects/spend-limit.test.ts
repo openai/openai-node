@@ -40,6 +40,11 @@ describe('resource spendLimit', () => {
       currency: 'USD',
       interval: 'month',
       threshold_amount: 1,
+      notification_channel: {
+        type: 'email',
+        recipients: ['string'],
+        subject_prefix: 'subject_prefix',
+      },
     });
   });
 

@@ -39,7 +39,7 @@ export class Transcriptions extends APIResource {
    * const transcription =
    *   await client.audio.transcriptions.create({
    *     file: fs.createReadStream('speech.mp3'),
-   *     model: 'gpt-4o-transcribe',
+   *     model: 'gpt-transcribe',
    *   });
    * ```
    */
