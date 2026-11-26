@@ -104,8 +104,8 @@ importers:
         specifier: npm:typescript@4.9.5
         version: typescript@4.9.5
       ultracite:
-        specifier: 8.1.0
-        version: 8.1.0(oxfmt@0.75.0)(oxlint@1.90.0)
+        specifier: 8.2.1
+        version: 8.2.1(oxfmt@0.75.0)(oxlint@1.90.0)
       undici:
         specifier: 8.12.2
         version: 8.12.2
@@ -3279,15 +3279,15 @@ packages:
     engines: {node: '>=0.8.0'}
     hasBin: true
 
-  ultracite@8.1.0:
-    resolution: {integrity: sha512-YX14p9HzKjOZFi2N4zug+zM3757BZcRpxn8vnGKgO+0Vh3mnU9G1hZAgvSD9d1HAUyV1KSaCUAB8BfbqVXEnmQ==}
+  ultracite@8.2.1:
+    resolution: {integrity: sha512-+HAwOkdpdNaf6Fr+JEh0YkikJU4vjRO977kMAvtOsk8YWk+VG3rdy7gyFLgbO1Edv+k5hhL/3CKAiEmUlvt3ow==}
     engines: {node: ^22.22.2 || >=24.15.0}
     hasBin: true
     peerDependencies:
       '@biomejs/biome': ^2.6.2
       eslint: ^10.9.0
       oxfmt: '>=0.71.0 <1'
-      oxlint: ^1.86.0
+      oxlint: ^1.90.0
       prettier: ^3.5.3
       stylelint: ^17.0.0
     peerDependenciesMeta:
@@ -6842,7 +6842,7 @@ snapshots:
   uglify-js@3.19.3:
     optional: true
 
-  ultracite@8.1.0(oxfmt@0.75.0)(oxlint@1.90.0):
+  ultracite@8.2.1(oxfmt@0.75.0)(oxlint@1.90.0):
     dependencies:
       '@clack/prompts': 1.8.1
       cli-truncate: 6.1.1
