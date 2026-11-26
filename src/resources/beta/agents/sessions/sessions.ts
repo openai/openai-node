@@ -258,9 +258,9 @@ export class Sessions extends APIResource {
   }
 
   /**
-   * Updates session tools, metadata, model, reasoning effort, service tier, or the
-   * default prompt cache lifetime. Model settings apply to subsequent turns. Omitted
-   * fields are unchanged. See
+   * Updates session tools, vaults, metadata, model, reasoning effort, service tier,
+   * or the default prompt cache lifetime. Model settings apply to subsequent turns.
+   * Omitted fields are unchanged. See
    * [managing sessions](https://developers.openai.com/api/docs/guides/agents-api/sessions/manage).
    *
    * @example
@@ -691,6 +691,12 @@ export interface SessionUpdateParams {
    * spend.
    */
   spend_control?: SessionUpdateParams.SpendControl | null;
+
+  /**
+   * Replaces the session's referenced vaults. Omit to retain them; null or [] clears
+   * them.
+   */
+  vault_ids?: Array<string> | null;
 }
 
 export namespace SessionUpdateParams {
