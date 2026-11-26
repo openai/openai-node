@@ -150,7 +150,7 @@ export class Jobs extends APIResource {
    * @example
    * ```ts
    * const fineTuningJob = await client.fineTuning.jobs.create({
-   *   model: 'gpt-4o-mini',
+   *   model: 'gpt-4.1-mini-2025-04-14',
    *   training_file: 'file-abc123',
    * });
    * ```
@@ -773,7 +773,13 @@ export interface JobCreateParams {
    * The name of the model to fine-tune. You can select one of the
    * [supported models](https://developers.openai.com/api/docs/guides/model-optimization#fine-tuning-methods).
    */
-  model: (string & {}) | 'babbage-002' | 'davinci-002' | 'gpt-3.5-turbo' | 'gpt-4o-mini';
+  model:
+    | (string & {})
+    | 'gpt-4.1-mini-2025-04-14'
+    | 'babbage-002'
+    | 'davinci-002'
+    | 'gpt-3.5-turbo'
+    | 'gpt-4o-mini';
 
   /**
    * The ID of an uploaded file that contains training data.
@@ -836,7 +842,7 @@ export interface JobCreateParams {
    * name.
    *
    * For example, a `suffix` of "custom-model-name" would produce a model name like
-   * `ft:gpt-4o-mini:openai:custom-model-name:7p4lURel`.
+   * `ft:gpt-4.1-mini-2025-04-14:openai:custom-model-name:7p4lURel`.
    */
   suffix?: string | null;
 

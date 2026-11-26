@@ -198,7 +198,10 @@ export class Credentials extends APIResource {
    * const credential =
    *   await client.beta.agents.vaults.credentials.update(
    *     'credential_id',
-   *     { vault_id: 'vault_id', metadata: {} },
+   *     {
+   *       vault_id: 'vault_id',
+   *       metadata: { environment: 'staging' },
+   *     },
    *   );
    * ```
    */

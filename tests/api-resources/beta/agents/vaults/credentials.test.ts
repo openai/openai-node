@@ -93,7 +93,7 @@ describe('resource credentials', () => {
           token_endpoint_auth: { type: 'client_secret_basic', client_secret: 'client_secret' },
         },
       },
-      metadata: { foo: 'string' },
+      metadata: { environment: 'staging' },
     });
   });
 

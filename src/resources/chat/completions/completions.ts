@@ -188,8 +188,13 @@ export class Completions extends APIResource {
    * ```ts
    * const chatCompletion = await client.chat.completions.create(
    *   {
-   *     messages: [{ content: 'string', role: 'developer' }],
-   *     model: 'gpt-6-astra',
+   *     model: 'gpt-6.2-astra',
+   *     messages: [
+   *       {
+   *         role: 'user',
+   *         content: 'Say hello in one sentence.',
+   *       },
+   *     ],
    *   },
    * );
    * ```
@@ -2348,9 +2353,9 @@ export interface ChatCompletionCreateParamsBase {
   messages: Array<ChatCompletionMessageParam>;
 
   /**
-   * Model ID used to generate the response, like `gpt-6-astra` or `o3`. OpenAI
-   * offers a wide range of models with different capabilities, performance
-   * characteristics, and price points. Refer to the
+   * Model ID used to generate the response, like `gpt-6.2-astra`. OpenAI offers a
+   * wide range of models with different capabilities, performance characteristics,
+   * and price points. Refer to the
    * [model guide](https://developers.openai.com/api/docs/models) to browse and
    * compare available models.
    */
@@ -2606,7 +2611,7 @@ export interface ChatCompletionCreateParamsBase {
   service_tier?: 'auto' | 'default' | 'flex' | 'scale' | 'priority' | 'fast' | null;
 
   /**
-   * Not supported with latest reasoning models `o3` and `o4-mini`.
+   * Not supported with reasoning models `o3` and `o4-mini`.
    *
    * Up to 4 sequences where the API will stop generating further tokens. The
    * returned text will not contain the stop sequence.

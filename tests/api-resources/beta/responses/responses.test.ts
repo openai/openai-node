@@ -113,6 +113,7 @@ describe('resource responses', () => {
       prompt_cache_key: 'prompt_cache_key',
       prompt_cache_options: { mode: 'implicit', ttl: '30m' },
       prompt_cache_retention: 'in_memory',
+      safety_identifier: 'safety_identifier',
       service_tier: 'auto',
       betas: ['responses_multi_agent=v1'],
     });

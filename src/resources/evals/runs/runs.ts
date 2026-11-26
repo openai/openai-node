@@ -342,7 +342,7 @@ export interface CreateEvalCompletionsRunDataSource {
     | CreateEvalCompletionsRunDataSource.ItemReference;
 
   /**
-   * The name of the model to use for generating completions (e.g. "o3-mini").
+   * The model to use to sample outputs with the Chat Completions API.
    */
   model?: string;
 
@@ -416,7 +416,7 @@ export namespace CreateEvalCompletionsRunDataSource {
     metadata?: Shared.Metadata | null;
 
     /**
-     * An optional model to filter by (e.g., 'gpt-6-astra').
+     * An optional model to filter by (e.g., 'gpt-4.1-mini-2025-04-14').
      */
     model?: string | null;
   }
@@ -746,7 +746,7 @@ export namespace RunCreateResponse {
     input_messages?: Responses.Template | Responses.ItemReference;
 
     /**
-     * The name of the model to use for generating completions (e.g. "o3-mini").
+     * The model to use to sample outputs with the Responses API.
      */
     model?: string;
 
@@ -1235,7 +1235,7 @@ export namespace RunRetrieveResponse {
     input_messages?: Responses.Template | Responses.ItemReference;
 
     /**
-     * The name of the model to use for generating completions (e.g. "o3-mini").
+     * The model to use to sample outputs with the Responses API.
      */
     model?: string;
 
@@ -1721,7 +1721,7 @@ export namespace RunListResponse {
     input_messages?: Responses.Template | Responses.ItemReference;
 
     /**
-     * The name of the model to use for generating completions (e.g. "o3-mini").
+     * The model to use to sample outputs with the Responses API.
      */
     model?: string;
 
@@ -2218,7 +2218,7 @@ export namespace RunCancelResponse {
     input_messages?: Responses.Template | Responses.ItemReference;
 
     /**
-     * The name of the model to use for generating completions (e.g. "o3-mini").
+     * The model to use to sample outputs with the Responses API.
      */
     model?: string;
 
@@ -2654,7 +2654,7 @@ export namespace RunCreateParams {
       | CreateEvalResponsesRunDataSource.ItemReference;
 
     /**
-     * The name of the model to use for generating completions (e.g. "o3-mini").
+     * The model to use to sample outputs with the Responses API.
      */
     model?: string;
 

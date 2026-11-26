@@ -46,7 +46,7 @@ describe('resource calls', () => {
         include: ['item.input_audio_transcription.logprobs'],
         instructions: 'instructions',
         max_output_tokens: 'inf',
-        model: 'gpt-realtime',
+        model: 'gpt-realtime-2.1',
         output_modalities: ['text'],
         parallel_tool_calls: true,
         prompt: {
@@ -115,7 +115,7 @@ describe('resource calls', () => {
       include: ['item.input_audio_transcription.logprobs'],
       instructions: 'instructions',
       max_output_tokens: 'inf',
-      model: 'gpt-realtime',
+      model: 'gpt-realtime-2.1',
       output_modalities: ['text'],
       parallel_tool_calls: true,
       prompt: {

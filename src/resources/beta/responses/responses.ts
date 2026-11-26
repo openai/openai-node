@@ -159,7 +159,10 @@ export class Responses extends APIResource {
    *
    * @example
    * ```ts
-   * const betaResponse = await client.beta.responses.create();
+   * const betaResponse = await client.beta.responses.create({
+   *   model: 'gpt-6.2-astra',
+   *   input: 'Write a one-sentence bedtime story about a unicorn.',
+   * });
    * ```
    */
   create(params: ResponseCreateParamsNonStreaming, options?: RequestOptions): APIPromise<BetaResponse>;
@@ -529,6 +532,16 @@ export interface BetaCompactedResponse {
   usage: BetaResponseUsage;
 
   image?: BetaCompactedResponse.Image;
+
+  /**
+   * A stable identifier that was used for safety monitoring and abuse detection.
+   */
+  safety_identifier?: string | null;
+
+  /**
+   * The service tier used for compaction, when reported.
+   */
+  service_tier?: string;
 }
 
 export namespace BetaCompactedResponse {
@@ -1446,9 +1459,9 @@ export interface BetaResponse {
   metadata: { [key: string]: string } | null;
 
   /**
-   * Model ID used to generate the response, like `gpt-6-astra`. OpenAI offers a wide
-   * range of models with different capabilities, performance characteristics, and
-   * price points. Refer to the
+   * Model ID used to generate the response, like `gpt-6.2-astra`. OpenAI offers a
+   * wide range of models with different capabilities, performance characteristics,
+   * and price points. Refer to the
    * [model guide](https://developers.openai.com/api/docs/models) to browse and
    * compare available models.
    *
@@ -13088,9 +13101,9 @@ export namespace BetaResponsesClientEvent {
     metadata?: { [key: string]: string } | null;
 
     /**
-     * Model ID used to generate the response, like `gpt-6-astra`. OpenAI offers a wide
-     * range of models with different capabilities, performance characteristics, and
-     * price points. Refer to the
+     * Model ID used to generate the response, like `gpt-6.2-astra`. OpenAI offers a
+     * wide range of models with different capabilities, performance characteristics,
+     * and price points. Refer to the
      * [model guide](https://developers.openai.com/api/docs/models) to browse and
      * compare available models.
      *
@@ -15656,7 +15669,7 @@ export interface ResponseCreateParamsBase {
   metadata?: { [key: string]: string } | null;
 
   /**
-   * Body param: Model ID used to generate the response, like `gpt-6-astra`. OpenAI
+   * Body param: Model ID used to generate the response, like `gpt-6.2-astra`. OpenAI
    * offers a wide range of models with different capabilities, performance
    * characteristics, and price points. Refer to the
    * [model guide](https://developers.openai.com/api/docs/models) to browse and
@@ -16392,7 +16405,7 @@ export interface ResponseCancelParams {
 
 export interface ResponseCompactParams {
   /**
-   * Body param: Model ID used to generate the response, like `gpt-6-astra`. OpenAI
+   * Body param: Model ID used to generate the response, like `gpt-6.2-astra`. OpenAI
    * offers a wide range of models with different capabilities, performance
    * characteristics, and price points. Refer to the
    * [model guide](https://developers.openai.com/api/docs/models) to browse and
@@ -16572,6 +16585,11 @@ export interface ResponseCompactParams {
    * request.
    */
   prompt_cache_retention?: 'in_memory' | '24h' | null;
+
+  /**
+   * Body param: A stable identifier used for safety monitoring and abuse detection.
+   */
+  safety_identifier?: string | null;
 
   /**
    * Body param: Specifies the processing type used for serving the request. - If set

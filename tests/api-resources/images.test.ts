@@ -36,7 +36,10 @@ describe('resource images', () => {
   test('edit: only required params', async () => {
     const responsePromise = client.images.edit({
       image: await toFile(Buffer.from('Example data'), 'README.md'),
-      prompt: 'A cute baby sea otter wearing a beret',
+      prompt: 'Add a watercolor effect to this image',
+      model: 'gpt-image-2.6-flare',
+      quality: 'high',
+      size: '1024x1024',
     });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
@@ -50,7 +53,10 @@ describe('resource images', () => {
   test('edit: required and optional params', async () => {
     await client.images.edit({
       image: await toFile(Buffer.from('Example data'), 'README.md'),
-      prompt: 'A cute baby sea otter wearing a beret',
+      prompt: 'Add a watercolor effect to this image',
+      model: 'gpt-image-2.6-flare',
+      quality: 'high',
+      size: '1024x1024',
       background: 'transparent',
       complexity: 'low',
       frame_count: 2,
@@ -58,15 +64,12 @@ describe('resource images', () => {
       input_fidelity: 'high',
       markup: await toFile(Buffer.from('Example data'), 'README.md'),
       mask: await toFile(Buffer.from('Example data'), 'README.md'),
-      model: 'gpt-image-1.5',
       n: 1,
       output_compression: 100,
       output_format: 'png',
       partial_images: 1,
-      quality: 'high',
       response_format: 'url',
       safety_identifier: 'user-1234',
-      size: '1024x1024',
       stream: false,
       svg: {
         model: 'x',
@@ -77,7 +80,10 @@ describe('resource images', () => {
   });
 
   test('generate: only required params', async () => {
-    const responsePromise = client.images.generate({ prompt: 'A cute baby sea otter' });
+    const responsePromise = client.images.generate({
+      prompt: 'A cute baby sea otter',
+      model: 'gpt-image-2.6-flare',
+    });
     const rawResponse = await responsePromise.asResponse();
     expect(rawResponse).toBeInstanceOf(Response);
     const response = await responsePromise;
@@ -90,11 +96,11 @@ describe('resource images', () => {
   test('generate: required and optional params', async () => {
     await client.images.generate({
       prompt: 'A cute baby sea otter',
+      model: 'gpt-image-2.6-flare',
       background: 'transparent',
       complexity: 'low',
       frame_count: 2,
       frame_duration_ms: 20,
-      model: 'gpt-image-2.5-flare',
       moderation: 'low',
       n: 1,
       output_compression: 100,

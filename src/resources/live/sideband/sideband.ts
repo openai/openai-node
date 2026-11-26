@@ -91,9 +91,9 @@ export type ConnectServerEvent =
 
 export namespace ConnectServerEvent {
   /**
-   * Sent when speech resumes paused inference and it is ready for audio in a Live
-   * WebRTC session. Delivered to the sideband and, when permitted by its event
-   * settings, the data channel.
+   * Sent when speech wakes inference and it is ready for audio in a Live WebRTC
+   * session. This occurs on the first wake and after each later wake. Delivered to
+   * the sideband and, when permitted by its event settings, the data channel.
    */
   export interface SessionResumed {
     /**

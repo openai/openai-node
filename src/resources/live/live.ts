@@ -1844,9 +1844,10 @@ export interface MediaSessionConfig {
   delegation?: ClientDelegation | MediaSessionConfig.Responses | MediaSessionConfig.Decisions | null;
 
   /**
-   * Whole seconds of inactivity after which a Live WebRTC session with a speech wake
-   * policy pauses inference. The connection and conversation history are retained.
-   * Omit to keep inference active until the session ends.
+   * Whole seconds of inactivity after which a Live WebRTC or SIP session with a
+   * speech wake policy pauses inference. The connection and conversation history are
+   * retained. Omit to keep inference active after the first wake until the session
+   * ends.
    */
   idle_timeout_s?: number;
 
@@ -1889,8 +1890,7 @@ export interface MediaSessionConfig {
   triggers?: Array<DecisionTrigger>;
 
   /**
-   * Inference starts when the Live WebRTC session connects. After an idle pause,
-   * microphone speech resumes inference.
+   * Starts inference when microphone speech is detected.
    */
   wake_policy?: MediaSessionConfig.WakePolicy;
 }
@@ -1964,8 +1964,7 @@ export namespace MediaSessionConfig {
   }
 
   /**
-   * Inference starts when the Live WebRTC session connects. After an idle pause,
-   * microphone speech resumes inference.
+   * Starts inference when microphone speech is detected.
    */
   export interface WakePolicy {
     /**
@@ -1974,8 +1973,8 @@ export namespace MediaSessionConfig {
     type: 'speech';
 
     /**
-     * The speech detection threshold for resuming paused inference, from 0 to 1
-     * inclusive. Defaults to 0.5. Higher values require stronger evidence of speech.
+     * The speech detection threshold for the first wake and each later wake, from 0 to
+     * 1 inclusive. Defaults to 0.5. Higher values require stronger evidence of speech.
      * This setting is independent of active turn detection.
      */
     vad_threshold?: number;
@@ -3634,9 +3633,9 @@ export type ServerEvent =
 
 export namespace ServerEvent {
   /**
-   * Sent when speech resumes paused inference and it is ready for audio in a Live
-   * WebRTC session. Delivered to the sideband and, when permitted by its event
-   * settings, the data channel.
+   * Sent when speech wakes inference and it is ready for audio in a Live WebRTC
+   * session. This occurs on the first wake and after each later wake. Delivered to
+   * the sideband and, when permitted by its event settings, the data channel.
    */
   export interface SessionResumed {
     /**

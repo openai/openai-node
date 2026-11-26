@@ -299,6 +299,11 @@ export interface ConversationCreateParams {
    * a maximum length of 512 characters.
    */
   metadata?: Shared.Metadata | null;
+
+  /**
+   * A stable identifier used for safety monitoring and abuse detection.
+   */
+  safety_identifier?: string | null;
 }
 
 export interface ConversationUpdateParams {
