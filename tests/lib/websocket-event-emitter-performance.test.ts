@@ -325,6 +325,7 @@ describe.each(websocketVariants)('$name event waiters', ({ event, create, dispat
       connection.on(mode === 'success' ? event : 'error', () => {
         throw failure;
       });
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       void connection.emitted(event).then(settled, settled);
       const payload =
         mode === 'success'
@@ -362,6 +363,7 @@ test.each([
   connection.on('close', () => {
     throw failure;
   });
+  // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
   void connection.emitted('close').then(settled, settled);
   const socket = connection.socket.platformSocket;
 
@@ -390,6 +392,7 @@ describe.each(emitterVariants)('$name listener compatibility', ({ create }) => {
         throw laterFailure;
       });
       emitter.once('value', once);
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       void emitter.emitted('value').then(settled, settled);
       let didThrow = false;
       // oxlint-disable-next-line anti-slop/no-known-value-widening -- The sentinel is replaced by an arbitrary thrown value; the test must preserve that original value.
@@ -466,6 +469,7 @@ describe.each(emitterVariants)('$name listener compatibility', ({ create }) => {
 
       const pending = emitter.emitted('value');
       const settled = vi.fn();
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       void pending.then(settled, settled);
       emit(emitter, event, event === 'error' ? failure : 8);
       await Promise.resolve();

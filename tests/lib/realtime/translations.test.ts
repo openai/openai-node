@@ -1125,6 +1125,7 @@ describe('translation connection authentication', () => {
         expect(connected).not.toHaveBeenCalled();
       } finally {
         // Clean up even when regressing to a version that opens the unwanted socket.
+        // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
         await creating.then(
           (connection) => connection.close(),
           () => {},

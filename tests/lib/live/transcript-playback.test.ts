@@ -53,6 +53,7 @@ it.for(['before-eof', 'after-eof', 'complete', 'missing', 'nonzero'])(
         expect(await readFile(eof).catch(() => {})).toBeUndefined();
         await player.close();
       } else {
+        // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
         const result = player.finish().then(
           () => 'completed',
           () => 'failed',

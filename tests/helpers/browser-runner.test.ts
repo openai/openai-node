@@ -6776,7 +6776,7 @@ describe('ResponsesToolRunner request context budget', () => {
           },
         },
       })
-      // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Observe rejection immediately while the test controls the gate.
+      // oxlint-disable-next-line promise/prefer-await-to-callbacks, promise/prefer-catch -- Observe rejection immediately while the test controls the gate. Preserve separate promise outcomes.
       .then(
         (value) => ({ value }),
         // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Observe rejection immediately while the test controls the gate.

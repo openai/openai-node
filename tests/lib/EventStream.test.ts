@@ -60,6 +60,7 @@ class TestStream extends EventStream<TestEvents> {
 
 function settledWithin(promise: Promise<unknown>, ticks = 50): Promise<'settled' | 'pending'> {
   let settled = false;
+  // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
   void promise.then(
     () => {
       settled = true;

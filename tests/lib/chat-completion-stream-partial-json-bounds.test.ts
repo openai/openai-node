@@ -2150,6 +2150,7 @@ it.each(['byte', 'depth'] as const)(
       },
     );
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await stream.finalChatCompletion().then(
       () => 'unexpected success',
       (error: unknown) => (error instanceof Error ? error.message : String(error)),
@@ -2218,6 +2219,7 @@ it.each(['byte', 'depth', 'fragment'] as const)(
       },
     );
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await stream.finalChatCompletion().then(
       () => 'unexpected success',
       (error: unknown) => (error instanceof Error ? error.message : String(error)),
@@ -2484,6 +2486,7 @@ it.each(
       }
     });
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await stream.finalChatCompletion().then(
       () => null,
       (error: unknown) => error,
@@ -2523,6 +2526,7 @@ it.each(['content', 'tool'] as const)(
       });
     }
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await stream.finalChatCompletion().then(
       () => null,
       (error: unknown) => error,
@@ -2580,6 +2584,7 @@ it.each(['data', 'accessor'] as const)(
       Object.setPrototypeOf(message, prototype);
     });
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await stream.finalChatCompletion().then(
       () => null,
       (error: unknown) => error,
@@ -2621,6 +2626,7 @@ it.each(['refusal', 'message'] as const)(
       }
     });
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await stream.finalChatCompletion().then(
       () => null,
       (error: unknown) => error,
@@ -2651,6 +2657,7 @@ it('rejects an inherited structured refusal accessor without invoking it', async
     Object.setPrototypeOf(message, Object.defineProperty({}, 'refusal', { get: read }));
   });
 
+  // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
   const failure = await stream.finalChatCompletion().then(
     () => null,
     (error: unknown) => error,
@@ -2677,6 +2684,7 @@ it('rejects an inherited structured choice message without invoking its getter',
     Object.setPrototypeOf(choice, Object.defineProperty({}, 'message', { get: read }));
   });
 
+  // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
   const failure = await stream.finalChatCompletion().then(
     () => null,
     (error: unknown) => error,
@@ -3013,6 +3021,7 @@ it.each(['choices', 'tool_calls'] as const)(
       Object.defineProperty(array, Symbol.iterator, { configurable: true, value: iterate });
     });
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await stream.finalChatCompletion().then(
       () => null,
       (error: unknown) => error,
@@ -3061,6 +3070,7 @@ it('enforces an aggregate final budget across independently bounded public parse
     }
   });
 
+  // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
   const failure = await stream.finalChatCompletion().then(
     () => null,
     (error: unknown) => error,
@@ -3124,6 +3134,7 @@ it.each(['content', 'tool'] as const)(
       }
     });
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await stream.finalChatCompletion().then(
       () => null,
       (error: unknown) => error,
@@ -3151,6 +3162,7 @@ it('bounds a new strict tool appended to the public snapshot before its final pa
     });
   });
 
+  // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
   const failure = await stream.finalChatCompletion().then(
     () => null,
     (error: unknown) => error,
@@ -3214,6 +3226,7 @@ it.each(['content', 'tool'] as const)(
             tools: [makeParseableTool(strictTool, { parser, callback: undefined })],
           });
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await stream.finalChatCompletion().then(
       () => null,
       (error: unknown) => error,
@@ -3308,6 +3321,7 @@ it('charges repeated whole-snapshot strict-tool scans to the cumulative parse-wo
     tools: [strictTool],
   });
 
+  // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
   const failure = await stream.finalChatCompletion().then(
     () => null,
     (error: unknown) => error,

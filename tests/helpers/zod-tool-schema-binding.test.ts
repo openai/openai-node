@@ -229,6 +229,7 @@ describe.each(variants)('$name tool schema binding', ({ schema }) => {
           return mockResponse(endpoint, stream, code);
         },
       });
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       const outcome = await parsedArguments(client, tool, stream).then(
         (parsed) => ({ parsed }),
         (error: unknown) => ({ error }),

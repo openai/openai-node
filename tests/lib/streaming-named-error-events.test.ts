@@ -93,6 +93,7 @@ async function collect(stream: AsyncIterable<unknown>): Promise<unknown[]> {
 
 // oxlint-disable-next-line anti-slop/no-unknown-returns -- JavaScript rejection values can have any type; the calling test must validate the captured failure.
 async function rejection(stream: AsyncIterable<unknown>): Promise<unknown> {
+  // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
   return await collect(stream).then(
     () => null,
     (error: unknown) => error,
@@ -163,6 +164,7 @@ describe('named SSE provider errors', () => {
     const iterator = Stream.fromSSEResponse(response, controller)[Symbol.asyncIterator]();
 
     try {
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       const caught = await iterator.next().then(
         () => null,
         (error: unknown) => error,
@@ -191,6 +193,7 @@ describe('named SSE provider errors', () => {
       for await (const event of stream) {
         received.push(event);
       }
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     })().then(
       () => null,
       (error: unknown) => error,
@@ -355,6 +358,7 @@ describe.each([
         failure = await client.chat.completions
           .stream({ model: 'gpt-synthetic', messages: [] })
           .finalChatCompletion()
+          // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
           .then(
             () => null,
             (error: unknown) => error,

@@ -314,6 +314,7 @@ describe('lazy multipart stream encoding', () => {
       headers: { 'content-type': contentType },
     })
       .formData()
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       .then(
         (form) => ({ hasUpload: form.has('upload'), purposes: form.getAll('purpose') }),
         (error: unknown) => error,
@@ -360,6 +361,7 @@ describe('lazy multipart stream encoding', () => {
       headers: { 'content-type': contentType },
     })
       .formData()
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       .then(
         (form) => ({ hasUpload: form.has('upload'), purposes: form.getAll('purpose') }),
         (error: unknown) => error,

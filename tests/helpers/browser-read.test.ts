@@ -712,14 +712,17 @@ describe('Browser bounded reads', () => {
           label: 'Include',
           get value(): undefined {
             counts.value += 1;
+            // oxlint-disable-next-line unicorn/no-useless-undefined -- This typed getter must explicitly return the undefined fixture value.
             return undefined;
           },
           get checked(): undefined {
             counts.checked += 1;
+            // oxlint-disable-next-line unicorn/no-useless-undefined -- This typed getter must explicitly return the undefined fixture value.
             return undefined;
           },
           get options(): undefined {
             counts.options += 1;
+            // oxlint-disable-next-line unicorn/no-useless-undefined -- This typed getter must explicitly return the undefined fixture value.
             return undefined;
           },
         },
@@ -733,6 +736,7 @@ describe('Browser bounded reads', () => {
               value: 'one',
               get selected(): undefined {
                 counts.selected += 1;
+                // oxlint-disable-next-line unicorn/no-useless-undefined -- This typed getter must explicitly return the undefined fixture value.
                 return undefined;
               },
             },
@@ -864,6 +868,7 @@ describe('Browser bounded reads', () => {
         ...state(),
         get observation(): undefined {
           observationReads += 1;
+          // oxlint-disable-next-line unicorn/no-useless-undefined -- This typed getter must explicitly return the undefined fixture value.
           return undefined;
         },
       })),

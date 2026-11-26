@@ -259,7 +259,7 @@ export class WorkloadIdentityAuth {
 
     if (!response.ok) {
       const errorText = await response.text();
-      let body: any = undefined;
+      let body: any;
 
       try {
         body = JSON.parse(errorText);

@@ -461,6 +461,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
       stream.on('event', events);
       stream.on('error', errors);
 
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       const failure = await stream.finalResponse().then(
         () => {
           throw new Error('Expected the first response event to be rejected.');
@@ -491,6 +492,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
       stream.on('error', errors);
 
       const completion = completionMethod === 'done' ? stream.done() : stream.finalResponse();
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       const failure = await completion.then(
         () => {
           throw new Error('Expected the restored stream to reject.');
@@ -548,6 +550,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
       stream.on('error', errors);
 
       const completion = completionMethod === 'done' ? stream.done() : stream.finalResponse();
+      // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
       const failure = await completion.then(
         () => {
           throw new Error('Expected the public response stream to reject.');
@@ -585,6 +588,7 @@ describe('unsupported Responses event diagnostic privacy', () => {
       ]),
     );
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const failure = await stream.finalResponse().then(
       () => {
         throw new Error('Expected the provider API error to reject.');

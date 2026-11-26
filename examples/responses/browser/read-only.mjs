@@ -116,6 +116,7 @@ export async function openReader({ documents, signal: startupSignal } = {}) {
   // A cancelled launch still owns any browser it eventually returns.
   /* oxlint-disable promise/prefer-await-to-then -- Retain one close across an unresolved launch; a failed launch has no browser. */
   const close = () =>
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     (closing ??= launching.then(
       (browser) => browser.close(),
       () => null,

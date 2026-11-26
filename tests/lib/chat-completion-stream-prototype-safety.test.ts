@@ -342,6 +342,7 @@ describe('ChatCompletionStream prototype safety', () => {
     runner.on('tool_calls.function.arguments.delta', argumentDelta);
     runner.on('tool_calls.function.arguments.done', argumentDone);
 
+    // oxlint-disable-next-line promise/prefer-catch -- Keep fulfillment and rejection outcomes separate, including callback failures and settlement timing.
     const completionError = await runner.done().then(
       () => null,
       (error: unknown) => error,
