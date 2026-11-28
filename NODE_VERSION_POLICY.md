@@ -40,12 +40,12 @@ exception may end early.
 
 ## Current compatibility
 
-| Node.js line | Upstream status on 2026-07-27      | OpenAI status             | Treatment                                                                                                                   |
+| Node.js line | Upstream status on 2026-11-01      | OpenAI status             | Treatment                                                                                                                   |
 | ------------ | ---------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | 20           | EOL since 2026-04-30               | Unsupported               | Remove from required CI. Previously published SDK releases remain available without guaranteed fixes or security backports. |
-| 22           | Maintenance LTS through 2027-04-30 | Supported minimum         | Blocking CI. Publish retirement notice by 2026-10-30.                                                                       |
-| 24           | Active LTS; EOL 2028-04-30         | Supported and recommended | Blocking CI and preferred repository toolchain.                                                                             |
-| 26           | Current; LTS planned 2026-10-28    | Forward-tested only       | Non-blocking CI on the latest patch; admit within 30 days after LTS promotion.                                              |
+| 22           | Maintenance LTS through 2027-04-30 | Supported minimum         | Blocking CI. Retirement planned for 2027-04-30.                                                                             |
+| 24           | Maintenance LTS through 2028-04-30 | Supported                 | Blocking CI.                                                                                                                |
+| 26           | Active LTS; EOL 2029-04-30         | Supported and recommended | Blocking CI and preferred repository toolchain.                                                                             |
 
 The next SDK major requires Node.js 22 or later. The final Node.js
 20-compatible SDK release is the last release published before that major; the
